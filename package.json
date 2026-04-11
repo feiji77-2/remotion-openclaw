@@ -1,0 +1,23 @@
+{
+  "name": "openclaw-remotion-video-pipeline",
+  "private": true,
+  "version": "1.0.0",
+  "description": "OpenClaw + Remotion 中文短视频流水线工作台",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "setup": "npm --prefix remotion-video ci && npm --prefix video-pipeline-view/player-app ci",
+    "clean": "npm run remotion-video:clean:runtime && node -e \"const fs=require('node:fs'); for (const target of ['video-pipeline-view/player-app/dist','video-pipeline-view/player-app/.vite','remotion-video/out','remotion-video/dist']) fs.rmSync(target,{recursive:true,force:true});\"",
+    "dev:player": "npm --prefix video-pipeline-view/player-app run dev",
+    "dev:api": "npm --prefix remotion-video run pipeline:api",
+    "dev:worker": "npm --prefix remotion-video run pipeline:worker",
+    "dev:video": "npm --prefix remotion-video run dev",
+    "remotion-video:clean:runtime": "npm --prefix remotion-video run clean:runtime",
+    "typecheck": "npm --prefix video-pipeline-view/player-app run typecheck && npm --prefix remotion-video run typecheck && node --check remotion-video/server/api/server.js && node --check remotion-video/server/workers/renderWorker.js && node --check remotion-video/server/workflow/skillRegistry.js && node --check remotion-video/server/workflow/step123/pipeline.js",
+    "build:video": "npm --prefix remotion-video run build",
+    "build": "npm --prefix video-pipeline-view/player-app run build",
+    "release:check": "npm run clean && npm run typecheck && npm run build && node remotion-video/scripts/clean-runtime.mjs --check"
+  }
+}

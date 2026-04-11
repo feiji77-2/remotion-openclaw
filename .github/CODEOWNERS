@@ -1,0 +1,8 @@
+# CODEOWNERS template
+#
+# 发布到 GitHub 前，请把下面的示例规则替换成真实 owner。
+# 支持个人账号或团队，例如：
+# * @your-github-id
+# /prompt-engineering/projects/remotion-generated-video-project/remotion-video/ @your-team
+#
+# 当前先留空，避免仓库在 owner 未确认前出现无效账号告警。

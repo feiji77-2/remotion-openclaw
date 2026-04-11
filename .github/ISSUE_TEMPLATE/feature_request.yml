@@ -1,0 +1,38 @@
+name: Feature Request
+description: 提交一个功能或架构改进建议
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: 目标
+      description: 你想解决什么问题
+      placeholder: 希望 Step 8 支持批量导出多个分辨率。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 尽量写成可执行的改动方向
+      placeholder: 在渲染设置里增加多分辨率预设，并让 worker 依次产出多个文件。
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 影响范围
+      description: 涉及哪些 Step、API、服务或 UI
+      placeholder: Step 8、/api/render、renderWorker、下载区。
+    validations:
+      required: false
+  - type: textarea
+    id: risks
+    attributes:
+      label: 风险与取舍
+      description: 可选，说明兼容性、性能或维护风险
+      placeholder: 会增加渲染时间和磁盘占用。
+    validations:
+      required: false

@@ -1,0 +1,34 @@
+# OS / Editor
+.DS_Store
+*.log
+*.pid
+*.swp
+*.swo
+*.bak
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Node
+node_modules/
+
+# Build output
+dist/
+out/
+coverage/
+*.tsbuildinfo
+
+# Vite / Remotion caches
+video-pipeline-view/player-app/.vite/
+
+# Runtime artifacts
+remotion-video/public/assets/*
+remotion-video/public/jobs/*
+remotion-video/public/voice/*
+remotion-video/scripts/public/
+!remotion-video/public/assets/.gitkeep
+!remotion-video/public/jobs/.gitkeep
+!remotion-video/public/voice/.gitkeep
