@@ -3,6 +3,8 @@ import {Composition} from 'remotion';
 import {OpenClawVideo} from './OpenClawVideo';
 import {FPS, TOTAL_DURATION_SEC, VIDEO_HEIGHT, VIDEO_WIDTH} from './data/storyboard';
 import type {SRTSubtitle} from './components/SRTParser';
+import Video1v4 from './compositions/Video1v4';
+import {SEGMENTS, TRANSITION_FRAMES} from './data/segments_meta_v4h';
 
 export type AudioSegmentProps = {
   src: string;
@@ -16,6 +18,7 @@ export type RenderShotProps = {
   narration?: string;
   durationSeconds?: number;
   imageUrl?: string | null;
+  posterMode?: boolean;
   promptZh?: string;
   visualSummaryZh?: string;
   visualFocusZh?: string;
@@ -127,28 +130,52 @@ const resolvePositiveInt = (value: number | undefined, fallback: number) => {
   return Number.isFinite(value) && Number(value) > 0 ? Math.round(Number(value)) : fallback;
 };
 
-registerRoot((passedProps: VideoProps) => {
-  const props: VideoProps = { ...DEFAULT_PROPS, ...passedProps };
+const ROOT_DURATION_IN_FRAMES = resolvePositiveInt(TOTAL_DURATION_SEC * FPS, FPS);
+
+// Video1v4 总帧数：从合同计算
+const VIDEO1V4_TOTAL_FRAMES = SEGMENTS.length > 0
+  ? SEGMENTS[SEGMENTS.length - 1].start + SEGMENTS[SEGMENTS.length - 1].frames + TRANSITION_FRAMES
+  : 7169;
+
+export const RemotionRoot: React.FC = () => {
   return (
     <>
+      {/* OpenClaw 通用模板 */}
       <Composition
         id="OpenClawVideo"
         component={OpenClawVideo as React.FC<Record<string, unknown>>}
-        durationInFrames={TOTAL_DURATION_SEC * FPS}
+        durationInFrames={ROOT_DURATION_IN_FRAMES}
         fps={FPS}
         width={VIDEO_WIDTH}
         height={VIDEO_HEIGHT}
         calculateMetadata={({props: metadataProps}: {props: VideoProps}) => {
+          const resolvedProps: VideoProps = {
+            ...DEFAULT_PROPS,
+            ...(metadataProps ?? {}),
+          };
+
           return {
-            durationInFrames: resolvePositiveInt(metadataProps.durationInFrames, TOTAL_DURATION_SEC * FPS),
-            fps: resolvePositiveInt(metadataProps.renderFps, FPS),
-            width: resolvePositiveInt(metadataProps.renderWidth, VIDEO_WIDTH),
-            height: resolvePositiveInt(metadataProps.renderHeight, VIDEO_HEIGHT),
+            durationInFrames: resolvePositiveInt(resolvedProps.durationInFrames, ROOT_DURATION_IN_FRAMES),
+            fps: resolvePositiveInt(resolvedProps.renderFps, FPS),
+            width: resolvePositiveInt(resolvedProps.renderWidth, VIDEO_WIDTH),
+            height: resolvePositiveInt(resolvedProps.renderHeight, VIDEO_HEIGHT),
           };
         }}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        defaultProps={props as any}
+        defaultProps={DEFAULT_PROPS as any}
+      />
+      {/* Video1v4 生产合同（video-gen 迁移） */}
+      <Composition
+        id="Video1v4"
+        component={Video1v4}
+        durationInFrames={VIDEO1V4_TOTAL_FRAMES}
+        fps={FPS}
+        width={1080}
+        height={1920}
+        defaultProps={{directorPresetId: 'clean-tiktok'}}
       />
     </>
   );
-});
+};
+
+registerRoot(RemotionRoot);

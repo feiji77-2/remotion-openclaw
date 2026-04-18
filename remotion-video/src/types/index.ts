@@ -1,4 +1,7 @@
 // 视频项目类型定义
+// 共享类型：video-gen 生产合同类型
+export type { SegmentMeta } from './video-gen';
+
 
 export type TemplateType = 'caption' | 'split' | 'fullscreen';
 export type VoiceType = 'chattts' | 'melo' | 'azure';

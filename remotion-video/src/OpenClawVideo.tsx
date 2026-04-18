@@ -26,6 +26,7 @@ import {CAPTION_TIMELINE, type CaptionChunk} from './captions';
 import {SplitScreen} from './compositions/SplitScreen';
 import {PipelineStoryboardVideo} from './components/PipelineStoryboardVideo';
 import {SharedCaptionBubble} from './components/DesignCaptionText';
+import {ShotVisualAccent} from './components/ShotVisualAccent';
 import {parseSRT, textToFallbackSubtitles} from './components/SRTParser';
 import type {
   AudioSegmentProps,
@@ -75,7 +76,8 @@ const TagText: React.FC<{text: string}> = ({text}) => (
 // ─── 各 Shot 组件（保持原有样式）──────────────────────────
 // （Shot01~09 组件保持不变，以下为节选）
 const Shot01: React.FC = () => (
-  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center'}}>
+  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}}>
+    <ShotVisualAccent shotId="shot-01" />
     <FadeIn delay={0} duration={20}>
       <div style={{fontSize: 280, marginBottom: 40}}>🦞</div>
     </FadeIn>
@@ -92,7 +94,8 @@ const Shot01: React.FC = () => (
 );
 
 const Shot02: React.FC = () => (
-  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 50px'}}>
+  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 50px', overflow: 'hidden'}}>
+    <ShotVisualAccent shotId="shot-02" />
     <FadeIn delay={5} duration={20}>
       <TitleText text="为什么一个技术项目，能靠一个角色打开传播入口之后，后面还有一整套技术结构把热度接住？" size={56} />
     </FadeIn>
@@ -103,7 +106,8 @@ const Shot03: React.FC = () => {
   const steps = ['install', 'onboard', 'gateway', 'dashboard'];
   const icons = ['⌨️', '▶️', '🖥️', '📊'];
   return (
-    <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center'}}>
+    <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}}>
+      <ShotVisualAccent shotId="shot-03" />
       <FadeIn delay={0} duration={10}>
         <TitleText text="从讨论到试用，只需要四步" size={52} />
       </FadeIn>
@@ -128,7 +132,8 @@ const Shot03: React.FC = () => {
 };
 
 const Shot04: React.FC = () => (
-  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 60px'}}>
+  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 60px', overflow: 'hidden'}}>
+    <ShotVisualAccent shotId="shot-04" />
     <FadeIn delay={0} duration={12}><TitleText text="不需要研究底层架构" size={60} /></FadeIn>
     <FadeIn delay={15} duration={15}>
       <SubtitleText text="Node + 安装脚本 + onboarding + dashboard = 第一轮真实交互" size={30} />
@@ -146,7 +151,8 @@ const Shot04: React.FC = () => (
 );
 
 const Shot05a: React.FC = () => (
-  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 60px'}}>
+  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 60px', overflow: 'hidden'}}>
+    <ShotVisualAccent shotId="shot-5a" />
     <FadeIn delay={0} duration={12}><div style={{fontSize: 160, marginBottom: 30}}>📁</div></FadeIn>
     <FadeIn delay={12} duration={15}><TitleText text="workspace 不是目录，是 Agent 的 home" size={58} /></FadeIn>
     <FadeIn delay={28} duration={12}><SubtitleText text="默认工作目录 · 记忆组织中心 · 人格定义空间" size={28} /></FadeIn>
@@ -163,7 +169,8 @@ const Shot05b: React.FC = () => {
     {name: 'skills/', icon: '🎯', desc: '技能模块'},
   ];
   return (
-    <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 40px'}}>
+    <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 40px', overflow: 'hidden'}}>
+      <ShotVisualAccent shotId="shot-5b" />
       <FadeIn delay={0} duration={10}><TitleText text="这些文件共同构成 Agent 的工作模型" size={48} /></FadeIn>
       <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 50}}>
         {files.map((f, i) => (
@@ -183,7 +190,8 @@ const Shot05b: React.FC = () => {
 };
 
 const Shot05c: React.FC = () => (
-  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 60px'}}>
+  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 60px', overflow: 'hidden'}}>
+    <ShotVisualAccent shotId="shot-5c" />
     <FadeIn delay={0} duration={12}><TitleText text="把规则写进文件，把行为写进模型" size={56} /></FadeIn>
     <FadeIn delay={15} duration={12}>
       <div style={{display: 'flex', gap: 30, marginTop: 60, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center'}}>
@@ -205,7 +213,8 @@ const Shot06a: React.FC = () => {
   const nodes = ['接收输入', '组装上下文', '模型推理', '执行工具', '流式回复', '持久化'];
   const icons = ['📥', '🔗', '🧠', '🔧', '⚡', '💾'];
   return (
-    <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 30px'}}>
+    <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 30px', overflow: 'hidden'}}>
+      <ShotVisualAccent shotId="shot-6a" />
       <FadeIn delay={0} duration={10}><TitleText text="这不是壳，是能稳定跑的系统" size={52} /></FadeIn>
       <div style={{display: 'flex', gap: 0, marginTop: 50, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center'}}>
         {nodes.map((node, i) => (
@@ -227,7 +236,8 @@ const Shot06a: React.FC = () => {
 };
 
 const Shot06b: React.FC = () => (
-  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 60px'}}>
+  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 60px', overflow: 'hidden'}}>
+    <ShotVisualAccent shotId="shot-6b" />
     <FadeIn delay={0} duration={12}><TitleText text="连续消息不会乱" size={64} /></FadeIn>
     <FadeIn delay={12} duration={10}><SubtitleText text="session lane + queueing" size={32} /></FadeIn>
     <FadeIn delay={25} duration={15}>
@@ -248,7 +258,8 @@ const Shot06b: React.FC = () => (
 );
 
 const Shot07a: React.FC = () => (
-  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 60px'}}>
+  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 60px', overflow: 'hidden'}}>
+    <ShotVisualAccent shotId="shot-7a" />
     <FadeIn delay={0} duration={12}><TitleText text="不是单点工具，是可扩展平台" size={56} /></FadeIn>
     <FadeIn delay={14} duration={15}>
       <div style={{marginTop: 50, display: 'flex', gap: 30, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap'}}>
@@ -267,7 +278,8 @@ const Shot07a: React.FC = () => (
 );
 
 const Shot07b: React.FC = () => (
-  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 50px'}}>
+  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 50px', overflow: 'hidden'}}>
+    <ShotVisualAccent shotId="shot-7b" />
     <FadeIn delay={0} duration={12}><TitleText text="哪些工具对哪个 Agent 开放，完全可配置" size={50} /></FadeIn>
     <FadeIn delay={14} duration={12}>
       <div style={{marginTop: 50, display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center'}}>
@@ -287,7 +299,8 @@ const Shot07b: React.FC = () => (
 );
 
 const Shot08: React.FC = () => (
-  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 50px'}}>
+  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 50px', overflow: 'hidden'}}>
+    <ShotVisualAccent shotId="shot-08" />
     <FadeIn delay={0} duration={10}><div style={{fontSize: 120, marginBottom: 30}}>🦞</div></FadeIn>
     <FadeIn delay={10} duration={15}><TitleText text="真正撑住热度的，不是梗，是这套技术结构" size={52} /></FadeIn>
     <FadeIn delay={28} duration={15}>
@@ -303,7 +316,8 @@ const Shot08: React.FC = () => (
 );
 
 const Shot09: React.FC = () => (
-  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 50px'}}>
+  <AbsoluteFill style={{backgroundColor: BG_COLOR, justifyContent: 'center', alignItems: 'center', padding: '0 50px', overflow: 'hidden'}}>
+    <ShotVisualAccent shotId="shot-09" />
     <FadeIn delay={0} duration={15}><div style={{fontSize: 160, marginBottom: 40}}>✨</div></FadeIn>
     <FadeIn delay={15} duration={15}>
       <TitleText text="下一条，我们可以继续拆：OpenClaw 最值得借鉴的几条技术设计" size={48} />
