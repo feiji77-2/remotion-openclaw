@@ -2,8 +2,19 @@
   "name": "openclaw-remotion-video-pipeline",
   "private": true,
   "version": "1.0.0",
-  "description": "OpenClaw + Remotion 中文短视频流水线工作台",
+  "description": "Open-source video workflow studio and Remotion render pipeline for Chinese short-form content",
   "license": "MIT",
+  "keywords": [
+    "remotion",
+    "video-pipeline",
+    "short-video",
+    "workflow",
+    "react",
+    "typescript",
+    "express",
+    "tts",
+    "video-generation"
+  ],
   "engines": {
     "node": ">=20.0.0"
   },

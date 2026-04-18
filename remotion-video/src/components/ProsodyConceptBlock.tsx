@@ -7,7 +7,7 @@
  * - 停顿间隙帧 → 切换装饰元素
  *
  * 使用方式:
- *   1. 先生成韵律标记: python3 scripts/analyze-prosody.py --audio your_audio.wav
+ *   1. 历史韵律分析脚本已归档到 docs/archive/remotion-video-legacy/scripts/analyze-prosody.py
  *   2. 在组件中导入 prosodyMarkers
  *   3. 使用 useProsody hook 获取当前帧韵律状态
  */

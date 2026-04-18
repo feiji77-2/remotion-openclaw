@@ -42,3 +42,6 @@ __pycache__/
 # Generated content (run npm run content:generate to rebuild)
 remotion-video/src/data/generated/
 remotion-video/src/data/contracts/
+
+# Local generated project packages
+remotion-video/projects/
