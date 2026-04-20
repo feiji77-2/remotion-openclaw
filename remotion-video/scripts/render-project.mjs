@@ -22,6 +22,11 @@ const loadJson = async (filePath) => {
   return JSON.parse(content);
 };
 
+const sanitizeVersionForFileName = (value) => {
+  const normalized = String(value || '').trim().replace(/[^0-9A-Za-z._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return normalized || '';
+};
+
 const writeJson = async (filePath, data) => {
   await fs.mkdir(path.dirname(filePath), {recursive: true});
   await fs.writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
@@ -86,14 +91,17 @@ const stageRenderPropsFile = async (projectRoot, projectId, renderProps, composi
     renderWidth: Number(renderProps?.renderWidth) || (compositionId === 'UltimateSceneTemplate' ? 1920 : 1080),
     renderHeight: Number(renderProps?.renderHeight) || (compositionId === 'UltimateSceneTemplate' ? 1080 : 1920),
     template: renderProps?.template,
+    packageVersion: typeof renderProps?.packageVersion === 'string' ? renderProps.packageVersion : null,
     projectId,
   };
 };
 
 async function main() {
   const inputArg = process.argv[2];
-  const outputArg = process.argv[3];
-  const passthroughArgs = process.argv.slice(4);
+  const rawOutputArg = process.argv[3];
+  const hasExplicitOutputArg = typeof rawOutputArg === 'string' && rawOutputArg.length > 0 && !rawOutputArg.startsWith('--');
+  const outputArg = hasExplicitOutputArg ? rawOutputArg : null;
+  const passthroughArgs = process.argv.slice(hasExplicitOutputArg ? 4 : 3);
 
   if (!inputArg) {
     console.error('Usage: node scripts/render-project.mjs <render-props-json> [output-path] [...remotion-flags]');
@@ -103,6 +111,8 @@ async function main() {
   const propsPath = path.resolve(process.cwd(), inputArg);
   const props = await loadJson(propsPath);
   const projectId = String(props.projectId || 'project-render').trim() || 'project-render';
+  const packageVersion = typeof props.packageVersion === 'string' ? props.packageVersion.trim() : '';
+  const versionSuffix = sanitizeVersionForFileName(packageVersion);
   const shouldUseUltimate = (
     String(props.compositionId || '').trim() === 'UltimateSceneTemplate'
       || props.renderTemplate === 'ultimate'
@@ -112,7 +122,7 @@ async function main() {
   const compositionId = shouldUseUltimate ? 'UltimateSceneTemplate' : 'OpenClawVideo';
   const outputPath = outputArg
     ? path.resolve(process.cwd(), outputArg)
-    : path.resolve(process.cwd(), 'out', `${projectId}.mp4`);
+    : path.resolve(process.cwd(), 'out', `${projectId}${versionSuffix ? `-v${versionSuffix}` : ''}.mp4`);
   const requestedBrowserExecutable = String(process.env.REMOTION_BROWSER_EXECUTABLE || '').trim();
   const browserExecutable = detectPreferredBrowserExecutable();
   const chromeMode = resolveChromeMode(browserExecutable);
@@ -126,6 +136,7 @@ async function main() {
   const renderProps = compositionId === 'UltimateSceneTemplate'
     ? {
         config: props.config,
+        packageVersion: packageVersion || null,
         voiceFile: typeof props.voiceFile === 'string' ? props.voiceFile : null,
         audioSegments: Array.isArray(props.audioSegments) ? props.audioSegments : null,
       }
@@ -165,6 +176,7 @@ async function main() {
     process.stdout.write(
       [
       `[render-project] projectId=${projectId}`,
+      packageVersion ? `[render-project] package-version=${packageVersion}` : '',
       `[render-project] composition=${compositionId}`,
       `[render-project] output=${outputPath}`,
       `[render-project] props-file=${inlineProps.propsFile}`,

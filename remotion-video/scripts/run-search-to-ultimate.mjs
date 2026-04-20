@@ -15,6 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REMOTION_ROOT = path.resolve(__dirname, '..');
 const PROJECTS_DIR = path.join(REMOTION_ROOT, 'projects');
+const REMOTION_PACKAGE_JSON_PATH = path.join(REMOTION_ROOT, 'package.json');
 
 const DEFAULT_TEMPLATE = 'ultimate';
 const DEFAULT_VISUAL_SYSTEM = 'ultimate-1080p';
@@ -22,6 +23,10 @@ const DEFAULT_QUALITY = 'high';
 const DEFAULT_FPS = 30;
 const DEFAULT_WIDTH = 1920;
 const DEFAULT_HEIGHT = 1080;
+const STEP_CACHE_VERSION = 2;
+const IMAGE_CACHE_VERSION = 2;
+const VOICE_CACHE_VERSION = 1;
+const RENDER_CACHE_VERSION = 1;
 
 const safeString = (value) => String(value || '').trim();
 
@@ -100,6 +105,7 @@ Options:
   --voice-engine <name>     chattts | melo | openvoice
   --voice-speed <number>    默认 1.0
   --speaker <value>         speaker seed / voice code
+  --package-version <ver>   指定打包版本号，默认读取 remotion-video/package.json
   --output <path>           指定最终视频输出路径
   --resume                  复用已有 step/voice/images/render 产物继续执行
   --no-images               跳过分镜图资产生成
@@ -178,6 +184,10 @@ const parseArgs = (argv) => {
         options.speaker = safeString(argv[index + 1]);
         index += 1;
         break;
+      case '--package-version':
+        options.packageVersion = safeString(argv[index + 1]);
+        index += 1;
+        break;
       case '--output':
         options.output = safeString(argv[index + 1]);
         index += 1;
@@ -249,6 +259,7 @@ const createInitialRunState = ({
   topic,
   explicitProjectName,
   options,
+  packageVersion,
 }) => {
   return {
     projectState: {
@@ -257,6 +268,7 @@ const createInitialRunState = ({
       fps: options.fps,
       width: options.width,
       height: options.height,
+      packageVersion: safeString(packageVersion),
     },
     shotsState: [],
     pipelineState: {
@@ -270,12 +282,73 @@ const createInitialRunState = ({
         fps: options.fps,
         width: options.width,
         height: options.height,
+        packageVersion: safeString(packageVersion),
         format: 'mp4',
         codec: 'h264',
         bitrate: 12000,
       },
     },
   };
+};
+
+const resolvePackageVersion = async (explicitVersion) => {
+  const manual = safeString(explicitVersion);
+  if (manual) {
+    return manual;
+  }
+
+  try {
+    const pkg = await loadJson(REMOTION_PACKAGE_JSON_PATH);
+    return safeString(pkg?.version) || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+};
+
+const sanitizeVersionForFileName = (value) => {
+  const normalized = safeString(value).replace(/[^0-9A-Za-z._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return normalized || '0.0.0';
+};
+
+const normalizeForHash = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeForHash(item));
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === 'object') {
+    const normalized = {};
+    for (const key of Object.keys(value).sort()) {
+      const nextValue = normalizeForHash(value[key]);
+      if (nextValue !== undefined) {
+        normalized[key] = nextValue;
+      }
+    }
+    return normalized;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === 'boolean' || typeof value === 'string') {
+    return value;
+  }
+
+  return safeString(value);
+};
+
+const stableStringify = (value) => JSON.stringify(normalizeForHash(value));
+
+const hashValue = (value) => {
+  return crypto.createHash('sha1').update(stableStringify(value)).digest('hex');
 };
 
 const ensureDir = async (dirPath) => {
@@ -322,6 +395,202 @@ const selectedTitleFromState = (pipelineState) => {
   const options = Array.isArray(pipelineState?.titles?.options) ? pipelineState.titles.options : [];
   const selectedId = safeString(pipelineState?.selectedTitleId || pipelineState?.titles?.selectedId);
   return options.find((item) => safeString(item?.id) === selectedId) || options[0] || null;
+};
+
+const pickStepSkill = (pipelineState, stepId) => {
+  const stepSkills = pipelineState?.stepSkills && typeof pipelineState.stepSkills === 'object'
+    ? pipelineState.stepSkills
+    : {};
+  return stepSkills[stepId] && typeof stepSkills[stepId] === 'object' ? stepSkills[stepId] : null;
+};
+
+const summarizeSelectedTitle = (pipelineState) => {
+  const selectedTitle = selectedTitleFromState(pipelineState);
+  return selectedTitle
+    ? {
+        id: safeString(selectedTitle.id),
+        title: safeString(selectedTitle.title),
+        angle: safeString(selectedTitle.angle),
+      }
+    : null;
+};
+
+const buildWorkflowStepCacheInput = ({stepId, projectState, shotsState, pipelineState}) => {
+  const topicState = {
+    inputTopic: safeString(pipelineState?.inputTopic),
+    inputTitleKeywords: safeString(pipelineState?.inputTitleKeywords),
+  };
+  const projectSummary = {
+    id: safeString(projectState?.id),
+    name: safeString(projectState?.name),
+    fps: toNumber(projectState?.fps, DEFAULT_FPS),
+    width: toNumber(projectState?.width, DEFAULT_WIDTH),
+    height: toNumber(projectState?.height, DEFAULT_HEIGHT),
+  };
+  const analysisState = pipelineState?.selectedAnalysis || pipelineState?.analysis || null;
+  const titlesState = pipelineState?.titles || null;
+  const copyState = pipelineState?.copy || null;
+  const promptsState = pipelineState?.prompts || null;
+  const voiceState = pipelineState?.voice || null;
+  const renderState = pipelineState?.render || null;
+  const selectedTitle = summarizeSelectedTitle(pipelineState);
+  const currentStepSkill = pickStepSkill(pipelineState, stepId);
+
+  if (stepId === 1) {
+    return {
+      version: STEP_CACHE_VERSION,
+      stepId,
+      topic: topicState,
+      project: {
+        id: projectSummary.id,
+        name: projectSummary.name,
+      },
+      stepSkill: currentStepSkill,
+    };
+  }
+
+  if (stepId === 2) {
+    return {
+      version: STEP_CACHE_VERSION,
+      stepId,
+      topic: topicState,
+      analysis: analysisState,
+      stepSkill: currentStepSkill,
+    };
+  }
+
+  if (stepId === 3) {
+    return {
+      version: STEP_CACHE_VERSION,
+      stepId,
+      topic: topicState,
+      analysis: analysisState,
+      titles: titlesState,
+      selectedTitleId: safeString(pipelineState?.selectedTitleId),
+      selectedTitle,
+      stepSkill: currentStepSkill,
+    };
+  }
+
+  if (stepId === 4) {
+    return {
+      version: STEP_CACHE_VERSION,
+      stepId,
+      topic: topicState,
+      project: {
+        id: projectSummary.id,
+        name: projectSummary.name,
+      },
+      selectedTitle,
+      copy: copyState,
+      shots: Array.isArray(shotsState) ? shotsState : [],
+      stepSkill: currentStepSkill,
+    };
+  }
+
+  if (stepId === 5) {
+    return {
+      version: STEP_CACHE_VERSION,
+      stepId,
+      topic: topicState,
+      project: {
+        id: projectSummary.id,
+        name: projectSummary.name,
+      },
+      selectedTitle,
+      copy: copyState,
+      shots: Array.isArray(shotsState) ? shotsState : [],
+      stepSkill: currentStepSkill,
+    };
+  }
+
+  if (stepId === 6) {
+    return {
+      version: STEP_CACHE_VERSION,
+      stepId,
+      topic: topicState,
+      project: {
+        id: projectSummary.id,
+        name: projectSummary.name,
+      },
+      selectedTitle,
+      copy: copyState,
+      shots: Array.isArray(shotsState) ? shotsState : [],
+      stepSkill: currentStepSkill,
+    };
+  }
+
+  if (stepId === 7) {
+    return {
+      version: STEP_CACHE_VERSION,
+      stepId,
+      project: projectSummary,
+      shots: Array.isArray(shotsState) ? shotsState : [],
+      prompts: promptsState,
+      voice: voiceState,
+      render: renderState,
+    };
+  }
+
+  return {
+    version: STEP_CACHE_VERSION,
+    stepId,
+    project: projectSummary,
+    shots: Array.isArray(shotsState) ? shotsState : [],
+    render: renderState,
+    projectBuild: pipelineState?.projectBuild || null,
+  };
+};
+
+const wrapStepResultWithCacheMeta = (stepResult, inputHash) => {
+  return {
+    ...stepResult,
+    resumeMeta: {
+      version: STEP_CACHE_VERSION,
+      inputHash,
+      updatedAt: new Date().toISOString(),
+    },
+  };
+};
+
+const readStepInputHash = (stepResult) => {
+  return safeString(stepResult?.resumeMeta?.inputHash || stepResult?.cacheMeta?.inputHash);
+};
+
+const isValidStepResult = (stepResult, stepId) => {
+  return Boolean(
+    stepResult
+    && Number(stepResult?.stepId) === stepId
+    && stepResult?.payload
+    && typeof stepResult.payload === 'object',
+  );
+};
+
+const canLegacyReuseWorkflowStep = ({stepId, cachedWorkflowState, projectState, pipelineState}) => {
+  if (!cachedWorkflowState || typeof cachedWorkflowState !== 'object') {
+    return false;
+  }
+
+  if (stepId <= 6) {
+    return true;
+  }
+
+  const cachedRender = cachedWorkflowState?.pipelineState?.render && typeof cachedWorkflowState.pipelineState.render === 'object'
+    ? cachedWorkflowState.pipelineState.render
+    : {};
+  const currentRender = pipelineState?.render && typeof pipelineState.render === 'object'
+    ? pipelineState.render
+    : {};
+  const cachedProject = cachedWorkflowState?.projectState && typeof cachedWorkflowState.projectState === 'object'
+    ? cachedWorkflowState.projectState
+    : {};
+
+  return (
+    safeString(cachedRender.quality || DEFAULT_QUALITY) === safeString(currentRender.quality || DEFAULT_QUALITY)
+    && Math.round(toNumber(cachedRender.fps, cachedProject.fps || DEFAULT_FPS)) === Math.round(toNumber(currentRender.fps, projectState?.fps || DEFAULT_FPS))
+    && Math.round(toNumber(cachedRender.width, cachedProject.width || DEFAULT_WIDTH)) === Math.round(toNumber(currentRender.width, projectState?.width || DEFAULT_WIDTH))
+    && Math.round(toNumber(cachedRender.height, cachedProject.height || DEFAULT_HEIGHT)) === Math.round(toNumber(currentRender.height, projectState?.height || DEFAULT_HEIGHT))
+  );
 };
 
 const mergeStepResult = ({stepId, result, projectState, shotsState, pipelineState, explicitProjectName}) => {
@@ -535,6 +804,303 @@ const sumShotDurations = (shotsState) => {
   );
 };
 
+const loadCachedWorkflowContext = async ({
+  projectId,
+  projectDir,
+  topic,
+  options,
+  explicitProjectName,
+  packageVersion,
+}) => {
+  const workflowStatePath = path.join(projectDir, 'workflow-state.json');
+  const cachedWorkflowState = await loadJsonIfExists(workflowStatePath);
+  const cachedInputTopic = safeString(cachedWorkflowState?.inputTopic);
+
+  if (cachedInputTopic && cachedInputTopic !== safeString(topic)) {
+    return {
+      ...createInitialRunState({projectId, topic, explicitProjectName, options, packageVersion}),
+      cachedWorkflowState: null,
+      resumeWarning: `检测到已有缓存主题为「${cachedInputTopic}」，与当前输入「${topic}」不一致，已放弃 resume 改为全新执行。`,
+    };
+  }
+
+  return {
+    ...createInitialRunState({projectId, topic, explicitProjectName, options, packageVersion}),
+    cachedWorkflowState,
+    resumeWarning: null,
+  };
+};
+
+const loadProjectCacheManifest = async (cacheManifestPath) => {
+  const manifest = await loadJsonIfExists(cacheManifestPath);
+  return manifest && typeof manifest === 'object'
+    ? manifest
+    : {
+        version: 1,
+        render: null,
+      };
+};
+
+const buildImagePromptContext = async (imagePromptsPath) => {
+  const promptsData = await loadJson(imagePromptsPath);
+  const rawByShotId = promptsData?.prompts?.byShotId && typeof promptsData.prompts.byShotId === 'object'
+    ? promptsData.prompts.byShotId
+    : promptsData?.byShotId && typeof promptsData.byShotId === 'object'
+      ? promptsData.byShotId
+      : {};
+  const shotMetaList = Array.isArray(promptsData?.shots) ? promptsData.shots : [];
+  const shotMetaMap = Object.fromEntries(
+    shotMetaList
+      .filter((shot) => safeString(shot?.id))
+      .map((shot, index) => [safeString(shot.id), {...shot, shotIndex: index}]),
+  );
+  const shotOrder = Object.keys(rawByShotId);
+  const shotPlan = shotOrder.map((shotId, index) => {
+    const shotMeta = shotMetaMap[shotId] || {id: shotId, shotIndex: index};
+    const prompt = rawByShotId[shotId] && typeof rawByShotId[shotId] === 'object'
+      ? rawByShotId[shotId]
+      : {};
+    return {
+      shotId,
+      shotIndex: Number(shotMeta?.shotIndex ?? prompt?.shotIndex ?? index),
+      shotMeta,
+      prompt,
+    };
+  });
+
+  return {
+    promptsData,
+    shotPlan,
+    shotOrder,
+  };
+};
+
+const buildImageShotInputHash = ({promptsData, shotPlanItem}) => {
+  return hashValue({
+    version: IMAGE_CACHE_VERSION,
+    projectId: safeString(promptsData?.projectId),
+    title: safeString(promptsData?.title),
+    visualSystem: safeString(promptsData?.visualSystem),
+    canvasWidth: toNumber(promptsData?.canvasWidth || promptsData?.renderWidth, DEFAULT_WIDTH),
+    canvasHeight: toNumber(promptsData?.canvasHeight || promptsData?.renderHeight, DEFAULT_HEIGHT),
+    shotId: shotPlanItem.shotId,
+    shotIndex: shotPlanItem.shotIndex,
+    shot: shotPlanItem.shotMeta,
+    prompt: shotPlanItem.prompt,
+  });
+};
+
+const buildPartialImagePromptsPayload = ({promptsData, shotPlan, selectedShotIds}) => {
+  const selectedSet = new Set(selectedShotIds);
+  const filteredPlan = shotPlan.filter((item) => selectedSet.has(item.shotId));
+  const byShotId = Object.fromEntries(
+    filteredPlan.map((item) => [
+      item.shotId,
+      {
+        ...(item.prompt && typeof item.prompt === 'object' ? item.prompt : {}),
+        shotIndex: item.shotIndex,
+      },
+    ]),
+  );
+  const shots = filteredPlan.map((item) => ({
+    ...(item.shotMeta && typeof item.shotMeta === 'object' ? item.shotMeta : {id: item.shotId}),
+    shotIndex: item.shotIndex,
+  }));
+  const basePrompts = promptsData?.prompts && typeof promptsData.prompts === 'object'
+    ? promptsData.prompts
+    : null;
+
+  return {
+    ...promptsData,
+    shots,
+    byShotId,
+    ...(basePrompts
+      ? {
+          prompts: {
+            ...basePrompts,
+            byShotId,
+          },
+        }
+      : {}),
+  };
+};
+
+const orderImageEntries = (images, shotOrder) => {
+  const imageMap = new Map(
+    (Array.isArray(images) ? images : [])
+      .filter((item) => safeString(item?.shotId))
+      .map((item) => [safeString(item.shotId), item]),
+  );
+  return (Array.isArray(shotOrder) ? shotOrder : [])
+    .map((shotId) => imageMap.get(shotId))
+    .filter(Boolean);
+};
+
+const planReusableImages = async ({imagePromptsPath, imageManifestPath}) => {
+  const {promptsData, shotPlan, shotOrder} = await buildImagePromptContext(imagePromptsPath);
+  const manifest = await loadJsonIfExists(imageManifestPath);
+  const manifestImages = Array.isArray(manifest?.images) ? manifest.images : [];
+  const manifestMap = new Map(
+    manifestImages
+      .filter((item) => safeString(item?.shotId))
+      .map((item) => [safeString(item.shotId), item]),
+  );
+  const reusable = [];
+  const toGenerate = [];
+  const inputHashes = {};
+
+  for (const item of shotPlan) {
+    const inputHash = buildImageShotInputHash({promptsData, shotPlanItem: item});
+    inputHashes[item.shotId] = inputHash;
+    const cachedImage = manifestMap.get(item.shotId);
+    const cachedHash = safeString(cachedImage?.inputHash);
+
+    if (cachedHash && cachedHash === inputHash && safeString(cachedImage?.path) && await fileExists(resolvePublicAssetFile(cachedImage.path))) {
+      reusable.push({
+        shotId: item.shotId,
+        path: safeString(cachedImage.path),
+        format: safeString(cachedImage.format) || 'svg',
+        motif: safeString(cachedImage.motif),
+        inputHash,
+      });
+      continue;
+    }
+
+    toGenerate.push(item);
+  }
+
+  return {
+    promptsData,
+    shotPlan,
+    shotOrder,
+    inputHashes,
+    reusable: orderImageEntries(reusable, shotOrder),
+    toGenerate,
+  };
+};
+
+const buildVoiceSettings = (options, pipelineState) => {
+  return {
+    ...(pipelineState?.voice && typeof pipelineState.voice === 'object' ? pipelineState.voice : {}),
+    engine: options.voiceEngine,
+    speed: options.voiceSpeed,
+    ...(safeString(options.speaker)
+      ? {
+          speakerSeed: options.speaker,
+          voice: options.speaker,
+        }
+      : {}),
+  };
+};
+
+const resolveVoiceShotText = (shot, pipelineState) => {
+  return safeString(
+    pipelineState?.voice?.byShotId?.[shot.id]?.text || shot?.narration,
+  );
+};
+
+const buildVoiceShotInputHash = ({shot, pipelineState, voiceSettings}) => {
+  return hashValue({
+    version: VOICE_CACHE_VERSION,
+    shotId: safeString(shot?.id),
+    text: resolveVoiceShotText(shot, pipelineState),
+    engine: safeString(voiceSettings?.engine),
+    speed: safeString(voiceSettings?.speed),
+    speakerSeed: safeString(voiceSettings?.speakerSeed),
+    voice: safeString(voiceSettings?.voice),
+    referenceUrl: safeString(voiceSettings?.referenceUrl || voiceSettings?.reference_url),
+    temperature: toNumber(voiceSettings?.temperature, 0.3),
+    topP: toNumber(voiceSettings?.topP ?? voiceSettings?.top_p, 0.7),
+    topK: toNumber(voiceSettings?.topK ?? voiceSettings?.top_k, 20),
+  });
+};
+
+const buildVoiceManifestPayload = ({projectId, shotsState, pipelineState, voiceSettings, queue}) => {
+  const queueMap = new Map(
+    (Array.isArray(queue) ? queue : [])
+      .filter((item) => safeString(item?.shotId))
+      .map((item) => [safeString(item.shotId), item]),
+  );
+  const shots = {};
+
+  for (const shot of Array.isArray(shotsState) ? shotsState : []) {
+    const shotId = safeString(shot?.id);
+    if (!shotId) {
+      continue;
+    }
+
+    const queueEntry = queueMap.get(shotId);
+    if (!queueEntry || !safeString(queueEntry.voiceFile)) {
+      continue;
+    }
+
+    shots[shotId] = {
+      inputHash: buildVoiceShotInputHash({shot, pipelineState, voiceSettings}),
+      durationSeconds: roundTo(toNumber(queueEntry.durationSeconds, 0)),
+      voiceFile: safeString(queueEntry.voiceFile),
+    };
+  }
+
+  return {
+    version: VOICE_CACHE_VERSION,
+    projectId,
+    generatedAt: new Date().toISOString(),
+    settings: {
+      engine: safeString(voiceSettings?.engine),
+      speed: safeString(voiceSettings?.speed),
+      speakerSeed: safeString(voiceSettings?.speakerSeed),
+      voice: safeString(voiceSettings?.voice),
+      referenceUrl: safeString(voiceSettings?.referenceUrl || voiceSettings?.reference_url),
+      temperature: toNumber(voiceSettings?.temperature, 0.3),
+      topP: toNumber(voiceSettings?.topP ?? voiceSettings?.top_p, 0.7),
+      topK: toNumber(voiceSettings?.topK ?? voiceSettings?.top_k, 20),
+    },
+    shots,
+  };
+};
+
+const planReusableVoiceQueue = async ({projectDir, shotsState, pipelineState, options}) => {
+  const voiceManifestPath = path.join(projectDir, 'voice-manifest.json');
+  const voiceManifest = await loadJsonIfExists(voiceManifestPath);
+  const voiceSettings = buildVoiceSettings(options, pipelineState);
+  const queue = [];
+  const missingShots = [];
+
+  for (const shot of Array.isArray(shotsState) ? shotsState : []) {
+    const shotId = safeString(shot?.id);
+    if (!shotId) {
+      continue;
+    }
+
+    const inputHash = buildVoiceShotInputHash({shot, pipelineState, voiceSettings});
+    const cachedShot = voiceManifest?.shots && typeof voiceManifest.shots === 'object'
+      ? voiceManifest.shots[shotId]
+      : null;
+    const cachedHash = safeString(cachedShot?.inputHash);
+    const voiceFile = safeString(cachedShot?.voiceFile);
+
+    if (cachedHash && cachedHash === inputHash && voiceFile && await fileExists(resolvePublicAssetFile(voiceFile))) {
+      queue.push({
+        id: `reuse-${shotId}`,
+        shotId,
+        status: 'done',
+        durationSeconds: roundTo(toNumber(cachedShot?.durationSeconds, 0)),
+        voiceFile,
+      });
+      continue;
+    }
+
+    missingShots.push(shot);
+  }
+
+  return {
+    voiceManifestPath,
+    voiceSettings,
+    reusableQueue: queue,
+    missingShots,
+  };
+};
+
 const executeCommand = async (command, args, {cwd, label}) => {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -641,145 +1207,19 @@ const runRenderProject = async (projectId, outputPath) => {
   });
 };
 
-const loadCachedWorkflowPrefix = async ({
-  projectId,
-  projectDir,
-  topic,
-  options,
-  explicitProjectName,
-}) => {
-  const workflowStatePath = path.join(projectDir, 'workflow-state.json');
-  const cachedWorkflowState = await loadJsonIfExists(workflowStatePath);
-  const cachedInputTopic = safeString(cachedWorkflowState?.inputTopic);
-
-  if (cachedInputTopic && cachedInputTopic !== safeString(topic)) {
-    return {
-      ...createInitialRunState({projectId, topic, explicitProjectName, options}),
-      stepResults: [],
-      resumedStepCount: 0,
-      cachedWorkflowState: null,
-      resumeWarning: `检测到已有缓存主题为「${cachedInputTopic}」，与当前输入「${topic}」不一致，已放弃 resume 改为全新执行。`,
-    };
-  }
-
-  let {projectState, shotsState, pipelineState} = createInitialRunState({
-    projectId,
-    topic,
-    explicitProjectName,
-    options,
-  });
-  const stepResults = [];
-  const stepTimingEntries = [];
-
-  for (let stepId = 1; stepId <= 8; stepId += 1) {
-    const stepFilePath = path.join(projectDir, 'steps', `step-${String(stepId).padStart(2, '0')}.json`);
-    const stepResult = await loadJsonIfExists(stepFilePath);
-    if (!stepResult || Number(stepResult?.stepId) !== stepId || !stepResult?.payload || typeof stepResult.payload !== 'object') {
-      break;
-    }
-
-    stepResults.push(stepResult);
-    const merged = mergeStepResult({
-      stepId,
-      result: stepResult,
-      projectState,
-      shotsState,
-      pipelineState,
-      explicitProjectName,
-    });
-    projectState = merged.projectState;
-    shotsState = merged.shotsState;
-    pipelineState = merged.pipelineState;
-    stepTimingEntries.push({
-      stepId,
-      startedAt: null,
-      endedAt: null,
-      durationMs: 0,
-      source: stepResult?.source || 'cached',
-      model: stepResult?.model || 'cached',
-      status: 'reused',
-    });
-  }
-
-  if (stepResults.length === 8 && cachedWorkflowState) {
-    projectState = cachedWorkflowState?.projectState && typeof cachedWorkflowState.projectState === 'object'
-      ? cachedWorkflowState.projectState
-      : projectState;
-    shotsState = Array.isArray(cachedWorkflowState?.shotsState)
-      ? cachedWorkflowState.shotsState
-      : shotsState;
-    pipelineState = cachedWorkflowState?.pipelineState && typeof cachedWorkflowState.pipelineState === 'object'
-      ? {
-          ...pipelineState,
-          ...cachedWorkflowState.pipelineState,
-        }
-      : pipelineState;
-  }
-
-  return {
-    projectState,
-    shotsState,
-    pipelineState,
-    stepResults,
-    resumedStepCount: stepResults.length,
-    stepTimingEntries,
-    cachedWorkflowState,
-    resumeWarning: null,
-  };
-};
-
-const loadReusableImageSummary = async (imageManifestPath) => {
-  const manifest = await loadJsonIfExists(imageManifestPath);
-  const images = Array.isArray(manifest?.images) ? manifest.images : [];
-  if (images.length === 0) {
-    return null;
-  }
-
-  for (const image of images) {
-    if (!safeString(image?.shotId) || !safeString(image?.path)) {
-      return null;
-    }
-    if (!(await fileExists(resolvePublicAssetFile(image.path)))) {
-      return null;
-    }
-  }
-
-  return {
-    total: images.length,
-    imageManifestPath,
-    urls: images.map((image) => ({
-      shotId: safeString(image.shotId),
-      url: safeString(image.path),
-    })),
-    images,
-  };
-};
-
-const canReuseVoiceOutputs = async (workflowState) => {
-  const audioSegments = Array.isArray(workflowState?.pipelineState?.audioSegments)
-    ? workflowState.pipelineState.audioSegments
-    : [];
-
-  if (audioSegments.length === 0) {
-    return false;
-  }
-
-  for (const segment of audioSegments) {
-    if (!safeString(segment?.src) || !(await fileExists(resolvePublicAssetFile(segment.src)))) {
-      return false;
-    }
-  }
-
-  return true;
-};
-
 const applyGeneratedImages = async ({
   projectJsonPath,
   workflowStatePath,
   imageManifestPath,
   images,
+  inputHashesByShotId,
+  shotOrder,
 }) => {
-  const imageEntries = Array.isArray(images) ? images : [];
+  const imageEntries = orderImageEntries(images, shotOrder).map((image, index) => ({
+    ...image,
+    shotIndex: index,
+    inputHash: safeString(inputHashesByShotId?.[safeString(image?.shotId)]),
+  }));
   const imageMap = new Map(
     imageEntries
       .filter((item) => safeString(item?.shotId) && safeString(item?.path))
@@ -843,11 +1283,22 @@ const applyGeneratedImages = async ({
     total: imageEntries.length,
     imageManifestPath,
     urls: imageUrls,
+    images: imageEntries,
   };
 };
 
 const logSection = (title) => {
   process.stdout.write(`\n=== ${title} ===\n`);
+};
+
+const setStageTiming = (timingMap, key, status, startedAt, startTime, details = {}) => {
+  timingMap[key] = {
+    status,
+    startedAt,
+    endedAt: new Date().toISOString(),
+    durationMs: Date.now() - startTime,
+    ...details,
+  };
 };
 
 const measureAsync = async (timingMap, key, task) => {
@@ -905,101 +1356,168 @@ async function main() {
   await ensureDir(stepsDir);
 
   const explicitProjectName = safeString(options.projectName);
-  const initialRunState = createInitialRunState({
-    projectId,
-    topic,
-    explicitProjectName,
-    options,
-  });
-  let projectState = initialRunState.projectState;
-  let shotsState = initialRunState.shotsState;
-  let pipelineState = initialRunState.pipelineState;
+  const packageVersion = await resolvePackageVersion(options.packageVersion);
+  const workflowContext = options.resume
+    ? await loadCachedWorkflowContext({
+        projectId,
+        projectDir,
+        topic,
+        options,
+        explicitProjectName,
+        packageVersion,
+      })
+    : {
+        ...createInitialRunState({
+          projectId,
+          topic,
+          explicitProjectName,
+          options,
+          packageVersion,
+        }),
+        cachedWorkflowState: null,
+        resumeWarning: null,
+      };
+  let projectState = workflowContext.projectState;
+  let shotsState = workflowContext.shotsState;
+  let pipelineState = workflowContext.pipelineState;
+  const cacheManifestPath = path.join(projectDir, 'cache-manifest.json');
+  const cacheManifest = await loadProjectCacheManifest(cacheManifestPath);
   const stepResults = [];
   const warnings = [];
   const stageTimings = {};
   const stepTimings = [];
-  let cachedWorkflowState = null;
   let resumedStepCount = 0;
   let resumedFromCache = false;
   let reusedVoice = false;
   let reusedImages = false;
   let reusedRender = false;
+  let reusedVoiceCount = 0;
+  let generatedVoiceCount = 0;
+  let reusedImageCount = 0;
+  let generatedImageCount = 0;
+  const reusedWorkflowStepIds = [];
+  const regeneratedWorkflowStepIds = [];
+  let allowResume = Boolean(options.resume);
 
-  if (options.resume) {
-    const cachedPrefix = await loadCachedWorkflowPrefix({
-      projectId,
-      projectDir,
-      topic,
-      options,
+  if (workflowContext.resumeWarning) {
+    warnings.push(workflowContext.resumeWarning);
+    process.stdout.write(`[resume] warning: ${workflowContext.resumeWarning}\n`);
+    allowResume = false;
+  }
+
+  logSection('Workflow 1-8');
+  const workflowStartedAt = new Date().toISOString();
+  const workflowStart = Date.now();
+  let legacyResumeOpen = allowResume;
+
+  for (let stepId = 1; stepId <= 8; stepId += 1) {
+    const stepFilePath = path.join(stepsDir, `step-${String(stepId).padStart(2, '0')}.json`);
+    const stepInputHash = hashValue(buildWorkflowStepCacheInput({
+      stepId,
+      projectState,
+      shotsState,
+      pipelineState,
+    }));
+    const cachedStep = allowResume ? await loadJsonIfExists(stepFilePath) : null;
+    let stepResult = null;
+    let reusedStep = false;
+    let reuseMode = '';
+
+    if (allowResume && isValidStepResult(cachedStep, stepId)) {
+      const cachedInputHash = readStepInputHash(cachedStep);
+      if (cachedInputHash && cachedInputHash === stepInputHash) {
+        stepResult = cachedStep;
+        reusedStep = true;
+        reuseMode = 'hash';
+      } else if (
+        !cachedInputHash
+        && legacyResumeOpen
+        && canLegacyReuseWorkflowStep({
+          stepId,
+          cachedWorkflowState: workflowContext.cachedWorkflowState,
+          projectState,
+          pipelineState,
+        })
+      ) {
+        stepResult = wrapStepResultWithCacheMeta(cachedStep, stepInputHash);
+        reusedStep = true;
+        reuseMode = 'legacy';
+        await writeJson(stepFilePath, stepResult);
+      }
+    }
+
+    if (reusedStep) {
+      resumedStepCount += 1;
+      reusedWorkflowStepIds.push(stepId);
+      process.stdout.write(`[workflow] step ${stepId}/8 reused (${reuseMode})\n`);
+      stepTimings.push({
+        stepId,
+        startedAt: null,
+        endedAt: null,
+        durationMs: 0,
+        source: stepResult?.source || 'cached',
+        model: stepResult?.model || 'cached',
+        status: 'reused',
+      });
+    } else {
+      legacyResumeOpen = false;
+      process.stdout.write(`[workflow] step ${stepId}/8\n`);
+      const startedAt = new Date().toISOString();
+      const stepStart = Date.now();
+      const generatedStep = await generateWorkflowStep({
+        stepId,
+        generationMeta: {
+          mode: 'generate',
+          trigger: 'manual',
+          attempt: 0,
+        },
+        projectState,
+        shotsState,
+        pipelineState,
+      });
+      stepResult = wrapStepResultWithCacheMeta(generatedStep, stepInputHash);
+      regeneratedWorkflowStepIds.push(stepId);
+      stepTimings.push({
+        stepId,
+        startedAt,
+        endedAt: new Date().toISOString(),
+        durationMs: Date.now() - stepStart,
+        source: stepResult?.source || 'unknown',
+        model: stepResult?.model || 'unknown',
+        status: 'done',
+      });
+      await writeJson(stepFilePath, stepResult);
+    }
+
+    stepResults.push(stepResult);
+    const merged = mergeStepResult({
+      stepId,
+      result: stepResult,
+      projectState,
+      shotsState,
+      pipelineState,
       explicitProjectName,
     });
-    projectState = cachedPrefix.projectState;
-    shotsState = cachedPrefix.shotsState;
-    pipelineState = cachedPrefix.pipelineState;
-    stepResults.push(...cachedPrefix.stepResults);
-    stepTimings.push(...cachedPrefix.stepTimingEntries);
-    cachedWorkflowState = cachedPrefix.cachedWorkflowState;
-    resumedStepCount = cachedPrefix.resumedStepCount;
-    resumedFromCache = resumedStepCount > 0;
-
-    if (cachedPrefix.resumeWarning) {
-      warnings.push(cachedPrefix.resumeWarning);
-      process.stdout.write(`[resume] warning: ${cachedPrefix.resumeWarning}\n`);
-    } else if (resumedFromCache) {
-      process.stdout.write(`[resume] reused workflow steps 1-${resumedStepCount}\n`);
-    }
+    projectState = merged.projectState;
+    shotsState = merged.shotsState;
+    pipelineState = merged.pipelineState;
   }
 
-  const nextWorkflowStep = resumedStepCount + 1;
-  logSection('Workflow 1-8');
-
-  if (nextWorkflowStep > 8) {
-    markStageReused(stageTimings, 'workflow', {reusedSteps: resumedStepCount});
-  } else {
-    await measureAsync(stageTimings, 'workflow', async () => {
-      for (let stepId = nextWorkflowStep; stepId <= 8; stepId += 1) {
-        process.stdout.write(`[workflow] step ${stepId}/8\n`);
-        const startedAt = new Date().toISOString();
-        const stepStart = Date.now();
-        const result = await generateWorkflowStep({
-          stepId,
-          generationMeta: {
-            mode: 'generate',
-            trigger: 'manual',
-            attempt: 0,
-          },
-          projectState,
-          shotsState,
-          pipelineState,
-        });
-
-        stepTimings.push({
-          stepId,
-          startedAt,
-          endedAt: new Date().toISOString(),
-          durationMs: Date.now() - stepStart,
-          source: result?.source || 'unknown',
-          model: result?.model || 'unknown',
-          status: 'done',
-        });
-        stepResults.push(result);
-        await writeJson(path.join(stepsDir, `step-${String(stepId).padStart(2, '0')}.json`), result);
-
-        const merged = mergeStepResult({
-          stepId,
-          result,
-          projectState,
-          shotsState,
-          pipelineState,
-          explicitProjectName,
-        });
-
-        projectState = merged.projectState;
-        shotsState = merged.shotsState;
-        pipelineState = merged.pipelineState;
-      }
-    });
+  resumedFromCache = resumedStepCount > 0;
+  if (resumedFromCache) {
+    process.stdout.write(`[resume] reused workflow steps: ${reusedWorkflowStepIds.join(', ')}\n`);
   }
+  setStageTiming(
+    stageTimings,
+    'workflow',
+    regeneratedWorkflowStepIds.length === 0 ? 'reused' : reusedWorkflowStepIds.length > 0 ? 'partial' : 'done',
+    workflowStartedAt,
+    workflowStart,
+    {
+      reusedSteps: resumedStepCount,
+      regeneratedSteps: regeneratedWorkflowStepIds.length,
+    },
+  );
 
   pipelineState.render = {
     ...(pipelineState.render && typeof pipelineState.render === 'object' ? pipelineState.render : {}),
@@ -1008,6 +1526,7 @@ async function main() {
     fps: options.fps,
     width: options.width,
     height: options.height,
+    packageVersion,
     format: 'mp4',
     codec: 'h264',
     bitrate: toNumber(pipelineState?.render?.bitrate, 12000) || 12000,
@@ -1016,65 +1535,93 @@ async function main() {
 
   if (options.voice) {
     logSection('Voice');
+    const voiceStartedAt = new Date().toISOString();
+    const voiceStart = Date.now();
     try {
-      if (options.resume && cachedWorkflowState && await canReuseVoiceOutputs(cachedWorkflowState)) {
-        reusedVoice = true;
-        projectState = cachedWorkflowState?.projectState && typeof cachedWorkflowState.projectState === 'object'
-          ? cachedWorkflowState.projectState
-          : projectState;
-        shotsState = Array.isArray(cachedWorkflowState?.shotsState) ? cachedWorkflowState.shotsState : shotsState;
-        pipelineState = cachedWorkflowState?.pipelineState && typeof cachedWorkflowState.pipelineState === 'object'
-          ? {
-              ...pipelineState,
-              ...cachedWorkflowState.pipelineState,
-            }
-          : pipelineState;
-        markStageReused(stageTimings, 'voice');
-        process.stdout.write(`[voice] reused ${Array.isArray(pipelineState.audioSegments) ? pipelineState.audioSegments.length : 0} cached audio segments\n`);
-      } else {
-        const voiceResult = await measureAsync(stageTimings, 'voice', async () => {
-          const voiceJobId = `voice_${Date.now()}`;
-          return await processVoiceJob(
-            {
-              id: voiceJobId,
-              data: {
-                projectId,
-                shots: (Array.isArray(shotsState) ? shotsState : []).map((shot) => ({
-                  ...shot,
-                  narration: safeString(
-                    pipelineState?.voice?.byShotId?.[shot.id]?.text || shot.narration,
-                  ),
-                })),
-                voiceSettings: {
-                  ...(pipelineState.voice && typeof pipelineState.voice === 'object' ? pipelineState.voice : {}),
-                  engine: options.voiceEngine,
-                  speed: options.voiceSpeed,
-                  ...(safeString(options.speaker)
-                    ? {
-                        speakerSeed: options.speaker,
-                        voice: options.speaker,
-                      }
-                    : {}),
-                },
-              },
-            },
-            (pct, message) => {
-              process.stdout.write(`[voice] ${String(pct).padStart(3, ' ')}% ${message}\n`);
-            },
-          );
-        });
+      const voicePlan = allowResume
+        ? await planReusableVoiceQueue({projectDir, shotsState, pipelineState, options})
+        : {
+            voiceManifestPath: path.join(projectDir, 'voice-manifest.json'),
+            voiceSettings: buildVoiceSettings(options, pipelineState),
+            reusableQueue: [],
+            missingShots: Array.isArray(shotsState) ? shotsState : [],
+          };
+      const shotOrder = (Array.isArray(shotsState) ? shotsState : []).map((shot) => safeString(shot?.id));
+      let mergedVoiceQueue = [...voicePlan.reusableQueue];
 
-        const adjusted = applyVoiceDurations(shotsState, voiceResult.queue, options.fps);
-        shotsState = adjusted.shots;
-        pipelineState.voice = updateVoiceState(pipelineState, voiceResult.queue);
-        pipelineState.render = {
-          ...(pipelineState.render && typeof pipelineState.render === 'object' ? pipelineState.render : {}),
-          estimatedDuration: sumShotDurations(shotsState),
-        };
-        pipelineState.audioSegments = adjusted.audioSegments;
-        process.stdout.write(`[voice] total clips=${voiceResult.totalClips}, total duration=${voiceResult.totalDurationSeconds}s\n`);
+      if (voicePlan.missingShots.length === 0 && voicePlan.reusableQueue.length === 0) {
+        process.stdout.write('[voice] no shots to synthesize\n');
+      } else if (voicePlan.missingShots.length === 0 && voicePlan.reusableQueue.length > 0) {
+        reusedVoice = true;
+        reusedVoiceCount = voicePlan.reusableQueue.length;
+        process.stdout.write(`[voice] reused=${reusedVoiceCount}\n`);
+      } else {
+        const voiceJobId = `voice_${Date.now()}`;
+        const voiceResult = await processVoiceJob(
+          {
+            id: voiceJobId,
+            data: {
+              projectId,
+              shots: voicePlan.missingShots.map((shot) => ({
+                ...shot,
+                narration: resolveVoiceShotText(shot, pipelineState),
+              })),
+              voiceSettings: voicePlan.voiceSettings,
+            },
+          },
+          (pct, message) => {
+            process.stdout.write(`[voice] ${String(pct).padStart(3, ' ')}% ${message}\n`);
+          },
+        );
+
+        reusedVoiceCount = voicePlan.reusableQueue.length;
+        generatedVoiceCount = Array.isArray(voiceResult.queue) ? voiceResult.queue.length : 0;
+        const mergedVoiceMap = new Map(
+          [...voicePlan.reusableQueue, ...voiceResult.queue].map((item) => [safeString(item?.shotId), item]),
+        );
+        mergedVoiceQueue = shotOrder.map((shotId) => mergedVoiceMap.get(shotId)).filter(Boolean);
+        process.stdout.write(
+          reusedVoiceCount > 0
+            ? `[voice] reused=${reusedVoiceCount}, generated=${generatedVoiceCount}\n`
+            : `[voice] total clips=${voiceResult.totalClips}, total duration=${voiceResult.totalDurationSeconds}s\n`,
+        );
       }
+
+      const adjusted = applyVoiceDurations(shotsState, mergedVoiceQueue, options.fps);
+      shotsState = adjusted.shots;
+      pipelineState.voice = updateVoiceState(pipelineState, mergedVoiceQueue);
+      pipelineState.render = {
+        ...(pipelineState.render && typeof pipelineState.render === 'object' ? pipelineState.render : {}),
+        packageVersion,
+        estimatedDuration: sumShotDurations(shotsState),
+      };
+      pipelineState.audioSegments = adjusted.audioSegments;
+      await writeJson(
+        voicePlan.voiceManifestPath,
+        buildVoiceManifestPayload({
+          projectId,
+          shotsState,
+          pipelineState,
+          voiceSettings: voicePlan.voiceSettings,
+          queue: mergedVoiceQueue,
+        }),
+      );
+      reusedVoice = reusedVoiceCount > 0;
+      setStageTiming(
+        stageTimings,
+        'voice',
+        generatedVoiceCount === 0 && reusedVoiceCount > 0 ? 'reused' : reusedVoiceCount > 0 ? 'partial' : 'done',
+        voiceStartedAt,
+        voiceStart,
+        {
+          reusedCount: reusedVoiceCount,
+          generatedCount: generatedVoiceCount,
+        },
+      );
     } catch (error) {
+      setStageTiming(stageTimings, 'voice', 'error', voiceStartedAt, voiceStart, {
+        error: error instanceof Error ? error.message : String(error),
+      });
       const message = `配音生成失败，已保留无音轨项目继续执行：${error.message}`;
       warnings.push(message);
       process.stdout.write(`[voice] warning: ${message}\n`);
@@ -1087,12 +1634,14 @@ async function main() {
   const projectJson = {
     projectId,
     title: finalTitle,
+    packageVersion,
     template: DEFAULT_TEMPLATE,
     visualSystem: DEFAULT_VISUAL_SYSTEM,
     render: {
       fps: options.fps,
       width: options.width,
       height: options.height,
+      packageVersion,
       quality: options.quality,
       format: 'mp4',
       codec: 'h264',
@@ -1107,6 +1656,7 @@ async function main() {
   const workflowState = {
     generatedAt: new Date().toISOString(),
     inputTopic: topic,
+    packageVersion,
     projectState,
     pipelineState,
     shotsState,
@@ -1128,34 +1678,99 @@ async function main() {
 
   if (options.images) {
     logSection('Images');
+    const imagesStartedAt = new Date().toISOString();
+    const imagesStart = Date.now();
     try {
-      const reusableImageSummary = options.resume
-        ? await loadReusableImageSummary(imageManifestPath)
-        : null;
+      const imagePlan = allowResume
+        ? await planReusableImages({
+            imagePromptsPath: buildResult.imagePromptsPath,
+            imageManifestPath,
+          })
+        : await (async () => {
+            const emptyPlan = await buildImagePromptContext(buildResult.imagePromptsPath);
+            return {
+              ...emptyPlan,
+              inputHashes: Object.fromEntries(
+                emptyPlan.shotPlan.map((item) => [
+                  item.shotId,
+                  buildImageShotInputHash({promptsData: emptyPlan.promptsData, shotPlanItem: item}),
+                ]),
+              ),
+              reusable: [],
+              toGenerate: emptyPlan.shotPlan,
+            };
+          })();
+      reusedImageCount = imagePlan.reusable.length;
+      let mergedImages = [...imagePlan.reusable];
 
-      if (reusableImageSummary) {
-        reusedImages = true;
-        generatedImageSummary = reusableImageSummary;
-        markStageReused(stageTimings, 'images', {count: reusableImageSummary.total});
-        process.stdout.write(`[images] reused=${generatedImageSummary.total}\n`);
+      if (imagePlan.toGenerate.length > 0) {
+        let promptsPathForRun = buildResult.imagePromptsPath;
+        let tempPromptsPath = null;
+        if (imagePlan.toGenerate.length !== imagePlan.shotPlan.length) {
+          tempPromptsPath = path.join(projectDir, `image-prompts.partial.${Date.now()}.json`);
+          await writeJson(
+            tempPromptsPath,
+            buildPartialImagePromptsPayload({
+              promptsData: imagePlan.promptsData,
+              shotPlan: imagePlan.shotPlan,
+              selectedShotIds: imagePlan.toGenerate.map((item) => item.shotId),
+            }),
+          );
+          promptsPathForRun = tempPromptsPath;
+        }
+
+        try {
+          const imageResult = await runGenerateProjectImages(projectId, promptsPathForRun);
+          generatedImageCount = Array.isArray(imageResult.images) ? imageResult.images.length : 0;
+          mergedImages = orderImageEntries(
+            [...imagePlan.reusable, ...(Array.isArray(imageResult.images) ? imageResult.images : [])],
+            imagePlan.shotOrder,
+          );
+        } finally {
+          if (tempPromptsPath) {
+            await fs.rm(tempPromptsPath, {force: true});
+          }
+        }
       } else {
-        const imageResult = await measureAsync(stageTimings, 'images', async () => {
-          return await runGenerateProjectImages(projectId, buildResult.imagePromptsPath);
-        });
-        generatedImageSummary = await applyGeneratedImages({
-          projectJsonPath,
-          workflowStatePath,
-          imageManifestPath,
-          images: imageResult.images,
-        });
-
-        logSection('Rebuild');
-        buildResult = await measureAsync(stageTimings, 'rebuild', async () => {
-          return await runBuildProject(projectId);
-        });
-        process.stdout.write(`[images] generated=${generatedImageSummary.total}\n`);
+        reusedImages = mergedImages.length > 0;
       }
+
+      generatedImageSummary = await applyGeneratedImages({
+        projectJsonPath,
+        workflowStatePath,
+        imageManifestPath,
+        images: mergedImages,
+        inputHashesByShotId: imagePlan.inputHashes,
+        shotOrder: imagePlan.shotOrder,
+      });
+      reusedImages = reusedImageCount > 0;
+      setStageTiming(
+        stageTimings,
+        'images',
+        generatedImageCount === 0 && reusedImageCount > 0 ? 'reused' : reusedImageCount > 0 ? 'partial' : 'done',
+        imagesStartedAt,
+        imagesStart,
+        {
+          reusedCount: reusedImageCount,
+          generatedCount: generatedImageCount,
+        },
+      );
+      process.stdout.write(
+        generatedImageCount === 0
+          ? `[images] reused=${reusedImageCount}\n`
+          : reusedImageCount > 0
+            ? `[images] reused=${reusedImageCount}, generated=${generatedImageCount}\n`
+            : `[images] generated=${generatedImageCount}\n`,
+      );
+
+      logSection('Rebuild');
+      buildResult = await measureAsync(stageTimings, 'rebuild', async () => {
+        return await runBuildProject(projectId);
+      });
     } catch (error) {
+      setStageTiming(stageTimings, 'images', 'error', imagesStartedAt, imagesStart, {
+        error: error instanceof Error ? error.message : String(error),
+      });
       const message = `分镜图资产生成失败，已保留当前项目继续执行：${error.message}`;
       warnings.push(message);
       process.stdout.write(`[images] warning: ${message}\n`);
@@ -1167,9 +1782,27 @@ async function main() {
     logSection('Render');
     resolvedOutputPath = safeString(options.output)
       ? path.resolve(process.cwd(), options.output)
-      : path.join(REMOTION_ROOT, 'public', 'assets', 'outputs', projectId, `${projectId}.mp4`);
+      : path.join(
+          REMOTION_ROOT,
+          'public',
+          'assets',
+          'outputs',
+          projectId,
+          `${projectId}-v${sanitizeVersionForFileName(packageVersion)}.mp4`,
+        );
     await ensureDir(path.dirname(resolvedOutputPath));
-    if (options.resume && await fileExists(resolvedOutputPath)) {
+    const renderInputHash = hashValue({
+      version: RENDER_CACHE_VERSION,
+      outputPath: resolvedOutputPath,
+      renderProps: await loadJson(buildResult.renderPropsPath),
+    });
+    if (
+      allowResume
+      && cacheManifest?.render
+      && safeString(cacheManifest.render.inputHash) === renderInputHash
+      && safeString(cacheManifest.render.outputPath) === resolvedOutputPath
+      && await fileExists(resolvedOutputPath)
+    ) {
       reusedRender = true;
       markStageReused(stageTimings, 'render', {outputPath: resolvedOutputPath});
       process.stdout.write(`[render] reused existing output ${resolvedOutputPath}\n`);
@@ -1177,22 +1810,37 @@ async function main() {
       await measureAsync(stageTimings, 'render', async () => {
         await runRenderProject(projectId, resolvedOutputPath);
       });
+      cacheManifest.render = {
+        version: RENDER_CACHE_VERSION,
+        inputHash: renderInputHash,
+        outputPath: resolvedOutputPath,
+        updatedAt: new Date().toISOString(),
+      };
     }
   }
+
+  await writeJson(cacheManifestPath, cacheManifest);
 
   const report = {
     status: 'ok',
     projectId,
     title: finalTitle,
     topic,
+    packageVersion,
     renderEnabled: Boolean(options.render),
     imagesEnabled: Boolean(options.images),
     voiceEnabled: Boolean(options.voice),
     resumeEnabled: Boolean(options.resume),
     resumedFromCache,
     resumedStepCount,
+    reusedWorkflowStepIds,
+    regeneratedWorkflowStepIds,
     reusedVoice,
+    reusedVoiceCount,
+    generatedVoiceCount,
     reusedImages,
+    reusedImageCount,
+    generatedImageCount,
     reusedRender,
     shotCount: projectShots.length,
     durationSeconds: sumShotDurations(shotsState),
@@ -1200,7 +1848,7 @@ async function main() {
     workflowStatePath,
     imagePromptsPath: buildResult.imagePromptsPath,
     imageManifestPath: generatedImageSummary?.imageManifestPath || null,
-    generatedImageCount: generatedImageSummary?.total || 0,
+    imageAssetCount: generatedImageSummary?.total || 0,
     renderPropsPath: buildResult.renderPropsPath,
     ultimateConfigPath: buildResult.ultimateConfigPath,
     outputPath: resolvedOutputPath,

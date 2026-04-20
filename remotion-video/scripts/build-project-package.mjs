@@ -22,6 +22,9 @@ const loadJson = async (filePath) => {
 };
 
 const sanitizeText = (value) => String(value || '').trim();
+const resolvePackageVersion = (project) => {
+  return sanitizeText(project.packageVersion || project.version || project?.render?.packageVersion);
+};
 const sanitizeListItem = (value) => {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return sanitizeText(value);
@@ -120,6 +123,7 @@ async function main() {
 
   const projectId = sanitizeText(project.projectId) || 'test-project';
   const projectTitle = sanitizeText(project.title) || projectId;
+  const packageVersion = resolvePackageVersion(project);
   const template = resolveTemplate(project);
   const visualSystem = resolveVisualSystem(project, template);
   const fps = Number.isFinite(project?.render?.fps) ? Math.round(project.render.fps) : DEFAULT_FPS;
@@ -190,6 +194,7 @@ async function main() {
   const imagePrompts = {
     projectId,
     title: projectTitle,
+    packageVersion,
     visualSystem,
     canvasWidth: width,
     canvasHeight: height,
@@ -223,6 +228,7 @@ async function main() {
   let renderProps = {
     template,
     projectId,
+    packageVersion,
     visualSystem,
     subtitleStyle: 'caption',
     typewriter: false,
@@ -237,7 +243,9 @@ async function main() {
   let resolvedUltimateConfigPath = null;
 
   if (template === ULTIMATE_TEMPLATE) {
-    renderProps = buildUltimateRenderProps({
+    renderProps = {
+      packageVersion,
+      ...buildUltimateRenderProps({
       ...project,
       projectId,
       title: projectTitle,
@@ -249,7 +257,8 @@ async function main() {
         height,
       },
       shots: normalizedShots,
-    });
+    }),
+    };
     await fs.writeFile(ultimateConfigPath, `${JSON.stringify(renderProps.config, null, 2)}\n`, 'utf8');
     resolvedUltimateConfigPath = ultimateConfigPath;
   }
@@ -261,6 +270,7 @@ async function main() {
     `${JSON.stringify({
       status: 'ok',
       projectId,
+      packageVersion,
       durationInFrames,
       durationSeconds: Number((durationInFrames / fps).toFixed(2)),
       imagePromptsPath,

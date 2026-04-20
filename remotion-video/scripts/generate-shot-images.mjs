@@ -1564,7 +1564,12 @@ async function main() {
     const safeId = shotId.replace(/[^a-zA-Z0-9_-]/g, '_');
     const mood = typeof item?.mood === 'string' ? item.mood : '';
     const style = item?.style || 'default';
-    const display = resolveShotDisplayContent(item, shotMetaMap[shotId], shotId);
+    const shotMeta = shotMetaMap[shotId];
+    const resolvedShotIndex = Math.max(
+      0,
+      Math.round(Number(item?.shotIndex ?? shotMeta?.shotIndex ?? index) || 0),
+    );
+    const display = resolveShotDisplayContent(item, shotMeta, shotId);
 
     emitJobEvent({
       type: 'shot-start',
@@ -1576,7 +1581,7 @@ async function main() {
 
     const svg = buildSvg({
       visualSystem,
-      shotIndex: index,
+      shotIndex: resolvedShotIndex,
       id: shotId,
       title: display.title,
       projectTitle: promptsData?.title || projectId,
