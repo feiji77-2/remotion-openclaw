@@ -30,6 +30,7 @@ video-pipeline-view/player-app/.vite/
 remotion-video/public/assets/*
 remotion-video/public/jobs/*
 remotion-video/public/voice/*
+remotion-video/runtime/
 remotion-video/scripts/public/
 !remotion-video/public/assets/.gitkeep
 !remotion-video/public/jobs/.gitkeep

@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDir, '..');
-const runtimeDirs = ['public/assets', 'public/jobs', 'public/voice'].map((dir) =>
+const runtimeDirs = ['public/assets', 'public/jobs', 'public/voice', 'runtime/jobs'].map((dir) =>
   path.join(projectRoot, dir),
 );
 const checkOnly = process.argv.includes('--check');

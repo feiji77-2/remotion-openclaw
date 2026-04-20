@@ -10,6 +10,29 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
 const {
+  buildCorsOptions,
+  createApiAuthMiddleware,
+  createAdminAuthMiddleware,
+  createAdminReadRateLimitMiddleware,
+  createAdminWriteRateLimitMiddleware,
+  createReadRateLimitMiddleware,
+  createWriteRateLimitMiddleware,
+  getSecurityConfig,
+  assertQueueModeAllowed,
+} = require('../security/apiSecurity');
+const {
+  normalizeRenderRequest,
+  normalizeVoiceRequest,
+  normalizeWorkflowRequest,
+  normalizeImageRequest,
+  sanitizeProjectId,
+} = require('../validators/requestValidators');
+const {
+  createWorkflowJob,
+  readWorkflowJob,
+  runWorkflowJob,
+} = require('../workflow/workflowJobStore');
+const {
   getQueue,
   getJob: getBullJob,
   getQueueStats,
@@ -25,28 +48,36 @@ const {
 const { generateWorkflowStep, getWorkflowCapabilities } = require('../workflow/workflowGenerator');
 const { getSkillSpec, listSkillCatalog } = require('../workflow/skillRegistry');
 const { getVoiceCapabilities } = require('../voice/voiceJob');
+const {
+  PROJECT_ROOT,
+  PUBLIC_DIR,
+  ASSETS_DIR,
+  OUTPUT_ASSETS_DIR,
+  IMAGE_JOBS_DIR,
+  ensureRuntimePaths,
+} = require('../config/runtimePaths');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const QUEUE_MODE = (process.env.PIPELINE_QUEUE_MODE || 'file').toLowerCase();
 const USE_REDIS = QUEUE_MODE === 'redis';
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
-const PUBLIC_DIR = path.join(PROJECT_ROOT, 'public');
-const ASSETS_DIR = path.join(PUBLIC_DIR, 'assets');
-const OUTPUT_ASSETS_DIR = path.join(ASSETS_DIR, 'outputs');
-const IMAGE_JOBS_DIR = path.join(JOBS_DIR, 'images');
+const SECURITY_CONFIG = getSecurityConfig();
+const requireAdminAuth = createAdminAuthMiddleware(SECURITY_CONFIG);
+const adminReadRateLimitMiddleware = createAdminReadRateLimitMiddleware(SECURITY_CONFIG);
+const adminWriteRateLimitMiddleware = createAdminWriteRateLimitMiddleware(SECURITY_CONFIG);
+
+assertQueueModeAllowed(QUEUE_MODE, SECURITY_CONFIG);
+ensureRuntimePaths();
 
 // ─── Middleware ────────────────────────────────────────────
-app.use(cors({ origin: '*' }));
+const readRateLimitMiddleware = createReadRateLimitMiddleware(SECURITY_CONFIG);
+const writeRateLimitMiddleware = createWriteRateLimitMiddleware(SECURITY_CONFIG);
+app.use(cors(buildCorsOptions(SECURITY_CONFIG)));
 app.use(express.static(PUBLIC_DIR));  // serve public/assets for images etc.
 app.use(express.json({ limit: '10mb' }));
-
-if (!fs.existsSync(JOBS_DIR)) {
-  fs.mkdirSync(JOBS_DIR, { recursive: true });
-}
-if (!fs.existsSync(IMAGE_JOBS_DIR)) {
-  fs.mkdirSync(IMAGE_JOBS_DIR, { recursive: true });
-}
+app.use(createApiAuthMiddleware(SECURITY_CONFIG));
+app.use(readRateLimitMiddleware);
+app.use(writeRateLimitMiddleware);
 
 function normalizeQueueProgress(progress) {
   if (progress && typeof progress === 'object') {
@@ -88,7 +119,7 @@ function toLocalPublicFile(filePath) {
     return null;
   }
 
-  if (filePath.startsWith('/assets/') || filePath.startsWith('/jobs/')) {
+  if (filePath.startsWith('/assets/')) {
     return path.join(PUBLIC_DIR, filePath.replace(/^\/+/, ''));
   }
 
@@ -109,7 +140,7 @@ function toPublicAssetUrl(filePath) {
     return filePath;
   }
 
-  if (filePath.startsWith('/assets/') || filePath.startsWith('/jobs/')) {
+  if (filePath.startsWith('/assets/')) {
     return filePath;
   }
 
@@ -293,55 +324,7 @@ async function getJobResponse(jobId) {
  */
 app.post('/api/render', async (req, res) => {
   try {
-    const {
-      script,
-      template = 'caption',
-      voice = 'chattts',
-      webhook,
-      projectId,
-      options,
-      quality,
-      audioSegments,
-      subtitleFile,
-      subtitleStyle = 'caption',
-      subtitleText,
-      subtitleData,
-      typewriter = true,
-      designJson,
-      shots,
-      durationInFrames,
-      renderFps,
-      renderWidth,
-      renderHeight,
-    } = req.body;
-
-    if (!script && !projectId) {
-      return res.status(400).json({ error: 'script or projectId required' });
-    }
-
-    const jobPayload = {
-      script,
-      template,
-      voice,
-      webhook,
-      projectId: projectId || 'default',
-      quality: quality || 'high',
-      audioSegments: Array.isArray(audioSegments) ? audioSegments : null,
-      subtitleFile: typeof subtitleFile === 'string' ? subtitleFile : null,
-      subtitleStyle,
-      subtitleText: typeof subtitleText === 'string' ? subtitleText : null,
-      subtitleData: Array.isArray(subtitleData) ? subtitleData : null,
-      typewriter: Boolean(typewriter),
-      designJson: designJson && typeof designJson === 'object' ? designJson : null,
-      shots: Array.isArray(shots) ? shots : null,
-      durationInFrames: Number.isFinite(Number(durationInFrames)) ? Number(durationInFrames) : null,
-      renderFps: Number.isFinite(Number(renderFps)) ? Number(renderFps) : null,
-      renderWidth: Number.isFinite(Number(renderWidth)) ? Number(renderWidth) : null,
-      renderHeight: Number.isFinite(Number(renderHeight)) ? Number(renderHeight) : null,
-      options: options || {},
-      submittedAt: new Date().toISOString(),
-      submittedBy: req.body.userId || 'api',
-    };
+    const jobPayload = await normalizeRenderRequest(req.body, SECURITY_CONFIG);
     let jobId;
 
     if (USE_REDIS) {
@@ -375,7 +358,7 @@ app.post('/api/render', async (req, res) => {
     });
   } catch (err) {
     console.error('[API] POST /api/render error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -435,7 +418,7 @@ app.get('/api/render/:jobId/download', async (req, res) => {
  * DELETE /api/render/:jobId
  * 取消任务
  */
-app.delete('/api/render/:jobId', async (req, res) => {
+app.delete('/api/render/:jobId', requireAdminAuth, adminWriteRateLimitMiddleware, async (req, res) => {
   try {
     const { jobId } = req.params;
 
@@ -468,7 +451,7 @@ app.delete('/api/render/:jobId', async (req, res) => {
  * GET /api/render
  * 列出所有任务（分页）
  */
-app.get('/api/render', async (req, res) => {
+app.get('/api/render', requireAdminAuth, adminReadRateLimitMiddleware, async (req, res) => {
   try {
     const { status, limit = 20, offset = 0 } = req.query;
     const normalizedLimit = Number.parseInt(limit, 10);
@@ -517,7 +500,7 @@ app.get('/api/render', async (req, res) => {
  * POST /api/render/:jobId/retry
  * 重试失败任务
  */
-app.post('/api/render/:jobId/retry', async (req, res) => {
+app.post('/api/render/:jobId/retry', requireAdminAuth, adminWriteRateLimitMiddleware, async (req, res) => {
   try {
     const { jobId } = req.params;
     if (USE_REDIS) {
@@ -579,20 +562,19 @@ app.get('/api/skills/:skillId', (req, res) => {
 
 app.post('/api/workflow/generate', async (req, res) => {
   try {
-    const stepId = Number(req.body.stepId);
-    if (!Number.isFinite(stepId)) {
-      return res.status(400).json({ error: 'stepId is required' });
-    }
+    const workflowInput = normalizeWorkflowRequest(req.body);
+    const job = createWorkflowJob(workflowInput);
+    void runWorkflowJob(job.jobId, workflowInput, generateWorkflowStep);
 
-    const result = await generateWorkflowStep({
-      stepId,
-      generationMeta: req.body.generationMeta,
-      projectState: req.body.projectState,
-      shotsState: req.body.shotsState,
-      pipelineState: req.body.pipelineState,
+    res.status(202).json({
+      jobId: job.jobId,
+      status: job.status,
+      progress: job.progress,
+      progressMsg: job.progressMsg,
+      docs: {
+        status: `GET /api/workflow/${job.jobId}`,
+      },
     });
-
-    res.json(result);
   } catch (err) {
     console.error('[API] POST /api/workflow/generate error:', err);
     res.status(err.status || 500).json({
@@ -603,23 +585,24 @@ app.post('/api/workflow/generate', async (req, res) => {
   }
 });
 
+app.get('/api/workflow/:jobId', (req, res) => {
+  try {
+    const job = readWorkflowJob(req.params.jobId);
+    if (!job) {
+      return res.status(404).json({error: '任务不存在', jobId: req.params.jobId});
+    }
+    return res.json(job);
+  } catch (err) {
+    console.error('[API] GET /api/workflow/:jobId error:', err);
+    return res.status(500).json({error: err.message});
+  }
+});
+
 // ─── Voice Job API ────────────────────────────────────────
 
 app.post('/api/voice', async (req, res) => {
   try {
-    const { projectId, shots, voiceSettings } = req.body;
-
-    if (!Array.isArray(shots) || shots.length === 0) {
-      return res.status(400).json({ error: 'shots required' });
-    }
-
-    const jobPayload = {
-      projectId: projectId || 'default',
-      shots,
-      voiceSettings: voiceSettings && typeof voiceSettings === 'object' ? voiceSettings : {},
-      submittedAt: new Date().toISOString(),
-      submittedBy: req.body.userId || 'api',
-    };
+    const jobPayload = normalizeVoiceRequest(req.body);
 
     const jobId = await enqueueJob('voice', jobPayload);
     console.log(`[API] Voice job queued: ${jobId}`);
@@ -633,7 +616,7 @@ app.post('/api/voice', async (req, res) => {
     });
   } catch (err) {
     console.error('[API] POST /api/voice error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -650,7 +633,7 @@ app.get('/api/voice/:jobId', async (req, res) => {
   }
 });
 
-app.post('/api/voice/:jobId/retry', async (req, res) => {
+app.post('/api/voice/:jobId/retry', requireAdminAuth, adminWriteRateLimitMiddleware, async (req, res) => {
   try {
     const { jobId } = req.params;
 
@@ -1097,14 +1080,7 @@ async function runImageGenerationJob(jobId) {
 
 app.post('/api/images/generate', async (req, res) => {
   try {
-    const projectId = sanitizeFileSegment(req.body.projectId, 'default');
-    const prompts = req.body.prompts && typeof req.body.prompts === 'object' ? req.body.prompts : null;
-    const shots = Array.isArray(req.body.shots) ? req.body.shots : [];
-
-    if (!prompts) {
-      return res.status(400).json({ error: 'prompts is required' });
-    }
-
+    const {projectId, prompts, shots} = normalizeImageRequest(req.body);
     const job = createImageJob({ projectId, prompts, shots });
     void runImageGenerationJob(job.jobId);
 
@@ -1121,7 +1097,7 @@ app.post('/api/images/generate', async (req, res) => {
     });
   } catch (err) {
     console.error('[API] POST /api/images/generate error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -1139,7 +1115,7 @@ app.get('/api/images/:jobId', async (req, res) => {
   }
 });
 
-app.get('/api/jobs', async (req, res) => {
+app.get('/api/jobs', requireAdminAuth, adminReadRateLimitMiddleware, async (req, res) => {
   try {
     const { limit = 20 } = req.query;
     const normalizedLimit = Number.parseInt(limit, 10);
@@ -1197,7 +1173,7 @@ app.get('/api/jobs', async (req, res) => {
  * GET /api/projects
  * 列出所有项目
  */
-app.get('/api/projects', (req, res) => {
+app.get('/api/projects', requireAdminAuth, adminReadRateLimitMiddleware, (req, res) => {
   const projectsDir = ASSETS_DIR;
   if (!fs.existsSync(projectsDir)) return res.json({ projects: [] });
 
@@ -1211,8 +1187,8 @@ app.get('/api/projects', (req, res) => {
  * GET /api/projects/:project/assets
  * 列出项目资产
  */
-app.get('/api/projects/:project/assets', (req, res) => {
-  const { project } = req.params;
+app.get('/api/projects/:project/assets', requireAdminAuth, adminReadRateLimitMiddleware, (req, res) => {
+  const project = sanitizeProjectId(req.params.project);
   const assetDir = path.join(ASSETS_DIR, project);
   if (!fs.existsSync(assetDir)) return res.json({ assets: [] });
 
@@ -1273,6 +1249,7 @@ app.get('/', (req, res) => {
       'GET    /api/skills/catalog  获取 Skill 库目录',
       'GET    /api/skills/:skillId 获取单个 Skill 真源摘要',
       'POST   /api/workflow/generate  生成工作流步骤内容',
+      'GET    /api/workflow/:jobId  查询工作流生成任务',
       'POST   /api/voice           提交语音任务',
       'GET    /api/voice/:jobId    查询语音任务',
       'POST   /api/voice/:jobId/retry  重试语音任务',
@@ -1285,9 +1262,26 @@ app.get('/', (req, res) => {
 });
 
 // ─── Start ────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n🎬 OpenClaw Video Pipeline API`);
-  console.log(`   http://localhost:${PORT}`);
-  console.log(`   Queue mode: ${QUEUE_MODE}`);
-  console.log(`   Health: http://localhost:${PORT}/health\n`);
-});
+function startServer(port = PORT) {
+  return app.listen(port, () => {
+    console.log(`\n🎬 OpenClaw Video Pipeline API`);
+    console.log(`   http://localhost:${port}`);
+    console.log(`   Queue mode: ${QUEUE_MODE}`);
+    console.log(`   Health: http://localhost:${port}/health\n`);
+  });
+}
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = {
+  app,
+  startServer,
+  resetServerState() {
+    readRateLimitMiddleware.reset?.();
+    writeRateLimitMiddleware.reset?.();
+    adminReadRateLimitMiddleware.reset?.();
+    adminWriteRateLimitMiddleware.reset?.();
+  },
+};

@@ -18,6 +18,8 @@
     "pipeline:start": "./scripts/start-pipeline.sh",
     "pipeline:api": "node server/api/server.js",
     "pipeline:worker": "node server/workers/renderWorker.js",
+    "smoke:staging": "node scripts/run-staging-smoke.mjs",
+    "test": "node --test server/tests/*.test.js",
     "typecheck": "tsc --noEmit",
     "check:server": "node --check server/api/server.js && node --check server/workers/renderWorker.js && node --check server/workflow/skillRegistry.js && node --check server/workflow/step123/pipeline.js",
     "clean:runtime": "node scripts/clean-runtime.mjs",

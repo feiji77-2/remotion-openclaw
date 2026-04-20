@@ -280,6 +280,7 @@ export interface VoiceAssetPreview extends VoiceQueueItem {
 
 export interface PipelineSessionSnapshot {
   apiBase: string;
+  apiKey: string;
   titleKeywords: string;
   projectState: ProjectState;
   shotsState: Shot[];

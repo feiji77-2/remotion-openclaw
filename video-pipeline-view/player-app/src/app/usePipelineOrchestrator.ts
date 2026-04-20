@@ -2,6 +2,7 @@ import {useCallback, useEffect, useMemo} from 'react';
 import {DEFAULT_SHOTS, STEP_LIST, getStepOutputPreview} from '../workflow/steps';
 import type {AudioSegment, JobStatus, ProjectState, RenderJobResult, Shot, VoiceJobResult, WorkflowStepId} from '../workflow/types';
 import {callJson} from './pipelineApi';
+import {startPollingLoop, waitForJob} from './jobPolling';
 import {readPersistedPipelineSnapshot, writePersistedPipelineSnapshot} from './pipelinePersistence';
 import {
   backfillShotDurations,
@@ -64,6 +65,18 @@ interface WorkflowGenerateResponse {
   evaluation?: StepEvaluation;
 }
 
+interface WorkflowJobResponse {
+  jobId?: string;
+  status?: JobStatus | string;
+  progress?: number;
+  progressMsg?: string | null;
+  createdAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  error?: string | null;
+  result?: WorkflowGenerateResponse | null;
+}
+
 interface ImageJobResponse {
   jobId?: string;
   status?: JobStatus | string;
@@ -108,6 +121,7 @@ function normalizeImageUrls(apiBase: string, images: Array<{shotId?: string; pat
 export function usePipelineOrchestrator() {
   const {
     apiBase,
+    apiKey,
     titleKeywords,
     projectState,
     shotsState,
@@ -138,6 +152,7 @@ export function usePipelineOrchestrator() {
     playbackResetKey,
     hasHydrated,
     setApiBase,
+    setApiKey,
     setTitleKeywords,
     setProjectState,
     setShotsState,
@@ -184,6 +199,7 @@ export function usePipelineOrchestrator() {
     const payload: PersistedPipelineSnapshot = {
       savedAt: Date.now(),
       apiBase,
+      apiKey,
       titleKeywords,
       projectState,
       shotsState,
@@ -210,6 +226,7 @@ export function usePipelineOrchestrator() {
   }, [
     activeStep,
     apiBase,
+    apiKey,
     hasHydrated,
     imageCount,
     imageStatus,
@@ -261,7 +278,7 @@ export function usePipelineOrchestrator() {
 
   const loadSkillCatalog = useCallback(async () => {
     try {
-      const data = await callJson(`${apiBase}/api/skills/catalog`, {method: 'GET'});
+      const data = await callJson(`${apiBase}/api/skills/catalog`, {method: 'GET'}, apiKey);
       const catalog = normalizeCatalogEntries(data?.skills);
       setPipelineState((prev) => ({
         ...prev,
@@ -271,7 +288,7 @@ export function usePipelineOrchestrator() {
     } catch {
       return null;
     }
-  }, [apiBase, setPipelineState]);
+  }, [apiBase, apiKey, setPipelineState]);
 
   const loadSkillSpec = useCallback(async (stepId: WorkflowStepId) => {
     const skillId = getSkillIdForStep(stepId);
@@ -286,7 +303,7 @@ export function usePipelineOrchestrator() {
     }
 
     try {
-      const data = await callJson(`${apiBase}/api/skills/${skillId}`, {method: 'GET'});
+      const data = await callJson(`${apiBase}/api/skills/${skillId}`, {method: 'GET'}, apiKey);
       const skillSpec = data as SkillSpec;
       setPipelineState((prev) => ({
         ...prev,
@@ -299,7 +316,7 @@ export function usePipelineOrchestrator() {
     } catch {
       return null;
     }
-  }, [apiBase, setPipelineState]);
+  }, [apiBase, apiKey, setPipelineState]);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -449,7 +466,7 @@ export function usePipelineOrchestrator() {
       const previousPayload = buildStepPayloadSnapshot(stepId, pipelineForRequest, shotsForRequest);
       const shouldForceVariation = trigger === 'manual' && Boolean(stepDone[stepId] && previousPayload);
       const nextAttempt = shouldForceVariation ? (regenerateAttempts[stepId] || 0) + 1 : (regenerateAttempts[stepId] || 0);
-      const data = await callJson(`${apiBase}/api/workflow/generate`, {
+      const queuedJob = await callJson(`${apiBase}/api/workflow/generate`, {
         method: 'POST',
         body: JSON.stringify({
           stepId,
@@ -476,7 +493,27 @@ export function usePipelineOrchestrator() {
             selectedTitleId: pipelineForRequest.selectedTitleId ?? selectedTitleId,
           },
         }),
-      }) as WorkflowGenerateResponse;
+      }, apiKey) as WorkflowJobResponse;
+
+      if (!queuedJob.jobId) {
+        throw new Error('工作流任务提交失败，缺少 jobId');
+      }
+
+      const finalJob = await waitForJob<WorkflowJobResponse>({
+        load: async () => {
+          return await callJson(`${apiBase}/api/workflow/${queuedJob.jobId}`, {
+            method: 'GET',
+          }, apiKey) as WorkflowJobResponse;
+        },
+        isDone: (job) => job.status === 'done' || job.status === 'error',
+        getError: (job) => job.status === 'error' ? job.error || '工作流生成失败' : null,
+        timeoutMs: stepId <= 3 ? 240000 : 120000,
+      });
+
+      const data = finalJob.result;
+      if (!data) {
+        throw new Error('工作流任务完成但未返回结果');
+      }
 
       if (shouldForceVariation) {
         setRegenerateAttempts((prev) => ({...prev, [stepId]: nextAttempt}));
@@ -513,7 +550,7 @@ export function usePipelineOrchestrator() {
     } finally {
       setStepLoading((prev) => ({...prev, [stepId]: false}));
     }
-  }, [apiBase, pipelineState, projectState, regenerateAttempts, selectedAnalysis, selectedTitleId, setStepSkillDirty, shotsState, showToast, stepDone, titleKeywords, updateWithStepPayload]);
+  }, [apiBase, apiKey, pipelineState, projectState, regenerateAttempts, selectedAnalysis, selectedTitleId, setStepSkillDirty, shotsState, showToast, stepDone, titleKeywords, updateWithStepPayload]);
 
   const appliedTitleKeywords = useMemo(() => getAppliedTitleKeywords(pipelineState), [pipelineState]);
   const titleKeywordsPending = useMemo(() => getHasPendingTitleKeywords(titleKeywords, appliedTitleKeywords), [appliedTitleKeywords, titleKeywords]);
@@ -596,7 +633,7 @@ export function usePipelineOrchestrator() {
           shots: latestShots,
           voiceSettings,
         }),
-      });
+      }, apiKey);
 
       setVoiceJobId(data.jobId);
       setVoiceJobResult(null);
@@ -606,7 +643,7 @@ export function usePipelineOrchestrator() {
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : String(error));
     }
-  }, [apiBase, callJson, projectState.id, shotsState, showToast]);
+  }, [apiBase, apiKey, projectState.id, shotsState, showToast]);
 
   const submitRender = useCallback(async () => {
     setErrorMsg(null);
@@ -633,7 +670,7 @@ export function usePipelineOrchestrator() {
           renderHeight: Number(render.height) || projectState.height,
           subtitleText: scriptForRender,
         }),
-      });
+      }, apiKey);
 
       setRenderJobId(data.jobId);
       setRenderJobResult(null);
@@ -645,7 +682,7 @@ export function usePipelineOrchestrator() {
       setErrorMsg(error instanceof Error ? error.message : String(error));
       return null;
     }
-  }, [apiBase, pipelineState.projectBuild?.compositionId, pipelineState.render, pipelineState.voice?.engine, projectState.fps, projectState.height, projectState.id, projectState.width, renderPlan.shots, renderPlan.totalFrames, reusableVoiceSegments, scriptForRender, showToast]);
+  }, [apiBase, apiKey, pipelineState.projectBuild?.compositionId, pipelineState.render, pipelineState.voice?.engine, projectState.fps, projectState.height, projectState.id, projectState.width, renderPlan.shots, renderPlan.totalFrames, reusableVoiceSegments, scriptForRender, showToast]);
 
   const generateStoryboardImages = useCallback(async () => {
     setErrorMsg(null);
@@ -673,7 +710,7 @@ export function usePipelineOrchestrator() {
           prompts,
           shots: shotsState,
         }),
-      }) as ImageJobResponse;
+      }, apiKey) as ImageJobResponse;
 
       const initialByShotStatus = shotIds.reduce<Record<string, string>>((acc, shotId) => {
         acc[shotId] = 'pending';
@@ -704,7 +741,7 @@ export function usePipelineOrchestrator() {
       setErrorMsg(error instanceof Error ? error.message : String(error));
       return null;
     }
-  }, [apiBase, pipelineState.prompts, projectState.id, setImageCount, shotsState, showToast]);
+  }, [apiBase, apiKey, pipelineState.prompts, projectState.id, setImageCount, shotsState, showToast]);
 
   useEffect(() => {
     if (activeStep !== 5) return;
@@ -728,9 +765,11 @@ export function usePipelineOrchestrator() {
       return;
     }
 
-    const timer = window.setInterval(async () => {
-      try {
-        const job = await callJson(`${apiBase}/api/images/${imageJobId}`, {method: 'GET'}) as ImageJobResponse;
+    return startPollingLoop<ImageJobResponse>({
+      load: async () => {
+        return await callJson(`${apiBase}/api/images/${imageJobId}`, {method: 'GET'}, apiKey) as ImageJobResponse;
+      },
+      onData: (job) => {
         const versionKey = job.completedAt || job.progress || job.startedAt || '';
         const urls = normalizeImageUrls(apiBase, job.images, versionKey);
 
@@ -766,13 +805,29 @@ export function usePipelineOrchestrator() {
         if (job.status === 'error') {
           setErrorMsg(job.error || '分镜图生成失败');
         }
-      } catch {
-        // ignore polling errors
-      }
-    }, 1200);
-
-    return () => window.clearInterval(timer);
-  }, [apiBase, callJson, imageStatus, pipelineState.images?.jobId, pipelineState.images?.status, setPipelineState, showToast]);
+      },
+      shouldStop: (job) => job.status === 'done' || job.status === 'error',
+      onError: (error, failureCount) => {
+        const message = error.message || '分镜图状态轮询失败';
+        if (failureCount >= 3) {
+          setImageStatus('error');
+          setPipelineState((prev) => ({
+            ...prev,
+            images: {
+              ...(prev.images || {}),
+              status: 'error',
+              error: message,
+              progressMsg: '分镜图状态同步失败',
+            },
+          }));
+          setErrorMsg(message);
+          return false;
+        }
+        return true;
+      },
+      intervalMs: 1200,
+    });
+  }, [apiBase, apiKey, imageStatus, pipelineState.images?.jobId, pipelineState.images?.status, setPipelineState, showToast]);
 
   const runAll = useCallback(async () => {
     setBusyAll(true);
@@ -798,31 +853,44 @@ export function usePipelineOrchestrator() {
 
   useEffect(() => {
     if (!voiceJobId) return;
-    const timer = window.setInterval(async () => {
-      try {
-        const job = await callJson(`${apiBase}/api/voice/${voiceJobId}`, {method: 'GET'});
+    return startPollingLoop<Record<string, unknown>>({
+      load: async () => {
+        return await callJson(`${apiBase}/api/voice/${voiceJobId}`, {method: 'GET'}, apiKey) as Record<string, unknown>;
+      },
+      onData: (job) => {
         setVoiceProgress(Number(job.progress) || 0);
-        setVoiceJobStatus(job.status || 'pending');
+        setVoiceJobStatus(String(job.status || 'pending') as JobStatus);
         if ((job.status === 'done' || job.status === 'error') && job.result && typeof job.result === 'object') {
           setVoiceJobResult(job.result as VoiceJobResult);
         } else if ((job.status === 'done' || job.status === 'error') && job.queue) {
-          setVoiceJobResult(job as VoiceJobResult);
+          setVoiceJobResult(job as unknown as VoiceJobResult);
         }
-      } catch {
-        // ignore
-      }
-    }, 1500);
-
-    return () => window.clearInterval(timer);
-  }, [apiBase, callJson, voiceJobId]);
+        if (job.status === 'error') {
+          setErrorMsg(typeof job.error === 'string' ? job.error : '配音任务失败');
+        }
+      },
+      shouldStop: (job) => job.status === 'done' || job.status === 'error',
+      onError: (error, failureCount) => {
+        if (failureCount >= 3) {
+          setVoiceJobStatus('error');
+          setErrorMsg(error.message || '配音任务状态轮询失败');
+          return false;
+        }
+        return true;
+      },
+      intervalMs: 1500,
+    });
+  }, [apiBase, apiKey, voiceJobId]);
 
   useEffect(() => {
     if (!renderJobId) return;
-    const timer = window.setInterval(async () => {
-      try {
-        const job = await callJson(`${apiBase}/api/render/${renderJobId}`, {method: 'GET'});
+    return startPollingLoop<Record<string, unknown>>({
+      load: async () => {
+        return await callJson(`${apiBase}/api/render/${renderJobId}`, {method: 'GET'}, apiKey) as Record<string, unknown>;
+      },
+      onData: (job) => {
         setRenderProgress(Number(job.progress) || 0);
-        setRenderJobStatus(job.status || 'pending');
+        setRenderJobStatus(String(job.status || 'pending') as JobStatus);
         if (
           job?.outputUrl
           || job?.downloadUrl
@@ -832,13 +900,22 @@ export function usePipelineOrchestrator() {
         ) {
           setRenderJobResult(job as RenderJobResult);
         }
-      } catch {
-        // ignore
-      }
-    }, 1500);
-
-    return () => window.clearInterval(timer);
-  }, [apiBase, callJson, renderJobId]);
+        if (job.status === 'error') {
+          setErrorMsg(typeof job.error === 'string' ? job.error : '渲染任务失败');
+        }
+      },
+      shouldStop: (job) => job.status === 'done' || job.status === 'error',
+      onError: (error, failureCount) => {
+        if (failureCount >= 3) {
+          setRenderJobStatus('error');
+          setErrorMsg(error.message || '渲染任务状态轮询失败');
+          return false;
+        }
+        return true;
+      },
+      intervalMs: 1500,
+    });
+  }, [apiBase, apiKey, renderJobId]);
 
   const statusLabel = getStatusLabel;
   const statusClass = getStatusClass;
@@ -1163,6 +1240,7 @@ export function usePipelineOrchestrator() {
     activeStepStatusLabel,
     activeStepSummary,
     apiBase,
+    apiKey,
     appliedTitleKeywords,
     applyTitleKeywords,
     backfillVoiceDurations,
@@ -1203,6 +1281,7 @@ export function usePipelineOrchestrator() {
     selectedTitle,
     selectedTitleId,
     setApiBase,
+    setApiKey,
     setPreviewRatio,
     setSelectedShotId,
     setTitleKeywords,

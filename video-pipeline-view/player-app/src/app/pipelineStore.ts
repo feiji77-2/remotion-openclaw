@@ -1,7 +1,7 @@
 import {create} from 'zustand';
 import {DEFAULT_SHOTS} from '../workflow/steps';
 import type {JobStatus, PreviewRatio, ProjectState, RenderJobResult, Shot, VoiceJobResult, WorkflowStepId} from '../workflow/types';
-import {API_BASE_DEFAULT, createInitialProjectState} from './pipelineConstants';
+import {API_BASE_DEFAULT, API_KEY_DEFAULT, createInitialProjectState} from './pipelineConstants';
 import type {PersistedPipelineSnapshot, PipelinePayload} from './pipelineTypes';
 
 type Updater<T> = T | ((prev: T) => T);
@@ -12,6 +12,7 @@ function resolveUpdater<T>(next: Updater<T>, prev: T): T {
 
 interface PipelineSessionState {
   apiBase: string;
+  apiKey: string;
   titleKeywords: string;
   projectState: ProjectState;
   shotsState: Shot[];
@@ -45,6 +46,7 @@ interface PipelineSessionState {
 
 interface PipelineSessionActions {
   setApiBase: (next: Updater<string>) => void;
+  setApiKey: (next: Updater<string>) => void;
   setTitleKeywords: (next: Updater<string>) => void;
   setProjectState: (next: Updater<ProjectState>) => void;
   setShotsState: (next: Updater<Shot[]>) => void;
@@ -82,6 +84,7 @@ export type PipelineSessionStore = PipelineSessionState & PipelineSessionActions
 function createInitialPipelineSessionState(): PipelineSessionState {
   return {
     apiBase: API_BASE_DEFAULT,
+    apiKey: API_KEY_DEFAULT,
     titleKeywords: 'OpenClaw 小龙虾为什么这么火？',
     projectState: createInitialProjectState(),
     shotsState: DEFAULT_SHOTS,
@@ -129,6 +132,7 @@ export const usePipelineSessionStore = create<PipelineSessionStore>((set) => {
   return {
     ...initialState,
     setApiBase: createSetter('apiBase')(set),
+    setApiKey: createSetter('apiKey')(set),
     setTitleKeywords: createSetter('titleKeywords')(set),
     setProjectState: createSetter('projectState')(set),
     setShotsState: createSetter('shotsState')(set),
@@ -197,6 +201,7 @@ export const usePipelineSessionStore = create<PipelineSessionStore>((set) => {
 
       set(() => ({
         apiBase: snapshot.apiBase,
+        apiKey: snapshot.apiKey || API_KEY_DEFAULT,
         titleKeywords: snapshot.titleKeywords,
         projectState: snapshot.projectState,
         shotsState: snapshot.shotsState,

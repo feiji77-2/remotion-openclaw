@@ -26,9 +26,11 @@
     "dev:worker": "npm --prefix remotion-video run pipeline:worker",
     "dev:video": "npm --prefix remotion-video run dev",
     "remotion-video:clean:runtime": "npm --prefix remotion-video run clean:runtime",
+    "smoke:staging": "npm --prefix remotion-video run smoke:staging --",
+    "test": "npm --prefix remotion-video run test",
     "typecheck": "npm --prefix video-pipeline-view/player-app run typecheck && npm --prefix remotion-video run typecheck && node --check remotion-video/server/api/server.js && node --check remotion-video/server/workers/renderWorker.js && node --check remotion-video/server/workflow/skillRegistry.js && node --check remotion-video/server/workflow/step123/pipeline.js",
     "build:video": "npm --prefix remotion-video run build",
     "build": "npm --prefix video-pipeline-view/player-app run build",
-    "release:check": "npm run clean && npm run typecheck && npm run build && node remotion-video/scripts/clean-runtime.mjs --check"
+    "release:check": "npm run clean && npm run test && npm run typecheck && npm run build && node remotion-video/scripts/clean-runtime.mjs --check"
   }
 }

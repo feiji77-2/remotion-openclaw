@@ -12,6 +12,7 @@ const App: React.FC = () => {
     activeStepStatusLabel,
     activeStepSummary,
     apiBase,
+    apiKey,
     appliedTitleKeywords,
     applyTitleKeywords,
     backfillVoiceDurations,
@@ -51,6 +52,7 @@ const App: React.FC = () => {
     selectedTitle,
     selectedTitleId,
     setApiBase,
+    setApiKey,
     setPreviewRatio,
     setSelectedShotId,
     setTitleKeywords,
@@ -135,6 +137,12 @@ const App: React.FC = () => {
                 onChange={(e) => setApiBase(e.target.value)}
                 className="mac-input mac-api"
                 placeholder="API Base"
+              />
+              <input
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="mac-input mac-api"
+                placeholder="API Key"
               />
               <button className="mac-btn" type="button" onClick={() => showToast('导出设置面板（示意）')}>导出设置</button>
               <button className={`mac-btn mac-btn-primary ${busyAll ? 'is-loading' : ''}`} onClick={runAll} disabled={busyAll} type="button">

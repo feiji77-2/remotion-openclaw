@@ -104,8 +104,12 @@ npm run dev:player
   构建前端工作台
 - `npm run build:video`
   执行一次默认生产组合渲染
+- `npm run test`
+  执行后端安全与 API 回归测试
+- `npm run smoke:staging`
+  执行 staging 冒烟脚本（需先配置 `remotion-video/.env.staging`）
 - `npm run release:check`
-  执行公开发布前的主校验
+  执行公开发布前的主校验（含测试）
 
 ## 发布校验
 
@@ -143,6 +147,7 @@ node remotion-video/scripts/clean-runtime.mjs --check
 - `GET /api/skills/catalog`
 - `GET /api/skills/:skillId`
 - `POST /api/workflow/generate`
+- `GET /api/workflow/:jobId`
 - `POST /api/images/generate`
 - `GET /api/images/:jobId`
 - `POST /api/voice`
@@ -158,6 +163,11 @@ node remotion-video/scripts/clean-runtime.mjs --check
 常用变量：
 
 - `PIPELINE_QUEUE_MODE`
+- `PIPELINE_API_KEY`
+- `PIPELINE_ADMIN_KEY`
+- `PIPELINE_ALLOWED_ORIGINS`
+- `PIPELINE_WEBHOOK_HOSTS`
+- `PIPELINE_ALLOW_FILE_QUEUE`
 - `OPENAI_API_KEY`
 - `OPENAI_BASE_URL`
 - `OPENAI_WORKFLOW_MODEL`
@@ -178,6 +188,8 @@ node remotion-video/scripts/clean-runtime.mjs --check
   安全问题报告方式
 - [docs/release-metadata.md](docs/release-metadata.md)
   GitHub / Gitee 仓库简介、标签与 Release 文案模板
+- [docs/staging-smoke.md](docs/staging-smoke.md)
+  staging 环境的标准化冒烟流程
 - [docs/archive/README.md](docs/archive/README.md)
   归档策略说明
 

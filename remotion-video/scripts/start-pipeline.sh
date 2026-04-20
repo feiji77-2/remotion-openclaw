@@ -8,7 +8,7 @@
 #   ./scripts/start-pipeline.sh --worker # 只启动 Worker
 #   ./scripts/start-pipeline.sh --redis  # 只启动 Redis（Docker）
 # 环境变量：
-#   PIPELINE_QUEUE_MODE=file|redis       # 默认 file
+#   PIPELINE_QUEUE_MODE=file|redis       # 默认 redis，file 仅限开发
 # ============================================================
 
 set -e
@@ -46,7 +46,7 @@ check_redis() {
   echo "  2. Or use Docker:      docker run -p 6379:6379 redis:latest"
   echo ""
   echo "  Or use the default local file queue mode:"
-  echo "    PIPELINE_QUEUE_MODE=file node server/api/server.js"
+  echo "    PIPELINE_ALLOW_FILE_QUEUE=true PIPELINE_QUEUE_MODE=file node server/api/server.js"
   echo ""
   return 1
 }

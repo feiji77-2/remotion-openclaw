@@ -1,10 +1,15 @@
-export async function callJson(url: string, options: RequestInit) {
+export function buildApiHeaders(apiKey?: string | null, headers?: HeadersInit) {
+  return {
+    'Content-Type': 'application/json',
+    ...(apiKey ? {'X-API-Key': apiKey} : {}),
+    ...(headers || {}),
+  };
+}
+
+export async function callJson(url: string, options: RequestInit, apiKey?: string | null) {
   const response = await fetch(url, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
+    headers: buildApiHeaders(apiKey, options.headers),
   });
 
   const data = await response.json().catch(() => ({}));

@@ -106,6 +106,7 @@ flowchart LR
 - `GET /api/skills/catalog`
 - `GET /api/skills/:skillId`
 - `POST /api/workflow/generate`
+- `GET /api/workflow/:jobId`
 - `POST /api/images/generate`
 - `GET /api/images/:jobId`
 - `POST /api/voice`
@@ -113,6 +114,18 @@ flowchart LR
 - `POST /api/render`
 - `GET /api/render/:jobId`
 - `GET /api/render/:jobId/download`
+
+管理面补充：
+
+- `GET /api/render`
+- `GET /api/jobs`
+- `GET /api/projects`
+- `GET /api/projects/:project/assets`
+- `DELETE /api/render/:jobId`
+- `POST /api/render/:jobId/retry`
+- `POST /api/voice/:jobId/retry`
+
+这些接口建议使用独立 `PIPELINE_ADMIN_KEY`，不要和普通提交/状态查询流量共用权限。
 
 ## 7. 持久化与产物
 
@@ -125,7 +138,7 @@ flowchart LR
 后端运行时产物：
 
 - `remotion-video/public/assets/`
-- `remotion-video/public/jobs/`
+- `remotion-video/runtime/jobs/`
 - `remotion-video/public/voice/`
 
 这些目录现在视为本地产物，不再属于发布面的一部分，已由根目录 `.gitignore` 屏蔽。

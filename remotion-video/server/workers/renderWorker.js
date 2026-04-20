@@ -13,24 +13,58 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const { processVoiceJob } = require('../voice/voiceJob');
 const {
+  PROJECT_ROOT,
+  PUBLIC_DIR,
+  OUTPUT_ASSETS_DIR,
+  VOICE_ASSETS_DIR,
+  SUBTITLE_ASSETS_DIR,
+} = require('../config/runtimePaths');
+const {getSecurityConfig, assertQueueModeAllowed} = require('../security/apiSecurity');
+const {
   buildUltimateRenderProps,
   isUltimateProject,
 } = require('../../scripts/lib/ultimate-project-adapter.js');
 
-const PROJECT_ROOT = path.join(__dirname, '../..');
-const PUBLIC_DIR = path.join(PROJECT_ROOT, 'public');
-const OUTPUT_DIR = path.join(PUBLIC_DIR, 'assets/outputs');
-const VOICE_DIR = path.join(PUBLIC_DIR, 'assets/voice');
-const SUBTITLE_DIR = path.join(PUBLIC_DIR, 'assets/subtitles');
+const OUTPUT_DIR = OUTPUT_ASSETS_DIR;
+const VOICE_DIR = VOICE_ASSETS_DIR;
+const SUBTITLE_DIR = SUBTITLE_ASSETS_DIR;
 const RENDER_TIMEOUT_MS = Number(process.env.WORKER_DURATION_LIMIT || '1200000');
 const DEFAULT_SMOKE_DURATION_FRAMES = 180;
 const CHAT_TTS_HTTP_HEALTH_URL = process.env.CHATTTS_HTTP_HEALTH_URL || 'http://127.0.0.1:18084/health';
 const CHAT_TTS_HTTP_SYNTH_URL = process.env.CHATTTS_HTTP_SYNTH_URL || 'http://127.0.0.1:18084/synthesize';
+const SECURITY_CONFIG = getSecurityConfig();
 
 // 确保目录存在
 [OUTPUT_DIR, VOICE_DIR, SUBTITLE_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
+
+function resolveRemotionLaunch(cwd) {
+  const bundledCli = path.join(cwd, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
+  const binaryShim = path.join(cwd, 'node_modules', '.bin', 'remotion');
+
+  if (fs.existsSync(bundledCli)) {
+    return {
+      command: process.execPath,
+      argsPrefix: [bundledCli],
+      displayCommand: `${process.execPath} ${bundledCli}`,
+    };
+  }
+
+  if (fs.existsSync(binaryShim)) {
+    return {
+      command: binaryShim,
+      argsPrefix: [],
+      displayCommand: binaryShim,
+    };
+  }
+
+  return {
+    command: 'npx',
+    argsPrefix: ['remotion'],
+    displayCommand: 'npx remotion',
+  };
+}
 
 // ─── Stage 1: 配音合成 ─────────────────────────────────
 async function stageVoiceSynthesis(job, update) {
@@ -63,7 +97,7 @@ async function stageVoiceSynthesis(job, update) {
   }
 
   // 已有现成音频则复制
-  const fallbackVoice = path.join(PROJECT_ROOT, 'public/voice/full-narration.wav');
+  const fallbackVoice = path.join(VOICE_DIR, 'full-narration.wav');
   if (fs.existsSync(fallbackVoice) && !fs.existsSync(voiceFile)) {
     fs.copyFileSync(fallbackVoice, voiceFile);
     console.log(`[Worker] Voice copied from fallback: ${voiceFile}`);
@@ -102,7 +136,7 @@ async function stageVoiceSynthesis(job, update) {
       const scriptPath = path.join(PROJECT_ROOT, 'scripts/synthesize-melo-voice.mjs');
       if (fs.existsSync(scriptPath)) {
         try {
-          await execPromise(`node ${scriptPath} "${script.replace(/"/g, '\\"')}" "${voiceFile}"`, {
+          await execFilePromise(process.execPath, [scriptPath, script, voiceFile], {
             cwd: PROJECT_ROOT,
             timeout: 60000,
           });
@@ -288,9 +322,9 @@ async function stageRemotionRender(job, files, update) {
 
   // 构建渲染命令（在项目根目录执行）
   const remotionDir = PROJECT_ROOT;
-  const cmd = 'npx';
+  const launch = resolveRemotionLaunch(remotionDir);
   const args = [
-    'remotion', 'render',
+    'render',
     'src/Root.tsx',
     compositionId,
     outputFile,
@@ -302,7 +336,7 @@ async function stageRemotionRender(job, files, update) {
     args.push('--frames', `${resolvedFrameRange[0]}-${resolvedFrameRange[1]}`);
   }
 
-  console.log(`[Worker] Remotion command: npx ${args.join(' ')}`);
+  console.log(`[Worker] Remotion command: ${launch.displayCommand} ${args.join(' ')}`);
   update(45, '🎬 Remotion 渲染中（请稍候）...');
 
   let stdout = '';
@@ -310,7 +344,7 @@ async function stageRemotionRender(job, files, update) {
 
   try {
     const exitCode = await new Promise((resolve, reject) => {
-      const proc = spawn(cmd, args, {
+      const proc = spawn(launch.command, [...launch.argsPrefix, ...args], {
         cwd: remotionDir,
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: false,
@@ -843,6 +877,9 @@ function materializeAudioSegments(audioSegments, projectId) {
       }
 
       if (/^https?:\/\//.test(sourcePath)) {
+        if (!SECURITY_CONFIG.allowRemoteMedia) {
+          return null;
+        }
         return {
           src: sourcePath,
           startFrame: Math.max(0, getPositiveInt(segment.startFrame) ?? 0),
@@ -850,7 +887,7 @@ function materializeAudioSegments(audioSegments, projectId) {
         };
       }
 
-      const resolvedSource = resolveLocalAssetFile(sourcePath);
+      const resolvedSource = resolvePublicAssetFile(sourcePath);
       if (!resolvedSource) {
         return null;
       }
@@ -968,43 +1005,42 @@ function resolveRenderFrameRange(options, durationInFrames) {
 }
 
 function resolveExistingSubtitleFile(subtitleFile) {
-  return resolveLocalAssetFile(subtitleFile);
+  return resolvePublicAssetFile(subtitleFile);
 }
 
-function resolveLocalAssetFile(assetPath) {
+function resolvePublicAssetFile(assetPath) {
   if (typeof assetPath !== 'string' || !assetPath.trim()) {
     return null;
   }
 
-  const normalizedPath = assetPath.trim();
-  const looksLikePublicAssetPath = normalizedPath.startsWith('/assets/') || normalizedPath.startsWith('/voice/');
-  if (path.isAbsolute(normalizedPath)) {
-    if (looksLikePublicAssetPath) {
-      const publicAssetPath = normalizedPath.replace(/^\//, '');
-      const candidatePath = path.join(PUBLIC_DIR, publicAssetPath);
-      return fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile()
-        ? candidatePath
-        : null;
-    }
-    return fs.existsSync(normalizedPath) && fs.statSync(normalizedPath).isFile()
+  const normalizedPath = assetPath
+    .trim()
+    .replace(/^https?:\/\/[^/]+/i, '')
+    .replace(/^public\//, '')
+    .replace(/^\.?\//, '');
+  const publicAssetPath = normalizedPath.startsWith('assets/')
+    ? `/${normalizedPath}`
+    : normalizedPath.startsWith('/assets/')
       ? normalizedPath
-      : null;
+      : normalizedPath.startsWith('voice/')
+        ? `/assets/${normalizedPath}`
+        : normalizedPath.startsWith('/voice/')
+          ? `/assets${normalizedPath}`
+          : null;
+
+  if (!publicAssetPath) {
+    return null;
   }
 
-  const strippedPath = normalizedPath.replace(/^\.?\//, '');
-  const publicRelativePath = strippedPath.replace(/^public\//, '');
-  const candidatePaths = [
-    path.join(PUBLIC_DIR, publicRelativePath),
-    path.join(PROJECT_ROOT, strippedPath),
-  ];
-
-  for (const candidatePath of candidatePaths) {
-    if (fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile()) {
-      return candidatePath;
-    }
+  const safeAssetPath = path.posix.normalize(publicAssetPath);
+  if (!safeAssetPath.startsWith('/assets/') || safeAssetPath.includes('..')) {
+    return null;
   }
 
-  return null;
+  const candidatePath = path.join(PUBLIC_DIR, safeAssetPath.replace(/^\//, ''));
+  return fs.existsSync(candidatePath) && fs.statSync(candidatePath).isFile()
+    ? candidatePath
+    : null;
 }
 
 function formatSrtTimestamp(ms) {
@@ -1065,7 +1101,8 @@ async function processRenderJob(job, update) {
 
 // ─── Worker 循环（文件队列版）────────────────────────────
 function startFileBasedWorker() {
-  const { startSimpleWorker, getJob, completeJob, failJob, JOBS_DIR } = require('../queue/fileQueue');
+  assertQueueModeAllowed('file', SECURITY_CONFIG);
+  const { startSimpleWorker } = require('../queue/fileQueue');
 
   console.log('[Worker] 🚀 File-based render worker started');
 
@@ -1124,9 +1161,9 @@ function startRedisWorker() {
 }
 
 // ─── 工具函数 ───────────────────────────────────────────
-function execPromise(cmd, { cwd, timeout = 60000 } = {}) {
+function execFilePromise(command, args, { cwd, timeout = 60000 } = {}) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('/bin/sh', ['-c', cmd], { cwd, shell: false });
+    const proc = spawn(command, args, {cwd, shell: false});
     let stdout = '', stderr = '';
 
     proc.stdout.on('data', d => { stdout += d.toString(); });
@@ -1134,7 +1171,7 @@ function execPromise(cmd, { cwd, timeout = 60000 } = {}) {
 
     const timer = setTimeout(() => {
       proc.kill('SIGTERM');
-      reject(new Error(`Command timeout: ${cmd}`));
+      reject(new Error(`Command timeout: ${command}`));
     }, timeout);
 
     proc.on('close', code => {

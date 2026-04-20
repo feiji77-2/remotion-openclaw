@@ -1,20 +1,15 @@
 /**
- * 文件版任务队列（无需 Redis）
- * 适合本地开发 / 没有 Redis 的环境
- * 
- * 所有任务状态存储在 public/jobs/ 目录下
+ * 文件版任务队列（仅限本地开发）
+ *
+ * 任务状态保存在私有 runtime/jobs/ 目录，不再暴露到 public/。
  */
 
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const {JOBS_DIR, ensureDir} = require('../config/runtimePaths');
 
-const JOBS_DIR = path.join(__dirname, '../../public/jobs');
-
-// ─── 初始化 ───────────────────────────────────────────────
-if (!fs.existsSync(JOBS_DIR)) {
-  fs.mkdirSync(JOBS_DIR, { recursive: true });
-}
+ensureDir(JOBS_DIR);
 
 // ─── 添加任务 ─────────────────────────────────────────────
 function addJob(jobType, data) {
@@ -129,8 +124,10 @@ function listJobs(filterStatus) {
  */
 function startSimpleWorker(handlers = {}) {
   console.log('[FileQueue] Simple worker started (polling every 1s)');
+  let isProcessing = false;
 
   setInterval(() => {
+    if (isProcessing) return;
     const jobs = listJobs('pending');
     if (jobs.length === 0) return;
 
@@ -142,12 +139,16 @@ function startSimpleWorker(handlers = {}) {
     fullJob.status = 'running';
     fullJob.startedAt = new Date().toISOString();
     fs.writeFileSync(getJobPath(job.id), JSON.stringify(fullJob, null, 2));
+    isProcessing = true;
 
     // 执行处理函数
     Promise.resolve()
       .then(() => handlers[job.type]?.(fullJob, (pct, msg) => updateProgress(job.id, pct, msg)))
       .then(result => completeJob(job.id, result))
-      .catch(err => failJob(job.id, err.message));
+      .catch(err => failJob(job.id, err.message))
+      .finally(() => {
+        isProcessing = false;
+      });
   }, 1000);
 }
 
