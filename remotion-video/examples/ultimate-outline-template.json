@@ -1,0 +1,101 @@
+{
+  "title": "你的 1080p 视频标题",
+  "brand": "你的品牌",
+  "account": "@你的账号",
+  "searchLabel": "你的检索栏文案",
+  "watermark": "1080p",
+  "transition": {
+    "preset": "lift",
+    "durationInFrames": 12
+  },
+  "sections": [
+    {
+      "id": "cover",
+      "kind": "cover",
+      "warm": true,
+      "kicker": "顶部小标签",
+      "title": "主标题",
+      "subtitle": "副标题或一句解释",
+      "badge": "hero / opener / cover",
+      "accent": "orange"
+    },
+    {
+      "id": "core-points",
+      "kind": "cards",
+      "heading": "三到四个核心点",
+      "items": [
+        {"title": "点 1", "detail": "解释 1"},
+        {"title": "点 2", "detail": "解释 2"},
+        {"title": "点 3", "detail": "解释 3"}
+      ]
+    },
+    {
+      "id": "concept",
+      "kind": "definition",
+      "keyword": "关键概念",
+      "question": "这一屏要解释什么？",
+      "description": "这里写概念解释。",
+      "diagram": "framing"
+    },
+    {
+      "id": "workflow",
+      "kind": "steps",
+      "heading": "你的流程",
+      "steps": [
+        {"label": "步骤 1", "detail": "说明"},
+        {"label": "步骤 2", "detail": "说明"},
+        {"label": "步骤 3", "detail": "说明"}
+      ]
+    },
+    {
+      "id": "runtime",
+      "kind": "command",
+      "heading": "运行 / 命令 / 日志",
+      "command": "node scripts/render-ultimate-scene.mjs --outline ./your-outline.json --out out/your-video.mp4",
+      "outputs": [
+        "> line 1",
+        "> line 2",
+        "> line 3"
+      ]
+    },
+    {
+      "id": "modules",
+      "kind": "tags",
+      "heading": "标签 / 模块 / 分类",
+      "tabs": ["script", "visual", "motion"],
+      "activeTab": "visual",
+      "tags": ["hero", "focus", "steps", "code", "cta"]
+    },
+    {
+      "id": "schema",
+      "kind": "schema",
+      "heading": "配置片段",
+      "filename": "your-video.json",
+      "lines": [
+        "{",
+        "  \"family\": \"hero\",",
+        "  \"subtitle\": \"你的字幕\"",
+        "}"
+      ],
+      "highlightLine": 2
+    },
+    {
+      "id": "results",
+      "kind": "metrics",
+      "heading": "结果 / 指标 / 收益",
+      "metrics": [
+        {"label": "结果 1", "value": "数值 1"},
+        {"label": "结果 2", "value": "数值 2"},
+        {"label": "结果 3", "value": "数值 3"}
+      ]
+    },
+    {
+      "id": "closing",
+      "kind": "close",
+      "heading": "结尾标题",
+      "subtitle": "结尾副标题",
+      "searchLabel": "结尾输入框文案",
+      "badge": "cta / close"
+    }
+  ]
+}

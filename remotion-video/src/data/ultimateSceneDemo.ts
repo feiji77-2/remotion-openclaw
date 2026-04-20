@@ -1,0 +1,165 @@
+import type {UltimateProjectConfig} from '../components/ultimate-kit';
+
+export const ULTIMATE_SCENE_DEMO: UltimateProjectConfig = {
+  title: 'Ultimate 1080p Demo',
+  defaultPlatformOverlay: {
+    brand: 'SceneLab',
+    account: '@your-brand',
+    searchLabel: 'Search reusable scenes',
+    watermark: '1080p',
+  },
+  defaultTransition: {
+    preset: 'lift',
+    durationInFrames: 12,
+  },
+  scenes: [
+    {
+      id: 'hero-intro',
+      family: 'hero',
+      subtitle: '封面场景 / 你可以替换标题、副标题、徽章和账号位',
+      warm: true,
+      showGrid: false,
+      transition: {
+        preset: 'flash',
+      },
+      data: {
+        kicker: 'ultimate scene template',
+        title: '把你的文案填进来',
+        subtitle: '这不是写死的视频，而是一套 1920×1080 的统一场景语言。你后面只需要替换 JSON 里的文字和模块数据。',
+        badge: 'hero / opener / cover',
+        accent: 'orange',
+        avatarLabel: 'YOU',
+      },
+    },
+    {
+      id: 'feature-rail',
+      family: 'feature-rail',
+      subtitle: '卡片轨道 / 适合拆概念、列维度、讲结构',
+      data: {
+        kicker: 'feature rail',
+        heading: '四个维度逐个点亮',
+        items: [
+          {title: '主体', eyebrow: 'slot a', caption: '人物、产品、角色、对象', icon: 'S', accent: 'green'},
+          {title: '景别', eyebrow: 'slot b', caption: '远近、大小、构图范围', icon: 'F', accent: 'cyan'},
+          {title: '动作', eyebrow: 'slot c', caption: '状态、行为、运动趋势', icon: 'A', accent: 'yellow'},
+          {title: '场景', eyebrow: 'slot d', caption: '环境、语境、世界观线索', icon: 'C', accent: 'red'},
+        ],
+      },
+    },
+    {
+      id: 'focus-definition',
+      family: 'focus',
+      subtitle: '定义页 / 大关键词 + 图示解释',
+      data: {
+        eyebrow: 'focus explainer',
+        keyword: '核心概念',
+        question: '这一屏只讲一个重点',
+        description: '把大词、解释句和右侧图示换掉，就能做教程定义页、术语讲解页、方法论页。',
+        accent: 'cyan',
+        diagram: 'framing',
+      },
+    },
+    {
+      id: 'step-flow',
+      family: 'step-flow',
+      subtitle: '流程页 / 适合讲方法、管线、步骤',
+      data: {
+        heading: '五步生成完整视频',
+        steps: [
+          {label: '输入文案', detail: '标题、正文、口播提纲或分段脚本', icon: '1', accent: 'cyan'},
+          {label: '匹配场景', detail: '根据内容选择最合适的 scene family', icon: '2', accent: 'green'},
+          {label: '绑定元素', detail: '卡片、图示、代码窗、标签矩阵自动填充', icon: '3', accent: 'yellow'},
+          {label: '生成动画', detail: '统一节奏、字幕、安全区和过渡样式', icon: '4', accent: 'orange'},
+          {label: '导出成片', detail: '得到 1080p 的完整输出版本', icon: '5', accent: 'purple'},
+        ],
+      },
+    },
+    {
+      id: 'terminal-demo',
+      family: 'terminal',
+      subtitle: '终端窗 / 适合命令、日志、运行结果',
+      data: {
+        heading: '运行时模块',
+        windowTitle: 'ultimate-scene-runtime',
+        command: 'pnpm render:ultimate --props ./scenes/your-video.json',
+        outputs: [
+          '> loading project config',
+          '> mapping copy to scene families',
+          '> building motion timeline',
+          '> export ready in 1080p',
+        ],
+        note: '这里可以换成真实命令、伪代码日志或流程结果。',
+        accent: 'green',
+      },
+    },
+    {
+      id: 'tag-matrix',
+      family: 'tag-matrix',
+      subtitle: '标签矩阵 / 适合分类、选项、能力清单',
+      data: {
+        heading: '可复用素材模块',
+        tabs: ['script', 'visual', 'motion', 'closing'],
+        activeTab: 'visual',
+        items: [
+          {label: 'hero', accent: 'orange'},
+          {label: 'cards', accent: 'cyan'},
+          {label: 'focus', accent: 'green'},
+          {label: 'diagram', accent: 'yellow'},
+          {label: 'steps', accent: 'purple'},
+          {label: 'terminal', accent: 'cyan'},
+          {label: 'code', accent: 'green'},
+          {label: 'metrics', accent: 'yellow'},
+          {label: 'compare', accent: 'orange'},
+          {label: 'cta', accent: 'purple'},
+        ],
+      },
+    },
+    {
+      id: 'code-schema',
+      family: 'code',
+      subtitle: '代码窗 / 适合 schema、配置、代码片段',
+      transition: {
+        preset: 'fade',
+      },
+      data: {
+        heading: 'JSON 驱动模板',
+        filename: 'your-video.json',
+        lines: [
+          {text: '{', tone: 'base'},
+          {text: '  "family": "feature-rail",', tone: 'accent'},
+          {text: '  "headline": "你的标题",', tone: 'base'},
+          {text: '  "items": ["元素1", "元素2"],', tone: 'base'},
+          {text: '  "subtitle": "你的字幕"', tone: 'muted'},
+          {text: '}', tone: 'base'},
+        ],
+        highlightLine: 2,
+        footer: '你后面只需要改 JSON，不用重写动画。',
+        accent: 'purple',
+      },
+    },
+    {
+      id: 'metrics-output',
+      family: 'metrics',
+      subtitle: '结果条 / 适合对比、收益、产出指标',
+      data: {
+        heading: '三档输出结果',
+        items: [
+          {label: '预览版', value: '1.4s', ratio: 0.92, accent: 'cyan'},
+          {label: '清晰版', value: '1080p', ratio: 0.84, accent: 'green'},
+          {label: '平台切片', value: '3种', ratio: 0.66, accent: 'yellow'},
+        ],
+      },
+    },
+    {
+      id: 'closing-cta',
+      family: 'cta',
+      subtitle: '结尾页 / 适合 CTA、搜索框、下集预告',
+      data: {
+        heading: '下一步直接填你的文案',
+        subtitle: '如果你愿意，我下一步就把这个模板继续接成读取本地 JSON 自动出片的正式管线。',
+        searchLabel: '输入下一条视频的 scene family',
+        badge: 'cta / search / next episode',
+      },
+    },
+  ],
+};

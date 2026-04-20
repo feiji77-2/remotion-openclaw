@@ -1,0 +1,116 @@
+{
+  "title": "Ultimate 1080p Outline Demo",
+  "brand": "SceneLab",
+  "account": "@your-brand",
+  "searchLabel": "Search reusable scenes",
+  "watermark": "1080p",
+  "transition": {
+    "preset": "lift",
+    "durationInFrames": 12
+  },
+  "sections": [
+    {
+      "id": "cover",
+      "kind": "cover",
+      "warm": true,
+      "transition": {"preset": "flash"},
+      "kicker": "ultimate scene template",
+      "title": "把你的文案填进来",
+      "subtitle": "你只需要改这一层的大纲和文字，不用再一帧一帧去拼动画。",
+      "badge": "hero / opener / cover",
+      "accent": "orange",
+      "avatarLabel": "YOU"
+    },
+    {
+      "id": "core-dimensions",
+      "kind": "cards",
+      "kicker": "feature rail",
+      "heading": "四个维度逐个点亮",
+      "items": [
+        {"title": "主体", "detail": "人物、产品、角色、对象", "accent": "green"},
+        {"title": "景别", "detail": "远近、大小、构图范围", "accent": "cyan"},
+        {"title": "动作", "detail": "状态、行为、运动趋势", "accent": "yellow"},
+        {"title": "场景", "detail": "环境、语境、世界观线索", "accent": "red"}
+      ]
+    },
+    {
+      "id": "focus-definition",
+      "kind": "definition",
+      "eyebrow": "focus explainer",
+      "keyword": "核心概念",
+      "question": "这一屏只讲一个重点",
+      "description": "把大词、解释句和右侧图示换掉，就能做教程定义页、术语讲解页、方法论页。",
+      "accent": "cyan",
+      "diagram": "framing"
+    },
+    {
+      "id": "process",
+      "kind": "steps",
+      "heading": "五步生成完整视频",
+      "steps": [
+        {"label": "输入文案", "detail": "标题、正文、口播提纲或分段脚本"},
+        {"label": "匹配场景", "detail": "根据内容选择最合适的 scene family"},
+        {"label": "绑定元素", "detail": "卡片、图示、代码窗、标签矩阵自动填充"},
+        {"label": "生成动画", "detail": "统一节奏、字幕、安全区和过渡样式"},
+        {"label": "导出成片", "detail": "得到 1080p 的完整输出版本"}
+      ]
+    },
+    {
+      "id": "runtime",
+      "kind": "command",
+      "heading": "运行时模块",
+      "windowTitle": "ultimate-scene-runtime",
+      "command": "node scripts/render-ultimate-scene.mjs --outline ./my-outline.json --out out/my-video.mp4",
+      "outputs": [
+        "> loading outline",
+        "> compiling scenes",
+        "> building motion timeline",
+        "> export ready in 1080p"
+      ],
+      "note": "这里可以放真实命令、日志、运行结果。",
+      "accent": "green"
+    },
+    {
+      "id": "modules",
+      "kind": "tags",
+      "heading": "可复用素材模块",
+      "tabs": ["script", "visual", "motion", "closing"],
+      "activeTab": "visual",
+      "tags": ["hero", "cards", "focus", "diagram", "steps", "terminal", "code", "metrics", "cta"]
+    },
+    {
+      "id": "schema",
+      "kind": "schema",
+      "heading": "大纲自动编译后的 JSON",
+      "filename": "my-video.compiled.json",
+      "highlightLine": 2,
+      "lines": [
+        "{",
+        "  \"family\": \"feature-rail\",",
+        "  \"data\": {\"heading\": \"你的标题\"},",
+        "  \"subtitle\": \"你的字幕\"",
+        "}"
+      ],
+      "footer": "你可以写大纲，也可以直接写最终 scene config。",
+      "accent": "purple"
+    },
+    {
+      "id": "results",
+      "kind": "metrics",
+      "heading": "三档输出结果",
+      "metrics": [
+        {"label": "大纲输入", "value": "更快", "ratio": 0.92, "accent": "cyan"},
+        {"label": "自动编译", "value": "更稳", "ratio": 0.82, "accent": "green"},
+        {"label": "成片输出", "value": "1080p", "ratio": 0.7, "accent": "yellow"}
+      ]
+    },
+    {
+      "id": "closing",
+      "kind": "close",
+      "heading": "下一步直接填你的真实文案",
+      "subtitle": "把这个 demo 大纲复制一份，替换标题、结构和要点，就能生成同样的镜头语言。",
+      "searchLabel": "输入你的下一条视频大纲",
+      "badge": "cta / search / next episode"
+    }
+  ]
+}

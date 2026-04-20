@@ -4,6 +4,10 @@ import {OpenClawVideo} from './OpenClawVideo';
 import {FPS, TOTAL_DURATION_SEC, VIDEO_HEIGHT, VIDEO_WIDTH} from './data/storyboard';
 import type {SRTSubtitle} from './components/SRTParser';
 import Video1v4 from './compositions/Video1v4';
+import UltimateElementsLibrary, {ULTIMATE_ELEMENTS_LIBRARY_DURATION} from './compositions/UltimateElementsLibrary';
+import UltimateSceneTemplate from './compositions/UltimateSceneTemplate';
+import {type UltimateProjectConfig, getUltimateProjectDuration} from './components/ultimate-kit';
+import {ULTIMATE_SCENE_DEMO} from './data/ultimateSceneDemo';
 import {SEGMENTS, TRANSITION_FRAMES} from './data/segments_meta_v4h';
 
 export type AudioSegmentProps = {
@@ -117,6 +121,10 @@ export type VideoProps = {
   cardCount?: number;
 };
 
+export type UltimateSceneCompositionProps = {
+  config?: UltimateProjectConfig;
+};
+
 const DEFAULT_PROPS: VideoProps = {
   template: 'caption',
   subtitleStyle: 'caption',
@@ -173,6 +181,34 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={{directorPresetId: 'clean-tiktok'}}
+      />
+      <Composition
+        id="UltimateElementsLibrary"
+        component={UltimateElementsLibrary}
+        durationInFrames={ULTIMATE_ELEMENTS_LIBRARY_DURATION}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="UltimateSceneTemplate"
+        component={UltimateSceneTemplate as React.FC<Record<string, unknown>>}
+        durationInFrames={getUltimateProjectDuration(ULTIMATE_SCENE_DEMO)}
+        fps={30}
+        width={1920}
+        height={1080}
+        calculateMetadata={({props}: {props: UltimateSceneCompositionProps}) => {
+          const resolvedConfig = props?.config ?? ULTIMATE_SCENE_DEMO;
+
+          return {
+            durationInFrames: getUltimateProjectDuration(resolvedConfig),
+            fps: 30,
+            width: 1920,
+            height: 1080,
+          };
+        }}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        defaultProps={{config: ULTIMATE_SCENE_DEMO} as any}
       />
     </>
   );
