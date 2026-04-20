@@ -29,11 +29,13 @@ video-pipeline-view/player-app/.vite/
 # Runtime artifacts
 remotion-video/public/assets/*
 remotion-video/public/jobs/*
+remotion-video/public/runtime/*
 remotion-video/public/voice/*
 remotion-video/runtime/
 remotion-video/scripts/public/
 !remotion-video/public/assets/.gitkeep
 !remotion-video/public/jobs/.gitkeep
+!remotion-video/public/runtime/.gitkeep
 !remotion-video/public/voice/.gitkeep
 
 # Python

@@ -85,11 +85,11 @@ const sceneMediaLayout: Partial<Record<ResolvedUltimateSceneConfig['family'], {
   height: number;
   opacity?: number;
 }>> = {
-  hero: {top: 138, right: 86, width: 392, height: 662, opacity: 0.9},
-  focus: {top: 186, right: 72, width: 332, height: 566, opacity: 0.82},
-  'feature-rail': {top: 178, right: 72, width: 332, height: 566, opacity: 0.8},
-  metrics: {top: 198, right: 74, width: 312, height: 530, opacity: 0.78},
-  cta: {top: 172, right: 98, width: 324, height: 552, opacity: 0.68},
+  hero: {top: 174, right: 72, width: 640, height: 360, opacity: 0.92},
+  focus: {top: 196, right: 74, width: 560, height: 315, opacity: 0.82},
+  'feature-rail': {top: 188, right: 74, width: 560, height: 315, opacity: 0.8},
+  metrics: {top: 214, right: 76, width: 520, height: 293, opacity: 0.78},
+  cta: {top: 188, right: 92, width: 580, height: 326, opacity: 0.72},
 };
 
 const UltimateSceneMediaCard: React.FC<{scene: ResolvedUltimateSceneConfig}> = ({scene}) => {

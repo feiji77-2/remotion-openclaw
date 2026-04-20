@@ -101,6 +101,7 @@ Options:
   --voice-speed <number>    默认 1.0
   --speaker <value>         speaker seed / voice code
   --output <path>           指定最终视频输出路径
+  --resume                  复用已有 step/voice/images/render 产物继续执行
   --no-images               跳过分镜图资产生成
   --no-voice                跳过 TTS，只生成带旁白文本的项目
   --no-render               只生成 workflow + project + render props，不直接出片
@@ -118,6 +119,7 @@ const parseArgs = (argv) => {
     render: true,
     voice: true,
     images: true,
+    resume: false,
     quality: DEFAULT_QUALITY,
     fps: DEFAULT_FPS,
     width: DEFAULT_WIDTH,
@@ -180,6 +182,12 @@ const parseArgs = (argv) => {
         options.output = safeString(argv[index + 1]);
         index += 1;
         break;
+      case '--resume':
+        options.resume = true;
+        break;
+      case '--no-resume':
+        options.resume = false;
+        break;
       case '--no-images':
         options.images = false;
         break;
@@ -236,8 +244,51 @@ const buildProjectId = (topic, explicitId) => {
   return `ultimate-${stamp}-${hash}`;
 };
 
+const createInitialRunState = ({
+  projectId,
+  topic,
+  explicitProjectName,
+  options,
+}) => {
+  return {
+    projectState: {
+      id: projectId,
+      name: explicitProjectName || topic,
+      fps: options.fps,
+      width: options.width,
+      height: options.height,
+    },
+    shotsState: [],
+    pipelineState: {
+      inputTopic: topic,
+      inputTitleKeywords: topic,
+      selectedAnalysis: null,
+      selectedTitleId: null,
+      render: {
+        template: DEFAULT_TEMPLATE,
+        quality: options.quality,
+        fps: options.fps,
+        width: options.width,
+        height: options.height,
+        format: 'mp4',
+        codec: 'h264',
+        bitrate: 12000,
+      },
+    },
+  };
+};
+
 const ensureDir = async (dirPath) => {
   await fs.mkdir(dirPath, {recursive: true});
+};
+
+const fileExists = async (filePath) => {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 const loadJson = async (filePath) => {
@@ -245,9 +296,26 @@ const loadJson = async (filePath) => {
   return JSON.parse(content);
 };
 
+const loadJsonIfExists = async (filePath) => {
+  return await fileExists(filePath) ? loadJson(filePath) : null;
+};
+
 const writeJson = async (filePath, data) => {
   await ensureDir(path.dirname(filePath));
   await fs.writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+};
+
+const normalizePublicAssetPath = (assetPath) => {
+  return safeString(assetPath).replace(/^https?:\/\/[^/]+/i, '').replace(/^\/+/, '');
+};
+
+const resolvePublicAssetFile = (assetPath) => {
+  const normalized = normalizePublicAssetPath(assetPath);
+  if (!normalized) {
+    return '';
+  }
+
+  return path.join(REMOTION_ROOT, 'public', normalized);
 };
 
 const selectedTitleFromState = (pipelineState) => {
@@ -573,6 +641,138 @@ const runRenderProject = async (projectId, outputPath) => {
   });
 };
 
+const loadCachedWorkflowPrefix = async ({
+  projectId,
+  projectDir,
+  topic,
+  options,
+  explicitProjectName,
+}) => {
+  const workflowStatePath = path.join(projectDir, 'workflow-state.json');
+  const cachedWorkflowState = await loadJsonIfExists(workflowStatePath);
+  const cachedInputTopic = safeString(cachedWorkflowState?.inputTopic);
+
+  if (cachedInputTopic && cachedInputTopic !== safeString(topic)) {
+    return {
+      ...createInitialRunState({projectId, topic, explicitProjectName, options}),
+      stepResults: [],
+      resumedStepCount: 0,
+      cachedWorkflowState: null,
+      resumeWarning: `检测到已有缓存主题为「${cachedInputTopic}」，与当前输入「${topic}」不一致，已放弃 resume 改为全新执行。`,
+    };
+  }
+
+  let {projectState, shotsState, pipelineState} = createInitialRunState({
+    projectId,
+    topic,
+    explicitProjectName,
+    options,
+  });
+  const stepResults = [];
+  const stepTimingEntries = [];
+
+  for (let stepId = 1; stepId <= 8; stepId += 1) {
+    const stepFilePath = path.join(projectDir, 'steps', `step-${String(stepId).padStart(2, '0')}.json`);
+    const stepResult = await loadJsonIfExists(stepFilePath);
+    if (!stepResult || Number(stepResult?.stepId) !== stepId || !stepResult?.payload || typeof stepResult.payload !== 'object') {
+      break;
+    }
+
+    stepResults.push(stepResult);
+    const merged = mergeStepResult({
+      stepId,
+      result: stepResult,
+      projectState,
+      shotsState,
+      pipelineState,
+      explicitProjectName,
+    });
+    projectState = merged.projectState;
+    shotsState = merged.shotsState;
+    pipelineState = merged.pipelineState;
+    stepTimingEntries.push({
+      stepId,
+      startedAt: null,
+      endedAt: null,
+      durationMs: 0,
+      source: stepResult?.source || 'cached',
+      model: stepResult?.model || 'cached',
+      status: 'reused',
+    });
+  }
+
+  if (stepResults.length === 8 && cachedWorkflowState) {
+    projectState = cachedWorkflowState?.projectState && typeof cachedWorkflowState.projectState === 'object'
+      ? cachedWorkflowState.projectState
+      : projectState;
+    shotsState = Array.isArray(cachedWorkflowState?.shotsState)
+      ? cachedWorkflowState.shotsState
+      : shotsState;
+    pipelineState = cachedWorkflowState?.pipelineState && typeof cachedWorkflowState.pipelineState === 'object'
+      ? {
+          ...pipelineState,
+          ...cachedWorkflowState.pipelineState,
+        }
+      : pipelineState;
+  }
+
+  return {
+    projectState,
+    shotsState,
+    pipelineState,
+    stepResults,
+    resumedStepCount: stepResults.length,
+    stepTimingEntries,
+    cachedWorkflowState,
+    resumeWarning: null,
+  };
+};
+
+const loadReusableImageSummary = async (imageManifestPath) => {
+  const manifest = await loadJsonIfExists(imageManifestPath);
+  const images = Array.isArray(manifest?.images) ? manifest.images : [];
+  if (images.length === 0) {
+    return null;
+  }
+
+  for (const image of images) {
+    if (!safeString(image?.shotId) || !safeString(image?.path)) {
+      return null;
+    }
+    if (!(await fileExists(resolvePublicAssetFile(image.path)))) {
+      return null;
+    }
+  }
+
+  return {
+    total: images.length,
+    imageManifestPath,
+    urls: images.map((image) => ({
+      shotId: safeString(image.shotId),
+      url: safeString(image.path),
+    })),
+    images,
+  };
+};
+
+const canReuseVoiceOutputs = async (workflowState) => {
+  const audioSegments = Array.isArray(workflowState?.pipelineState?.audioSegments)
+    ? workflowState.pipelineState.audioSegments
+    : [];
+
+  if (audioSegments.length === 0) {
+    return false;
+  }
+
+  for (const segment of audioSegments) {
+    if (!safeString(segment?.src) || !(await fileExists(resolvePublicAssetFile(segment.src)))) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 const applyGeneratedImages = async ({
   projectJsonPath,
   workflowStatePath,
@@ -675,6 +875,17 @@ const measureAsync = async (timingMap, key, task) => {
   }
 };
 
+const markStageReused = (timingMap, key, details = {}) => {
+  const timestamp = new Date().toISOString();
+  timingMap[key] = {
+    status: 'reused',
+    startedAt: timestamp,
+    endedAt: timestamp,
+    durationMs: 0,
+    ...details,
+  };
+};
+
 async function main() {
   const {topic, options} = parseArgs(process.argv.slice(2));
 
@@ -694,79 +905,101 @@ async function main() {
   await ensureDir(stepsDir);
 
   const explicitProjectName = safeString(options.projectName);
-  let projectState = {
-    id: projectId,
-    name: explicitProjectName || topic,
-    fps: options.fps,
-    width: options.width,
-    height: options.height,
-  };
-  let shotsState = [];
-  let pipelineState = {
-    inputTopic: topic,
-    inputTitleKeywords: topic,
-    selectedAnalysis: null,
-    selectedTitleId: null,
-    render: {
-      template: DEFAULT_TEMPLATE,
-      quality: options.quality,
-      fps: options.fps,
-      width: options.width,
-      height: options.height,
-      format: 'mp4',
-      codec: 'h264',
-      bitrate: 12000,
-    },
-  };
+  const initialRunState = createInitialRunState({
+    projectId,
+    topic,
+    explicitProjectName,
+    options,
+  });
+  let projectState = initialRunState.projectState;
+  let shotsState = initialRunState.shotsState;
+  let pipelineState = initialRunState.pipelineState;
   const stepResults = [];
   const warnings = [];
   const stageTimings = {};
   const stepTimings = [];
+  let cachedWorkflowState = null;
+  let resumedStepCount = 0;
+  let resumedFromCache = false;
+  let reusedVoice = false;
+  let reusedImages = false;
+  let reusedRender = false;
 
+  if (options.resume) {
+    const cachedPrefix = await loadCachedWorkflowPrefix({
+      projectId,
+      projectDir,
+      topic,
+      options,
+      explicitProjectName,
+    });
+    projectState = cachedPrefix.projectState;
+    shotsState = cachedPrefix.shotsState;
+    pipelineState = cachedPrefix.pipelineState;
+    stepResults.push(...cachedPrefix.stepResults);
+    stepTimings.push(...cachedPrefix.stepTimingEntries);
+    cachedWorkflowState = cachedPrefix.cachedWorkflowState;
+    resumedStepCount = cachedPrefix.resumedStepCount;
+    resumedFromCache = resumedStepCount > 0;
+
+    if (cachedPrefix.resumeWarning) {
+      warnings.push(cachedPrefix.resumeWarning);
+      process.stdout.write(`[resume] warning: ${cachedPrefix.resumeWarning}\n`);
+    } else if (resumedFromCache) {
+      process.stdout.write(`[resume] reused workflow steps 1-${resumedStepCount}\n`);
+    }
+  }
+
+  const nextWorkflowStep = resumedStepCount + 1;
   logSection('Workflow 1-8');
 
-  await measureAsync(stageTimings, 'workflow', async () => {
-    for (let stepId = 1; stepId <= 8; stepId += 1) {
-      process.stdout.write(`[workflow] step ${stepId}/8\n`);
-      const startedAt = new Date().toISOString();
-      const stepStart = Date.now();
-      const result = await generateWorkflowStep({
-        stepId,
-        generationMeta: {
-          mode: 'generate',
-          trigger: 'manual',
-          attempt: 0,
-        },
-        projectState,
-        shotsState,
-        pipelineState,
-      });
+  if (nextWorkflowStep > 8) {
+    markStageReused(stageTimings, 'workflow', {reusedSteps: resumedStepCount});
+  } else {
+    await measureAsync(stageTimings, 'workflow', async () => {
+      for (let stepId = nextWorkflowStep; stepId <= 8; stepId += 1) {
+        process.stdout.write(`[workflow] step ${stepId}/8\n`);
+        const startedAt = new Date().toISOString();
+        const stepStart = Date.now();
+        const result = await generateWorkflowStep({
+          stepId,
+          generationMeta: {
+            mode: 'generate',
+            trigger: 'manual',
+            attempt: 0,
+          },
+          projectState,
+          shotsState,
+          pipelineState,
+        });
 
-      stepTimings.push({
-        stepId,
-        startedAt,
-        endedAt: new Date().toISOString(),
-        durationMs: Date.now() - stepStart,
-        source: result?.source || 'unknown',
-        model: result?.model || 'unknown',
-      });
-      stepResults.push(result);
-      await writeJson(path.join(stepsDir, `step-${String(stepId).padStart(2, '0')}.json`), result);
+        stepTimings.push({
+          stepId,
+          startedAt,
+          endedAt: new Date().toISOString(),
+          durationMs: Date.now() - stepStart,
+          source: result?.source || 'unknown',
+          model: result?.model || 'unknown',
+          status: 'done',
+        });
+        stepResults.push(result);
+        await writeJson(path.join(stepsDir, `step-${String(stepId).padStart(2, '0')}.json`), result);
 
-      const merged = mergeStepResult({
-        stepId,
-        result,
-        projectState,
-        shotsState,
-        pipelineState,
-        explicitProjectName,
-      });
+        const merged = mergeStepResult({
+          stepId,
+          result,
+          projectState,
+          shotsState,
+          pipelineState,
+          explicitProjectName,
+        });
 
-      projectState = merged.projectState;
-      shotsState = merged.shotsState;
-      pipelineState = merged.pipelineState;
-    }
-  });
+        projectState = merged.projectState;
+        shotsState = merged.shotsState;
+        pipelineState = merged.pipelineState;
+      }
+    });
+  }
 
   pipelineState.render = {
     ...(pipelineState.render && typeof pipelineState.render === 'object' ? pipelineState.render : {}),
@@ -784,47 +1017,63 @@ async function main() {
   if (options.voice) {
     logSection('Voice');
     try {
-      const voiceResult = await measureAsync(stageTimings, 'voice', async () => {
-        const voiceJobId = `voice_${Date.now()}`;
-        return await processVoiceJob(
-          {
-            id: voiceJobId,
-            data: {
-              projectId,
-              shots: (Array.isArray(shotsState) ? shotsState : []).map((shot) => ({
-                ...shot,
-                narration: safeString(
-                  pipelineState?.voice?.byShotId?.[shot.id]?.text || shot.narration,
-                ),
-              })),
-              voiceSettings: {
-                ...(pipelineState.voice && typeof pipelineState.voice === 'object' ? pipelineState.voice : {}),
-                engine: options.voiceEngine,
-                speed: options.voiceSpeed,
-                ...(safeString(options.speaker)
-                  ? {
-                      speakerSeed: options.speaker,
-                      voice: options.speaker,
-                    }
-                  : {}),
+      if (options.resume && cachedWorkflowState && await canReuseVoiceOutputs(cachedWorkflowState)) {
+        reusedVoice = true;
+        projectState = cachedWorkflowState?.projectState && typeof cachedWorkflowState.projectState === 'object'
+          ? cachedWorkflowState.projectState
+          : projectState;
+        shotsState = Array.isArray(cachedWorkflowState?.shotsState) ? cachedWorkflowState.shotsState : shotsState;
+        pipelineState = cachedWorkflowState?.pipelineState && typeof cachedWorkflowState.pipelineState === 'object'
+          ? {
+              ...pipelineState,
+              ...cachedWorkflowState.pipelineState,
+            }
+          : pipelineState;
+        markStageReused(stageTimings, 'voice');
+        process.stdout.write(`[voice] reused ${Array.isArray(pipelineState.audioSegments) ? pipelineState.audioSegments.length : 0} cached audio segments\n`);
+      } else {
+        const voiceResult = await measureAsync(stageTimings, 'voice', async () => {
+          const voiceJobId = `voice_${Date.now()}`;
+          return await processVoiceJob(
+            {
+              id: voiceJobId,
+              data: {
+                projectId,
+                shots: (Array.isArray(shotsState) ? shotsState : []).map((shot) => ({
+                  ...shot,
+                  narration: safeString(
+                    pipelineState?.voice?.byShotId?.[shot.id]?.text || shot.narration,
+                  ),
+                })),
+                voiceSettings: {
+                  ...(pipelineState.voice && typeof pipelineState.voice === 'object' ? pipelineState.voice : {}),
+                  engine: options.voiceEngine,
+                  speed: options.voiceSpeed,
+                  ...(safeString(options.speaker)
+                    ? {
+                        speakerSeed: options.speaker,
+                        voice: options.speaker,
+                      }
+                    : {}),
+                },
               },
             },
-          },
-          (pct, message) => {
-            process.stdout.write(`[voice] ${String(pct).padStart(3, ' ')}% ${message}\n`);
-          },
-        );
-      });
+            (pct, message) => {
+              process.stdout.write(`[voice] ${String(pct).padStart(3, ' ')}% ${message}\n`);
+            },
+          );
+        });
 
-      const adjusted = applyVoiceDurations(shotsState, voiceResult.queue, options.fps);
-      shotsState = adjusted.shots;
-      pipelineState.voice = updateVoiceState(pipelineState, voiceResult.queue);
-      pipelineState.render = {
-        ...(pipelineState.render && typeof pipelineState.render === 'object' ? pipelineState.render : {}),
-        estimatedDuration: sumShotDurations(shotsState),
-      };
-      pipelineState.audioSegments = adjusted.audioSegments;
-      process.stdout.write(`[voice] total clips=${voiceResult.totalClips}, total duration=${voiceResult.totalDurationSeconds}s\n`);
+        const adjusted = applyVoiceDurations(shotsState, voiceResult.queue, options.fps);
+        shotsState = adjusted.shots;
+        pipelineState.voice = updateVoiceState(pipelineState, voiceResult.queue);
+        pipelineState.render = {
+          ...(pipelineState.render && typeof pipelineState.render === 'object' ? pipelineState.render : {}),
+          estimatedDuration: sumShotDurations(shotsState),
+        };
+        pipelineState.audioSegments = adjusted.audioSegments;
+        process.stdout.write(`[voice] total clips=${voiceResult.totalClips}, total duration=${voiceResult.totalDurationSeconds}s\n`);
+      }
     } catch (error) {
       const message = `配音生成失败，已保留无音轨项目继续执行：${error.message}`;
       warnings.push(message);
@@ -880,21 +1129,32 @@ async function main() {
   if (options.images) {
     logSection('Images');
     try {
-      const imageResult = await measureAsync(stageTimings, 'images', async () => {
-        return await runGenerateProjectImages(projectId, buildResult.imagePromptsPath);
-      });
-      generatedImageSummary = await applyGeneratedImages({
-        projectJsonPath,
-        workflowStatePath,
-        imageManifestPath,
-        images: imageResult.images,
-      });
+      const reusableImageSummary = options.resume
+        ? await loadReusableImageSummary(imageManifestPath)
+        : null;
 
-      logSection('Rebuild');
-      buildResult = await measureAsync(stageTimings, 'rebuild', async () => {
-        return await runBuildProject(projectId);
-      });
-      process.stdout.write(`[images] generated=${generatedImageSummary.total}\n`);
+      if (reusableImageSummary) {
+        reusedImages = true;
+        generatedImageSummary = reusableImageSummary;
+        markStageReused(stageTimings, 'images', {count: reusableImageSummary.total});
+        process.stdout.write(`[images] reused=${generatedImageSummary.total}\n`);
+      } else {
+        const imageResult = await measureAsync(stageTimings, 'images', async () => {
+          return await runGenerateProjectImages(projectId, buildResult.imagePromptsPath);
+        });
+        generatedImageSummary = await applyGeneratedImages({
+          projectJsonPath,
+          workflowStatePath,
+          imageManifestPath,
+          images: imageResult.images,
+        });
+
+        logSection('Rebuild');
+        buildResult = await measureAsync(stageTimings, 'rebuild', async () => {
+          return await runBuildProject(projectId);
+        });
+        process.stdout.write(`[images] generated=${generatedImageSummary.total}\n`);
+      }
     } catch (error) {
       const message = `分镜图资产生成失败，已保留当前项目继续执行：${error.message}`;
       warnings.push(message);
@@ -909,9 +1169,15 @@ async function main() {
       ? path.resolve(process.cwd(), options.output)
       : path.join(REMOTION_ROOT, 'public', 'assets', 'outputs', projectId, `${projectId}.mp4`);
     await ensureDir(path.dirname(resolvedOutputPath));
-    await measureAsync(stageTimings, 'render', async () => {
-      await runRenderProject(projectId, resolvedOutputPath);
-    });
+    if (options.resume && await fileExists(resolvedOutputPath)) {
+      reusedRender = true;
+      markStageReused(stageTimings, 'render', {outputPath: resolvedOutputPath});
+      process.stdout.write(`[render] reused existing output ${resolvedOutputPath}\n`);
+    } else {
+      await measureAsync(stageTimings, 'render', async () => {
+        await runRenderProject(projectId, resolvedOutputPath);
+      });
+    }
   }
 
   const report = {
@@ -922,6 +1188,12 @@ async function main() {
     renderEnabled: Boolean(options.render),
     imagesEnabled: Boolean(options.images),
     voiceEnabled: Boolean(options.voice),
+    resumeEnabled: Boolean(options.resume),
+    resumedFromCache,
+    resumedStepCount,
+    reusedVoice,
+    reusedImages,
+    reusedRender,
     shotCount: projectShots.length,
     durationSeconds: sumShotDurations(shotsState),
     projectJsonPath,

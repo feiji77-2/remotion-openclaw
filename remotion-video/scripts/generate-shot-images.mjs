@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 /**
  * Shot Image Generator
- * 根据 Step 5 的中文展示字段生成 9:16 SVG 分镜图，并在 stdout 输出进度事件。
+ * 根据 Step 5 的中文展示字段生成 SVG 分镜图，并在 stdout 输出进度事件。
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-const WIDTH = 1080;
-const HEIGHT = 1920;
+const DEFAULT_WIDTH = 1080;
+const DEFAULT_HEIGHT = 1920;
+let WIDTH = DEFAULT_WIDTH;
+let HEIGHT = DEFAULT_HEIGHT;
 
 const MOTIFS = {
   cinematic: (accent = '#8b5cf6') => `
@@ -1070,6 +1072,198 @@ function buildSystemHeroSvg({
 </svg>`;
 }
 
+function splitLandscapeLines(text, maxChars = 14, maxLines = 2) {
+  const value = localizeDisplayText(text);
+  if (!value) {
+    return [];
+  }
+
+  const segments = value
+    .split(/(?<=[，：:、\s])/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const lines = [];
+  let current = '';
+
+  for (const segment of segments.length > 0 ? segments : [value]) {
+    if (!current) {
+      current = segment;
+      continue;
+    }
+
+    if ((current + segment).length <= maxChars) {
+      current += segment;
+      continue;
+    }
+
+    lines.push(current);
+    current = segment;
+    if (lines.length >= maxLines - 1) {
+      break;
+    }
+  }
+
+  if (lines.length < maxLines && current) {
+    lines.push(current);
+  }
+
+  if (lines.length === 0) {
+    lines.push(value);
+  }
+
+  return lines
+    .slice(0, maxLines)
+    .map((line, index) => index === maxLines - 1 ? truncate(line, maxChars + 6) : truncate(line, maxChars + 2));
+}
+
+function buildLandscapeSvg({
+  id,
+  title,
+  subtitle,
+  visualSummary,
+  visualFocus,
+  comparisonSummary,
+  dataHighlights,
+  style,
+  accent,
+  heroMark,
+  topLabel,
+  orbitLabels,
+  bottomLine,
+  motifKey,
+}) {
+  const titleLines = splitLandscapeLines(title, 14, 2);
+  const subtitleText = esc(truncate(subtitle || visualFocus || comparisonSummary, 34));
+  const summaryText = esc(truncate(localizeDisplayText(visualSummary || comparisonSummary || visualFocus), 72));
+  const focusText = esc(truncate(localizeDisplayText(visualFocus || comparisonSummary), 30));
+  const footer = esc(buildBottomLine({bottomLine}));
+  const hero = esc(buildHeroMark({
+    title,
+    subtitle,
+    visualFocus,
+    comparisonSummary,
+    dataHighlights,
+    heroMark,
+    topLabel,
+  }));
+  const orbit = buildOrbitLabels({
+    orbitLabels,
+    visualFocus,
+    dataHighlights,
+    subtitle,
+    motifKey,
+    visualSystem: 'ultimate-1080p',
+  }).slice(0, 4);
+  const infoCards = dedupeTextList([
+    ...toTextList(dataHighlights),
+    ...splitSemanticTokens(visualFocus),
+    ...splitSemanticTokens(comparisonSummary),
+  ]).slice(0, 4);
+  const topChip = esc(cleanToken(topLabel));
+  const panelX = WIDTH - 760;
+  const panelY = 142;
+  const panelWidth = 620;
+  const panelHeight = 660;
+  const titleFontSize = titleLines[0]?.length > 10 ? 86 : 94;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${style === 'warm' ? '#10141a' : '#080b14'}"/>
+      <stop offset="56%" stop-color="${style === 'cool' ? '#091623' : '#0b1020'}"/>
+      <stop offset="100%" stop-color="${style === 'warm' ? '#1b1209' : '#121226'}"/>
+    </linearGradient>
+    <linearGradient id="panelGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${accent}" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.02"/>
+    </linearGradient>
+    <radialGradient id="heroGlow" cx="50%" cy="50%" r="56%">
+      <stop offset="0%" stop-color="${accent}" stop-opacity="0.28"/>
+      <stop offset="40%" stop-color="${accent}" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="${accent}" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softBlur">
+      <feGaussianBlur stdDeviation="28"/>
+    </filter>
+  </defs>
+
+  <rect width="${WIDTH}" height="${HEIGHT}" fill="url(#bg)"/>
+  <circle cx="${panelX + 320}" cy="${panelY + 320}" r="360" fill="url(#heroGlow)" filter="url(#softBlur)"/>
+  <circle cx="240" cy="210" r="180" fill="${accent}" fill-opacity="0.06" filter="url(#softBlur)"/>
+  <circle cx="${WIDTH - 220}" cy="${HEIGHT - 150}" r="220" fill="#f59e0b" fill-opacity="0.05" filter="url(#softBlur)"/>
+
+  <g opacity="0.13">
+    ${buildSubtleMotif(motifKey, accent)}
+  </g>
+
+  <line x1="120" y1="860" x2="${WIDTH - 120}" y2="860" stroke="rgba(255,255,255,0.08)" stroke-width="1.2"/>
+  <line x1="120" y1="128" x2="480" y2="128" stroke="${accent}" stroke-opacity="0.22" stroke-width="2"/>
+
+  ${topChip ? `
+  <g transform="translate(128 144)">
+    <rect x="0" y="0" width="${Math.max(140, topChip.length * 28)}" height="52" rx="26"
+      fill="rgba(6,18,28,0.56)" stroke="${accent}" stroke-opacity="0.42" stroke-width="1.2"/>
+    <circle cx="24" cy="26" r="6" fill="${accent}"/>
+    <text x="42" y="34" fill="${accent}" font-size="22" font-weight="700"
+      font-family="PingFang SC, Microsoft YaHei, sans-serif">${topChip}</text>
+  </g>` : ''}
+
+  ${titleLines.map((line, index) => `
+  <text x="132" y="${topChip ? 304 + index * 110 : 256 + index * 110}" fill="#f5f7fb"
+    font-size="${titleFontSize}" font-weight="700" font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(line)}</text>
+  `).join('')}
+
+  ${subtitleText ? `
+  <text x="136" y="${topChip ? 542 : 494}" fill="${accent}" font-size="30" font-weight="600"
+    font-family="PingFang SC, Microsoft YaHei, sans-serif">${subtitleText}</text>` : ''}
+
+  ${summaryText ? `
+  <text x="136" y="${topChip ? 622 : 574}" fill="rgba(255,255,255,0.82)" font-size="32" font-weight="500"
+    font-family="PingFang SC, Microsoft YaHei, sans-serif">${summaryText}</text>` : ''}
+
+  ${focusText ? `
+  <text x="136" y="${topChip ? 688 : 640}" fill="rgba(255,255,255,0.56)" font-size="24" font-weight="500"
+    font-family="PingFang SC, Microsoft YaHei, sans-serif">${focusText}</text>` : ''}
+
+  <g transform="translate(${panelX} ${panelY})">
+    <rect x="0" y="0" width="${panelWidth}" height="${panelHeight}" rx="36"
+      fill="rgba(7, 10, 18, 0.58)" stroke="rgba(194,219,255,0.18)" stroke-width="1.6"/>
+    <rect x="18" y="18" width="${panelWidth - 36}" height="${panelHeight - 36}" rx="28"
+      fill="url(#panelGlow)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    <circle cx="${panelWidth / 2}" cy="250" r="180" fill="url(#heroGlow)"/>
+    <circle cx="${panelWidth / 2}" cy="250" r="148" fill="none" stroke="${accent}" stroke-opacity="0.2" stroke-width="2"/>
+    <circle cx="${panelWidth / 2}" cy="250" r="102" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.2"/>
+    <text x="${panelWidth / 2}" y="282" text-anchor="middle" fill="${accent}" font-size="${hero.length >= 3 ? 122 : 148}" font-weight="700"
+      font-family="Georgia, Times New Roman, serif" letter-spacing="-3">${hero}</text>
+    <text x="${panelWidth / 2}" y="446" text-anchor="middle" fill="#f5f7fb" font-size="42" font-weight="700"
+      font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(truncate(title, 20))}</text>
+    <text x="${panelWidth / 2}" y="508" text-anchor="middle" fill="${accent}" font-size="24" font-weight="600"
+      font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(truncate(subtitle || visualFocus || comparisonSummary, 22))}</text>
+    ${orbit.map((item, index) => `
+    <g transform="translate(${78 + (index % 2) * 254} ${552 + Math.floor(index / 2) * 72})">
+      <rect x="0" y="0" width="210" height="46" rx="23" fill="rgba(255,255,255,0.05)" stroke="${accent}" stroke-opacity="0.16" stroke-width="1"/>
+      <circle cx="18" cy="23" r="5" fill="${accent}"/>
+      <text x="34" y="30" fill="rgba(255,255,255,0.88)" font-size="18" font-weight="600"
+        font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(truncate(item, 14))}</text>
+    </g>`).join('')}
+  </g>
+
+  ${infoCards.map((item, index) => `
+  <g transform="translate(${128 + index * 330} 902)">
+    <rect x="0" y="0" width="292" height="108" rx="24" fill="rgba(255,255,255,0.04)" stroke="${accent}" stroke-opacity="${index === 0 ? '0.36' : '0.14'}" stroke-width="1.2"/>
+    <text x="24" y="42" fill="${index === 0 ? accent : 'rgba(255,255,255,0.6)'}" font-size="16" font-weight="700"
+      font-family="Inter, PingFang SC, Microsoft YaHei, sans-serif">POINT ${String(index + 1).padStart(2, '0')}</text>
+    <text x="24" y="78" fill="#f5f7fb" font-size="28" font-weight="700"
+      font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(truncate(item, 16))}</text>
+  </g>`).join('')}
+
+  ${footer ? `
+  <text x="${WIDTH / 2}" y="${HEIGHT - 92}" text-anchor="middle" fill="#ffffff" font-size="34" font-weight="700"
+    font-family="PingFang SC, Microsoft YaHei, sans-serif">${footer}</text>` : ''}
+</svg>`;
+}
+
 function buildSvg({
   visualSystem = 'poster-hero',
   shotIndex = 0,
@@ -1092,6 +1286,27 @@ function buildSvg({
   const accent = style === 'warm' ? '#f59e0b' : style === 'cool' ? '#06b6d4' : '#8b5cf6';
   const titlePresentation = resolveTitlePresentation({title, topLabel});
   const displaySubtitle = buildSubtitle({visualFocus, comparisonSummary, subtitle});
+  const isLandscape = WIDTH >= HEIGHT;
+
+  if (isLandscape) {
+    return buildLandscapeSvg({
+      id,
+      title: titlePresentation.title || title,
+      subtitle: displaySubtitle,
+      visualSummary,
+      visualFocus,
+      comparisonSummary,
+      dataHighlights,
+      style,
+      accent,
+      heroMark,
+      topLabel: titlePresentation.topLabel,
+      orbitLabels,
+      bottomLine,
+      motifKey,
+    });
+  }
+
   const useBrandHero = shouldUseBrandHero({
     visualSystem,
     shotIndex,
@@ -1326,6 +1541,8 @@ async function main() {
   const visualSystem = typeof promptsData?.visualSystem === 'string' && promptsData.visualSystem.trim()
     ? promptsData.visualSystem.trim()
     : 'poster-hero';
+  WIDTH = Math.max(320, Math.round(Number(promptsData?.canvasWidth || promptsData?.renderWidth || DEFAULT_WIDTH) || DEFAULT_WIDTH));
+  HEIGHT = Math.max(320, Math.round(Number(promptsData?.canvasHeight || promptsData?.renderHeight || DEFAULT_HEIGHT) || DEFAULT_HEIGHT));
   const shotMetaMap = Object.fromEntries(
     (Array.isArray(promptsData?.shots) ? promptsData.shots : [])
       .filter((item) => item && item.id)

@@ -1,11 +1,11 @@
 import {registerRoot} from 'remotion';
 import {Composition} from 'remotion';
-import {OpenClawVideo} from './OpenClawVideo';
 import {FPS, TOTAL_DURATION_SEC, VIDEO_HEIGHT, VIDEO_WIDTH} from './data/storyboard';
 import type {SRTSubtitle} from './components/SRTParser';
 import Video1v4 from './compositions/Video1v4';
+import FileBackedOpenClawVideo from './compositions/FileBackedOpenClawVideo';
+import FileBackedUltimateSceneTemplate from './compositions/FileBackedUltimateSceneTemplate';
 import UltimateElementsLibrary, {ULTIMATE_ELEMENTS_LIBRARY_DURATION} from './compositions/UltimateElementsLibrary';
-import UltimateSceneTemplate from './compositions/UltimateSceneTemplate';
 import {type UltimateProjectConfig, getUltimateProjectDuration} from './components/ultimate-kit';
 import {ULTIMATE_SCENE_DEMO} from './data/ultimateSceneDemo';
 import {SEGMENTS, TRANSITION_FRAMES} from './data/segments_meta_v4h';
@@ -98,6 +98,7 @@ export type CaptionStyleSegmentProps = {
 export type VideoTheme = 'tech-dark' | 'minimal-light' | 'neon';
 
 export type VideoProps = {
+  propsFile?: string | null;
   subtitleFile?: string;
   subtitleStyle?: 'caption' | 'bottom';
   template?: 'caption' | 'split' | 'fullscreen' | 'card-draw' | 'ultimate';
@@ -122,9 +123,14 @@ export type VideoProps = {
 };
 
 export type UltimateSceneCompositionProps = {
+  propsFile?: string | null;
   config?: UltimateProjectConfig;
   voiceFile?: string | null;
   audioSegments?: AudioSegmentProps[] | null;
+  durationInFrames?: number;
+  renderFps?: number;
+  renderWidth?: number;
+  renderHeight?: number;
 };
 
 const DEFAULT_PROPS: VideoProps = {
@@ -153,7 +159,7 @@ export const RemotionRoot: React.FC = () => {
       {/* OpenClaw 通用模板 */}
       <Composition
         id="OpenClawVideo"
-        component={OpenClawVideo as React.FC<Record<string, unknown>>}
+        component={FileBackedOpenClawVideo as React.FC<Record<string, unknown>>}
         durationInFrames={ROOT_DURATION_IN_FRAMES}
         fps={FPS}
         width={VIDEO_WIDTH}
@@ -194,19 +200,22 @@ export const RemotionRoot: React.FC = () => {
       />
       <Composition
         id="UltimateSceneTemplate"
-        component={UltimateSceneTemplate as React.FC<Record<string, unknown>>}
+        component={FileBackedUltimateSceneTemplate as React.FC<Record<string, unknown>>}
         durationInFrames={getUltimateProjectDuration(ULTIMATE_SCENE_DEMO)}
         fps={30}
         width={1920}
         height={1080}
         calculateMetadata={({props}: {props: UltimateSceneCompositionProps}) => {
           const resolvedConfig = props?.config ?? ULTIMATE_SCENE_DEMO;
+          const durationInFrames = props?.durationInFrames
+            ? resolvePositiveInt(props.durationInFrames, getUltimateProjectDuration(resolvedConfig))
+            : getUltimateProjectDuration(resolvedConfig);
 
           return {
-            durationInFrames: getUltimateProjectDuration(resolvedConfig),
-            fps: 30,
-            width: 1920,
-            height: 1080,
+            durationInFrames,
+            fps: resolvePositiveInt(props?.renderFps, 30),
+            width: resolvePositiveInt(props?.renderWidth, 1920),
+            height: resolvePositiveInt(props?.renderHeight, 1080),
           };
         }}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

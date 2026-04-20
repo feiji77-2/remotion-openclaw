@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 
+import crypto from 'node:crypto';
 import {existsSync} from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {detectPreferredBrowserExecutable, resolveChromeMode} from './browser-paths.mjs';
+
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..');
 
 const hasCliFlag = (args, flag) => {
   return args.some((arg, index) => {
@@ -15,6 +20,11 @@ const hasCliFlag = (args, flag) => {
 const loadJson = async (filePath) => {
   const content = await fs.readFile(filePath, 'utf8');
   return JSON.parse(content);
+};
+
+const writeJson = async (filePath, data) => {
+  await fs.mkdir(path.dirname(filePath), {recursive: true});
+  await fs.writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
 };
 
 const SANDBOX_HINTS = [
@@ -48,6 +58,35 @@ const resolveRemotionLaunch = (cwd) => {
     command: 'npx',
     argsPrefix: ['remotion'],
     displayCommand: 'npx remotion',
+  };
+};
+
+const getUltimateDurationInFrames = (config) => {
+  const scenes = Array.isArray(config?.scenes) ? config.scenes : [];
+  return scenes.reduce((sum, scene) => {
+    return sum + Math.max(1, Math.round(Number(scene?.durationInFrames) || 1));
+  }, 0);
+};
+
+const stageRenderPropsFile = async (projectRoot, projectId, renderProps, compositionId) => {
+  const propsJson = JSON.stringify(renderProps);
+  const hash = crypto.createHash('sha1').update(propsJson).digest('hex').slice(0, 12);
+  const relativePath = `/runtime/render-props/${projectId}-${compositionId.toLowerCase()}-${hash}.json`;
+  const absolutePath = path.join(projectRoot, 'public', relativePath.replace(/^\//, ''));
+  await writeJson(absolutePath, renderProps);
+
+  const defaultDuration = compositionId === 'UltimateSceneTemplate'
+    ? getUltimateDurationInFrames(renderProps?.config)
+    : Number(renderProps?.durationInFrames) || 0;
+
+  return {
+    propsFile: relativePath,
+    durationInFrames: Math.max(1, Math.round(defaultDuration || 1)),
+    renderFps: Number(renderProps?.renderFps) || 30,
+    renderWidth: Number(renderProps?.renderWidth) || (compositionId === 'UltimateSceneTemplate' ? 1920 : 1080),
+    renderHeight: Number(renderProps?.renderHeight) || (compositionId === 'UltimateSceneTemplate' ? 1080 : 1920),
+    template: renderProps?.template,
+    projectId,
   };
 };
 
@@ -97,14 +136,16 @@ async function main() {
     process.exit(1);
   }
 
-  const launch = resolveRemotionLaunch(process.cwd());
+  const inlineProps = await stageRenderPropsFile(PROJECT_ROOT, projectId, renderProps, compositionId);
+
+  const launch = resolveRemotionLaunch(PROJECT_ROOT);
   const remotionArgs = [
     'render',
     'src/Root.tsx',
     compositionId,
     outputPath,
     '--props',
-    JSON.stringify(renderProps),
+    JSON.stringify(inlineProps),
   ];
 
   if (browserExecutable) {
@@ -126,6 +167,7 @@ async function main() {
       `[render-project] projectId=${projectId}`,
       `[render-project] composition=${compositionId}`,
       `[render-project] output=${outputPath}`,
+      `[render-project] props-file=${inlineProps.propsFile}`,
       `[render-project] cli=${launch.displayCommand}`,
       `[render-project] browser=${browserExecutable ?? 'auto-download'}`,
       renderPort ? `[render-project] port=${renderPort}` : '',
@@ -139,7 +181,7 @@ async function main() {
   let stderrBuffer = '';
 
   const child = spawn(launch.command, [...launch.argsPrefix, ...remotionArgs], {
-    cwd: process.cwd(),
+    cwd: PROJECT_ROOT,
     stdio: ['ignore', 'inherit', 'pipe'],
     shell: false,
   });

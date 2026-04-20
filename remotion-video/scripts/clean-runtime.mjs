@@ -4,9 +4,11 @@ import {fileURLToPath} from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDir, '..');
-const runtimeDirs = ['public/assets', 'public/jobs', 'public/voice', 'runtime/jobs'].map((dir) =>
+const workspaceRoot = path.resolve(projectRoot, '..');
+const runtimeDirs = ['public/assets', 'public/jobs', 'public/runtime', 'public/voice', 'runtime/jobs'].map((dir) =>
   path.join(projectRoot, dir),
 );
+const legacyRuntimeDirs = ['public/runtime'].map((dir) => path.join(workspaceRoot, dir));
 const checkOnly = process.argv.includes('--check');
 
 const relativeToProject = (targetPath) => path.relative(projectRoot, targetPath) || '.';
@@ -69,6 +71,12 @@ if (checkOnly) {
       problems.push(problem);
     }
   }
+  for (const dirPath of legacyRuntimeDirs) {
+    const legacyEntries = await listUnexpectedEntries(dirPath);
+    if (legacyEntries && legacyEntries.length > 0) {
+      problems.push(`legacy ${path.relative(workspaceRoot, dirPath)} 存在额外内容: ${legacyEntries.join(', ')}`);
+    }
+  }
   if (problems.length > 0) {
     console.error('[clean-runtime] runtime 校验失败');
     for (const problem of problems) {
@@ -83,4 +91,13 @@ if (checkOnly) {
 for (const dirPath of runtimeDirs) {
   await cleanRuntimeDir(dirPath);
   console.log(`[clean-runtime] cleaned ${relativeToProject(dirPath)}`);
+}
+
+for (const dirPath of legacyRuntimeDirs) {
+  const entries = await listUnexpectedEntries(dirPath);
+  if (!entries || entries.length === 0) {
+    continue;
+  }
+  await fs.rm(dirPath, {recursive: true, force: true});
+  console.log(`[clean-runtime] removed legacy ${path.relative(workspaceRoot, dirPath)}`);
 }

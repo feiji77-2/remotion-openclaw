@@ -191,6 +191,8 @@ async function main() {
     projectId,
     title: projectTitle,
     visualSystem,
+    canvasWidth: width,
+    canvasHeight: height,
     shots: normalizedShots,
     byShotId: Object.fromEntries(
       normalizedShots.map((shot) => [
