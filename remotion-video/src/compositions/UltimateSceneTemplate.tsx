@@ -1,5 +1,5 @@
 import React from 'react';
-import {Sequence} from 'remotion';
+import {Audio, Sequence, staticFile} from 'remotion';
 import {
   UltimateCodePanel,
   UltimateCtaPanel,
@@ -68,12 +68,36 @@ const resolveSceneOverlay = (
   };
 };
 
-export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({config}) => {
+const normalizeStaticAssetPath = (assetPath: string) => assetPath.replace(/^\/+/, '');
+
+const resolveAudioSource = (src: string) => {
+  return /^https?:\/\//.test(src) ? src : staticFile(normalizeStaticAssetPath(src));
+};
+
+export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
+  config,
+  voiceFile,
+  audioSegments,
+}) => {
   const normalizedConfig = React.useMemo(() => normalizeUltimateProjectConfig(config), [config]);
   let currentFrame = 0;
 
   return (
     <>
+      {typeof voiceFile === 'string' && voiceFile.trim().length > 0 ? (
+        <Audio src={resolveAudioSource(voiceFile)} />
+      ) : null}
+      {Array.isArray(audioSegments) && (!voiceFile || voiceFile.trim().length === 0)
+        ? audioSegments.map((segment) => (
+            <Sequence
+              key={`${segment.src}-${segment.startFrame}`}
+              from={segment.startFrame}
+              durationInFrames={segment.durationInFrames}
+            >
+              <Audio src={resolveAudioSource(segment.src)} />
+            </Sequence>
+          ))
+        : null}
       {normalizedConfig.scenes.map((scene) => {
         const startFrame = currentFrame;
         currentFrame += scene.durationInFrames;

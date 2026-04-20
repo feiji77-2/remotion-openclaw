@@ -12,6 +12,10 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const { processVoiceJob } = require('../voice/voiceJob');
+const {
+  buildUltimateRenderProps,
+  isUltimateProject,
+} = require('../../scripts/lib/ultimate-project-adapter.js');
 
 const PROJECT_ROOT = path.join(__dirname, '../..');
 const PUBLIC_DIR = path.join(PROJECT_ROOT, 'public');
@@ -228,30 +232,57 @@ async function stageRemotionRender(job, files, update) {
   const directRenderFps = getPositiveInt(job.data.renderFps);
   const directRenderWidth = getPositiveInt(job.data.renderWidth);
   const directRenderHeight = getPositiveInt(job.data.renderHeight);
+  const resolvedRenderFps = directRenderFps || getPositiveInt(designRenderData.renderFps) || 30;
+  const resolvedRenderWidth = directRenderWidth || getPositiveInt(designRenderData.renderWidth);
+  const resolvedRenderHeight = directRenderHeight || getPositiveInt(designRenderData.renderHeight);
+  const publicVoiceFile = voiceFile ? `/assets/voice/${projectId}/${path.basename(voiceFile)}` : null;
+  const canUseUltimate = Array.isArray(resolvedShots) && resolvedShots.length > 0;
+  const useUltimate = canUseUltimate && isUltimateProject({
+    template,
+    visualSystem: job.data.visualSystem || designRenderData.visualSystem,
+    render: {
+      width: resolvedRenderWidth,
+      height: resolvedRenderHeight,
+    },
+  });
 
   const outputDir = path.join(OUTPUT_DIR, projectId);
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const outputFile = path.join(outputDir, `${job.id}.mp4`);
 
-  // 构建 Remotion props（传给视频组件）
-  const remotionProps = {
-    template,
-    subtitleStyle,
-    subtitleData: resolvedSubtitleData.length > 0 ? resolvedSubtitleData : null,
-    subtitleFile: subtitleFile ? `/assets/subtitles/${projectId}/${path.basename(subtitleFile)}` : null,
-    subtitleText: resolvedSubtitleText || null,
-    voiceFile: voiceFile ? `/assets/voice/${projectId}/${path.basename(voiceFile)}` : null,
-    audioSegments: Array.isArray(audioSegments) && audioSegments.length > 0 ? audioSegments : null,
-    captionStyleSegments: resolvedCaptionStyleSegments,
-    durationInFrames: directDurationInFrames || resolvedDurationInFrames,
-    renderFps: directRenderFps || getPositiveInt(designRenderData.renderFps),
-    renderWidth: directRenderWidth || getPositiveInt(designRenderData.renderWidth),
-    renderHeight: directRenderHeight || getPositiveInt(designRenderData.renderHeight),
-    projectId,
-    shots: resolvedShots,
-    typewriter: Boolean(typewriter),
-  };
+  const compositionId = useUltimate ? 'UltimateSceneTemplate' : 'OpenClawVideo';
+  const remotionProps = useUltimate
+    ? buildUltimateRenderProps({
+        projectId,
+        title: designRenderData.title || job.data.title || resolvedShots?.[0]?.title || projectId,
+        visualSystem: job.data.visualSystem || designRenderData.visualSystem || 'ultimate-1080p',
+        render: {
+          fps: resolvedRenderFps,
+          width: resolvedRenderWidth || 1920,
+          height: resolvedRenderHeight || 1080,
+        },
+        shots: resolvedShots,
+        voiceFile: publicVoiceFile,
+        audioSegments: Array.isArray(audioSegments) && audioSegments.length > 0 ? audioSegments : null,
+      })
+    : {
+        template,
+        subtitleStyle,
+        subtitleData: resolvedSubtitleData.length > 0 ? resolvedSubtitleData : null,
+        subtitleFile: subtitleFile ? `/assets/subtitles/${projectId}/${path.basename(subtitleFile)}` : null,
+        subtitleText: resolvedSubtitleText || null,
+        voiceFile: publicVoiceFile,
+        audioSegments: Array.isArray(audioSegments) && audioSegments.length > 0 ? audioSegments : null,
+        captionStyleSegments: resolvedCaptionStyleSegments,
+        durationInFrames: directDurationInFrames || resolvedDurationInFrames,
+        renderFps: resolvedRenderFps,
+        renderWidth: resolvedRenderWidth,
+        renderHeight: resolvedRenderHeight,
+        projectId,
+        shots: resolvedShots,
+        typewriter: Boolean(typewriter),
+      };
 
   const propsJson = JSON.stringify(remotionProps);
 
@@ -261,7 +292,7 @@ async function stageRemotionRender(job, files, update) {
   const args = [
     'remotion', 'render',
     'src/Root.tsx',
-    'OpenClawVideo',
+    compositionId,
     outputFile,
     '--props', propsJson,
     '--log', 'info',

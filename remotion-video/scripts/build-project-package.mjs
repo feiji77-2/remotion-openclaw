@@ -2,11 +2,19 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import ultimateAdapter from './lib/ultimate-project-adapter.js';
 
 const DEFAULT_FPS = 30;
 const DEFAULT_WIDTH = 1080;
 const DEFAULT_HEIGHT = 1920;
 const DEFAULT_VISUAL_SYSTEM = 'poster-hero';
+const {
+  ULTIMATE_TEMPLATE,
+  ULTIMATE_DEFAULT_WIDTH,
+  ULTIMATE_DEFAULT_HEIGHT,
+  isUltimateProject,
+  buildUltimateRenderProps,
+} = ultimateAdapter;
 
 const loadJson = async (filePath) => {
   const content = await fs.readFile(filePath, 'utf8');
@@ -15,9 +23,13 @@ const loadJson = async (filePath) => {
 
 const sanitizeText = (value) => String(value || '').trim();
 
-const resolveVisualSystem = (project) => {
+const resolveVisualSystem = (project, template) => {
   const value = sanitizeText(project.visualSystem);
-  return value || DEFAULT_VISUAL_SYSTEM;
+  if (value) {
+    return value;
+  }
+
+  return template === ULTIMATE_TEMPLATE ? 'ultimate-1080p' : DEFAULT_VISUAL_SYSTEM;
 };
 
 const resolveTemplate = (project) => {
@@ -26,7 +38,11 @@ const resolveTemplate = (project) => {
     return explicitTemplate;
   }
 
-  return resolveVisualSystem(project) === 'poster-hero' ? 'fullscreen' : 'split';
+  if (isUltimateProject(project)) {
+    return ULTIMATE_TEMPLATE;
+  }
+
+  return sanitizeText(project.visualSystem) === 'poster-hero' ? 'fullscreen' : 'split';
 };
 
 const buildPromptBlock = (projectTitle, shot) => {
@@ -82,11 +98,15 @@ async function main() {
 
   const projectId = sanitizeText(project.projectId) || 'test-project';
   const projectTitle = sanitizeText(project.title) || projectId;
-  const visualSystem = resolveVisualSystem(project);
   const template = resolveTemplate(project);
+  const visualSystem = resolveVisualSystem(project, template);
   const fps = Number.isFinite(project?.render?.fps) ? Math.round(project.render.fps) : DEFAULT_FPS;
-  const width = Number.isFinite(project?.render?.width) ? Math.round(project.render.width) : DEFAULT_WIDTH;
-  const height = Number.isFinite(project?.render?.height) ? Math.round(project.render.height) : DEFAULT_HEIGHT;
+  const width = Number.isFinite(project?.render?.width)
+    ? Math.round(project.render.width)
+    : (template === ULTIMATE_TEMPLATE ? ULTIMATE_DEFAULT_WIDTH : DEFAULT_WIDTH);
+  const height = Number.isFinite(project?.render?.height)
+    ? Math.round(project.render.height)
+    : (template === ULTIMATE_TEMPLATE ? ULTIMATE_DEFAULT_HEIGHT : DEFAULT_HEIGHT);
   const shots = Array.isArray(project.shots) ? project.shots : [];
 
   if (shots.length === 0) {
@@ -154,7 +174,11 @@ async function main() {
     ),
   };
 
-  const renderProps = {
+  const imagePromptsPath = path.join(projectDir, 'image-prompts.json');
+  const renderPropsPath = path.join(projectDir, 'render-props.json');
+  const ultimateConfigPath = path.join(projectDir, 'ultimate-config.json');
+
+  let renderProps = {
     template,
     projectId,
     visualSystem,
@@ -168,8 +192,25 @@ async function main() {
     shots: normalizedShots,
   };
 
-  const imagePromptsPath = path.join(projectDir, 'image-prompts.json');
-  const renderPropsPath = path.join(projectDir, 'render-props.json');
+  let resolvedUltimateConfigPath = null;
+
+  if (template === ULTIMATE_TEMPLATE) {
+    renderProps = buildUltimateRenderProps({
+      ...project,
+      projectId,
+      title: projectTitle,
+      visualSystem,
+      render: {
+        ...(project.render && typeof project.render === 'object' ? project.render : {}),
+        fps,
+        width,
+        height,
+      },
+      shots: normalizedShots,
+    });
+    await fs.writeFile(ultimateConfigPath, `${JSON.stringify(renderProps.config, null, 2)}\n`, 'utf8');
+    resolvedUltimateConfigPath = ultimateConfigPath;
+  }
 
   await fs.writeFile(imagePromptsPath, `${JSON.stringify(imagePrompts, null, 2)}\n`, 'utf8');
   await fs.writeFile(renderPropsPath, `${JSON.stringify(renderProps, null, 2)}\n`, 'utf8');
@@ -182,6 +223,9 @@ async function main() {
       durationSeconds: Number((durationInFrames / fps).toFixed(2)),
       imagePromptsPath,
       renderPropsPath,
+      ultimateConfigPath: resolvedUltimateConfigPath,
+      compositionId: renderProps.compositionId || 'OpenClawVideo',
+      template,
       shotCount: normalizedShots.length,
     })}\n`,
   );

@@ -36,6 +36,13 @@ async function main() {
   const propsPath = path.resolve(process.cwd(), inputArg);
   const props = await loadJson(propsPath);
   const projectId = String(props.projectId || 'project-render').trim() || 'project-render';
+  const shouldUseUltimate = (
+    String(props.compositionId || '').trim() === 'UltimateSceneTemplate'
+      || props.renderTemplate === 'ultimate'
+      || props.template === 'ultimate'
+      || (props.config && Array.isArray(props.config.scenes))
+  );
+  const compositionId = shouldUseUltimate ? 'UltimateSceneTemplate' : 'OpenClawVideo';
   const outputPath = outputArg
     ? path.resolve(process.cwd(), outputArg)
     : path.resolve(process.cwd(), 'out', `${projectId}.mp4`);
@@ -49,14 +56,27 @@ async function main() {
 
   await fs.mkdir(path.dirname(outputPath), {recursive: true});
 
+  const renderProps = compositionId === 'UltimateSceneTemplate'
+    ? {
+        config: props.config,
+        voiceFile: typeof props.voiceFile === 'string' ? props.voiceFile : null,
+        audioSegments: Array.isArray(props.audioSegments) ? props.audioSegments : null,
+      }
+    : props;
+
+  if (compositionId === 'UltimateSceneTemplate' && (!props.config || !Array.isArray(props.config.scenes))) {
+    console.error('[render-project] Missing Ultimate config.scenes in render props.');
+    process.exit(1);
+  }
+
   const remotionArgs = [
     'remotion',
     'render',
     'src/Root.tsx',
-    'OpenClawVideo',
+    compositionId,
     outputPath,
     '--props',
-    JSON.stringify(props),
+    JSON.stringify(renderProps),
   ];
 
   if (browserExecutable) {
@@ -76,6 +96,7 @@ async function main() {
   process.stdout.write(
     [
       `[render-project] projectId=${projectId}`,
+      `[render-project] composition=${compositionId}`,
       `[render-project] output=${outputPath}`,
       `[render-project] browser=${browserExecutable ?? 'auto-download'}`,
       renderPort ? `[render-project] port=${renderPort}` : '',

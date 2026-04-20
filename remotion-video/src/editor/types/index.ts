@@ -333,6 +333,6 @@ export interface IRenderJob {
   design: IDesign;
   outputFormat: 'mp4' | 'json';
   quality: 'low' | 'medium' | 'high';
-  template?: 'caption' | 'split' | 'fullscreen';
+  template?: 'caption' | 'split' | 'fullscreen' | 'ultimate';
   webhookUrl?: string;
 }

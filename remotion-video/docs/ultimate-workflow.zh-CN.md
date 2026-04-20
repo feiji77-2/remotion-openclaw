@@ -114,6 +114,23 @@ node scripts/render-ultimate-scene.mjs --outline ./my-outline.json --out out/my-
 node scripts/compile-ultimate-outline.mjs --outline ./my-outline.json --out out/my-video.compiled.json
 ```
 
+## 接回原工作流
+
+现在 `Ultimate` 不再只是单独的大纲模板，它已经可以接回原来的搜索驱动流程。
+
+- 原工作流继续负责：`搜索标题/主题 -> 分析 -> 标题 -> 文案 -> 分镜 -> 配音`
+- 当 `render.template = "ultimate"` 时，构建和渲染会自动切到 `UltimateSceneTemplate`
+- 如果项目输出尺寸是 `1920x1080` 横版，构建脚本也会优先判定为 `Ultimate`
+- 原工作流里的 `shots / narration / keywords / dataPoints` 会自动编译成 `Ultimate` scenes
+- 配音文件也会直接挂进 `Ultimate` composition，不再丢失音轨
+
+对应入口：
+
+- [`scripts/lib/ultimate-project-adapter.js`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/lib/ultimate-project-adapter.js)
+- [`scripts/build-project-package.mjs`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/build-project-package.mjs)
+- [`scripts/render-project.mjs`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/render-project.mjs)
+- [`server/workers/renderWorker.js`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/server/workers/renderWorker.js)
+
 ## 推荐实战顺序
 
 1. 复制 [`examples/ultimate-outline-template.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-outline-template.json)

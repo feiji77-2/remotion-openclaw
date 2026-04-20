@@ -3,7 +3,7 @@
 export type { SegmentMeta } from './video-gen';
 
 
-export type TemplateType = 'caption' | 'split' | 'fullscreen';
+export type TemplateType = 'caption' | 'split' | 'fullscreen' | 'ultimate';
 export type VoiceType = 'chattts' | 'melo' | 'azure';
 export type RenderStatus = 'pending' | 'running' | 'done' | 'error';
 

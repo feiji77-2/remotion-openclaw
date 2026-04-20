@@ -265,7 +265,7 @@ const SKILL_DEFINITIONS = [
       style: '参数清楚、推荐理由简洁。',
       emphasis: '模板、质量、预计时长、大小和导出说明。',
       avoid: '把项目生成职责继续塞进 Step 8。',
-      notes: '默认 9:16 竖屏发布级参数。',
+      notes: '默认 9:16 竖屏发布级参数；横版 1920x1080 可选 ultimate 模板。',
     },
     constraints: [
       'Step 8 只输出渲染语义。',
@@ -940,6 +940,11 @@ function normalizeStep6Payload(payload, input) {
 function resolveStylePreset(input) {
   const promptStyle = safeString(input?.pipelineState?.prompts?.byShotId?.['shot-01']?.style);
   const renderTemplate = safeString(input?.pipelineState?.render?.template);
+  const renderWidth = toNumber(input?.pipelineState?.render?.width, 0);
+  const renderHeight = toNumber(input?.pipelineState?.render?.height, 0);
+  if (renderTemplate === 'ultimate' || (renderWidth >= renderHeight && renderWidth >= 1600)) {
+    return 'ultimate-1080p';
+  }
   if (/科技|tech|hud/i.test(promptStyle)) {
     return 'tech-dark';
   }
@@ -960,15 +965,17 @@ function buildProjectBuildPayload(input) {
   const template = safeString(input?.pipelineState?.render?.template) || 'caption';
   const quality = safeString(input?.pipelineState?.render?.quality) || 'high';
   const stylePreset = resolveStylePreset(input);
+  const compositionId = template === 'ultimate' ? 'UltimateSceneTemplate' : 'OpenClawVideo';
   const files = REMOTION_BUILD_FILES
     .filter((relativePath) => fs.existsSync(path.join(REMOTION_PROJECT_ROOT, relativePath)))
     .map((relativePath) => path.join(REMOTION_PROJECT_ROOT, relativePath));
   const missingFileCount = REMOTION_BUILD_FILES.length - files.length;
   const outputPath = path.join(REMOTION_PROJECT_ROOT, 'public', 'assets', 'outputs', projectId, `${projectId}.mp4`);
+  const renderPropsPath = path.join('projects', projectId, 'render-props.json');
 
   return {
     projectPath: REMOTION_PROJECT_ROOT,
-    compositionId: 'OpenClawVideo',
+    compositionId,
     stylePreset,
     buildStatus: missingFileCount === 0 ? 'ready' : 'missing',
     files,
@@ -976,7 +983,7 @@ function buildProjectBuildPayload(input) {
     notes: missingFileCount === 0
       ? '当前工程文件完整，可以直接进入最终渲染。'
       : `仍缺少 ${missingFileCount} 个核心构建文件，请先补齐后再渲染。`,
-    renderCommand: `npx remotion render src/Root.tsx OpenClawVideo ${outputPath} --props='{"projectId":"${projectId}","template":"${template}","quality":"${quality}"}'`,
+    renderCommand: `node scripts/render-project.mjs ${renderPropsPath} ${outputPath} --log=info`,
   };
 }
 
@@ -996,18 +1003,24 @@ function normalizeStep8Payload(payload, input) {
     : {};
   const shotDuration = (Array.isArray(input?.shotsState) ? input.shotsState : [])
     .reduce((sum, shot) => sum + toNumber(shot?.durationSeconds, 0), 0);
+  const template = safeString(render.template) || 'caption';
+  const isUltimate = template === 'ultimate';
 
-  render.template = safeString(render.template) || 'caption';
+  render.template = template;
   render.quality = safeString(render.quality) || 'high';
   render.fps = round(render.fps || 30);
-  render.width = round(render.width || 1080);
-  render.height = round(render.height || 1920);
+  render.width = round(render.width || (isUltimate ? 1920 : 1080));
+  render.height = round(render.height || (isUltimate ? 1080 : 1920));
   render.format = safeString(render.format) || 'mp4';
   render.codec = safeString(render.codec) || 'h264';
-  render.bitrate = round(render.bitrate || 8000);
+  render.bitrate = round(render.bitrate || (isUltimate ? 12000 : 8000));
   render.estimatedDuration = round(render.estimatedDuration || shotDuration || 45);
   render.estimatedSize = safeString(render.estimatedSize) || `~${Math.max(8, round((render.bitrate * render.estimatedDuration / 8) / 1024))}MB`;
-  render.notes = safeString(render.notes) || 'Step 8 只保留最终渲染语义：参数、预览、导出。';
+  render.notes = safeString(render.notes) || (
+    isUltimate
+      ? 'Step 8 采用 Ultimate 1920x1080 横版模板，适合结构化讲解、卡片拆解和章节化内容。'
+      : 'Step 8 只保留最终渲染语义：参数、预览、导出。'
+  );
   nextPayload.render = render;
   return nextPayload;
 }

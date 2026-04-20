@@ -36,7 +36,7 @@ export interface RenderResult {
 
 export interface RenderOptions {
   design: IDesign;
-  template?: 'caption' | 'split' | 'fullscreen';
+  template?: 'caption' | 'split' | 'fullscreen' | 'ultimate';
   quality?: 'low' | 'medium' | 'high';
   webhookUrl?: string;
   signal?: AbortSignal;

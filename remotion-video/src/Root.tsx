@@ -100,7 +100,7 @@ export type VideoTheme = 'tech-dark' | 'minimal-light' | 'neon';
 export type VideoProps = {
   subtitleFile?: string;
   subtitleStyle?: 'caption' | 'bottom';
-  template?: 'caption' | 'split' | 'fullscreen' | 'card-draw';
+  template?: 'caption' | 'split' | 'fullscreen' | 'card-draw' | 'ultimate';
   theme?: VideoTheme;
   typewriter?: boolean;
   useBundledShotAudio?: boolean;
@@ -123,6 +123,8 @@ export type VideoProps = {
 
 export type UltimateSceneCompositionProps = {
   config?: UltimateProjectConfig;
+  voiceFile?: string | null;
+  audioSegments?: AudioSegmentProps[] | null;
 };
 
 const DEFAULT_PROPS: VideoProps = {

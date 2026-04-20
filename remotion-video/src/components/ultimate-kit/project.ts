@@ -114,6 +114,12 @@ export type UltimateProjectConfig = {
 
 export type UltimateSceneTemplateProps = {
   config: UltimateProjectConfig;
+  voiceFile?: string | null;
+  audioSegments?: Array<{
+    src: string;
+    startFrame: number;
+    durationInFrames: number;
+  }> | null;
 };
 
 export type ResolvedUltimateTransitionConfig = Required<UltimateTransitionConfig>;

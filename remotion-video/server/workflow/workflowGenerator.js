@@ -542,7 +542,7 @@ function buildStepSchemaPrompt(stepId, context) {
       description: '生成渲染建议。',
       shape: {
         render: {
-          template: 'caption | split | fullscreen',
+          template: 'caption | split | fullscreen | ultimate',
           quality: 'low | medium | high',
         },
       },
@@ -771,31 +771,39 @@ function normalizeRenderPayload(candidate, input) {
   const current = clone(input.pipelineState.render || {});
   const nextRender = candidate.render && typeof candidate.render === 'object' ? candidate.render : {};
 
-  const template = ['caption', 'split', 'fullscreen'].includes(nextRender.template)
+  const template = ['caption', 'split', 'fullscreen', 'ultimate'].includes(nextRender.template)
     ? nextRender.template
     : current.template || 'caption';
   const quality = ['low', 'medium', 'high'].includes(nextRender.quality)
     ? nextRender.quality
     : current.quality || 'high';
+  const isUltimate = template === 'ultimate';
 
   // Compute sensible defaults from shots if LLM returned zeros/empties
   const shotsDur = (input.shotsState || []).reduce((s, sh) => s + (sh.durationSeconds || 5), 0);
   const computedDuration = shotsDur || toNumber(nextRender.estimatedDuration, 0);
-  const computedMB = Math.round((toNumber(nextRender.bitrate, 8000) * computedDuration / 8) / 1024);
+  const fallbackBitrate = isUltimate ? 12000 : 8000;
+  const computedMB = Math.round((toNumber(nextRender.bitrate, fallbackBitrate) * computedDuration / 8) / 1024);
 
   return {
     render: {
       template,
       quality,
       fps: toNumber(nextRender.fps || current.fps || 30, 30),
-      width: toNumber(nextRender.width || current.width || 1080, 1080),
-      height: toNumber(nextRender.height || current.height || 1920, 1920),
+      width: toNumber(nextRender.width || current.width || (isUltimate ? 1920 : 1080), isUltimate ? 1920 : 1080),
+      height: toNumber(nextRender.height || current.height || (isUltimate ? 1080 : 1920), isUltimate ? 1080 : 1920),
       format: String(nextRender.format || current.format || 'mp4').trim(),
       codec: String(nextRender.codec || current.codec || 'h264').trim(),
-      bitrate: toNumber(nextRender.bitrate || current.bitrate || 8000, 8000),
+      bitrate: toNumber(nextRender.bitrate || current.bitrate || fallbackBitrate, fallbackBitrate),
       estimatedDuration: computedDuration > 0 ? computedDuration : toNumber(current.estimatedDuration, 0),
       estimatedSize: computedMB > 0 ? '~' + computedMB + 'MB' : String(current.estimatedSize || '').trim(),
-      notes: (nextRender.notes || current.notes || '').trim() || (computedDuration > 0 ? `${computedDuration}s 竖屏视频，high 质量发布级输出` : ''),
+      notes: (nextRender.notes || current.notes || '').trim() || (
+        computedDuration > 0
+          ? isUltimate
+            ? `${computedDuration}s 横版 1920x1080 Ultimate 模板，适合结构化讲解和章节化信息视频`
+            : `${computedDuration}s 竖屏视频，high 质量发布级输出`
+          : ''
+      ),
     },
   };
 }
@@ -1186,23 +1194,52 @@ function createFallbackWorkflowPayload(stepId, input) {
 
   const totalDurationSec = shots.reduce((s, sh) => s + (sh.durationSeconds || 5), 0);
   const estimatedMB = Math.round((8000 * totalDurationSec / 8) / 1024);
-  return normalizeRenderPayload({
-    render: {
-      template: ['caption', 'split', 'fullscreen'][variant % 3] || 'caption',
-      quality: ['high', 'medium', 'high', 'low'][variant % 4] || 'high',
-      fps: 30,
+  const renderPresets = [
+    {
+      template: 'caption',
       width: 1080,
       height: 1920,
+      bitrate: 8000,
+      notes: '9:16 竖屏适合抖音/视频号，caption 模板突出口播内容',
+    },
+    {
+      template: 'split',
+      width: 1080,
+      height: 1920,
+      bitrate: 8000,
+      notes: '9:16 竖屏分屏模板，左侧文字右侧画面，适合对比讲解类内容',
+    },
+    {
+      template: 'fullscreen',
+      width: 1080,
+      height: 1920,
+      bitrate: 8000,
+      notes: '全屏模板适合视觉冲击力强的演示内容，建议配合高质量图片',
+    },
+    {
+      template: 'ultimate',
+      width: 1920,
+      height: 1080,
+      bitrate: 12000,
+      notes: 'Ultimate 1920x1080 横版模板，适合把搜索结果、文案和分镜压成章节化信息视频',
+    },
+  ];
+  const preset = renderPresets[variant % renderPresets.length] || renderPresets[0];
+  const presetEstimatedMB = Math.round((preset.bitrate * totalDurationSec / 8) / 1024);
+
+  return normalizeRenderPayload({
+    render: {
+      template: preset.template,
+      quality: ['high', 'medium', 'high', 'low'][variant % 4] || 'high',
+      fps: 30,
+      width: preset.width,
+      height: preset.height,
       format: 'mp4',
       codec: 'h264',
-      bitrate: 8000,
+      bitrate: preset.bitrate,
       estimatedDuration: Math.round(totalDurationSec),
-      estimatedSize: '~' + estimatedMB + 'MB',
-      notes: variant % 3 === 0
-        ? '9:16 竖屏适合抖音/视频号，caption 模板突出口播内容'
-        : variant % 3 === 1
-        ? '9:16 竖屏分屏模板，左侧文字右侧画面，适合对比讲解类内容'
-        : '全屏模板适合视觉冲击力强的演示内容，建议配合高质量图片',
+      estimatedSize: '~' + presetEstimatedMB + 'MB',
+      notes: preset.notes,
     },
   }, input);
 }
