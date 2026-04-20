@@ -1,5 +1,5 @@
 import React from 'react';
-import {Audio, Sequence, staticFile} from 'remotion';
+import {Audio, Img, Sequence, interpolate, spring, staticFile, useCurrentFrame} from 'remotion';
 import {
   UltimateCodePanel,
   UltimateCtaPanel,
@@ -74,6 +74,92 @@ const resolveAudioSource = (src: string) => {
   return /^https?:\/\//.test(src) ? src : staticFile(normalizeStaticAssetPath(src));
 };
 
+const resolveMediaSource = (src: string) => {
+  return /^https?:\/\//.test(src) ? src : staticFile(normalizeStaticAssetPath(src));
+};
+
+const sceneMediaLayout: Partial<Record<ResolvedUltimateSceneConfig['family'], {
+  top: number;
+  right: number;
+  width: number;
+  height: number;
+  opacity?: number;
+}>> = {
+  hero: {top: 138, right: 86, width: 392, height: 662, opacity: 0.9},
+  focus: {top: 186, right: 72, width: 332, height: 566, opacity: 0.82},
+  'feature-rail': {top: 178, right: 72, width: 332, height: 566, opacity: 0.8},
+  metrics: {top: 198, right: 74, width: 312, height: 530, opacity: 0.78},
+  cta: {top: 172, right: 98, width: 324, height: 552, opacity: 0.68},
+};
+
+const UltimateSceneMediaCard: React.FC<{scene: ResolvedUltimateSceneConfig}> = ({scene}) => {
+  const frame = useCurrentFrame();
+  const mediaSrc = typeof scene.mediaSrc === 'string' ? scene.mediaSrc.trim() : '';
+  const layout = sceneMediaLayout[scene.family];
+
+  if (!mediaSrc || !layout) {
+    return null;
+  }
+
+  const reveal = spring({
+    fps: 30,
+    frame,
+    config: {damping: 18, stiffness: 110},
+  });
+  const translateX = interpolate(reveal, [0, 1], [34, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const scale = interpolate(frame, [0, Math.max(36, scene.durationInFrames - 1)], [1.02, 1.08], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: layout.top,
+        right: layout.right,
+        width: layout.width,
+        height: layout.height,
+        borderRadius: 30,
+        overflow: 'hidden',
+        opacity: (layout.opacity ?? 0.82) * reveal,
+        transform: `translateX(${translateX}px)`,
+        border: '1px solid rgba(194, 219, 255, 0.2)',
+        boxShadow: '0 26px 90px rgba(0,0,0,0.3), 0 0 56px rgba(99,221,255,0.12)',
+        background: 'rgba(6, 10, 18, 0.56)',
+      }}
+    >
+      <Img
+        src={resolveMediaSource(mediaSrc)}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          transform: `scale(${scale})`,
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(180deg, rgba(4, 6, 12, 0.06), rgba(4, 6, 12, 0.18) 56%, rgba(4, 6, 12, 0.34) 100%)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 10,
+          borderRadius: 22,
+          border: '1px solid rgba(255,255,255,0.12)',
+        }}
+      />
+    </div>
+  );
+};
+
 export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
   config,
   voiceFile,
@@ -108,6 +194,7 @@ export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
             <UltimateSceneTransition scene={scene}>
               <UltimateStage warm={scene.warm} showGrid={scene.showGrid}>
                 {overlay ? <UltimatePlatformOverlay {...overlay} /> : null}
+                <UltimateSceneMediaCard scene={scene} />
                 {renderSceneContent(scene)}
                 <UltimateSubtitleBar text={scene.subtitle} />
               </UltimateStage>

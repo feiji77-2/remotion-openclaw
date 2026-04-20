@@ -37,6 +37,7 @@ type UltimateSceneBase = {
   family: UltimateSceneFamily;
   durationInFrames?: number;
   subtitle?: string;
+  mediaSrc?: string | null;
   warm?: boolean;
   showGrid?: boolean;
   overlay?: Partial<UltimatePlatformOverlayProps> | false;

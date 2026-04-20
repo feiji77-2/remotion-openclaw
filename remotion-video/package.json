@@ -14,6 +14,7 @@
     "content:generate": "node scripts/generate-content-manifest.js",
     "project:build": "node scripts/build-project-package.mjs",
     "project:render": "node scripts/render-project.mjs",
+    "workflow:ultimate": "node scripts/run-search-to-ultimate.mjs",
     "render:doctor": "node scripts/doctor-render-env.mjs",
     "pipeline:start": "./scripts/start-pipeline.sh",
     "pipeline:api": "node server/api/server.js",

@@ -131,6 +131,57 @@ node scripts/compile-ultimate-outline.mjs --outline ./my-outline.json --out out/
 - [`scripts/render-project.mjs`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/render-project.mjs)
 - [`server/workers/renderWorker.js`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/server/workers/renderWorker.js)
 
+## 一条命令跑完整原工作流
+
+现在已经补了真正的一键入口：
+
+- [`scripts/run-search-to-ultimate.mjs`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/run-search-to-ultimate.mjs)
+
+你在仓库根目录直接运行：
+
+```bash
+npm run workflow:ultimate -- "Claude Code 和 Codex 区别"
+```
+
+如果你在 `remotion-video` 目录里运行：
+
+```bash
+npm run workflow:ultimate -- "Claude Code 和 Codex 区别"
+```
+
+这条命令会一次性完成：
+
+- `Step 1-8 workflow`
+- 自动锁定 `Ultimate + 1920x1080`
+- 生成 `projects/<projectId>/project.json`
+- 生成 `projects/<projectId>/workflow-state.json`
+- 自动调用 `build-project-package.mjs`
+- 默认尝试生成分镜配音
+- 默认直接调用 `render-project.mjs` 出最终 mp4
+
+常用变体：
+
+```bash
+# 只生成 workflow / project / render props，不立刻渲染
+npm run workflow:ultimate -- "AI agent 工作流" --no-render
+
+# 跳过配音，只先看视觉工程产物
+npm run workflow:ultimate -- "Remotion 自动视频" --no-voice --no-render
+
+# 指定输出文件
+npm run workflow:ultimate -- "OpenAI 最新 Agent 能力" --output out/openai-agent.mp4
+```
+
+主要产物路径：
+
+- `remotion-video/projects/<projectId>/project.json`
+- `remotion-video/projects/<projectId>/workflow-state.json`
+- `remotion-video/projects/<projectId>/render-props.json`
+- `remotion-video/projects/<projectId>/ultimate-config.json`
+- `remotion-video/public/assets/outputs/<projectId>/<projectId>.mp4`
+
+这意味着你原来那条“根据搜索标题/主题生成内容，再制作视频和音频”的链路，现在已经不是概念说明，而是可直接执行的命令入口。
+
 ## 推荐实战顺序
 
 1. 复制 [`examples/ultimate-outline-template.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-outline-template.json)

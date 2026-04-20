@@ -4,6 +4,7 @@ const ULTIMATE_DEFAULT_FPS = 30;
 const ULTIMATE_DEFAULT_WIDTH = 1920;
 const ULTIMATE_DEFAULT_HEIGHT = 1080;
 const ACCENT_ROTATION = ['cyan', 'green', 'yellow', 'orange', 'purple', 'red'];
+const SCENE_MEDIA_FAMILIES = new Set(['hero', 'focus', 'feature-rail', 'metrics', 'cta']);
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -220,6 +221,7 @@ const buildTerminalOutputs = (shot) => {
 };
 
 const sceneCycle = ['focus', 'feature-rail', 'tag-matrix', 'metrics', 'feature-rail', 'focus'];
+const hasStandaloneAsciiToken = (text, token) => new RegExp(`(?:^|[^a-z])${token}(?:[^a-z]|$)`).test(text);
 
 const inferSceneFamily = (shot, index, total) => {
   const title = safeString(shot?.title);
@@ -233,11 +235,17 @@ const inferSceneFamily = (shot, index, total) => {
     return 'cta';
   }
 
-  if (/(命令|终端|日志|运行|shell|bash|terminal|cli|render)/.test(text)) {
+  if (
+    /(命令|终端|日志|运行)/.test(text)
+    || ['shell', 'bash', 'terminal', 'cli', 'render'].some((token) => hasStandaloneAsciiToken(text, token))
+  ) {
     return 'terminal';
   }
 
-  if (/(代码|schema|json|配置|脚本|api|函数|code)/.test(text)) {
+  if (
+    /(代码|配置|脚本|函数)/.test(text)
+    || ['schema', 'json', 'api', 'code'].some((token) => hasStandaloneAsciiToken(text, token))
+  ) {
     return 'code';
   }
 
@@ -381,6 +389,15 @@ function textFromShot(shot) {
   return `${safeString(shot?.title)} ${safeString(shot?.narration)} ${safeString(shot?.visualSummaryZh)} ${safeString(shot?.visualFocusZh)} ${safeString(shot?.type)} ${safeString(shot?.level)}`.toLowerCase();
 }
 
+function resolveSceneMediaSrc(family, shot) {
+  const mediaSrc = safeString(shot?.imageUrl);
+  if (!mediaSrc) {
+    return null;
+  }
+
+  return SCENE_MEDIA_FAMILIES.has(family) ? mediaSrc : null;
+}
+
 function isUltimateProject(project) {
   const explicitTemplate = safeString(project?.template || project?.renderTemplate).toLowerCase();
   const visualSystem = safeString(project?.visualSystem).toLowerCase();
@@ -420,6 +437,7 @@ function buildUltimateProjectConfig(project) {
       return {
         id: safeString(shot?.id) || `shot-${String(index + 1).padStart(2, '0')}`,
         family,
+        mediaSrc: resolveSceneMediaSrc(family, shot),
         subtitle: compactText(shot?.visualSummaryZh || shot?.narration || shot?.visualFocusZh, 72),
         durationInFrames: normalizeDurationInFrames(shot, fps),
         warm: /warm|里程碑|升级|结论|发布|收束/.test(`${safeString(shot?.style)} ${safeString(shot?.mood)} ${safeString(shot?.title)}`.toLowerCase()),

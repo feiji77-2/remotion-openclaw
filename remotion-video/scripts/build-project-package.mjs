@@ -22,6 +22,28 @@ const loadJson = async (filePath) => {
 };
 
 const sanitizeText = (value) => String(value || '').trim();
+const sanitizeListItem = (value) => {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return sanitizeText(value);
+  }
+
+  if (!value || typeof value !== 'object') {
+    return '';
+  }
+
+  return sanitizeText(
+    value.label
+    || value.value
+    || value.text
+    || value.title
+    || value.name
+    || value.point
+    || value.fact
+    || value.detail
+    || value.source
+    || '',
+  );
+};
 
 const resolveVisualSystem = (project, template) => {
   const value = sanitizeText(project.visualSystem);
@@ -120,9 +142,25 @@ async function main() {
     const durationSeconds = Number.isFinite(shot.durationSeconds)
       ? Math.max(1, Number(shot.durationSeconds))
       : 8;
+    const visual = shot.visual && typeof shot.visual === 'object'
+      ? {
+          description: sanitizeText(shot.visual.description),
+          focus: sanitizeText(shot.visual.focus),
+        }
+      : null;
+    const comparisons = Array.isArray(shot.comparisons)
+      ? shot.comparisons
+        .map((item) => ({
+          left: sanitizeText(item?.left),
+          right: sanitizeText(item?.right),
+        }))
+        .filter((item) => item.left || item.right)
+      : [];
 
     return {
       id,
+      level: sanitizeText(shot.level),
+      type: sanitizeText(shot.type),
       title,
       narration: sanitizeText(shot.narration),
       durationSeconds,
@@ -130,16 +168,18 @@ async function main() {
       posterMode: typeof shot.posterMode === 'boolean' ? shot.posterMode : visualSystem === 'poster-hero',
       heroMark: sanitizeText(shot.heroMark),
       topLabel: sanitizeText(shot.topLabel),
-      orbitLabels: Array.isArray(shot.orbitLabels) ? shot.orbitLabels.map((item) => sanitizeText(item)).filter(Boolean) : [],
+      orbitLabels: Array.isArray(shot.orbitLabels) ? shot.orbitLabels.map((item) => sanitizeListItem(item)).filter(Boolean) : [],
       bottomLine: sanitizeText(shot.bottomLine),
       visualSummaryZh: sanitizeText(shot.visualSummaryZh),
       visualFocusZh: sanitizeText(shot.visualFocusZh),
       comparisonSummaryZh: sanitizeText(shot.comparisonSummaryZh),
       mood: sanitizeText(shot.mood),
       style: sanitizeText(shot.style),
-      keywords: Array.isArray(shot.keywords) ? shot.keywords.map((item) => sanitizeText(item)).filter(Boolean) : [],
-      dataPoints: Array.isArray(shot.dataPoints) ? shot.dataPoints.map((item) => sanitizeText(item)).filter(Boolean) : [],
-      imageUrl: sanitizeText(shot.imageUrl) || `/assets/${projectId}/images/${id}.svg`,
+      visual,
+      comparisons,
+      keywords: Array.isArray(shot.keywords) ? shot.keywords.map((item) => sanitizeListItem(item)).filter(Boolean) : [],
+      dataPoints: Array.isArray(shot.dataPoints) ? shot.dataPoints.map((item) => sanitizeListItem(item)).filter(Boolean) : [],
+      imageUrl: sanitizeText(shot.imageUrl) || null,
     };
   });
 
@@ -165,7 +205,7 @@ async function main() {
           dataHighlightsZh: shot.dataPoints,
           heroMark: sanitizeText(shot.heroMark),
           topLabel: sanitizeText(shot.topLabel),
-          orbitLabels: Array.isArray(shot.orbitLabels) ? shot.orbitLabels.map((item) => sanitizeText(item)).filter(Boolean) : [],
+          orbitLabels: Array.isArray(shot.orbitLabels) ? shot.orbitLabels.map((item) => sanitizeListItem(item)).filter(Boolean) : [],
           bottomLine: sanitizeText(shot.bottomLine),
           mood: shot.mood,
           style: shot.style,

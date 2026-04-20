@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import {existsSync} from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
@@ -22,6 +23,33 @@ const SANDBOX_HINTS = [
   'Failed to launch the browser process',
   'Sandbox(Signal(6))',
 ];
+
+const resolveRemotionLaunch = (cwd) => {
+  const bundledCli = path.join(cwd, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
+  const binaryShim = path.join(cwd, 'node_modules', '.bin', 'remotion');
+
+  if (existsSync(bundledCli)) {
+    return {
+      command: process.execPath,
+      argsPrefix: [bundledCli],
+      displayCommand: `${process.execPath} ${bundledCli}`,
+    };
+  }
+
+  if (existsSync(binaryShim)) {
+    return {
+      command: binaryShim,
+      argsPrefix: [],
+      displayCommand: binaryShim,
+    };
+  }
+
+  return {
+    command: 'npx',
+    argsPrefix: ['remotion'],
+    displayCommand: 'npx remotion',
+  };
+};
 
 async function main() {
   const inputArg = process.argv[2];
@@ -69,8 +97,8 @@ async function main() {
     process.exit(1);
   }
 
+  const launch = resolveRemotionLaunch(process.cwd());
   const remotionArgs = [
-    'remotion',
     'render',
     'src/Root.tsx',
     compositionId,
@@ -93,11 +121,12 @@ async function main() {
 
   remotionArgs.push(...passthroughArgs);
 
-  process.stdout.write(
-    [
+    process.stdout.write(
+      [
       `[render-project] projectId=${projectId}`,
       `[render-project] composition=${compositionId}`,
       `[render-project] output=${outputPath}`,
+      `[render-project] cli=${launch.displayCommand}`,
       `[render-project] browser=${browserExecutable ?? 'auto-download'}`,
       renderPort ? `[render-project] port=${renderPort}` : '',
       chromeMode ? `[render-project] chrome-mode=${chromeMode}` : '',
@@ -109,7 +138,7 @@ async function main() {
 
   let stderrBuffer = '';
 
-  const child = spawn('npx', remotionArgs, {
+  const child = spawn(launch.command, [...launch.argsPrefix, ...remotionArgs], {
     cwd: process.cwd(),
     stdio: ['ignore', 'inherit', 'pipe'],
     shell: false,
