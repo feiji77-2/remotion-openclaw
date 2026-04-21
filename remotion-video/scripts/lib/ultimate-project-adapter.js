@@ -306,6 +306,48 @@ const buildStripHeading = (value, fallback = '') => {
   return compactText(buildStripItemLabel(text) || fallback || text, 20);
 };
 
+const buildCodeHeading = (shot, primaryText, fallbackTitle = '') => {
+  const text = safeString(primaryText);
+  const narrationUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+  const facts = buildCodeLines(shot)
+    .map((line) => safeString(line.text))
+    .filter((line) => /":\s*"/.test(line));
+
+  const scenarioLine = facts.find((line) => /"场景":/.test(line));
+  const flowLine = facts.find((line) => /"原流程":/.test(line));
+  const resultLine = facts.find((line) => /"提效结果":/.test(line));
+
+  const extractValue = (line) => {
+    const match = line.match(/:\s*"(.+)"[,]?$/);
+    return safeString(match?.[1] || '');
+  };
+
+  const scenarioValue = extractValue(scenarioLine || '');
+  const flowValue = extractValue(flowLine || '');
+  const resultValue = extractValue(resultLine || '');
+
+  if (/^(?:想象一下|假设|如果|比如)/.test(text)) {
+    if (scenarioValue && resultValue) {
+      return compactText(`${compactText(scenarioValue, 10)}接入 K2.6 后`, 18);
+    }
+
+    if (scenarioValue) {
+      return compactText(scenarioValue, 16);
+    }
+
+    if (flowValue && resultValue) {
+      return compactText(`${compactText(flowValue, 8)}到${compactText(resultValue, 8)}`, 18);
+    }
+  }
+
+  const usefulUnit = narrationUnits.find((item) => !/^(?:想象一下|比如|如果)/.test(item));
+  if (usefulUnit && usefulUnit.length <= 18) {
+    return compactText(usefulUnit, 18);
+  }
+
+  return compactText(text || fallbackTitle, 18);
+};
+
 const buildStripItemDetail = (value) => {
   const text = safeString(value);
 
@@ -947,7 +989,7 @@ const buildSceneData = (family, shot, index) => {
       };
     case 'code':
       return {
-        heading: title,
+        heading: buildCodeHeading(shot, primaryText, title),
         filename: '',
         lines: buildCodeLines(shot),
         highlightLine: 2,
