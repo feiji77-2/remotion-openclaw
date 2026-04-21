@@ -17,11 +17,16 @@ export const FileBackedUltimateSceneTemplate: React.FC<UltimateSceneCompositionP
   voiceFile,
   audioSegments,
 }) => {
-  const inlinePayload: InlineUltimateProps = React.useMemo(() => ({
-    config,
-    voiceFile: voiceFile ?? null,
-    audioSegments: Array.isArray(audioSegments) ? audioSegments : null,
-  }), [audioSegments, config, voiceFile]);
+  const hasPropsFile = typeof propsFile === 'string' && propsFile.trim().length > 0;
+  const inlinePayload: InlineUltimateProps = React.useMemo(() => (
+    hasPropsFile
+      ? {}
+      : {
+          config,
+          voiceFile: voiceFile ?? null,
+          audioSegments: Array.isArray(audioSegments) ? audioSegments : null,
+        }
+  ), [audioSegments, config, hasPropsFile, voiceFile]);
   const {resolvedProps, loadError} = useFileBackedProps<InlineUltimateProps>(inlinePayload, propsFile);
 
   if (loadError) {

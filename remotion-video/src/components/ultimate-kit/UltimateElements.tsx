@@ -236,23 +236,25 @@ export const UltimatePlatformOverlay: React.FC<UltimatePlatformOverlayProps> = (
           <div style={{fontSize: 28, fontWeight: 800, letterSpacing: 0.3}}>{brand}</div>
         </div>
         <div style={{fontSize: 22, color: kit.colors.textMuted}}>{account}</div>
-        <div
-          style={{
-            minWidth: 286,
-            padding: '12px 18px',
-            borderRadius: kit.radius.pill,
-            border: '1px solid rgba(210, 222, 255, 0.14)',
-            background: 'rgba(8, 10, 18, 0.56)',
-            color: kit.colors.textMuted,
-            fontSize: 20,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <span>{searchLabel}</span>
-          <span style={{opacity: 0.72}}>Q</span>
-        </div>
+        {searchLabel ? (
+          <div
+            style={{
+              minWidth: 286,
+              padding: '12px 18px',
+              borderRadius: kit.radius.pill,
+              border: '1px solid rgba(210, 222, 255, 0.14)',
+              background: 'rgba(8, 10, 18, 0.56)',
+              color: kit.colors.textMuted,
+              fontSize: 20,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>{searchLabel}</span>
+            <span style={{opacity: 0.72}}>Q</span>
+          </div>
+        ) : null}
       </div>
       <div
         style={{
@@ -317,12 +319,12 @@ export const UltimateSubtitleBar: React.FC<UltimateSubtitleBarProps> = ({text}) 
 };
 
 export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps> = ({
-  kicker = 'Ultimate scene system',
+  kicker = '',
   title,
   subtitle,
   badge,
   accent = 'orange',
-  avatarLabel = 'Kit',
+  avatarLabel = '',
 }) => {
   const frame = useCurrentFrame();
   const reveal = buildReveal(frame, 0);
@@ -344,7 +346,7 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps> = ({
         transform: `scale(${interpolate(reveal, [0, 1], [0.96, 1])})`,
       }}
     >
-      <div style={eyebrowStyle('#f3e7d9')}>{kicker}</div>
+      {kicker ? <div style={eyebrowStyle('#f3e7d9')}>{kicker}</div> : null}
       <div
         style={{
           fontFamily: kit.fonts.display,
@@ -388,41 +390,42 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps> = ({
           {subtitle}
         </div>
       ) : null}
-      <div
-        style={{
-          marginTop: 24,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 14,
-        }}
-      >
+      {avatarLabel ? (
         <div
           style={{
-            width: 98,
-            height: 98,
-            borderRadius: '50%',
-            border: `1px solid ${accentColor}55`,
-            background: `radial-gradient(circle at 35% 28%, #ffffff 0%, ${accentColor} 28%, rgba(16, 19, 28, 0.94) 82%)`,
-            boxShadow: ultimateGlow(accentColor, 0.7),
+            marginTop: 24,
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            color: '#10131c',
-            fontSize: 30,
-            fontWeight: 800,
+            gap: 14,
           }}
         >
-          {avatarLabel}
+          <div
+            style={{
+              width: 98,
+              height: 98,
+              borderRadius: '50%',
+              border: `1px solid ${accentColor}55`,
+              background: `radial-gradient(circle at 35% 28%, #ffffff 0%, ${accentColor} 28%, rgba(16, 19, 28, 0.94) 82%)`,
+              boxShadow: ultimateGlow(accentColor, 0.7),
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#10131c',
+              fontSize: 30,
+              fontWeight: 800,
+            }}
+          >
+            {avatarLabel}
+          </div>
         </div>
-        <div style={{fontSize: 22, color: kit.colors.textMuted}}>reusable author / account slot</div>
-      </div>
+      ) : null}
     </div>
   );
 };
 
 export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps> = ({
-  kicker = 'card rail',
+  kicker = '',
   heading,
   items,
 }) => {
@@ -441,10 +444,10 @@ export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps> = (
       }}
     >
       <div style={{position: 'absolute', top: 86, left: 0, right: 0}}>
-        <div style={eyebrowStyle(resolveUltimateAccent('green'))}>{kicker}</div>
+        {kicker ? <div style={eyebrowStyle(resolveUltimateAccent('green'))}>{kicker}</div> : null}
         <div
           style={{
-            marginTop: 20,
+            marginTop: kicker ? 20 : 0,
             textAlign: 'center',
             fontFamily: kit.fonts.display,
             fontSize: 78,
@@ -506,12 +509,16 @@ export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps> = (
               >
                 {item.title}
               </div>
-              <div style={{marginTop: 10, fontSize: 18, color: kit.colors.textSoft, letterSpacing: 2}}>
-                {item.eyebrow ?? 'MODULE SLOT'}
-              </div>
-              <div style={{marginTop: 18, fontSize: 24, lineHeight: 1.5, color: kit.colors.textMuted}}>
-                {item.caption ?? 'replace with your own descriptor or helper text'}
-              </div>
+              {item.eyebrow ? (
+                <div style={{marginTop: 10, fontSize: 18, color: kit.colors.textSoft, letterSpacing: 2}}>
+                  {item.eyebrow}
+                </div>
+              ) : null}
+              {item.caption ? (
+                <div style={{marginTop: 18, fontSize: 24, lineHeight: 1.5, color: kit.colors.textMuted}}>
+                  {item.caption}
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -762,7 +769,7 @@ const ScaleDiagram: React.FC<{accentColor: string}> = ({accentColor}) => {
 };
 
 export const UltimateFocusDiagram: React.FC<UltimateFocusDiagramProps> = ({
-  eyebrow = 'focus board',
+  eyebrow = '',
   keyword,
   question,
   description,
@@ -780,15 +787,15 @@ export const UltimateFocusDiagram: React.FC<UltimateFocusDiagramProps> = ({
           position: 'absolute',
           left: 160,
           top: 220,
-          width: 760,
-          opacity: reveal,
-          transform: `translateY(${interpolate(reveal, [0, 1], [24, 0])}px)`,
-        }}
-      >
-        <div style={eyebrowStyle(accentColor, false)}>{eyebrow}</div>
+        width: 760,
+        opacity: reveal,
+        transform: `translateY(${interpolate(reveal, [0, 1], [24, 0])}px)`,
+      }}
+    >
+        {eyebrow ? <div style={eyebrowStyle(accentColor, false)}>{eyebrow}</div> : null}
         <div
           style={{
-            marginTop: 18,
+            marginTop: eyebrow ? 18 : 0,
             fontFamily: kit.fonts.display,
             fontSize: 154,
             lineHeight: 0.96,
@@ -926,10 +933,9 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps> = ({heading, step
   return (
     <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
       <div style={{position: 'absolute', top: 120, left: 0, right: 0}}>
-        <div style={eyebrowStyle(resolveUltimateAccent('cyan'))}>flow system</div>
         <div
           style={{
-            marginTop: 20,
+            marginTop: 0,
             textAlign: 'center',
             fontFamily: kit.fonts.display,
             fontSize: 76,
@@ -982,13 +988,12 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps> = ({heading, step
                 >
                   {step.icon ?? `${index + 1}`}
                 </div>
-                <div style={{marginTop: 24, fontSize: 18, color: kit.colors.textSoft, letterSpacing: 3}}>
-                  STEP {String(index + 1).padStart(2, '0')}
-                </div>
                 <div style={{marginTop: 12, fontSize: 34, fontWeight: 800, lineHeight: 1.12}}>{step.label}</div>
-                <div style={{marginTop: 16, fontSize: 22, lineHeight: 1.45, color: kit.colors.textMuted}}>
-                  {step.detail ?? 'replace with your own helper line'}
-                </div>
+                {step.detail ? (
+                  <div style={{marginTop: 16, fontSize: 22, lineHeight: 1.45, color: kit.colors.textMuted}}>
+                    {step.detail}
+                  </div>
+                ) : null}
               </div>
               {index < steps.length - 1 ? (
                 <div
@@ -1014,7 +1019,7 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps> = ({heading, step
 
 export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps> = ({
   heading,
-  windowTitle = 'runtime',
+  windowTitle = '',
   command,
   outputs,
   note,
@@ -1128,10 +1133,9 @@ export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps> = ({
   return (
     <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
       <div style={{position: 'absolute', top: 120, left: 0, right: 0}}>
-        <div style={eyebrowStyle(resolveUltimateAccent('yellow'))}>matrix board</div>
         <div
           style={{
-            marginTop: 18,
+            marginTop: 0,
             textAlign: 'center',
             fontFamily: kit.fonts.display,
             fontSize: 72,
@@ -1225,7 +1229,7 @@ export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps> = ({
 
 export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
   heading,
-  filename = 'scene.tsx',
+  filename = '',
   lines,
   highlightLine = 1,
   footer,
@@ -1248,18 +1252,20 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
           ...panelStyle(accentColor),
         }}
       >
-        <div
-          style={{
-            padding: '16px 22px',
-            fontFamily: kit.fonts.mono,
-            fontSize: 18,
-            color: kit.colors.textSoft,
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            background: 'rgba(255,255,255,0.05)',
-          }}
-        >
-          {filename}
-        </div>
+        {filename ? (
+          <div
+            style={{
+              padding: '16px 22px',
+              fontFamily: kit.fonts.mono,
+              fontSize: 18,
+              color: kit.colors.textSoft,
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              background: 'rgba(255,255,255,0.05)',
+            }}
+          >
+            {filename}
+          </div>
+        ) : null}
         <div style={{padding: '24px 0 24px 0', fontFamily: kit.fonts.mono}}>
           {lines.map((line, index) => {
             const reveal = buildReveal(frame, index * 3);
@@ -1314,10 +1320,9 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({heading, 
   return (
     <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
       <div style={{position: 'absolute', top: 150, left: 0, right: 0}}>
-        <div style={eyebrowStyle(resolveUltimateAccent('green'))}>metric bars</div>
         <div
           style={{
-            marginTop: 16,
+            marginTop: 0,
             textAlign: 'center',
             fontFamily: kit.fonts.display,
             fontSize: 72,
@@ -1377,8 +1382,8 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({heading, 
 export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps> = ({
   heading,
   subtitle,
-  searchLabel = 'Search the next scene family',
-  badge = 'Your CTA goes here',
+  searchLabel = '',
+  badge = '',
 }) => {
   const frame = useCurrentFrame();
   const reveal = buildReveal(frame, 0);
@@ -1407,10 +1412,9 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps> = ({
           boxShadow: '0 0 0 24px rgba(110, 123, 255, 0.03)',
         }}
       />
-      <div style={eyebrowStyle(resolveUltimateAccent('cyan'))}>closing card</div>
       <div
         style={{
-          marginTop: 20,
+          marginTop: 0,
           fontFamily: kit.fonts.display,
           fontSize: 78,
           letterSpacing: -2,
@@ -1421,38 +1425,42 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps> = ({
       {subtitle ? (
         <div style={{marginTop: 16, fontSize: 28, color: kit.colors.textMuted, maxWidth: 720}}>{subtitle}</div>
       ) : null}
-      <div
-        style={{
-          marginTop: 34,
-          padding: '14px 20px',
-          borderRadius: kit.radius.pill,
-          border: '1px solid rgba(215, 225, 255, 0.16)',
-          background: 'rgba(8, 10, 18, 0.64)',
-          minWidth: 480,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: 20,
-          color: kit.colors.textMuted,
-        }}
-      >
-        <span>{searchLabel}</span>
-        <span style={{fontWeight: 700, color: resolveUltimateAccent('cyan')}}>GO</span>
-      </div>
-      <div
-        style={{
-          marginTop: 24,
-          padding: '10px 16px',
-          borderRadius: kit.radius.pill,
-          background: 'rgba(255,255,255,0.06)',
-          color: kit.colors.textMuted,
-          fontSize: 18,
-          letterSpacing: 2,
-          textTransform: 'uppercase',
-        }}
-      >
-        {badge}
-      </div>
+      {searchLabel ? (
+        <div
+          style={{
+            marginTop: 34,
+            padding: '14px 20px',
+            borderRadius: kit.radius.pill,
+            border: '1px solid rgba(215, 225, 255, 0.16)',
+            background: 'rgba(8, 10, 18, 0.64)',
+            minWidth: 480,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: 20,
+            color: kit.colors.textMuted,
+          }}
+        >
+          <span>{searchLabel}</span>
+          <span style={{fontWeight: 700, color: resolveUltimateAccent('cyan')}}>GO</span>
+        </div>
+      ) : null}
+      {badge ? (
+        <div
+          style={{
+            marginTop: 24,
+            padding: '10px 16px',
+            borderRadius: kit.radius.pill,
+            background: 'rgba(255,255,255,0.06)',
+            color: kit.colors.textMuted,
+            fontSize: 18,
+            letterSpacing: 2,
+            textTransform: 'uppercase',
+          }}
+        >
+          {badge}
+        </div>
+      ) : null}
     </div>
   );
 };

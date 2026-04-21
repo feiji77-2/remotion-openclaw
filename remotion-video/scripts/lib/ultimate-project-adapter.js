@@ -25,6 +25,50 @@ const compactText = (value, max = 80) => {
   return text.length > max ? `${text.slice(0, Math.max(1, max - 1))}…` : text;
 };
 
+const compactSimilarityKey = (value) => {
+  return safeString(value)
+    .replace(/[“”"'‘’（）()【】[\]，,、。！？!?\s…:：;；/\\|+-]+/g, '')
+    .toLowerCase();
+};
+
+const isCompactDuplicate = (left, right) => {
+  const leftKey = compactSimilarityKey(left);
+  const rightKey = compactSimilarityKey(right);
+
+  if (!leftKey || !rightKey) {
+    return false;
+  }
+
+  if (leftKey === rightKey) {
+    return true;
+  }
+
+  const minLength = Math.min(leftKey.length, rightKey.length);
+  return minLength >= 6 && (leftKey.includes(rightKey) || rightKey.includes(leftKey));
+};
+
+const compactUniqueItems = (items, maxChars, max = Infinity) => {
+  const output = [];
+
+  for (const item of items) {
+    const candidate = compactText(item, maxChars);
+    if (!candidate) {
+      continue;
+    }
+
+    if (output.some((entry) => isCompactDuplicate(entry, candidate))) {
+      continue;
+    }
+
+    output.push(candidate);
+    if (output.length >= max) {
+      break;
+    }
+  }
+
+  return output;
+};
+
 const asArray = (value) => {
   return Array.isArray(value) ? value.filter((item) => item !== null && item !== undefined) : [];
 };
@@ -90,6 +134,30 @@ const splitTextUnits = (value) => {
   );
 };
 
+const splitNarrationUnits = (value) => {
+  const parts = splitTextUnits(value);
+  const output = [];
+
+  for (let index = 0; index < parts.length; index += 1) {
+    const current = parts[index];
+    const next = parts[index + 1];
+
+    if (
+      next
+      && /^\d+(?:\.\d+)?月\d+日$/.test(current)
+      && !/^(?:20\d{2}[年./-]|\d+(?:\.\d+)?月\d+日|\d{1,2}[:：]\d{1,2})/.test(next)
+    ) {
+      output.push(`${current} ${next}`.trim());
+      index += 1;
+      continue;
+    }
+
+    output.push(current);
+  }
+
+  return uniqueList(output, 12);
+};
+
 const splitTitleTokens = (value) => {
   const text = safeString(value);
 
@@ -151,54 +219,60 @@ const normalizeDurationInFrames = (shot, fps) => {
 };
 
 const collectListTokens = (shot, max = 4) => {
+  const narrationUnits = splitNarrationUnits(shot?.narration);
   return uniqueList(
     [
       ...semanticArray(shot?.dataPoints),
       ...asArray(shot?.keywords),
-      ...splitTitleTokens(shot?.title),
-      ...splitTitleTokens(shot?.visualFocusZh),
-      ...splitTextUnits(shot?.narration),
+      ...narrationUnits,
     ],
     max,
   );
 };
 
 const buildFeatureItems = (shot) => {
-  const baseItems = collectListTokens(shot, 4);
+  const narrationUnits = splitNarrationUnits(shot?.narration);
+  const baseItems = uniqueList(
+    [
+      ...semanticArray(shot?.dataPoints),
+      ...narrationUnits,
+    ],
+    4,
+  );
 
   return baseItems.map((item, index) => ({
       title: compactText(item, 18),
-      eyebrow: `slot ${String.fromCharCode(97 + (index % 26))}`,
+      eyebrow: '',
       caption: compactText(
-      semanticArray(shot?.dataPoints)[index]
-        || asArray(shot?.keywords)[index]
-        || splitTextUnits(shot?.narration)[index]
-        || shot?.visualSummaryZh
-        || shot?.narration,
-      34,
-    ),
+        narrationUnits[index + 1]
+          || semanticArray(shot?.dataPoints)[index + 1]
+          || '',
+        34,
+      ),
     icon: compactText(item, 1) || String(index + 1),
     accent: inferAccent(shot, index),
   }));
 };
 
 const buildStepItems = (shot) => {
+  const narrationUnits = splitNarrationUnits(shot?.narration);
   const steps = uniqueList(
-    [...semanticArray(shot?.dataPoints), ...splitTextUnits(shot?.narration)],
+    [...semanticArray(shot?.dataPoints), ...narrationUnits],
     5,
   );
 
   return steps.map((item, index) => ({
     label: compactText(item, 18),
-    detail: compactText(splitTextUnits(shot?.visualSummaryZh)[index] || shot?.narration, 38),
+    detail: compactText(narrationUnits[index + 1] || '', 38),
     icon: String(index + 1),
     accent: inferAccent(shot, index),
   }));
 };
 
 const buildTagItems = (shot) => {
+  const narrationUnits = splitNarrationUnits(shot?.narration);
   return uniqueList(
-    [...asArray(shot?.keywords), ...semanticArray(shot?.dataPoints), ...splitTitleTokens(shot?.title)],
+    [...semanticArray(shot?.dataPoints), ...narrationUnits],
     10,
   ).map((item, index) => ({
     label: compactText(item, 18),
@@ -290,8 +364,7 @@ const buildMetricItems = (shot) => {
   const sourceItems = uniqueList(
     [
       ...semanticArray(shot?.dataPoints),
-      ...splitTextUnits(shot?.narration),
-      ...splitTextUnits(shot?.visualSummaryZh),
+      ...splitNarrationUnits(shot?.narration || shot?.visualSummaryZh),
     ],
     8,
   );
@@ -325,6 +398,7 @@ const buildMetricItems = (shot) => {
 
   return pairs
     .sort((left, right) => right.priority - left.priority)
+    .filter((item, index, array) => array.findIndex((entry) => entry.label === item.label) === index)
     .slice(0, 4)
     .map((item, index) => ({
       label: item.label,
@@ -335,25 +409,86 @@ const buildMetricItems = (shot) => {
 };
 
 const buildCodeLines = (shot) => {
-  const narrativeUnits = splitTextUnits(shot?.narration || shot?.visualSummaryZh);
-  const claim = compactText(narrativeUnits[0] || shot?.narration || shot?.visualSummaryZh || shot?.title, 34);
-  const proof = compactText(
-    uniqueList(
-      [
-        ...semanticArray(shot?.dataPoints),
-        ...narrativeUnits.slice(1),
-        shot?.visualFocusZh,
-      ].filter(Boolean),
-      3,
-    ).join(' / ') || shot?.visualFocusZh || shot?.type || 'scene',
-    34,
+  const narrativeUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+  const factSources = uniqueList(
+    [
+      ...narrativeUnits,
+      ...semanticArray(shot?.dataPoints),
+    ].filter(Boolean),
+    10,
   );
+  const factLabels = new Set();
+  const facts = [];
+  const pushFact = (label, value) => {
+    const normalizedLabel = compactText(label, 10);
+    const normalizedValue = compactText(value, 28);
+
+    if (!normalizedLabel || !normalizedValue) {
+      return;
+    }
+
+    if (factLabels.has(normalizedLabel)) {
+      return;
+    }
+
+    if (facts.some((item) => isCompactDuplicate(item.value, normalizedValue))) {
+      return;
+    }
+
+    factLabels.add(normalizedLabel);
+    facts.push({label: normalizedLabel, value: normalizedValue});
+  };
+
+  for (const source of factSources) {
+    if (/开发者|团队|你是个|你带团队|案例|场景/.test(source)) {
+      pushFact('场景', source);
+      continue;
+    }
+
+    if (/平时|原来|之前|要\d+(?:\.\d+)?(?:天|小时|分钟)|\d+(?:\.\d+)?(?:天|小时|分钟).*(?:要|需要)/.test(source)) {
+      pushFact('原流程', source);
+      continue;
+    }
+
+    if (/(?:节省|省下)\d+(?:\.\d+)?(?:人|个人力|天|小时)|\d+(?:\.\d+)?(?:天|小时).*(?:搞定|完成|盯完)|(?:搞定|完成|盯完).*\d+(?:\.\d+)?(?:天|小时)/i.test(source)) {
+      pushFact('提效结果', source);
+      continue;
+    }
+
+    if (/K2\.?6.*(?:辅助|自动生成|执行)/i.test(source)) {
+      pushFact('工具介入', source);
+      continue;
+    }
+
+    if (/Agent|并行|测试|部署/i.test(source)) {
+      pushFact('并行处理', source);
+      continue;
+    }
+
+    if (/真实问题|最看重|不是参数|解决什么问题/.test(source)) {
+      pushFact('判断', source);
+      continue;
+    }
+  }
+
+  if (facts.length === 0) {
+    compactUniqueItems(factSources, 28, 4).forEach((item, index) => {
+      pushFact(index === 0 ? '场景' : `要点${index}`, item);
+    });
+  }
+
+  const factPriority = ['场景', '原流程', '提效结果', '并行处理', '工具介入', '判断'];
+  const visibleFacts = facts
+    .slice()
+    .sort((left, right) => factPriority.indexOf(left.label) - factPriority.indexOf(right.label))
+    .slice(0, 4);
 
   return [
     {text: '{', tone: 'base'},
-    {text: `  "title": "${compactText(shot?.title, 24)}",`, tone: 'accent'},
-    {text: `  "claim": "${claim}",`, tone: 'base'},
-    {text: `  "proof": "${proof}"`, tone: 'muted'},
+    ...visibleFacts.map((fact, index) => ({
+      text: `  "${fact.label}": "${fact.value}"${index === visibleFacts.length - 1 ? '' : ','}`,
+      tone: index === 0 ? 'accent' : index === visibleFacts.length - 1 ? 'muted' : 'base',
+    })),
     {text: '}', tone: 'base'},
   ];
 };
@@ -361,14 +496,15 @@ const buildCodeLines = (shot) => {
 const buildTerminalOutputs = (shot) => {
   const items = uniqueList(
     [
-      ...splitTextUnits(shot?.visualSummaryZh),
-      ...splitTextUnits(shot?.narration),
+      ...splitNarrationUnits(shot?.narration),
       ...semanticArray(shot?.dataPoints),
     ],
     4,
   );
 
-  const fallbackItems = items.length > 0 ? items : [shot?.title || shot?.visualFocusZh || shot?.narration || 'scene ready'];
+  const fallbackItems = items.length > 0
+    ? items
+    : splitNarrationUnits(shot?.narration || shot?.visualSummaryZh || shot?.title || 'scene ready');
 
   return fallbackItems.map((item) => `> ${compactText(item, 48)}`);
 };
@@ -431,50 +567,73 @@ const inferSceneFamily = (shot, index, total) => {
 
 const buildSceneData = (family, shot, index) => {
   const accent = inferAccent(shot, index);
-  const title = compactText(shot?.title || shot?.level || shot?.type || `Scene ${index + 1}`, 28);
+  const narrationUnits = splitNarrationUnits(shot?.narration);
+  const primaryText = narrationUnits[0] || shot?.narration || shot?.title || shot?.level || shot?.type || `Scene ${index + 1}`;
+  const secondaryText = narrationUnits.slice(1).join('，') || shot?.narration || shot?.visualSummaryZh || '';
+  const title = compactText(primaryText, 28);
   const subtitle = compactText(shot?.narration || shot?.visualSummaryZh, 72);
-  const keywords = uniqueList(asArray(shot?.keywords), 3);
-  const points = collectListTokens(shot, 4);
+  const keywords = uniqueList(
+    [
+      ...semanticArray(shot?.dataPoints),
+      ...narrationUnits,
+    ],
+    3,
+  );
+  const points = uniqueList(
+    [
+      ...semanticArray(shot?.dataPoints),
+      ...narrationUnits.slice(1),
+    ],
+    4,
+  );
   const metricItems = buildMetricItems(shot);
 
   switch (family) {
     case 'hero':
       return {
-        kicker: compactText(shot?.topLabel || shot?.level || shot?.type || 'search-driven workflow', 28),
+        kicker: '',
         title,
-        subtitle: compactText(shot?.narration || shot?.visualSummaryZh, 94),
-        badge: keywords.join(' / ') || compactText(shot?.visualFocusZh || 'hero / opener', 32),
+        subtitle: compactText(secondaryText, 94),
+        badge: '',
         accent,
-        avatarLabel: 'AI',
+        avatarLabel: '',
       };
     case 'focus':
       return {
-        eyebrow: compactText(shot?.level || shot?.type || 'focus explainer', 28),
-        keyword: compactText(shot?.visualFocusZh || splitTitleTokens(title)[0] || title, 18),
-        question: title,
-        description: compactText(shot?.narration || shot?.visualSummaryZh, 88),
+        eyebrow: '',
+        keyword: compactText(primaryText, 18),
+        question: compactText(narrationUnits[1] || primaryText, 28),
+        description: compactText(secondaryText, 88),
         accent,
-        diagram: /对比|parallel|系统|loop|闭环/.test(`${shot?.visualFocusZh || ''} ${shot?.title || ''}`.toLowerCase()) ? 'rings' : 'framing',
+        diagram: /对比|parallel|系统|loop|闭环/.test(`${shot?.narration || ''} ${shot?.title || ''}`.toLowerCase()) ? 'rings' : 'framing',
       };
     case 'feature-rail':
       return {
-        kicker: compactText(shot?.level || shot?.type || 'feature rail', 28),
+        kicker: '',
         heading: title,
         items: buildFeatureItems(shot),
       };
     case 'number-strip': {
+      const displayPoints = compactUniqueItems(
+        [
+          ...semanticArray(shot?.dataPoints),
+          ...narrationUnits.slice(1),
+        ],
+        18,
+        4,
+      );
       const numericCount = toNumber(extractNumberTokens(title)[0], 0);
       return {
-        count: String(Math.max(2, points.length || numericCount || 2)),
+        count: String(Math.max(2, displayPoints.length || points.length || numericCount || 2)),
         heading: title,
-        items: points.length > 0
-          ? points.map((item, itemIndex) => ({
-              label: compactText(item, 18),
+        items: displayPoints.length > 0
+          ? displayPoints.map((item, itemIndex) => ({
+              label: item,
               accent: inferAccent(shot, itemIndex),
             }))
           : [
-              {label: compactText(shot?.visualFocusZh || '对比重点', 16), accent},
-              {label: compactText(shot?.comparisonSummaryZh || shot?.narration, 18), accent: inferAccent(shot, index + 1)},
+              {label: compactText(primaryText, 16), accent},
+              {label: compactText(secondaryText, 18), accent: inferAccent(shot, index + 1)},
         ],
         accent,
       };
@@ -487,26 +646,26 @@ const buildSceneData = (family, shot, index) => {
     case 'terminal':
       return {
         heading: title,
-        windowTitle: compactText(shot?.id || `scene-${index + 1}`, 24),
-        command: compactText(shot?.promptZh || `render --topic "${title}"`, 48),
+        windowTitle: '',
+        command: compactText(primaryText, 48),
         outputs: buildTerminalOutputs(shot),
-        note: subtitle,
+        note: compactText(secondaryText, 72),
         accent,
       };
     case 'tag-matrix':
       return {
         heading: title,
-        tabs: ['script', 'visual', 'motion', 'result'],
-        activeTab: /结果|output|metric|总结/.test(textFromShot(shot)) ? 'result' : 'visual',
+        tabs: [],
+        activeTab: '',
         items: buildTagItems(shot),
       };
     case 'code':
       return {
         heading: title,
-        filename: `${safeString(shot?.id) || `scene-${index + 1}`}.json`,
+        filename: '',
         lines: buildCodeLines(shot),
         highlightLine: 2,
-        footer: subtitle,
+        footer: compactText(secondaryText, 72),
         accent,
       };
     case 'metrics':
@@ -516,8 +675,8 @@ const buildSceneData = (family, shot, index) => {
           ? metricItems
           : [
               {
-                label: compactText(keywords[0] || 'summary', 16),
-                value: compactText(points[0] || shot?.visualFocusZh || shot?.title, 18),
+                label: compactText(keywords[0] || primaryText, 16),
+                value: compactText(points[0] || secondaryText || primaryText, 18),
                 ratio: 0.82,
                 accent,
               },
@@ -526,16 +685,16 @@ const buildSceneData = (family, shot, index) => {
     case 'cta':
       return {
         heading: title,
-        subtitle: compactText(shot?.narration || shot?.visualSummaryZh, 88),
-        searchLabel: compactText(shot?.visualFocusZh || '输入下一条搜索主题', 36),
-        badge: keywords.join(' / ') || compactText(shot?.type || 'cta / close', 28),
+        subtitle: compactText(secondaryText, 88),
+        searchLabel: compactText(narrationUnits.find((item) => /[？?]/.test(item)) || '', 36),
+        badge: '',
       };
     default:
       return {
-        eyebrow: compactText(shot?.level || shot?.type || 'focus explainer', 28),
-        keyword: compactText(shot?.visualFocusZh || title, 18),
+        eyebrow: '',
+        keyword: compactText(primaryText, 18),
         question: title,
-        description: compactText(shot?.narration || shot?.visualSummaryZh, 88),
+        description: compactText(secondaryText, 88),
         accent,
         diagram: 'framing',
       };

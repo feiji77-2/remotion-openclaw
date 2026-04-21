@@ -545,6 +545,22 @@ function getSelectedTitle(input, payload) {
   return options.find((item) => safeString(item?.id) === requestedSelectedId) || options[0] || null;
 }
 
+function uniqueBy(items, pickKey) {
+  const seen = new Set();
+  const output = [];
+
+  for (const item of Array.isArray(items) ? items : []) {
+    const key = safeString(pickKey(item));
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(item);
+  }
+
+  return output;
+}
+
 function splitNarrationClauses(text) {
   const parts = safeString(text)
     .replace(/\s+/g, ' ')
@@ -560,7 +576,7 @@ function splitNarrationClauses(text) {
     if (
       next
       && /^\d+(?:\.\d+)?月\d+日$/.test(current)
-      && !/\d/.test(next)
+      && !/^(?:20\d{2}[年./-]|\d+(?:\.\d+)?月\d+日|\d{1,2}[:：]\d{1,2})/.test(next)
     ) {
       output.push(`${current} ${next}`.trim());
       index += 1;

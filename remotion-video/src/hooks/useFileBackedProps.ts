@@ -41,9 +41,13 @@ export function useFileBackedProps<T extends Record<string, unknown>>(
           return;
         }
 
+        const definedInlineProps = Object.fromEntries(
+          Object.entries(inlineProps).filter(([, value]) => value !== undefined),
+        ) as Partial<T>;
+
         setResolvedProps({
           ...(payload && typeof payload === 'object' ? payload : {}),
-          ...inlineProps,
+          ...definedInlineProps,
         });
         setLoadError(null);
       } catch (error) {

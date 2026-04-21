@@ -166,6 +166,35 @@ function splitSemanticTokens(value) {
   );
 }
 
+function splitNarrationUnits(value) {
+  const parts = dedupeTextList(
+    localizeDisplayText(value)
+      .replace(/\s+/g, ' ')
+      .split(/[。！？!?\n]|(?<=，)|(?<=；)|(?<=：)|(?<=,)|(?<=;)|(?<=:)/u)
+      .map((item) => item.replace(/^[，；：,;:\-\s]+|[，；：,;:\-\s]+$/g, '').trim()),
+  );
+  const output = [];
+
+  for (let index = 0; index < parts.length; index += 1) {
+    const current = parts[index];
+    const next = parts[index + 1];
+
+    if (
+      next
+      && /^\d+(?:\.\d+)?月\d+日$/.test(current)
+      && !/^(?:20\d{2}[年./-]|\d+(?:\.\d+)?月\d+日|\d{1,2}[:：]\d{1,2})/.test(next)
+    ) {
+      output.push(`${current} ${next}`.trim());
+      index += 1;
+      continue;
+    }
+
+    output.push(current);
+  }
+
+  return dedupeTextList(output);
+}
+
 function extractDateChip(value) {
   const text = localizeDisplayText(value);
   const zhMatch = text.match(/^((?:20\d{2}\s*年\s*)?\d{1,2}\s*月\s*\d{1,2}\s*日)[：:]\s*(.+)$/);
@@ -205,33 +234,88 @@ function resolveTitlePresentation({title, topLabel}) {
   };
 }
 
-function buildSubtitle({visualFocus, comparisonSummary, subtitle}) {
-  const candidates = dedupeTextList([
-    localizeDisplayText(visualFocus),
-    localizeDisplayText(comparisonSummary),
-    localizeDisplayText(subtitle),
-  ]);
+function extractNarrationFromPrompt(value) {
+  const text = String(value || '').trim();
 
-  if (candidates.length === 0) {
+  if (!text) {
     return '';
   }
 
-  const primary = candidates[0];
-  const semanticTokens = splitSemanticTokens(primary).filter((item) => item.length <= 10);
+  const narrationMatch = text.match(
+    /(?:呈现|画面内容：)\s*([^\n]+?)(?:，重点突出|，画面重点是|重点突出|画面重点是|\n视觉重点：|\n关键信息：|$)/s,
+  );
 
-  if (semanticTokens.length >= 2) {
-    return truncate(`${semanticTokens[0]} / ${semanticTokens[1]}`, 18);
+  if (narrationMatch?.[1]) {
+    return cleanToken(narrationMatch[1].replace(/^.*?呈现\s*/, ''));
   }
 
-  if (/^从.+走向.+$/.test(primary)) {
-    return '';
-  }
-
-  if (primary.length <= 14) {
-    return primary;
+  const contentLine = text.match(/画面内容：([^\n]+)/);
+  if (contentLine?.[1]) {
+    return cleanToken(contentLine[1]);
   }
 
   return '';
+}
+
+function resolveNarrationText(item, shotMeta, shotId) {
+  const fallbackTitle = deriveTitleFromPrompt(item?.promptZh || item?.prompt, shotId);
+  const candidates = [
+    shotMeta?.narration,
+    item?.narration,
+    extractNarrationFromPrompt(item?.promptZh),
+    extractNarrationFromPrompt(item?.prompt),
+    extractNarrationFromPrompt(shotMeta?.promptZh),
+    extractNarrationFromPrompt(shotMeta?.prompt),
+    shotMeta?.visual?.description,
+    shotMeta?.visualSummaryZh,
+    item?.visual?.description,
+    item?.visualSummaryZh,
+    fallbackTitle,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = localizeDisplayText(candidate);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return fallbackTitle || '镜头';
+}
+
+function splitNarrationHeadline(unit) {
+  const text = cleanToken(unit);
+  if (!text) {
+    return {title: '', topLabel: ''};
+  }
+
+  const zhMatch = text.match(/^((?:20\d{2}\s*年\s*)?\d{1,2}\s*月\s*\d{1,2}\s*日)\s+(.+)$/u);
+  if (zhMatch) {
+    return {
+      title: cleanToken(zhMatch[2]),
+      topLabel: zhMatch[1].replace(/\s+/g, ''),
+    };
+  }
+
+  const isoMatch = text.match(/^((?:20\d{2})[./-]\d{1,2}[./-]\d{1,2})\s+(.+)$/u);
+  if (isoMatch) {
+    return {
+      title: cleanToken(isoMatch[2]),
+      topLabel: isoMatch[1],
+    };
+  }
+
+  return {title: text, topLabel: ''};
+}
+
+function buildSubtitle({subtitle, visualSummary, dataHighlights}) {
+  const candidates = dedupeTextList([
+    localizeDisplayText(subtitle),
+    ...splitNarrationUnits(visualSummary),
+    ...toTextList(dataHighlights).map((item) => localizeDisplayText(item)),
+  ]);
+
+  return truncate(candidates[0] || '', 22);
 }
 
 function emitJobEvent(payload) {
@@ -264,50 +348,44 @@ function deriveTitleFromPrompt(promptText, shotId) {
 
 function resolveShotDisplayContent(item, shotMeta, shotId) {
   const promptText = typeof item?.prompt === 'string' ? item.prompt : '';
+  const narrationText = resolveNarrationText(item, shotMeta, shotId);
+  const narrationUnits = splitNarrationUnits(narrationText);
+  const narrationHeadline = splitNarrationHeadline(
+    narrationUnits[0] || item?.shotTitle || shotMeta?.title || deriveTitleFromPrompt(promptText, shotId),
+  );
   const title = truncate(
-    String(item?.shotTitle || shotMeta?.title || deriveTitleFromPrompt(promptText, shotId) || '镜头').trim(),
+    narrationHeadline.title || deriveTitleFromPrompt(promptText, shotId) || '镜头',
     24,
   );
-  const visualSummary = String(
-    item?.visualSummaryZh
-    || item?.promptZh
-    || item?.visual?.description
-    || shotMeta?.visual?.description
-    || shotMeta?.narration
-    || promptText
-    || '围绕当前镜头内容生成竖屏视觉',
-  ).trim();
-  const visualFocus = String(
-    item?.visualFocusZh
-    || item?.visualFocus
-    || item?.visual?.focus
-    || shotMeta?.visual?.focus
-    || '',
-  ).trim();
-  const dataHighlights = [
+  const subtitle = cleanToken(narrationUnits[1] || '');
+  const visualSummary = narrationUnits.slice(2).join(' / ');
+  const dataHighlights = dedupeTextList([
+    ...narrationUnits.slice(1),
+    ...toTextList(shotMeta?.dataPoints),
     ...toTextList(item?.dataHighlightsZh),
     ...toTextList(item?.dataPoints),
-  ].filter(Boolean).slice(0, 3);
-  const comparisonSummary = String(item?.comparisonSummaryZh || buildComparisonSummaryZh(item?.comparisons)).trim();
-  const subtitle = String(visualFocus || item?.mood || shotMeta?.level || '').trim();
-  const contentText = [
-    `画面内容：${truncate(visualSummary, 72)}`,
-    visualFocus ? `视觉重点：${truncate(visualFocus, 48)}` : '',
-    dataHighlights.length > 0 ? `关键信息：${dataHighlights.map((entry) => truncate(entry, 18)).join(' / ')}` : '',
-    comparisonSummary,
-  ].filter(Boolean).join('\n');
-  const heroMark = String(item?.heroMark || shotMeta?.heroMark || '').trim();
-  const topLabel = String(item?.topLabel || shotMeta?.topLabel || '').trim();
-  const orbitLabels = toTextList(item?.orbitLabels || shotMeta?.orbitLabels).slice(0, 4);
-  const bottomLine = String(item?.bottomLine || shotMeta?.bottomLine || '').trim();
+  ])
+    .filter((entry) => entry !== title)
+    .slice(0, 4);
+  const contentText = dedupeTextList([
+    subtitle,
+    visualSummary,
+    ...dataHighlights,
+  ])
+    .slice(0, 4)
+    .join('\n');
+  const heroMark = '';
+  const topLabel = cleanToken(item?.topLabel || shotMeta?.topLabel || narrationHeadline.topLabel || '');
+  const orbitLabels = [];
+  const bottomLine = cleanToken(item?.bottomLine || shotMeta?.bottomLine || '');
 
   return {
     title,
     subtitle,
     visualSummary,
-    visualFocus,
+    visualFocus: '',
     dataHighlights,
-    comparisonSummary,
+    comparisonSummary: '',
     contentText,
     heroMark,
     topLabel,
@@ -1133,9 +1211,8 @@ function buildLandscapeSvg({
   motifKey,
 }) {
   const titleLines = splitLandscapeLines(title, 14, 2);
-  const subtitleText = esc(truncate(subtitle || visualFocus || comparisonSummary, 34));
-  const summaryText = esc(truncate(localizeDisplayText(visualSummary || comparisonSummary || visualFocus), 72));
-  const focusText = esc(truncate(localizeDisplayText(visualFocus || comparisonSummary), 30));
+  const subtitleText = esc(truncate(subtitle, 34));
+  const summaryLines = splitLandscapeLines(localizeDisplayText(visualSummary), 24, 2);
   const footer = esc(buildBottomLine({bottomLine}));
   const hero = esc(buildHeroMark({
     title,
@@ -1156,9 +1233,11 @@ function buildLandscapeSvg({
   }).slice(0, 4);
   const infoCards = dedupeTextList([
     ...toTextList(dataHighlights),
-    ...splitSemanticTokens(visualFocus),
-    ...splitSemanticTokens(comparisonSummary),
-  ]).slice(0, 4);
+    ...splitNarrationUnits(visualSummary),
+  ])
+    .filter((item) => item !== title)
+    .filter((item) => item !== subtitle)
+    .slice(0, 4);
   const topChip = esc(cleanToken(topLabel));
   const panelX = WIDTH - 760;
   const panelY = 142;
@@ -1218,13 +1297,9 @@ function buildLandscapeSvg({
   <text x="136" y="${topChip ? 542 : 494}" fill="${accent}" font-size="30" font-weight="600"
     font-family="PingFang SC, Microsoft YaHei, sans-serif">${subtitleText}</text>` : ''}
 
-  ${summaryText ? `
-  <text x="136" y="${topChip ? 622 : 574}" fill="rgba(255,255,255,0.82)" font-size="32" font-weight="500"
-    font-family="PingFang SC, Microsoft YaHei, sans-serif">${summaryText}</text>` : ''}
-
-  ${focusText ? `
-  <text x="136" y="${topChip ? 688 : 640}" fill="rgba(255,255,255,0.56)" font-size="24" font-weight="500"
-    font-family="PingFang SC, Microsoft YaHei, sans-serif">${focusText}</text>` : ''}
+  ${summaryLines.map((line, index) => `
+  <text x="136" y="${(topChip ? 622 : 574) + index * 44}" fill="${index === 0 ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.64)'}" font-size="${index === 0 ? 32 : 28}" font-weight="500"
+    font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(line)}</text>`).join('')}
 
   <g transform="translate(${panelX} ${panelY})">
     <rect x="0" y="0" width="${panelWidth}" height="${panelHeight}" rx="36"
@@ -1238,8 +1313,9 @@ function buildLandscapeSvg({
       font-family="Georgia, Times New Roman, serif" letter-spacing="-3">${hero}</text>
     <text x="${panelWidth / 2}" y="446" text-anchor="middle" fill="#f5f7fb" font-size="42" font-weight="700"
       font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(truncate(title, 20))}</text>
+    ${subtitle ? `
     <text x="${panelWidth / 2}" y="508" text-anchor="middle" fill="${accent}" font-size="24" font-weight="600"
-      font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(truncate(subtitle || visualFocus || comparisonSummary, 22))}</text>
+      font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(truncate(subtitle, 22))}</text>` : ''}
     ${orbit.map((item, index) => `
     <g transform="translate(${78 + (index % 2) * 254} ${552 + Math.floor(index / 2) * 72})">
       <rect x="0" y="0" width="210" height="46" rx="23" fill="rgba(255,255,255,0.05)" stroke="${accent}" stroke-opacity="0.16" stroke-width="1"/>
@@ -1252,10 +1328,9 @@ function buildLandscapeSvg({
   ${infoCards.map((item, index) => `
   <g transform="translate(${128 + index * 330} 902)">
     <rect x="0" y="0" width="292" height="108" rx="24" fill="rgba(255,255,255,0.04)" stroke="${accent}" stroke-opacity="${index === 0 ? '0.36' : '0.14'}" stroke-width="1.2"/>
-    <text x="24" y="42" fill="${index === 0 ? accent : 'rgba(255,255,255,0.6)'}" font-size="16" font-weight="700"
-      font-family="Inter, PingFang SC, Microsoft YaHei, sans-serif">POINT ${String(index + 1).padStart(2, '0')}</text>
-    <text x="24" y="78" fill="#f5f7fb" font-size="28" font-weight="700"
-      font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(truncate(item, 16))}</text>
+    ${splitLandscapeLines(item, 10, 2).map((line, lineIndex) => `
+    <text x="24" y="${lineIndex === 0 ? 52 : 84}" fill="${lineIndex === 0 && index === 0 ? accent : '#f5f7fb'}" font-size="${lineIndex === 0 ? 26 : 24}" font-weight="700"
+      font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(line)}</text>`).join('')}
   </g>`).join('')}
 
   ${footer ? `
@@ -1285,7 +1360,7 @@ function buildSvg({
   const motifKey = pickMotif(`${visualSummary} ${visualFocus} ${comparisonSummary}`, mood);
   const accent = style === 'warm' ? '#f59e0b' : style === 'cool' ? '#06b6d4' : '#8b5cf6';
   const titlePresentation = resolveTitlePresentation({title, topLabel});
-  const displaySubtitle = buildSubtitle({visualFocus, comparisonSummary, subtitle});
+  const displaySubtitle = buildSubtitle({subtitle, visualSummary, dataHighlights});
   const isLandscape = WIDTH >= HEIGHT;
 
   if (isLandscape) {
