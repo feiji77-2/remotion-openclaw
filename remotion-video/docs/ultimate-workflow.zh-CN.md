@@ -182,6 +182,29 @@ npm run workflow:ultimate -- "OpenAI 最新 Agent 能力" --output out/openai-ag
 
 这意味着你原来那条“根据搜索标题/主题生成内容，再制作视频和音频”的链路，现在已经不是概念说明，而是可直接执行的命令入口。
 
+## 风格命中手册
+
+如果你现在最关心的是：
+
+- 为什么某个风格没有出来
+- 为什么 `feature-rail` 被别的风格抢走
+- 怎么强制命中 `terminal / metrics / code / focus`
+- `metrics bars` 和 `focus diagram` 这些子变体怎么控
+
+直接看这份文档：
+
+- [`docs/ultimate-style-hit-guide.zh-CN.md`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/ultimate-style-hit-guide.zh-CN.md)
+
+如果你更关心的是：
+
+- 怎么把这套命中系统升级成 2-3 分钟技术型节目
+- 怎么支持“每天根据全球搜索信息自动出片”
+- 怎么从短视频规则命中升级成节目编排系统
+
+直接看这份升级蓝图：
+
+- [`docs/ultimate-daily-tech-upgrade.zh-CN.md`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/ultimate-daily-tech-upgrade.zh-CN.md)
+
 ## 推荐实战顺序
 
 1. 复制 [`examples/ultimate-outline-template.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-outline-template.json)

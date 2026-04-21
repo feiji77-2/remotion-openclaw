@@ -3,6 +3,22 @@ const ULTIMATE_VISUAL_SYSTEMS = new Set(['ultimate', 'ultimate-1080p', 'ultimate
 const ULTIMATE_DEFAULT_FPS = 30;
 const ULTIMATE_DEFAULT_WIDTH = 1920;
 const ULTIMATE_DEFAULT_HEIGHT = 1080;
+const ULTIMATE_SCENE_FAMILIES = new Set([
+  'hero',
+  'feature-rail',
+  'focus',
+  'number-strip',
+  'step-flow',
+  'timeline',
+  'compare-board',
+  'terminal',
+  'evidence-wall',
+  'architecture-map',
+  'tag-matrix',
+  'code',
+  'metrics',
+  'cta',
+]);
 const ACCENT_ROTATION = ['cyan', 'green', 'yellow', 'orange', 'purple', 'red'];
 const PLACEHOLDER_TEXT_RE = /^(?:数据点|关键词|补充|标签|summary|scene|item|slot|point)\s*[0-9a-zA-Z一二三四五六七八九十]*$/i;
 
@@ -183,6 +199,19 @@ const splitListPhrases = (value) => {
   );
 };
 
+const extractModelTokens = (value) => {
+  return uniqueList(
+    (
+      safeString(value).match(
+        /\b(?:Kimi|GPT|Claude|Gemini|Qwen|DeepSeek|Llama|Mistral|OpenAI|Anthropic)\s*[A-Za-z0-9.+-]*/gi,
+      ) || []
+    )
+      .map((item) => item.replace(/\s+/g, ' ').trim())
+      .filter(Boolean),
+    6,
+  );
+};
+
 const extractAsciiPhrases = (value) => {
   return uniqueList(
     (safeString(value).match(/\b[A-Za-z][A-Za-z0-9.+\-']*(?:\s+[A-Za-z][A-Za-z0-9.+\-']*){0,2}\b/g) || [])
@@ -308,44 +337,39 @@ const buildStripHeading = (value, fallback = '') => {
 
 const buildCodeHeading = (shot, primaryText, fallbackTitle = '') => {
   const text = safeString(primaryText);
-  const narrationUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
-  const facts = buildCodeLines(shot)
-    .map((line) => safeString(line.text))
-    .filter((line) => /":\s*"/.test(line));
+  const fullText = textFromShot(shot);
 
-  const scenarioLine = facts.find((line) => /"场景":/.test(line));
-  const flowLine = facts.find((line) => /"原流程":/.test(line));
-  const resultLine = facts.find((line) => /"提效结果":/.test(line));
-
-  const extractValue = (line) => {
-    const match = line.match(/:\s*"(.+)"[,]?$/);
-    return safeString(match?.[1] || '');
-  };
-
-  const scenarioValue = extractValue(scenarioLine || '');
-  const flowValue = extractValue(flowLine || '');
-  const resultValue = extractValue(resultLine || '');
-
-  if (/^(?:想象一下|假设|如果|比如)/.test(text)) {
-    if (scenarioValue && resultValue) {
-      return compactText(`${compactText(scenarioValue, 10)}接入 K2.6 后`, 18);
-    }
-
-    if (scenarioValue) {
-      return compactText(scenarioValue, 16);
-    }
-
-    if (flowValue && resultValue) {
-      return compactText(`${compactText(flowValue, 8)}到${compactText(resultValue, 8)}`, 18);
-    }
+  if (/(benchmark|bench|exam|基准|跑分|gpt-\d)/.test(fullText)) {
+    return 'Benchmark Snapshot';
   }
 
-  const usefulUnit = narrationUnits.find((item) => !/^(?:想象一下|比如|如果)/.test(item));
-  if (usefulUnit && usefulUnit.length <= 18) {
-    return compactText(usefulUnit, 18);
+  if (/(开发者|团队|案例|想象一下|workflow|agent|部署|测试)/.test(fullText)) {
+    return 'Workflow After K2.6';
   }
 
-  return compactText(text || fallbackTitle, 18);
+  if (/(json|schema|config|配置|脚本|接口)/.test(fullText)) {
+    return 'Config Snapshot';
+  }
+
+  return compactText(text || fallbackTitle || 'Execution Snapshot', 20);
+};
+
+const buildCodeFilename = (shot) => {
+  const fullText = textFromShot(shot);
+
+  if (/(benchmark|bench|exam|基准|跑分|gpt-\d)/.test(fullText)) {
+    return 'benchmark-facts.json';
+  }
+
+  if (/(开发者|团队|案例|想象一下|workflow|agent|部署|测试)/.test(fullText)) {
+    return 'workflow-facts.json';
+  }
+
+  if (/(json|schema|config|配置|脚本|接口)/.test(fullText)) {
+    return 'config-facts.json';
+  }
+
+  return 'scene-facts.json';
 };
 
 const buildStripItemDetail = (value) => {
@@ -453,6 +477,11 @@ const collectListTokens = (shot, max = 4) => {
   );
 };
 
+const inferManualGlyph = (value) => {
+  const text = safeString(value);
+  return /^(?:[A-Za-z0-9#+*?]{1,3})$/.test(text) ? text : '';
+};
+
 const buildFeatureItems = (shot) => {
   const narrationUnits = splitNarrationUnits(shot?.narration);
   const baseItems = uniqueList(
@@ -472,7 +501,7 @@ const buildFeatureItems = (shot) => {
           || '',
         34,
       ),
-    icon: compactText(item, 1) || String(index + 1),
+    icon: inferManualGlyph(item) || undefined,
     accent: inferAccent(shot, index),
   }));
 };
@@ -492,6 +521,116 @@ const buildStepItems = (shot) => {
   }));
 };
 
+const buildTimelineLabel = (value, index) => {
+  const text = safeString(value);
+  const dateToken = extractNumberTokens(text).find((token) => /20\d{2}[./-]\d{1,2}[./-]\d{1,2}|\d+月\d+日/.test(token));
+
+  if (dateToken) {
+    return compactText(dateToken, 14);
+  }
+
+  const model = extractModelTokens(text)[0];
+  if (model) {
+    return compactText(model, 14);
+  }
+
+  if (/开源/.test(text)) {
+    return '开源';
+  }
+
+  if (/发布/.test(text)) {
+    return '发布';
+  }
+
+  if (/升级|更新/.test(text)) {
+    return '升级';
+  }
+
+  return `节点 ${index + 1}`;
+};
+
+const buildTimelineItems = (shot) => {
+  const narrationUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+  const sourceItems = uniqueList(
+    [...semanticArray(shot?.dataPoints), ...narrationUnits],
+    8,
+  );
+  const items = [];
+
+  for (const source of sourceItems) {
+    const title = compactText(source, 24);
+    if (!title || items.some((item) => isCompactDuplicate(item.title, title))) {
+      continue;
+    }
+
+    items.push({
+      label: buildTimelineLabel(source, items.length),
+      title,
+      detail: compactText(buildSceneSummary(shot, source, 40), 40),
+      icon: '',
+      accent: inferAccent(shot, items.length),
+    });
+
+    if (items.length >= 4) {
+      break;
+    }
+  }
+
+  return items;
+};
+
+const inferCompareSideTitles = (shot) => {
+  const text = textFromShot(shot);
+  const models = extractModelTokens(text);
+
+  if (models.length >= 2) {
+    return {
+      leftTitle: compactText(models[0], 16),
+      rightTitle: compactText(models[1], 16),
+    };
+  }
+
+  if (/旧|之前|传统|原来|过去|误解/.test(text)) {
+    return {
+      leftTitle: '旧方案',
+      rightTitle: /事实|现在|当前|k2\.?6|新/.test(text) ? '当前方案' : '新方案',
+    };
+  }
+
+  if (/认知|以为|偏见/.test(text)) {
+    return {
+      leftTitle: '旧认知',
+      rightTitle: '当前事实',
+    };
+  }
+
+  return {
+    leftTitle: '对照 A',
+    rightTitle: '对照 B',
+  };
+};
+
+const buildCompareRows = (shot) => {
+  const labels = uniqueList(
+    [...semanticArray(shot?.dataPoints), ...splitNarrationUnits(shot?.narration)],
+    6,
+  );
+  const comparisons = asArray(shot?.comparisons);
+
+  return comparisons
+    .map((item, index) => ({
+      label: compactText(
+        safeString(item?.label || item?.title || labels[index] || `维度 ${index + 1}`),
+        16,
+      ),
+      left: compactText(safeString(item?.left || item?.before || item?.old || item?.a), 20),
+      right: compactText(safeString(item?.right || item?.after || item?.new || item?.b), 20),
+      accent: inferAccent(shot, index),
+    }))
+    .filter((row) => row.left && row.right)
+    .slice(0, 4);
+};
+
 const buildTagItems = (shot) => {
   const narrationUnits = splitNarrationUnits(shot?.narration);
   return uniqueList(
@@ -501,6 +640,64 @@ const buildTagItems = (shot) => {
     label: compactText(item, 18),
     accent: inferAccent(shot, index),
   }));
+};
+
+const buildEvidenceCards = (shot) => {
+  const narrationUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+  const sourceItems = uniqueList(
+    [...semanticArray(shot?.dataPoints), ...narrationUnits],
+    8,
+  );
+  const cards = [];
+
+  for (const source of sourceItems) {
+    const quote = compactText(source, 48);
+    if (!quote || cards.some((card) => isCompactDuplicate(card.quote, quote))) {
+      continue;
+    }
+
+    const chips = extractEvidenceChips(source, 3);
+    const sourceLabel =
+      compactText(
+        chips[0]
+          || extractAsciiPhrases(source)[0]
+          || (/官方|release|blog|docs|paper/i.test(source) ? 'Official' : `证据 ${cards.length + 1}`),
+        16,
+      ) || `证据 ${cards.length + 1}`;
+
+    cards.push({
+      source: sourceLabel,
+      quote,
+      detail: compactText(buildSceneSummary(shot, source, 40), 40),
+      chips,
+      icon: '',
+      accent: inferAccent(shot, cards.length),
+    });
+
+    if (cards.length >= 4) {
+      break;
+    }
+  }
+
+  return cards;
+};
+
+const buildArchitectureNodes = (shot) => {
+  const narrationUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+  const nodes = uniqueList(
+    [...semanticArray(shot?.dataPoints), ...narrationUnits],
+    8,
+  );
+
+  return nodes
+    .filter((item) => !isCompactDuplicate(item, shot?.title))
+    .slice(0, 6)
+    .map((item, index) => ({
+      label: compactText(item, 18),
+      detail: compactText(narrationUnits[index + 1] || '', 30),
+      icon: '',
+      accent: inferAccent(shot, index),
+    }));
 };
 
 const inferMetricLabel = (source, number, fallbackTitle, index) => {
@@ -730,6 +927,249 @@ const buildStripItems = (shot, summary) => {
   }));
 };
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const formatEnglishCountUnit = (rawCount, singular, plural = `${singular}s`) => {
+  const normalizedCount = safeString(rawCount);
+  return normalizedCount === '1' || normalizedCount === '1.0'
+    ? `${normalizedCount} ${singular}`
+    : `${normalizedCount} ${plural}`;
+};
+
+const toEnglishMetricToken = (value) => {
+  const text = safeString(value).replace(/\s+/g, '');
+  if (!text) {
+    return '';
+  }
+
+  const monthDayMatch = text.match(/^(\d{1,2})月(\d{1,2})日$/);
+  if (monthDayMatch) {
+    const monthIndex = Number(monthDayMatch[1]) - 1;
+    return `${MONTH_NAMES[monthIndex] || monthDayMatch[1]} ${monthDayMatch[2]}`;
+  }
+
+  const fullDateMatch = text.match(/^(20\d{2})[./-](\d{1,2})[./-](\d{1,2})$/);
+  if (fullDateMatch) {
+    const monthIndex = Number(fullDateMatch[2]) - 1;
+    return `${MONTH_NAMES[monthIndex] || fullDateMatch[2]} ${fullDateMatch[3]}, ${fullDateMatch[1]}`;
+  }
+
+  const numberToken = (text.match(/\d+(?:\.\d+)?\+?/) || [''])[0];
+  if (!numberToken) {
+    return text;
+  }
+
+  if (/小时/.test(text)) {
+    return formatEnglishCountUnit(numberToken, 'hour');
+  }
+
+  if (/分钟/.test(text)) {
+    return formatEnglishCountUnit(numberToken, 'min');
+  }
+
+  if (/秒/.test(text)) {
+    return formatEnglishCountUnit(numberToken, 'sec');
+  }
+
+  if (/天/.test(text)) {
+    return formatEnglishCountUnit(numberToken, 'day');
+  }
+
+  if (/行/.test(text)) {
+    return formatEnglishCountUnit(numberToken, 'line');
+  }
+
+  if (/子?Agent/i.test(text)) {
+    return formatEnglishCountUnit(numberToken, 'agent');
+  }
+
+  if (/个/.test(text)) {
+    return formatEnglishCountUnit(numberToken, 'item');
+  }
+
+  if (/次/.test(text)) {
+    return formatEnglishCountUnit(numberToken, 'run');
+  }
+
+  if (/项/.test(text)) {
+    return formatEnglishCountUnit(numberToken, 'item');
+  }
+
+  return numberToken;
+};
+
+const summarizeScenarioEn = (source, shot) => {
+  const text = safeString(source);
+  const asciiSource = extractAsciiPhrases(`${text} ${safeString(shot?.title)}`)
+    .find((item) => !/^(?:K2\.?6|GPT-\d+(?:\.\d+)?|SWE-Bench Pro|HLE)$/i.test(item));
+
+  if (/全栈开发者/.test(text)) {
+    return 'full-stack dev workflow';
+  }
+
+  if (/开发者/.test(text)) {
+    return 'developer workflow';
+  }
+
+  if (/团队/.test(text)) {
+    return 'team delivery workflow';
+  }
+
+  if (/视频|出片|渲染|口播/.test(text)) {
+    return 'video production flow';
+  }
+
+  if (/(benchmark|bench|exam|基准|跑分)/i.test(text)) {
+    return 'benchmark comparison';
+  }
+
+  if (/开源|发布/.test(text)) {
+    return 'open-source launch';
+  }
+
+  if (asciiSource) {
+    return compactText(`${asciiSource} workflow`, 34);
+  }
+
+  return 'production workflow';
+};
+
+const summarizeBaselineEn = (source) => {
+  const text = safeString(source);
+  const duration = extractNumberTokens(text).find((token) => /(天|小时|分钟|秒)/.test(token));
+
+  if (/模块|功能/.test(text) && duration) {
+    return `1 module took ${toEnglishMetricToken(duration)}`;
+  }
+
+  if (duration) {
+    return `baseline took ${toEnglishMetricToken(duration)}`;
+  }
+
+  if (/长任务中途崩|上下文丢|调不动/.test(text)) {
+    return 'long runs broke easily';
+  }
+
+  if (/很多人以为|不如|误解/.test(text)) {
+    return 'legacy view stayed behind';
+  }
+
+  return '';
+};
+
+const summarizeResultEn = (source) => {
+  const text = safeString(source);
+  const duration = extractNumberTokens(text).find((token) => /(天|小时|分钟|秒)/.test(token));
+  const gptTier = (text.match(/GPT-\d+(?:\.\d+)?/i) || [''])[0].toUpperCase();
+
+  if (duration && /(搞定|完成|盯完)/.test(text)) {
+    return `ship in ${toEnglishMetricToken(duration)}`;
+  }
+
+  if (duration && /(节省|省下)/.test(text)) {
+    return `save ${toEnglishMetricToken(duration)}`;
+  }
+
+  if (/持平|优于/.test(text) && gptTier) {
+    return `reach ${gptTier} tier`;
+  }
+
+  if (/同一档|第一次/.test(text) && /开源|闭源/.test(text)) {
+    return 'open source hits top tier';
+  }
+
+  if (/1个人.*3个人/.test(text)) {
+    return '1 person replaces 3';
+  }
+
+  if (/更稳|不断裂/.test(text)) {
+    return 'delivery stays stable';
+  }
+
+  return duration ? `result in ${toEnglishMetricToken(duration)}` : '';
+};
+
+const summarizeToolRoleEn = (source) => {
+  const text = safeString(source);
+
+  if (/K2\.?6/i.test(text) && /(编程|代码|coding|code)/i.test(text)) {
+    return 'K2.6 assists coding tasks';
+  }
+
+  if (/K2\.?6/i.test(text) && /(Agent|并行|测试|部署)/i.test(text)) {
+    return 'K2.6 coordinates agents';
+  }
+
+  if (/K2\.?6/i.test(text)) {
+    return 'K2.6 drives the workflow';
+  }
+
+  return '';
+};
+
+const summarizeParallelTasksEn = (source) => {
+  const text = safeString(source);
+
+  if (/测试/.test(text) && /部署/.test(text)) {
+    return 'tests + deploy run in parallel';
+  }
+
+  if (/(子Agent|Agent|并行)/i.test(text) && /调度|处理|协作/.test(text)) {
+    return 'parallel agents split the work';
+  }
+
+  if (/(子Agent|Agent|并行)/i.test(text)) {
+    return 'parallel agents stay active';
+  }
+
+  return '';
+};
+
+const summarizeBenchmarkEn = (source) => {
+  const text = safeString(source);
+  const gptTier = (text.match(/GPT-\d+(?:\.\d+)?/i) || [''])[0].toUpperCase();
+
+  if (/SWE[- ]Bench Pro/i.test(text) && gptTier) {
+    return `SWE-Bench Pro vs ${gptTier}`;
+  }
+
+  if (/Humanity'?s Last Exam/i.test(text) && gptTier) {
+    return `HLE tracks ${gptTier}`;
+  }
+
+  if (/持平|优于/.test(text) && gptTier) {
+    return `benchmarks reach ${gptTier}`;
+  }
+
+  if (/(benchmark|bench|exam|基准|跑分)/i.test(text)) {
+    return 'public benchmark signal';
+  }
+
+  return '';
+};
+
+const summarizeTakeawayEn = (source) => {
+  const text = safeString(source);
+
+  if (/不是.*参数|解决.*问题/.test(text)) {
+    return 'real value is solved work';
+  }
+
+  if (/不是.*口号|跑分/.test(text)) {
+    return 'proof comes from public tests';
+  }
+
+  if (/最看重哪个/.test(text)) {
+    return 'pick the capability that matters';
+  }
+
+  if (/开源|发布/.test(text)) {
+    return 'open release resets the race';
+  }
+
+  return '';
+};
+
 const buildCodeLines = (shot) => {
   const narrativeUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
   const factSources = uniqueList(
@@ -742,8 +1182,8 @@ const buildCodeLines = (shot) => {
   const factLabels = new Set();
   const facts = [];
   const pushFact = (label, value) => {
-    const normalizedLabel = compactText(label, 10);
-    const normalizedValue = compactText(value, 28);
+    const normalizedLabel = compactText(label, 14);
+    const normalizedValue = compactText(value, 34);
 
     if (!normalizedLabel || !normalizedValue) {
       return;
@@ -762,44 +1202,54 @@ const buildCodeLines = (shot) => {
   };
 
   for (const source of factSources) {
-    if (/开发者|团队|你是个|你带团队|案例|场景/.test(source)) {
-      pushFact('场景', source);
-      continue;
+    if (/开发者|团队|你是个|你带团队|案例|场景|发布|开源|基准|跑分/.test(source)) {
+      pushFact('scenario', summarizeScenarioEn(source, shot));
     }
 
     if (/平时|原来|之前|要\d+(?:\.\d+)?(?:天|小时|分钟)|\d+(?:\.\d+)?(?:天|小时|分钟).*(?:要|需要)/.test(source)) {
-      pushFact('原流程', source);
-      continue;
+      pushFact('baseline', summarizeBaselineEn(source));
     }
 
-    if (/(?:节省|省下)\d+(?:\.\d+)?(?:人|个人力|天|小时)|\d+(?:\.\d+)?(?:天|小时).*(?:搞定|完成|盯完)|(?:搞定|完成|盯完).*\d+(?:\.\d+)?(?:天|小时)/i.test(source)) {
-      pushFact('提效结果', source);
-      continue;
+    if (/(?:节省|省下)\d+(?:\.\d+)?(?:人|个人力|天|小时)|\d+(?:\.\d+)?(?:天|小时).*(?:搞定|完成|盯完)|(?:搞定|完成|盯完).*\d+(?:\.\d+)?(?:天|小时)|持平|优于|同一档|更稳|不断裂/i.test(source)) {
+      pushFact('result', summarizeResultEn(source));
     }
 
-    if (/K2\.?6.*(?:辅助|自动生成|执行)/i.test(source)) {
-      pushFact('工具介入', source);
-      continue;
+    if (/K2\.?6.*(?:辅助|自动生成|执行|编程|代码|协助)/i.test(source)) {
+      pushFact('toolRole', summarizeToolRoleEn(source));
     }
 
     if (/Agent|并行|测试|部署/i.test(source)) {
-      pushFact('并行处理', source);
-      continue;
+      pushFact('parallelTasks', summarizeParallelTasksEn(source));
     }
 
-    if (/真实问题|最看重|不是参数|解决什么问题/.test(source)) {
-      pushFact('判断', source);
-      continue;
+    if (/(benchmark|bench|exam|基准|跑分|GPT-\d)/i.test(source)) {
+      pushFact('benchmark', summarizeBenchmarkEn(source));
     }
+
+    if (/真实问题|最看重|不是参数|解决什么问题|不是.*口号/.test(source)) {
+      pushFact('takeaway', summarizeTakeawayEn(source));
+    }
+  }
+
+  if (!facts.some((item) => item.label === 'scenario')) {
+    pushFact('scenario', summarizeScenarioEn(shot?.title || shot?.narration, shot));
+  }
+
+  if (!facts.some((item) => item.label === 'toolRole') && /K2\.?6/i.test(textFromShot(shot))) {
+    pushFact('toolRole', 'K2.6 drives the workflow');
+  }
+
+  if (!facts.some((item) => item.label === 'takeaway')) {
+    const takeaway = summarizeTakeawayEn(shot?.narration || shot?.title) || 'execution matters more than hype';
+    pushFact('takeaway', takeaway);
   }
 
   if (facts.length === 0) {
-    compactUniqueItems(factSources, 28, 4).forEach((item, index) => {
-      pushFact(index === 0 ? '场景' : `要点${index}`, item);
-    });
+    pushFact('scenario', 'production workflow');
+    pushFact('takeaway', 'execution matters more than hype');
   }
 
-  const factPriority = ['场景', '原流程', '提效结果', '并行处理', '工具介入', '判断'];
+  const factPriority = ['scenario', 'baseline', 'result', 'parallelTasks', 'toolRole', 'benchmark', 'takeaway'];
   const visibleFacts = facts
     .slice()
     .sort((left, right) => factPriority.indexOf(left.label) - factPriority.indexOf(right.label))
@@ -831,12 +1281,27 @@ const buildTerminalOutputs = (shot) => {
   return fallbackItems.map((item) => `> ${compactText(item, 48)}`);
 };
 
-const sceneCycle = ['focus', 'feature-rail', 'tag-matrix', 'metrics', 'feature-rail', 'focus'];
+const sceneCycle = [
+  'focus',
+  'feature-rail',
+  'architecture-map',
+  'tag-matrix',
+  'metrics',
+  'timeline',
+  'feature-rail',
+  'evidence-wall',
+];
 const hasStandaloneAsciiToken = (text, token) => new RegExp(`(?:^|[^a-z])${token}(?:[^a-z]|$)`).test(text);
 
 const inferSceneFamily = (shot, index, total) => {
   const title = safeString(shot?.title);
   const text = `${title} ${safeString(shot?.narration)} ${safeString(shot?.visualSummaryZh)} ${safeString(shot?.visualFocusZh)} ${safeString(shot?.type)} ${safeString(shot?.level)}`.toLowerCase();
+  const requestedFamily = safeString(shot?.family || shot?.sceneFamily).toLowerCase();
+  const timelineTokenCount = extractNumberTokens(text).filter((token) => /20\d{2}[./-]\d{1,2}[./-]\d{1,2}|\d+月\d+日/.test(token)).length;
+
+  if (ULTIMATE_SCENE_FAMILIES.has(requestedFamily)) {
+    return requestedFamily;
+  }
 
   if (index === 0) {
     return 'hero';
@@ -853,8 +1318,36 @@ const inferSceneFamily = (shot, index, total) => {
     return 'terminal';
   }
 
-  if ((Array.isArray(shot?.comparisons) && shot.comparisons.length > 0) || /(对比|差异|vs|不是.*而是)/.test(text)) {
+  if (
+    (
+      /(发布时间|时间线|roadmap|里程碑|版本节点|版本演进|发布节奏|launch|release|history)/.test(text)
+      || timelineTokenCount >= 2
+    )
+    && buildTimelineItems(shot).length >= 3
+  ) {
+    return 'timeline';
+  }
+
+  if (/(很多人以为|不是.*而是|认知反转|旧认知|新事实|误解|偏见)/.test(text)) {
     return 'number-strip';
+  }
+
+  if (
+    /(官方|来源|博客|release|benchmark|bench|exam|paper|docs|github|hugging\s*face|实测|证据)/.test(text)
+    && buildEvidenceCards(shot).length >= 2
+  ) {
+    return 'evidence-wall';
+  }
+
+  if (
+    buildCompareRows(shot).length >= 2
+    || (
+      /(对比|差异|vs|versus|battle)/.test(text)
+      && extractModelTokens(text).length >= 2
+      && !/(很多人以为|误解|旧认知|新事实)/.test(text)
+    )
+  ) {
+    return 'compare-board';
   }
 
   if (
@@ -862,6 +1355,13 @@ const inferSceneFamily = (shot, index, total) => {
     || ['schema', 'json', 'api', 'code'].some((token) => hasStandaloneAsciiToken(text, token))
   ) {
     return 'code';
+  }
+
+  if (
+    /(架构|系统|模块|分层|拓扑|agent|router|memory|tool|orchestr|stack)/.test(text)
+    && buildArchitectureNodes(shot).length >= 4
+  ) {
+    return 'architecture-map';
   }
 
   if (/(步骤|流程|工作流|依次|第一|第二|第三|先|再|最后|pipeline|process)/.test(text) && buildStepItems(shot).length >= 3) {
@@ -910,6 +1410,11 @@ const buildSceneData = (family, shot, index) => {
     4,
   );
   const metricItems = buildMetricItems(shot);
+  const timelineItems = buildTimelineItems(shot);
+  const compareRows = buildCompareRows(shot);
+  const compareTitles = inferCompareSideTitles(shot);
+  const evidenceCards = buildEvidenceCards(shot);
+  const architectureNodes = buildArchitectureNodes(shot);
 
   switch (family) {
     case 'hero':
@@ -971,6 +1476,44 @@ const buildSceneData = (family, shot, index) => {
         heading: title,
         steps: buildStepItems(shot),
       };
+    case 'timeline':
+      return {
+        heading: title,
+        summary,
+        items: timelineItems.length > 0
+          ? timelineItems
+          : [
+              {
+                label: '节点 1',
+                title: compactText(primaryText, 24),
+                detail: compactText(secondaryText, 40),
+                icon: '',
+                accent,
+              },
+            ],
+        accent,
+      };
+    case 'compare-board':
+      return {
+        heading: title,
+        summary,
+        leftTitle: compareTitles.leftTitle,
+        rightTitle: compareTitles.rightTitle,
+        leftEyebrow: '',
+        rightEyebrow: '',
+        rows: compareRows.length > 0
+          ? compareRows
+          : [
+              {
+                label: compactText(shot?.title || '核心差异', 16),
+                left: compactText(primaryText, 20),
+                right: compactText(secondaryText || summary || primaryText, 20),
+                accent,
+              },
+            ],
+        leftAccent: 'red',
+        rightAccent: 'green',
+      };
     case 'terminal':
       return {
         heading: title,
@@ -979,6 +1522,42 @@ const buildSceneData = (family, shot, index) => {
         outputs: buildTerminalOutputs(shot),
         note: compactText(secondaryText, 72),
         accent,
+      };
+    case 'evidence-wall':
+      return {
+        heading: title,
+        summary,
+        cards: evidenceCards.length > 0
+          ? evidenceCards
+          : [
+              {
+                source: '证据 1',
+                quote: compactText(primaryText, 44),
+                detail: compactText(secondaryText, 40),
+                chips: extractEvidenceChips(primaryText),
+                icon: '',
+                accent,
+              },
+            ],
+        accent: 'yellow',
+      };
+    case 'architecture-map':
+      return {
+        heading: title,
+        centerTitle: compactText(shot?.title || primaryText, 22),
+        centerDetail: summary || compactText(secondaryText, 52),
+        nodes: architectureNodes.length > 0
+          ? architectureNodes
+          : [
+              {
+                label: compactText(primaryText, 18),
+                detail: compactText(secondaryText, 28),
+                icon: '',
+                accent,
+              },
+            ],
+        accent,
+        layout: architectureNodes.length >= 5 ? 'radial' : 'stack',
       };
     case 'tag-matrix':
       return {
@@ -990,7 +1569,7 @@ const buildSceneData = (family, shot, index) => {
     case 'code':
       return {
         heading: buildCodeHeading(shot, primaryText, title),
-        filename: '',
+        filename: buildCodeFilename(shot),
         lines: buildCodeLines(shot),
         highlightLine: 2,
         footer: summary || compactText(secondaryText, 72),
@@ -1000,6 +1579,7 @@ const buildSceneData = (family, shot, index) => {
       return {
         heading: title,
         summary,
+        layout: 'bars',
         items: metricItems.length > 0
           ? metricItems
           : [
@@ -1105,6 +1685,7 @@ function buildUltimateProjectConfig(project) {
       return {
         id: safeString(shot?.id) || `shot-${String(index + 1).padStart(2, '0')}`,
         family,
+        iconPack: semanticArray(shot?.iconPack, 6),
         mediaSrc: resolveSceneMediaSrc(family, shot),
         subtitle: compactText(shot?.narration || shot?.visualSummaryZh || shot?.visualFocusZh, 72),
         durationInFrames: normalizeDurationInFrames(shot, fps),

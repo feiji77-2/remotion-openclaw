@@ -1,6 +1,9 @@
 import type {
+  UltimateArchitectureMapProps,
   UltimateCodePanelProps,
+  UltimateCompareBoardProps,
   UltimateCtaPanelProps,
+  UltimateEvidenceWallProps,
   UltimateFeatureCardRailProps,
   UltimateFocusDiagramProps,
   UltimateHeroPanelProps,
@@ -10,6 +13,7 @@ import type {
   UltimateStepFlowProps,
   UltimateTagMatrixProps,
   UltimateTerminalPanelProps,
+  UltimateTimelineProps,
 } from './types';
 
 export type UltimateSceneFamily =
@@ -18,7 +22,11 @@ export type UltimateSceneFamily =
   | 'focus'
   | 'number-strip'
   | 'step-flow'
+  | 'timeline'
+  | 'compare-board'
   | 'terminal'
+  | 'evidence-wall'
+  | 'architecture-map'
   | 'tag-matrix'
   | 'code'
   | 'metrics'
@@ -37,6 +45,7 @@ type UltimateSceneBase = {
   family: UltimateSceneFamily;
   durationInFrames?: number;
   subtitle?: string;
+  iconPack?: string[];
   mediaSrc?: string | null;
   warm?: boolean;
   showGrid?: boolean;
@@ -69,9 +78,29 @@ export type UltimateStepFlowScene = UltimateSceneBase & {
   data: UltimateStepFlowProps;
 };
 
+export type UltimateTimelineScene = UltimateSceneBase & {
+  family: 'timeline';
+  data: UltimateTimelineProps;
+};
+
+export type UltimateCompareBoardScene = UltimateSceneBase & {
+  family: 'compare-board';
+  data: UltimateCompareBoardProps;
+};
+
 export type UltimateTerminalScene = UltimateSceneBase & {
   family: 'terminal';
   data: UltimateTerminalPanelProps;
+};
+
+export type UltimateEvidenceWallScene = UltimateSceneBase & {
+  family: 'evidence-wall';
+  data: UltimateEvidenceWallProps;
+};
+
+export type UltimateArchitectureMapScene = UltimateSceneBase & {
+  family: 'architecture-map';
+  data: UltimateArchitectureMapProps;
 };
 
 export type UltimateTagMatrixScene = UltimateSceneBase & {
@@ -100,7 +129,11 @@ export type UltimateSceneConfig =
   | UltimateFocusScene
   | UltimateNumberStripScene
   | UltimateStepFlowScene
+  | UltimateTimelineScene
+  | UltimateCompareBoardScene
   | UltimateTerminalScene
+  | UltimateEvidenceWallScene
+  | UltimateArchitectureMapScene
   | UltimateTagMatrixScene
   | UltimateCodeScene
   | UltimateMetricsScene
@@ -135,7 +168,11 @@ export type ResolvedUltimateFeatureRailScene = WithResolvedTiming<UltimateFeatur
 export type ResolvedUltimateFocusScene = WithResolvedTiming<UltimateFocusScene>;
 export type ResolvedUltimateNumberStripScene = WithResolvedTiming<UltimateNumberStripScene>;
 export type ResolvedUltimateStepFlowScene = WithResolvedTiming<UltimateStepFlowScene>;
+export type ResolvedUltimateTimelineScene = WithResolvedTiming<UltimateTimelineScene>;
+export type ResolvedUltimateCompareBoardScene = WithResolvedTiming<UltimateCompareBoardScene>;
 export type ResolvedUltimateTerminalScene = WithResolvedTiming<UltimateTerminalScene>;
+export type ResolvedUltimateEvidenceWallScene = WithResolvedTiming<UltimateEvidenceWallScene>;
+export type ResolvedUltimateArchitectureMapScene = WithResolvedTiming<UltimateArchitectureMapScene>;
 export type ResolvedUltimateTagMatrixScene = WithResolvedTiming<UltimateTagMatrixScene>;
 export type ResolvedUltimateCodeScene = WithResolvedTiming<UltimateCodeScene>;
 export type ResolvedUltimateMetricsScene = WithResolvedTiming<UltimateMetricsScene>;
@@ -147,7 +184,11 @@ export type ResolvedUltimateSceneConfig =
   | ResolvedUltimateFocusScene
   | ResolvedUltimateNumberStripScene
   | ResolvedUltimateStepFlowScene
+  | ResolvedUltimateTimelineScene
+  | ResolvedUltimateCompareBoardScene
   | ResolvedUltimateTerminalScene
+  | ResolvedUltimateEvidenceWallScene
+  | ResolvedUltimateArchitectureMapScene
   | ResolvedUltimateTagMatrixScene
   | ResolvedUltimateCodeScene
   | ResolvedUltimateMetricsScene
@@ -212,11 +253,65 @@ const readSceneComplexity = (scene: UltimateSceneConfig) => {
           0,
         )
       );
+    case 'timeline':
+      return (
+        countMany([scene.data.heading, scene.data.summary, scene.subtitle]) +
+        scene.data.items.length * 18 +
+        scene.data.items.reduce(
+          (total, item) => total + countMany([item.label, item.title, item.detail]),
+          0,
+        )
+      );
+    case 'compare-board':
+      return (
+        countMany([
+          scene.data.heading,
+          scene.data.summary,
+          scene.data.leftTitle,
+          scene.data.rightTitle,
+          scene.subtitle,
+        ]) +
+        scene.data.rows.length * 20 +
+        scene.data.rows.reduce(
+          (total, row) => total + countMany([row.label, row.left, row.right]),
+          0,
+        )
+      );
     case 'terminal':
       return (
         countMany([scene.data.heading, scene.data.windowTitle, scene.data.command, scene.data.note, scene.subtitle]) +
         scene.data.outputs.length * 16 +
         scene.data.outputs.reduce((total, line) => total + countText(line), 0)
+      );
+    case 'evidence-wall':
+      return (
+        countMany([scene.data.heading, scene.data.summary, scene.subtitle]) +
+        scene.data.cards.length * 22 +
+        scene.data.cards.reduce(
+          (total, card) =>
+            total +
+            countMany([
+              card.source,
+              card.quote,
+              card.detail,
+              ...(card.chips ?? []),
+            ]),
+          0,
+        )
+      );
+    case 'architecture-map':
+      return (
+        countMany([
+          scene.data.heading,
+          scene.data.centerTitle,
+          scene.data.centerDetail,
+          scene.subtitle,
+        ]) +
+        scene.data.nodes.length * 18 +
+        scene.data.nodes.reduce(
+          (total, node) => total + countMany([node.label, node.detail]),
+          0,
+        )
       );
     case 'tag-matrix':
       return (
@@ -257,7 +352,11 @@ const sceneBaseDurations: Record<UltimateSceneFamily, {base: number; max: number
   focus: {base: 78, max: 168},
   'number-strip': {base: 64, max: 144},
   'step-flow': {base: 88, max: 210},
+  timeline: {base: 82, max: 186},
+  'compare-board': {base: 90, max: 204},
   terminal: {base: 84, max: 186},
+  'evidence-wall': {base: 84, max: 192},
+  'architecture-map': {base: 90, max: 210},
   'tag-matrix': {base: 78, max: 168},
   code: {base: 74, max: 162},
   metrics: {base: 66, max: 144},
@@ -280,8 +379,16 @@ export const deriveUltimateSceneSubtitle = (scene: UltimateSceneConfig) => {
       return `${scene.data.count} ${scene.data.heading}`;
     case 'step-flow':
       return scene.data.heading;
+    case 'timeline':
+      return scene.data.summary ?? scene.data.heading;
+    case 'compare-board':
+      return scene.data.summary ?? scene.data.heading;
     case 'terminal':
       return scene.data.note ?? scene.data.heading;
+    case 'evidence-wall':
+      return scene.data.summary ?? scene.data.heading;
+    case 'architecture-map':
+      return scene.data.centerDetail ?? scene.data.heading;
     case 'tag-matrix':
       return scene.data.heading;
     case 'code':

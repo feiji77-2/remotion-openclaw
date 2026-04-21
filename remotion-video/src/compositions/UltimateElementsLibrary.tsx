@@ -1,8 +1,11 @@
 import React from 'react';
 import {Sequence} from 'remotion';
 import {
+  UltimateArchitectureMap,
   UltimateCodePanel,
+  UltimateCompareBoard,
   UltimateCtaPanel,
+  UltimateEvidenceWall,
   UltimateFeatureCardRail,
   UltimateFocusDiagram,
   UltimateHeroPanel,
@@ -14,9 +17,10 @@ import {
   UltimateSubtitleBar,
   UltimateTagMatrix,
   UltimateTerminalPanel,
+  UltimateTimeline,
 } from '../components/ultimate-kit';
 
-export const ULTIMATE_ELEMENTS_LIBRARY_DURATION = 810;
+export const ULTIMATE_ELEMENTS_LIBRARY_DURATION = 1146;
 
 export const UltimateElementsLibrary: React.FC = () => {
   return (
@@ -159,12 +163,12 @@ export const UltimateElementsLibrary: React.FC = () => {
             heading="Code Window Module"
             filename="ultimate-scene.tsx"
             lines={[
-              {text: 'export const scene = createScene({', tone: 'base'},
-              {text: "  family: 'feature-rail',", tone: 'accent'},
-              {text: '  headline: input.headline,', tone: 'base'},
-              {text: '  items: normalizeCards(input.cards),', tone: 'base'},
-              {text: '  subtitle: input.subtitle,', tone: 'muted'},
-              {text: '});', tone: 'base'},
+              {text: '{', tone: 'base'},
+              {text: '  "family": "feature-rail",', tone: 'accent'},
+              {text: '  "headline": "input.headline",', tone: 'base'},
+              {text: '  "items": ["subject", "framing"],', tone: 'base'},
+              {text: '  "subtitle": "input.subtitle"', tone: 'muted'},
+              {text: '}', tone: 'base'},
             ]}
             highlightLine={2}
             footer="Use for code snippets, JSON schemas, or declarative scene setup."
@@ -178,6 +182,7 @@ export const UltimateElementsLibrary: React.FC = () => {
         <UltimateStage>
           <UltimateMetricBars
             heading="Metric Bars + Result View"
+            layout="bars"
             items={[
               {label: 'preview', value: '1.4s', ratio: 0.92, accent: 'cyan'},
               {label: 'quality', value: '1080p', ratio: 0.84, accent: 'green'},
@@ -188,7 +193,82 @@ export const UltimateElementsLibrary: React.FC = () => {
         </UltimateStage>
       </Sequence>
 
-      <Sequence from={738} durationInFrames={72}>
+      <Sequence from={738} durationInFrames={84}>
+        <UltimateStage>
+          <UltimateTimeline
+            heading="Timeline Beats for Releases"
+            summary="Use this family for launch chronology, roadmap checkpoints, release cadence, and daily global AI update timelines."
+            items={[
+              {label: 'Apr 16', title: 'Model teaser lands', detail: 'Open-source signal starts spreading across communities.', accent: 'cyan'},
+              {label: 'Apr 18', title: 'Benchmarks circulate', detail: 'SWE-Bench Pro and HLE mentions start framing the narrative.', accent: 'green'},
+              {label: 'Apr 20', title: 'Workflow demos appear', detail: 'Developers begin sharing long-run coding and multi-agent tests.', accent: 'yellow'},
+              {label: 'Apr 22', title: 'Mainstream breakout', detail: 'The story becomes: open source is now pressuring closed leaders.', accent: 'orange'},
+            ]}
+            accent="cyan"
+          />
+          <UltimateSubtitleBar text="Timeline / release chronology / roadmap screen" />
+        </UltimateStage>
+      </Sequence>
+
+      <Sequence from={822} durationInFrames={84}>
+        <UltimateStage>
+          <UltimateCompareBoard
+            heading="Compare Board for A/B Claims"
+            summary="Unlike number-strip, this one is for structured side-by-side comparison when you need two clear columns."
+            leftTitle="Old Workflow"
+            rightTitle="K2.6 Workflow"
+            leftEyebrow="before"
+            rightEyebrow="after"
+            rows={[
+              {label: 'delivery', left: '2 days / module', right: '1 day / module', accent: 'yellow'},
+              {label: 'parallelism', left: 'single-threaded', right: 'tests + deploy + coding', accent: 'orange'},
+              {label: 'quality', left: 'context breaks often', right: 'long-run stability', accent: 'green'},
+            ]}
+            leftAccent="red"
+            rightAccent="green"
+          />
+          <UltimateSubtitleBar text="Compare board / structured A-B scene" />
+        </UltimateStage>
+      </Sequence>
+
+      <Sequence from={906} durationInFrames={84}>
+        <UltimateStage>
+          <UltimateEvidenceWall
+            heading="Evidence Wall for Source-Driven Segments"
+            summary="Best for proof-heavy tech explainers: sources, benchmark references, official notes, and quote cards."
+            cards={[
+              {source: 'SWE-Bench Pro', quote: 'Benchmark signal moves into GPT-class territory.', detail: 'Use quote-style cards instead of generic lists.', chips: ['benchmark', 'coding'], accent: 'cyan'},
+              {source: 'HLE', quote: 'Humanity’s Last Exam gets pulled into the comparison story.', detail: 'Good for “why this matters now” beats.', chips: ['HLE', 'public'], accent: 'green'},
+              {source: 'GitHub', quote: 'Open-source availability changes adoption speed.', detail: 'Great for release notes, repos, and docs citations.', chips: ['repo', 'release'], accent: 'yellow'},
+              {source: 'Field Tests', quote: 'Long-run coding and agent orchestration clips back the claim.', detail: 'Use as proof layer, not as CTA.', chips: ['agent', 'workflow'], accent: 'orange'},
+            ]}
+            accent="yellow"
+          />
+          <UltimateSubtitleBar text="Evidence wall / proof cards / source board" />
+        </UltimateStage>
+      </Sequence>
+
+      <Sequence from={990} durationInFrames={84}>
+        <UltimateStage>
+          <UltimateArchitectureMap
+            heading="Architecture Map for Agentic Systems"
+            centerTitle="AI Production Core"
+            centerDetail="Use this family when the narration is about modules, orchestration, memory, retrieval, or multi-agent topology."
+            nodes={[
+              {label: 'Search Intake', detail: 'global sources + daily signals', accent: 'cyan'},
+              {label: 'Fact Parser', detail: 'claims, dates, benchmarks, citations', accent: 'green'},
+              {label: 'Storyboard Planner', detail: 'segment intent -> scene family', accent: 'yellow'},
+              {label: 'Voice Layer', detail: 'narration timing + subtitles', accent: 'orange'},
+              {label: 'Render Worker', detail: 'Remotion export + packaging', accent: 'purple'},
+            ]}
+            accent="cyan"
+            layout="radial"
+          />
+          <UltimateSubtitleBar text="Architecture map / system topology / module graph" />
+        </UltimateStage>
+      </Sequence>
+
+      <Sequence from={1074} durationInFrames={72}>
         <UltimateStage>
           <UltimatePlatformOverlay brand="SceneLab" account="@ultimate-kit" searchLabel="Find your next scene" watermark="Library" />
           <UltimateCtaPanel

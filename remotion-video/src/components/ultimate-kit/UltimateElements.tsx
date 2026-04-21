@@ -2,15 +2,25 @@ import React, {type CSSProperties} from 'react';
 import {AbsoluteFill, Easing, interpolate, spring, useCurrentFrame} from 'remotion';
 import {ParticleBackground} from '../ParticleBackground';
 import {
+  getUltimateManualGlyph,
+  ULTIMATE_ICON_URLS,
+  isUltimateManualGlyph,
+  resolveUltimateIconPack,
+  type UltimateIconName,
+} from './iconography';
+import {
   resolveUltimateAccent,
   ultimateGlow,
   ultimateKitTokens,
   ultimateKitVideo,
 } from './tokens';
 import type {
+  UltimateArchitectureMapProps,
   UltimateCodeLine,
   UltimateCodePanelProps,
+  UltimateCompareBoardProps,
   UltimateCtaPanelProps,
+  UltimateEvidenceWallProps,
   UltimateFeatureCardRailProps,
   UltimateFocusDiagramProps,
   UltimateHeroPanelProps,
@@ -22,6 +32,7 @@ import type {
   UltimateSubtitleBarProps,
   UltimateTagMatrixProps,
   UltimateTerminalPanelProps,
+  UltimateTimelineProps,
 } from './types';
 
 const kit = ultimateKitTokens;
@@ -197,6 +208,137 @@ const lineClampStyle = (lines: number): CSSProperties => ({
   WebkitBoxOrient: 'vertical',
   overflow: 'hidden',
 });
+
+const iconMaskStyle = (icon: UltimateIconName): CSSProperties => ({
+  background: 'currentColor',
+  WebkitMaskImage: `url(${ULTIMATE_ICON_URLS[icon]})`,
+  WebkitMaskRepeat: 'no-repeat',
+  WebkitMaskPosition: 'center',
+  WebkitMaskSize: 'contain',
+  maskImage: `url(${ULTIMATE_ICON_URLS[icon]})`,
+  maskRepeat: 'no-repeat',
+  maskPosition: 'center',
+  maskSize: 'contain',
+});
+
+const semanticFallbackIcons: UltimateIconName[] = [
+  'sparkles',
+  'layers',
+  'code',
+  'messagesSquare',
+  'zap',
+  'arrowRight',
+];
+
+const resolveSemanticIcon = (
+  iconValue: string | undefined,
+  semanticText: string,
+  fallbackIndex = 0,
+  family?: string,
+) => {
+  const iconText = cleanDisplayText(iconValue);
+  if (iconText && isUltimateManualGlyph(iconText)) {
+    return null;
+  }
+
+  return resolveUltimateIconPack({
+    hints: [semanticText, iconText],
+    requested: iconText ? [iconText] : [],
+    count: 1,
+    family,
+    seed: fallbackIndex,
+  })[0] || semanticFallbackIcons[fallbackIndex % semanticFallbackIcons.length];
+};
+
+const SemanticIconGlyph: React.FC<{
+  iconValue?: string;
+  semanticText: string;
+  color: string;
+  size: number;
+  fallbackIndex?: number;
+  family?: string;
+}> = ({
+  iconValue,
+  semanticText,
+  color,
+  size,
+  fallbackIndex = 0,
+  family,
+}) => {
+  const manualGlyph = getUltimateManualGlyph(iconValue);
+
+  if (manualGlyph) {
+    return (
+      <span style={{color, fontSize: size * 0.72, fontWeight: 800, lineHeight: 1}}>
+        {manualGlyph}
+      </span>
+    );
+  }
+
+  const icon = resolveSemanticIcon(iconValue, semanticText, fallbackIndex, family);
+
+  if (!icon) {
+    const text = cleanDisplayText(iconValue);
+    return text ? (
+      <span style={{color, fontSize: size * 0.72, fontWeight: 800, lineHeight: 1}}>{text}</span>
+    ) : null;
+  }
+
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        color,
+        ...iconMaskStyle(icon),
+      }}
+    />
+  );
+};
+
+const SemanticIconBadge: React.FC<{
+  iconValue?: string;
+  semanticText: string;
+  color: string;
+  badgeSize?: number;
+  size?: number;
+  fallbackIndex?: number;
+  family?: string;
+  rounded?: number;
+}> = ({
+  iconValue,
+  semanticText,
+  color,
+  badgeSize = 46,
+  size = 20,
+  fallbackIndex = 0,
+  family,
+  rounded = 16,
+}) => (
+  <div
+    style={{
+      width: badgeSize,
+      height: badgeSize,
+      borderRadius: rounded,
+      border: `1px solid ${color}33`,
+      background: `linear-gradient(180deg, ${color}16 0%, rgba(10, 13, 24, 0.88) 100%)`,
+      boxShadow: ultimateGlow(color, 0.2),
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    }}
+  >
+    <SemanticIconGlyph
+      iconValue={iconValue}
+      semanticText={semanticText}
+      color={color}
+      size={size}
+      fallbackIndex={fallbackIndex}
+      family={family}
+    />
+  </div>
+);
 
 const parseCodeFacts = (lines: UltimateCodeLine[]) => {
   return lines
@@ -681,7 +823,14 @@ export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps> = (
                   boxShadow: ultimateGlow(accentColor, 0.55),
                 }}
               >
-                {item.icon ?? '[]'}
+                <SemanticIconGlyph
+                  iconValue={item.icon}
+                  semanticText={`${item.title} ${item.caption || ''} ${item.eyebrow || ''}`}
+                  color={accentColor}
+                  size={34}
+                  fallbackIndex={index}
+                  family="feature-rail"
+                />
               </div>
               <div
                 style={{
@@ -1132,6 +1281,9 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
               <>
                 <div
                   style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
                     fontSize: 18,
                     letterSpacing: 2,
                     color: toneToColor(primaryItem.accent ?? accent),
@@ -1139,6 +1291,13 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                     fontWeight: 700,
                   }}
                 >
+                  <SemanticIconBadge
+                    semanticText={`${primaryItem.tag || '核心判断'} ${primaryItem.label} ${primaryItem.detail || ''}`}
+                    color={toneToColor(primaryItem.accent ?? accent)}
+                    badgeSize={38}
+                    size={16}
+                    family="number-strip"
+                  />
                   {primaryItem.tag || '核心判断'}
                 </div>
                 <div style={{marginTop: 12}}>
@@ -1211,6 +1370,9 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
               <div>
                 <div
                   style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
                     fontSize: 17,
                     letterSpacing: 2,
                     color,
@@ -1218,6 +1380,15 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                     fontWeight: 700,
                   }}
                 >
+                  <SemanticIconBadge
+                    semanticText={`${item.tag || `补充 ${index + 1}`} ${item.label} ${item.detail || ''}`}
+                    color={color}
+                    badgeSize={34}
+                    size={14}
+                    fallbackIndex={index}
+                    family="number-strip"
+                    rounded={12}
+                  />
                   {item.tag || `补充 ${index + 1}`}
                 </div>
                 <div style={{marginTop: 14}}>
@@ -1358,7 +1529,14 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps> = ({heading, step
                     fontWeight: 800,
                   }}
                 >
-                  {step.icon ?? `${index + 1}`}
+                  <SemanticIconGlyph
+                    iconValue={step.icon}
+                    semanticText={`${step.label} ${step.detail || ''}`}
+                    color={accentColor}
+                    size={28}
+                    fallbackIndex={index}
+                    family="step-flow"
+                  />
                 </div>
                 <div style={{marginTop: 12, fontSize: 34, fontWeight: 800, lineHeight: 1.12}}>{step.label}</div>
                 {step.detail ? (
@@ -1385,6 +1563,689 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps> = ({heading, step
           );
         })}
       </div>
+    </div>
+  );
+};
+
+export const UltimateTimeline: React.FC<UltimateTimelineProps> = ({
+  heading,
+  summary,
+  items,
+  accent = 'cyan',
+}) => {
+  const frame = useCurrentFrame();
+  const accentColor = toneToColor(accent);
+  const visibleItems = items.slice(0, 5);
+  const railProgress = interpolate(frame, [10, 54], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const railLeft = 220;
+  const railWidth = 1480;
+
+  return (
+    <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
+      <div style={{position: 'absolute', top: 94, left: 160, right: 160}}>
+        <div style={eyebrowStyle(accentColor)}>时间线</div>
+        <div
+          style={{
+            marginTop: 18,
+            textAlign: 'center',
+            fontFamily: kit.fonts.display,
+            fontSize: 74,
+            letterSpacing: -2.6,
+          }}
+        >
+          {heading}
+        </div>
+        {summary ? (
+          <div
+            style={{
+              margin: '18px auto 0',
+              maxWidth: 1040,
+              fontSize: 24,
+              lineHeight: 1.55,
+              color: kit.colors.textMuted,
+              textAlign: 'center',
+            }}
+          >
+            {summary}
+          </div>
+        ) : null}
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: railLeft,
+          width: railWidth,
+          top: 504,
+          height: 4,
+          borderRadius: kit.radius.pill,
+          overflow: 'hidden',
+          background: 'linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.12))',
+        }}
+      >
+        <div
+          style={{
+            width: `${railProgress * 100}%`,
+            height: '100%',
+            background: `linear-gradient(90deg, ${accentColor}, rgba(255,255,255,0.94))`,
+            boxShadow: ultimateGlow(accentColor, 0.45),
+          }}
+        />
+      </div>
+      {visibleItems.map((item, index) => {
+        const reveal = buildReveal(frame, 6 + index * 8);
+        const itemColor = toneToColor(item.accent ?? accent);
+        const left = railLeft + (visibleItems.length === 1 ? railWidth / 2 : (railWidth / Math.max(visibleItems.length - 1, 1)) * index);
+        const upper = index % 2 === 0;
+        const cardTop = upper ? 286 : 574;
+        const lineHeight = upper ? 126 : 70;
+
+        return (
+          <div key={`${item.label}-${index}`}>
+            <div
+              style={{
+                position: 'absolute',
+                left: left - 2,
+                top: upper ? 504 - lineHeight : 508,
+                width: 4,
+                height: lineHeight,
+                borderRadius: kit.radius.pill,
+                background: `linear-gradient(180deg, ${itemColor}, rgba(255,255,255,0.08))`,
+                opacity: reveal,
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                left: left - 12,
+                top: 492,
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                background: itemColor,
+                boxShadow: ultimateGlow(itemColor, 0.8),
+                opacity: reveal,
+                transform: `scale(${interpolate(reveal, [0, 1], [0.8, 1])})`,
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                left: left - 170,
+                top: cardTop,
+                width: 340,
+                minHeight: 180,
+                padding: '24px 22px 22px',
+                opacity: reveal,
+                transform: `translateY(${interpolate(reveal, [0, 1], [24, 0])}px)`,
+                ...panelStyle(itemColor),
+              }}
+            >
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 14px',
+                  borderRadius: kit.radius.pill,
+                  border: `1px solid ${itemColor}38`,
+                  color: itemColor,
+                  fontSize: 16,
+                  letterSpacing: 1.4,
+                  textTransform: 'uppercase',
+                  background: `${itemColor}12`,
+                }}
+              >
+                <SemanticIconBadge
+                  iconValue={item.icon}
+                  semanticText={`${item.label} ${item.title} ${item.detail || ''}`}
+                  color={itemColor}
+                  badgeSize={32}
+                  size={14}
+                  fallbackIndex={index}
+                  family="timeline"
+                  rounded={12}
+                />
+                <span>{item.label}</span>
+              </div>
+              <div
+                style={{
+                  marginTop: 16,
+                  fontSize: 30,
+                  fontWeight: 800,
+                  lineHeight: 1.16,
+                  ...lineClampStyle(2),
+                }}
+              >
+                {item.title}
+              </div>
+              {item.detail ? (
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 19,
+                    lineHeight: 1.45,
+                    color: kit.colors.textMuted,
+                    ...lineClampStyle(3),
+                  }}
+                >
+                  {item.detail}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps> = ({
+  heading,
+  summary,
+  leftTitle,
+  rightTitle,
+  leftEyebrow,
+  rightEyebrow,
+  rows,
+  leftAccent = 'red',
+  rightAccent = 'green',
+}) => {
+  const frame = useCurrentFrame();
+  const leftColor = toneToColor(leftAccent);
+  const rightColor = toneToColor(rightAccent);
+  const visibleRows = rows.slice(0, 4);
+
+  return (
+    <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
+      <div style={{position: 'absolute', top: 90, left: 140, right: 140}}>
+        <div style={eyebrowStyle(resolveUltimateAccent('yellow'))}>双栏对照</div>
+        <div
+          style={{
+            marginTop: 18,
+            textAlign: 'center',
+            fontFamily: kit.fonts.display,
+            fontSize: 74,
+            letterSpacing: -2.6,
+          }}
+        >
+          {heading}
+        </div>
+        {summary ? (
+          <div
+            style={{
+              margin: '16px auto 0',
+              maxWidth: 980,
+              fontSize: 23,
+              lineHeight: 1.55,
+              color: kit.colors.textMuted,
+              textAlign: 'center',
+            }}
+          >
+            {summary}
+          </div>
+        ) : null}
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: 140,
+          top: 266,
+          width: 560,
+          padding: '24px 28px',
+          ...panelStyle(leftColor),
+        }}
+      >
+        {leftEyebrow ? <div style={{...eyebrowStyle(leftColor, false), fontSize: 14, letterSpacing: 2.2}}>{leftEyebrow}</div> : null}
+        <div style={{marginTop: leftEyebrow ? 10 : 0, fontSize: 48, fontWeight: 800, color: leftColor}}>{leftTitle}</div>
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          right: 140,
+          top: 266,
+          width: 560,
+          padding: '24px 28px',
+          textAlign: 'right',
+          ...panelStyle(rightColor),
+        }}
+      >
+        {rightEyebrow ? <div style={{...eyebrowStyle(rightColor, false), fontSize: 14, letterSpacing: 2.2}}>{rightEyebrow}</div> : null}
+        <div style={{marginTop: rightEyebrow ? 10 : 0, fontSize: 48, fontWeight: 800, color: rightColor}}>{rightTitle}</div>
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: 286,
+          width: 120,
+          height: 120,
+          marginLeft: -60,
+          borderRadius: '50%',
+          border: '1px solid rgba(255,255,255,0.14)',
+          background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.18), rgba(8, 10, 18, 0.96))',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 34,
+          fontWeight: 900,
+          letterSpacing: 3,
+          color: kit.colors.text,
+          boxShadow: '0 18px 46px rgba(0,0,0,0.26)',
+        }}
+      >
+        VS
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: 140,
+          right: 140,
+          top: 438,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 18,
+        }}
+      >
+        {visibleRows.map((row, index) => {
+          const reveal = buildReveal(frame, 8 + index * 6);
+          const rowColor = toneToColor(row.accent ?? 'yellow');
+          return (
+            <div
+              key={`${row.label}-${index}`}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 180px 1fr',
+                gap: 24,
+                alignItems: 'center',
+                opacity: reveal,
+                transform: `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
+              }}
+            >
+              <div style={{...panelStyle(leftColor), minHeight: 116, padding: '22px 24px'}}>
+                <div style={{fontSize: 14, letterSpacing: 2, textTransform: 'uppercase', color: `${leftColor}`}}>左侧</div>
+                <div style={{marginTop: 10, fontSize: 28, fontWeight: 750, lineHeight: 1.2}}>{row.left}</div>
+              </div>
+              <div
+                style={{
+                  padding: '14px 16px',
+                  borderRadius: 22,
+                  border: `1px solid ${rowColor}30`,
+                  background: `${rowColor}14`,
+                  textAlign: 'center',
+                  color: rowColor,
+                  fontSize: 18,
+                  fontWeight: 700,
+                  lineHeight: 1.35,
+                  boxShadow: ultimateGlow(rowColor, 0.16),
+                }}
+              >
+                {row.label}
+              </div>
+              <div style={{...panelStyle(rightColor), minHeight: 116, padding: '22px 24px'}}>
+                <div style={{fontSize: 14, letterSpacing: 2, textTransform: 'uppercase', color: `${rightColor}`}}>右侧</div>
+                <div style={{marginTop: 10, fontSize: 28, fontWeight: 750, lineHeight: 1.2}}>{row.right}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps> = ({
+  heading,
+  summary,
+  cards,
+  accent = 'yellow',
+}) => {
+  const frame = useCurrentFrame();
+  const accentColor = toneToColor(accent);
+  const visibleCards = cards.slice(0, 4);
+  const positions = [
+    {top: 254, left: 120, rotate: -5},
+    {top: 232, left: 1028, rotate: 4},
+    {top: 584, left: 180, rotate: 3},
+    {top: 562, left: 1086, rotate: -4},
+  ];
+
+  return (
+    <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
+      <div style={{position: 'absolute', top: 90, left: 130, right: 130}}>
+        <div style={eyebrowStyle(accentColor, false)}>证据层</div>
+        <div
+          style={{
+            marginTop: 18,
+            fontFamily: kit.fonts.display,
+            fontSize: 76,
+            letterSpacing: -2.6,
+            maxWidth: 1100,
+          }}
+        >
+          {heading}
+        </div>
+        {summary ? (
+          <div
+            style={{
+              marginTop: 16,
+              maxWidth: 720,
+              fontSize: 24,
+              lineHeight: 1.55,
+              color: kit.colors.textMuted,
+            }}
+          >
+            {summary}
+          </div>
+        ) : null}
+      </div>
+      {visibleCards.map((card, index) => {
+        const reveal = buildReveal(frame, 8 + index * 7);
+        const cardColor = toneToColor(card.accent ?? accent);
+        const position = positions[index] || positions[positions.length - 1];
+        return (
+          <div
+            key={`${card.source}-${index}`}
+            style={{
+              position: 'absolute',
+              top: position.top,
+              left: position.left,
+              width: 760,
+              minHeight: 238,
+              padding: '24px 24px 22px',
+              opacity: reveal,
+              transform: `translateY(${interpolate(reveal, [0, 1], [20, 0])}px) rotate(${position.rotate}deg)`,
+              ...panelStyle(cardColor),
+            }}
+          >
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16}}>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '10px 14px',
+                  borderRadius: kit.radius.pill,
+                  border: `1px solid ${cardColor}34`,
+                  color: cardColor,
+                  background: `${cardColor}14`,
+                  fontSize: 17,
+                  letterSpacing: 1.4,
+                  textTransform: 'uppercase',
+                }}
+              >
+                <SemanticIconBadge
+                  iconValue={card.icon}
+                  semanticText={`${card.source} ${card.quote} ${(card.chips ?? []).join(' ')}`}
+                  color={cardColor}
+                  badgeSize={34}
+                  size={15}
+                  fallbackIndex={index}
+                  family="evidence-wall"
+                  rounded={12}
+                />
+                <span>{card.source}</span>
+              </div>
+              <div style={{fontSize: 14, color: kit.colors.textSoft, letterSpacing: 2, textTransform: 'uppercase'}}>
+                证据 {String(index + 1).padStart(2, '0')}
+              </div>
+            </div>
+            <div
+              style={{
+                marginTop: 18,
+                fontSize: 31,
+                lineHeight: 1.28,
+                fontWeight: 760,
+                color: kit.colors.text,
+                ...lineClampStyle(3),
+              }}
+            >
+              {card.quote}
+            </div>
+            {card.detail ? (
+              <div
+                style={{
+                  marginTop: 14,
+                  fontSize: 18,
+                  lineHeight: 1.5,
+                  color: kit.colors.textMuted,
+                  ...lineClampStyle(2),
+                }}
+              >
+                {card.detail}
+              </div>
+            ) : null}
+            {card.chips && card.chips.length > 0 ? (
+              <div style={{marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 10}}>
+                {card.chips.slice(0, 3).map((chip) => (
+                  <div
+                    key={chip}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: kit.radius.pill,
+                      border: `1px solid ${cardColor}28`,
+                      background: 'rgba(255,255,255,0.03)',
+                      color: kit.colors.textSoft,
+                      fontSize: 15,
+                    }}
+                  >
+                    {chip}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = ({
+  heading,
+  centerTitle,
+  centerDetail,
+  nodes,
+  accent = 'cyan',
+  layout = 'radial',
+}) => {
+  const frame = useCurrentFrame();
+  const accentColor = toneToColor(accent);
+  const visibleNodes = nodes.slice(0, 6);
+  const radialPositions = [
+    {top: 226, left: 148},
+    {top: 160, left: 760},
+    {top: 236, left: 1456},
+    {top: 666, left: 1450},
+    {top: 748, left: 760},
+    {top: 646, left: 154},
+  ];
+  const centerBox = {left: 640, top: 390, width: 640, height: 256};
+  const useRadial = layout !== 'stack' && visibleNodes.length > 3;
+
+  return (
+    <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
+      <div style={{position: 'absolute', top: 90, left: 130, right: 130}}>
+        <div style={eyebrowStyle(accentColor, false)}>系统结构</div>
+        <div
+          style={{
+            marginTop: 18,
+            fontFamily: kit.fonts.display,
+            fontSize: 72,
+            letterSpacing: -2.5,
+            maxWidth: 980,
+          }}
+        >
+          {heading}
+        </div>
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: centerBox.left,
+          top: centerBox.top,
+          width: centerBox.width,
+          minHeight: centerBox.height,
+          padding: '32px 36px',
+          textAlign: 'center',
+          ...panelStyle(accentColor),
+          boxShadow: `0 28px 90px rgba(0,0,0,0.24), 0 0 60px ${accentColor}18`,
+        }}
+      >
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '10px 16px',
+            borderRadius: kit.radius.pill,
+            border: `1px solid ${accentColor}3a`,
+            color: accentColor,
+            background: `${accentColor}14`,
+          }}
+        >
+          <SemanticIconBadge
+            semanticText={`${centerTitle} ${centerDetail || ''}`}
+            color={accentColor}
+            badgeSize={36}
+            size={16}
+            family="architecture-map"
+            rounded={12}
+          />
+          <span style={{fontSize: 16, letterSpacing: 2, textTransform: 'uppercase'}}>核心节点</span>
+        </div>
+        <div style={{marginTop: 18, fontSize: 54, fontWeight: 840, lineHeight: 1.08}}>{centerTitle}</div>
+        {centerDetail ? (
+          <div
+            style={{
+              marginTop: 18,
+              fontSize: 22,
+              lineHeight: 1.55,
+              color: kit.colors.textMuted,
+              maxWidth: 500,
+              marginLeft: 'auto',
+              marginRight: 'auto',
+            }}
+          >
+            {centerDetail}
+          </div>
+        ) : null}
+      </div>
+      {useRadial
+        ? visibleNodes.map((node, index) => {
+            const reveal = buildReveal(frame, 8 + index * 6);
+            const nodeColor = toneToColor(node.accent ?? accent);
+            const position = radialPositions[index] || radialPositions[radialPositions.length - 1];
+            const nodeCenterX = position.left + 150;
+            const nodeCenterY = position.top + 72;
+            const coreCenterX = centerBox.left + centerBox.width / 2;
+            const coreCenterY = centerBox.top + centerBox.height / 2;
+            const dx = nodeCenterX - coreCenterX;
+            const dy = nodeCenterY - coreCenterY;
+            const length = Math.max(0, Math.hypot(dx, dy) - 180);
+            const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+
+            return (
+              <div key={`${node.label}-${index}`}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: coreCenterX,
+                    top: coreCenterY,
+                    width: length,
+                    height: 2,
+                    transformOrigin: '0 50%',
+                    transform: `rotate(${angle}deg)`,
+                    background: `linear-gradient(90deg, ${accentColor}70, ${nodeColor}44, transparent)`,
+                    opacity: reveal,
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: position.left,
+                    top: position.top,
+                    width: 300,
+                    minHeight: 144,
+                    padding: '20px 22px',
+                    opacity: reveal,
+                    transform: `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
+                    ...panelStyle(nodeColor),
+                  }}
+                >
+                  <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
+                    <SemanticIconBadge
+                      iconValue={node.icon}
+                      semanticText={`${node.label} ${node.detail || ''}`}
+                      color={nodeColor}
+                      badgeSize={36}
+                      size={15}
+                      fallbackIndex={index}
+                      family="architecture-map"
+                      rounded={12}
+                    />
+                    <div style={{fontSize: 26, fontWeight: 760, lineHeight: 1.15}}>{node.label}</div>
+                  </div>
+                  {node.detail ? (
+                    <div style={{marginTop: 12, fontSize: 18, lineHeight: 1.45, color: kit.colors.textMuted}}>
+                      {node.detail}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })
+        : (
+          <div
+            style={{
+              position: 'absolute',
+              left: 120,
+              right: 120,
+              top: 700,
+              display: 'grid',
+              gridTemplateColumns: `repeat(${Math.max(visibleNodes.length, 1)}, minmax(0, 1fr))`,
+              gap: 18,
+            }}
+          >
+            {visibleNodes.map((node, index) => {
+              const reveal = buildReveal(frame, 8 + index * 6);
+              const nodeColor = toneToColor(node.accent ?? accent);
+              return (
+                <div
+                  key={`${node.label}-${index}`}
+                  style={{
+                    minHeight: 160,
+                    padding: '20px 22px',
+                    opacity: reveal,
+                    transform: `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
+                    ...panelStyle(nodeColor),
+                  }}
+                >
+                  <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
+                    <SemanticIconBadge
+                      iconValue={node.icon}
+                      semanticText={`${node.label} ${node.detail || ''}`}
+                      color={nodeColor}
+                      badgeSize={36}
+                      size={15}
+                      fallbackIndex={index}
+                      family="architecture-map"
+                      rounded={12}
+                    />
+                    <div style={{fontSize: 24, fontWeight: 760}}>{node.label}</div>
+                  </div>
+                  {node.detail ? (
+                    <div style={{marginTop: 12, fontSize: 18, lineHeight: 1.45, color: kit.colors.textMuted}}>
+                      {node.detail}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
     </div>
   );
 };
@@ -1694,6 +2555,9 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
               >
                 <div
                   style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
                     fontSize: 17,
                     letterSpacing: 2,
                     color: factColor,
@@ -1701,6 +2565,15 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
                     fontWeight: 700,
                   }}
                 >
+                  <SemanticIconBadge
+                    semanticText={`${fact.label} ${fact.value}`}
+                    color={factColor}
+                    badgeSize={34}
+                    size={14}
+                    fallbackIndex={index}
+                    family="code"
+                    rounded={12}
+                  />
                   {fact.label}
                 </div>
                 <div
@@ -1773,11 +2646,18 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
   );
 };
 
-export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({heading, summary, items}) => {
+export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({
+  heading,
+  summary,
+  items,
+  layout = 'bars',
+}) => {
   const frame = useCurrentFrame();
   const headingLines = splitDisplayLines(heading, 18, 2);
   const summaryLines = splitDisplayLines(summary || '', 28, 2);
   const headingSize = headingLines.length > 1 || measureText(heading) > 22 ? 58 : 66;
+
+  const resolvedLayout = layout === 'cards' || items.length > 4 ? 'cards' : 'bars';
 
   return (
     <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
@@ -1823,91 +2703,227 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({heading, 
           </div>
         ) : null}
       </div>
-      <div
-        style={{
-          position: 'absolute',
-          left: 170,
-          right: 810,
-          top: 340,
-          bottom: 160,
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-          gap: 24,
-          alignContent: 'center',
-        }}
-      >
-        {items.map((item, index) => {
-          const color = toneToColor(item.accent ?? (index === 0 ? 'cyan' : index === 1 ? 'green' : 'yellow'));
-          const progress = interpolate(frame, [10 + index * 8, 34 + index * 8], [0, item.ratio], {
-            extrapolateLeft: 'clamp',
-            extrapolateRight: 'clamp',
-          });
-          return (
-            <div
-              key={`${item.label}-${index}`}
-              style={{
-                ...panelStyle(color),
-                minHeight: 196,
-                padding: '24px 24px 24px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-              }}
-            >
+      {resolvedLayout === 'cards' ? (
+        <div
+          style={{
+            position: 'absolute',
+            left: 170,
+            right: 810,
+            top: 340,
+            bottom: 160,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gap: 24,
+            alignContent: 'center',
+          }}
+        >
+          {items.map((item, index) => {
+            const color = toneToColor(item.accent ?? (index === 0 ? 'cyan' : index === 1 ? 'green' : 'yellow'));
+            const progress = interpolate(frame, [10 + index * 8, 34 + index * 8], [0, item.ratio], {
+              extrapolateLeft: 'clamp',
+              extrapolateRight: 'clamp',
+            });
+            return (
               <div
+                key={`${item.label}-${index}`}
                 style={{
+                  ...panelStyle(color),
+                  minHeight: 196,
+                  padding: '24px 24px 24px',
                   display: 'flex',
+                  flexDirection: 'column',
                   justifyContent: 'space-between',
-                  alignItems: 'flex-start',
                 }}
               >
                 <div
                   style={{
-                    fontSize: 17,
-                    color,
-                    letterSpacing: 2,
-                    textTransform: 'uppercase',
-                    fontWeight: 700,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    gap: 12,
                   }}
                 >
-                  {item.label}
+                  <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
+                    <SemanticIconBadge
+                      iconValue={item.icon}
+                      semanticText={`${item.label} ${item.value}`}
+                      color={color}
+                      badgeSize={38}
+                      size={16}
+                      fallbackIndex={index}
+                      family="metrics"
+                      rounded={14}
+                    />
+                    <div
+                      style={{
+                        fontSize: 17,
+                        color,
+                        letterSpacing: 2,
+                        textTransform: 'uppercase',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {item.label}
+                    </div>
+                  </div>
+                  <div style={{width: 14, height: 14, borderRadius: '50%', background: color, boxShadow: ultimateGlow(color, 0.45)}} />
                 </div>
-                <div style={{width: 14, height: 14, borderRadius: '50%', background: color, boxShadow: ultimateGlow(color, 0.45)}} />
-              </div>
-              <div
-                style={{
-                  fontSize: 58,
-                  lineHeight: 1,
-                  fontWeight: 800,
-                  color,
-                  textShadow: ultimateGlow(color, 0.35),
-                }}
-              >
-                {item.value}
-              </div>
-              <div
-                style={{
-                  height: 12,
-                  borderRadius: kit.radius.pill,
-                  background: 'rgba(255,255,255,0.06)',
-                  overflow: 'hidden',
-                }}
-              >
                 <div
                   style={{
-                    width: `${progress * 100}%`,
-                    height: '100%',
-                    borderRadius: kit.radius.pill,
-                    background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.92))`,
-                    boxShadow: ultimateGlow(color, 0.45),
+                    fontSize: 58,
+                    lineHeight: 1,
+                    fontWeight: 800,
+                    color,
+                    textShadow: ultimateGlow(color, 0.35),
                   }}
-                />
+                >
+                  {item.value}
+                </div>
+                <div
+                  style={{
+                    height: 12,
+                    borderRadius: kit.radius.pill,
+                    background: 'rgba(255,255,255,0.06)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${progress * 100}%`,
+                      height: '100%',
+                      borderRadius: kit.radius.pill,
+                      background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.92))`,
+                      boxShadow: ultimateGlow(color, 0.45),
+                    }}
+                  />
+                </div>
+                <div style={{fontSize: 17, color: kit.colors.textMuted}}>Key signal</div>
               </div>
-              <div style={{fontSize: 17, color: kit.colors.textMuted}}>关键信号</div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div
+          style={{
+            position: 'absolute',
+            left: 120,
+            right: 120,
+            top: 320,
+            bottom: 150,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: items.length >= 4 ? 28 : 34,
+            }}
+          >
+            {items.slice(0, 4).map((item, index) => {
+              const color = toneToColor(item.accent ?? (index === 0 ? 'cyan' : index === 1 ? 'green' : 'yellow'));
+              const reveal = buildReveal(frame, 8 + index * 5);
+              const progress = interpolate(frame, [10 + index * 8, 38 + index * 8], [0, item.ratio], {
+                extrapolateLeft: 'clamp',
+                extrapolateRight: 'clamp',
+              });
+              const fillWidth = Math.max(0, progress * 100);
+              const dotVisible = progress > 0.04;
+
+              return (
+                <div
+                  key={`${item.label}-${index}`}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: item.icon ? '240px 1fr 176px' : '200px 1fr 176px',
+                    alignItems: 'center',
+                    gap: 28,
+                    opacity: reveal,
+                    transform: `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: item.icon ? 14 : 0,
+                      fontSize: 32,
+                      fontWeight: 700,
+                      color: color,
+                      textShadow: ultimateGlow(color, 0.2),
+                    }}
+                  >
+                    {item.icon ? (
+                      <SemanticIconBadge
+                        iconValue={item.icon}
+                        semanticText={`${item.label} ${item.value}`}
+                        color={color}
+                        badgeSize={48}
+                        size={20}
+                        fallbackIndex={index}
+                        family="metrics"
+                        rounded={18}
+                      />
+                    ) : null}
+                    <span>{item.label}</span>
+                  </div>
+                  <div
+                    style={{
+                      position: 'relative',
+                      height: 34,
+                      borderRadius: kit.radius.pill,
+                      overflow: 'hidden',
+                      background: 'linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.08))',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${fillWidth}%`,
+                        height: '100%',
+                        borderRadius: kit.radius.pill,
+                        background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.96))`,
+                        boxShadow: ultimateGlow(color, 0.42),
+                      }}
+                    />
+                    {dotVisible ? (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          right: `calc(${100 - fillWidth}% - 11px)`,
+                          top: '50%',
+                          width: 22,
+                          height: 22,
+                          borderRadius: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'rgba(255,255,255,0.92)',
+                          boxShadow: ultimateGlow(color, 0.7),
+                          opacity: reveal,
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                  <div
+                    style={{
+                      textAlign: 'right',
+                      fontSize: 50,
+                      lineHeight: 1,
+                      fontWeight: 800,
+                      color,
+                      textShadow: ultimateGlow(color, 0.35),
+                    }}
+                  >
+                    {item.value}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -2023,7 +3039,18 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps> = ({
                   transform: `translateY(${interpolate(chipReveal, [0, 1], [16, 0])}px)`,
                 }}
               >
-                <div style={{fontSize: 16, letterSpacing: 2, color}}>关键元素</div>
+                <div style={{display: 'flex', alignItems: 'center', gap: 12, fontSize: 16, letterSpacing: 2, color}}>
+                  <SemanticIconBadge
+                    semanticText={item}
+                    color={color}
+                    badgeSize={36}
+                    size={15}
+                    fallbackIndex={index}
+                    family="cta"
+                    rounded={12}
+                  />
+                  <span>关键元素</span>
+                </div>
                 <div
                   style={{
                     fontSize: 34,

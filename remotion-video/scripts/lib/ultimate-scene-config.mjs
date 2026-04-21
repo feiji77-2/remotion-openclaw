@@ -4,7 +4,11 @@ const ALLOWED_FAMILIES = new Set([
   'focus',
   'number-strip',
   'step-flow',
+  'timeline',
+  'compare-board',
   'terminal',
+  'evidence-wall',
+  'architecture-map',
   'tag-matrix',
   'code',
   'metrics',
@@ -21,7 +25,11 @@ const sceneBaseDurations = {
   focus: {base: 78, max: 168},
   'number-strip': {base: 64, max: 144},
   'step-flow': {base: 88, max: 210},
+  timeline: {base: 82, max: 186},
+  'compare-board': {base: 90, max: 204},
   terminal: {base: 84, max: 186},
+  'evidence-wall': {base: 84, max: 192},
+  'architecture-map': {base: 90, max: 210},
   'tag-matrix': {base: 78, max: 168},
   code: {base: 74, max: 162},
   metrics: {base: 66, max: 144},
@@ -56,8 +64,16 @@ export const deriveSceneSubtitle = (scene) => {
       return [data.count, data.heading].filter(Boolean).join(' ').trim();
     case 'step-flow':
       return data.heading || '';
+    case 'timeline':
+      return data.summary || data.heading || '';
+    case 'compare-board':
+      return data.summary || data.heading || '';
     case 'terminal':
       return data.note || data.heading || '';
+    case 'evidence-wall':
+      return data.summary || data.heading || '';
+    case 'architecture-map':
+      return data.centerDetail || data.heading || '';
     case 'tag-matrix':
       return data.heading || '';
     case 'code':
@@ -118,12 +134,57 @@ export const estimateSceneDuration = (scene) => {
             )
           : 0);
       break;
+    case 'timeline':
+      complexity +=
+        countMany([data.heading, data.summary]) +
+        (Array.isArray(data.items) ? data.items.length * 18 : 0) +
+        (Array.isArray(data.items)
+          ? data.items.reduce(
+              (total, item) => total + countMany([item?.label, item?.title, item?.detail]),
+              0,
+            )
+          : 0);
+      break;
+    case 'compare-board':
+      complexity +=
+        countMany([data.heading, data.summary, data.leftTitle, data.rightTitle]) +
+        (Array.isArray(data.rows) ? data.rows.length * 20 : 0) +
+        (Array.isArray(data.rows)
+          ? data.rows.reduce(
+              (total, row) => total + countMany([row?.label, row?.left, row?.right]),
+              0,
+            )
+          : 0);
+      break;
     case 'terminal':
       complexity +=
         countMany([data.heading, data.windowTitle, data.command, data.note]) +
         (Array.isArray(data.outputs) ? data.outputs.length * 16 : 0) +
         (Array.isArray(data.outputs)
           ? data.outputs.reduce((total, item) => total + countText(item), 0)
+          : 0);
+      break;
+    case 'evidence-wall':
+      complexity +=
+        countMany([data.heading, data.summary]) +
+        (Array.isArray(data.cards) ? data.cards.length * 22 : 0) +
+        (Array.isArray(data.cards)
+          ? data.cards.reduce(
+              (total, card) =>
+                total + countMany([card?.source, card?.quote, card?.detail, ...(Array.isArray(card?.chips) ? card.chips : [])]),
+              0,
+            )
+          : 0);
+      break;
+    case 'architecture-map':
+      complexity +=
+        countMany([data.heading, data.centerTitle, data.centerDetail]) +
+        (Array.isArray(data.nodes) ? data.nodes.length * 18 : 0) +
+        (Array.isArray(data.nodes)
+          ? data.nodes.reduce(
+              (total, node) => total + countMany([node?.label, node?.detail]),
+              0,
+            )
           : 0);
       break;
     case 'tag-matrix':
@@ -250,11 +311,67 @@ const validateSceneData = (errors, scene, index) => {
         });
       }
       break;
+    case 'timeline':
+      requireString(errors, `${path}.data.heading`, data.heading);
+      if (!Array.isArray(data.items) || data.items.length === 0) {
+        pushError(errors, `${path}.data.items`, 'expected a non-empty array');
+      } else {
+        data.items.forEach((item, itemIndex) => {
+          requireString(errors, `${path}.data.items[${itemIndex}].label`, item?.label);
+          requireString(errors, `${path}.data.items[${itemIndex}].title`, item?.title);
+          validateAccent(errors, `${path}.data.items[${itemIndex}].accent`, item?.accent);
+        });
+      }
+      validateAccent(errors, `${path}.data.accent`, data.accent);
+      break;
+    case 'compare-board':
+      requireString(errors, `${path}.data.heading`, data.heading);
+      requireString(errors, `${path}.data.leftTitle`, data.leftTitle);
+      requireString(errors, `${path}.data.rightTitle`, data.rightTitle);
+      if (!Array.isArray(data.rows) || data.rows.length === 0) {
+        pushError(errors, `${path}.data.rows`, 'expected a non-empty array');
+      } else {
+        data.rows.forEach((row, rowIndex) => {
+          requireString(errors, `${path}.data.rows[${rowIndex}].label`, row?.label);
+          requireString(errors, `${path}.data.rows[${rowIndex}].left`, row?.left);
+          requireString(errors, `${path}.data.rows[${rowIndex}].right`, row?.right);
+          validateAccent(errors, `${path}.data.rows[${rowIndex}].accent`, row?.accent);
+        });
+      }
+      validateAccent(errors, `${path}.data.leftAccent`, data.leftAccent);
+      validateAccent(errors, `${path}.data.rightAccent`, data.rightAccent);
+      break;
     case 'terminal':
       requireString(errors, `${path}.data.heading`, data.heading);
       requireString(errors, `${path}.data.command`, data.command);
       if (!Array.isArray(data.outputs) || data.outputs.length === 0) {
         pushError(errors, `${path}.data.outputs`, 'expected a non-empty array');
+      }
+      validateAccent(errors, `${path}.data.accent`, data.accent);
+      break;
+    case 'evidence-wall':
+      requireString(errors, `${path}.data.heading`, data.heading);
+      if (!Array.isArray(data.cards) || data.cards.length === 0) {
+        pushError(errors, `${path}.data.cards`, 'expected a non-empty array');
+      } else {
+        data.cards.forEach((card, cardIndex) => {
+          requireString(errors, `${path}.data.cards[${cardIndex}].source`, card?.source);
+          requireString(errors, `${path}.data.cards[${cardIndex}].quote`, card?.quote);
+          validateAccent(errors, `${path}.data.cards[${cardIndex}].accent`, card?.accent);
+        });
+      }
+      validateAccent(errors, `${path}.data.accent`, data.accent);
+      break;
+    case 'architecture-map':
+      requireString(errors, `${path}.data.heading`, data.heading);
+      requireString(errors, `${path}.data.centerTitle`, data.centerTitle);
+      if (!Array.isArray(data.nodes) || data.nodes.length === 0) {
+        pushError(errors, `${path}.data.nodes`, 'expected a non-empty array');
+      } else {
+        data.nodes.forEach((node, nodeIndex) => {
+          requireString(errors, `${path}.data.nodes[${nodeIndex}].label`, node?.label);
+          validateAccent(errors, `${path}.data.nodes[${nodeIndex}].accent`, node?.accent);
+        });
       }
       validateAccent(errors, `${path}.data.accent`, data.accent);
       break;

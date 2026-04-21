@@ -25,10 +25,30 @@ const KIND_TO_FAMILY = new Map([
   ['process', 'step-flow'],
   ['flow', 'step-flow'],
   ['pipeline', 'step-flow'],
+  ['timeline', 'timeline'],
+  ['roadmap', 'timeline'],
+  ['history', 'timeline'],
+  ['milestones', 'timeline'],
+  ['events', 'timeline'],
+  ['compare-board', 'compare-board'],
+  ['compare', 'compare-board'],
+  ['comparison', 'compare-board'],
+  ['versus', 'compare-board'],
+  ['battle', 'compare-board'],
   ['terminal', 'terminal'],
   ['runtime', 'terminal'],
   ['command', 'terminal'],
   ['logs', 'terminal'],
+  ['evidence-wall', 'evidence-wall'],
+  ['evidence', 'evidence-wall'],
+  ['proof', 'evidence-wall'],
+  ['sources', 'evidence-wall'],
+  ['citations', 'evidence-wall'],
+  ['architecture-map', 'architecture-map'],
+  ['architecture', 'architecture-map'],
+  ['system-map', 'architecture-map'],
+  ['stack', 'architecture-map'],
+  ['topology', 'architecture-map'],
   ['tag-matrix', 'tag-matrix'],
   ['tags', 'tag-matrix'],
   ['matrix', 'tag-matrix'],
@@ -191,6 +211,81 @@ const normalizeSteps = (steps, errors, path) => {
   });
 };
 
+const normalizeTimelineItems = (items, errors, path) => {
+  const list = asArray(items);
+
+  if (list.length === 0) {
+    errors.push(`${path}: expected a non-empty array`);
+    return [];
+  }
+
+  return list.map((item, index) => {
+    if (typeof item === 'string') {
+      return {
+        label: `节点 ${index + 1}`,
+        title: item.trim(),
+        detail: '',
+        icon: '',
+        accent: pickAccent('', index),
+      };
+    }
+
+    const title = textOrEmpty(item?.title || item?.label || item?.name);
+
+    if (!title) {
+      errors.push(`${path}[${index}].title: expected a non-empty string`);
+    }
+
+    return {
+      label: textOrEmpty(item?.label || item?.kicker || item?.date || item?.time) || `节点 ${index + 1}`,
+      title,
+      detail: textOrEmpty(item?.detail || item?.caption || item?.description),
+      icon: textOrEmpty(item?.icon),
+      accent: pickAccent(item?.accent, index),
+    };
+  });
+};
+
+const normalizeCompareRows = (rows, errors, path) => {
+  const list = asArray(rows);
+
+  if (list.length === 0) {
+    errors.push(`${path}: expected a non-empty array`);
+    return [];
+  }
+
+  return list.map((item, index) => {
+    if (typeof item === 'string') {
+      const [label, left, right] = item.split('|').map((part) => textOrEmpty(part));
+      return {
+        label: label || `维度 ${index + 1}`,
+        left: left || '',
+        right: right || '',
+        accent: pickAccent('', index),
+      };
+    }
+
+    const label = textOrEmpty(item?.label || item?.title || item?.name) || `维度 ${index + 1}`;
+    const left = textOrEmpty(item?.left || item?.before || item?.old || item?.a);
+    const right = textOrEmpty(item?.right || item?.after || item?.new || item?.b);
+
+    if (!left) {
+      errors.push(`${path}[${index}].left: expected a non-empty string`);
+    }
+
+    if (!right) {
+      errors.push(`${path}[${index}].right: expected a non-empty string`);
+    }
+
+    return {
+      label,
+      left,
+      right,
+      accent: pickAccent(item?.accent, index),
+    };
+  });
+};
+
 const normalizeTagItems = (items, errors, path) => {
   const list = asArray(items);
 
@@ -215,6 +310,81 @@ const normalizeTagItems = (items, errors, path) => {
 
     return {
       label,
+      accent: pickAccent(item?.accent, index),
+    };
+  });
+};
+
+const normalizeEvidenceCards = (cards, errors, path) => {
+  const list = asArray(cards);
+
+  if (list.length === 0) {
+    errors.push(`${path}: expected a non-empty array`);
+    return [];
+  }
+
+  return list.map((item, index) => {
+    if (typeof item === 'string') {
+      return {
+        source: `证据 ${index + 1}`,
+        quote: item.trim(),
+        detail: '',
+        chips: [],
+        icon: '',
+        accent: pickAccent('', index),
+      };
+    }
+
+    const source = textOrEmpty(item?.source || item?.label || item?.title);
+    const quote = textOrEmpty(item?.quote || item?.text || item?.description || item?.detail);
+
+    if (!source) {
+      errors.push(`${path}[${index}].source: expected a non-empty string`);
+    }
+
+    if (!quote) {
+      errors.push(`${path}[${index}].quote: expected a non-empty string`);
+    }
+
+    return {
+      source,
+      quote,
+      detail: textOrEmpty(item?.detail || item?.caption),
+      chips: asArray(item?.chips || item?.tags).map((chip) => textOrEmpty(chip)).filter(Boolean),
+      icon: textOrEmpty(item?.icon),
+      accent: pickAccent(item?.accent, index),
+    };
+  });
+};
+
+const normalizeArchitectureNodes = (nodes, errors, path) => {
+  const list = asArray(nodes);
+
+  if (list.length === 0) {
+    errors.push(`${path}: expected a non-empty array`);
+    return [];
+  }
+
+  return list.map((item, index) => {
+    if (typeof item === 'string') {
+      return {
+        label: item.trim(),
+        detail: '',
+        icon: '',
+        accent: pickAccent('', index),
+      };
+    }
+
+    const label = textOrEmpty(item?.label || item?.title || item?.name);
+
+    if (!label) {
+      errors.push(`${path}[${index}].label: expected a non-empty string`);
+    }
+
+    return {
+      label,
+      detail: textOrEmpty(item?.detail || item?.caption || item?.description),
+      icon: textOrEmpty(item?.icon),
       accent: pickAccent(item?.accent, index),
     };
   });
@@ -365,6 +535,45 @@ const compileStepFlow = (section, errors, path) => {
   };
 };
 
+const compileTimeline = (section, errors, path) => {
+  return {
+    data: {
+      heading: requireText(errors, `${path}.heading`, section.heading || section.title),
+      summary: textOrEmpty(section.summary || section.subtitle || section.description),
+      items: normalizeTimelineItems(
+        section.items || section.timeline || section.milestones || section.events,
+        errors,
+        `${path}.items`,
+      ),
+      accent: pickAccent(section.accent, 0, 'cyan'),
+    },
+  };
+};
+
+const compileCompareBoard = (section, errors, path) => {
+  const rows = normalizeCompareRows(
+    section.rows || section.items || section.comparisons,
+    errors,
+    `${path}.rows`,
+  );
+  const leftTitle = textOrEmpty(section.leftTitle || section.beforeTitle || section.left) || '对照 A';
+  const rightTitle = textOrEmpty(section.rightTitle || section.afterTitle || section.right) || '对照 B';
+
+  return {
+    data: {
+      heading: requireText(errors, `${path}.heading`, section.heading || section.title),
+      summary: textOrEmpty(section.summary || section.subtitle || section.description),
+      leftTitle,
+      rightTitle,
+      leftEyebrow: textOrEmpty(section.leftEyebrow || section.leftKicker),
+      rightEyebrow: textOrEmpty(section.rightEyebrow || section.rightKicker),
+      rows,
+      leftAccent: pickAccent(section.leftAccent, 0, 'red'),
+      rightAccent: pickAccent(section.rightAccent, 1, 'green'),
+    },
+  };
+};
+
 const compileTerminal = (section, errors, path) => {
   const outputs = asArray(section.outputs || section.logs || section.lines).map((item) =>
     typeof item === 'string' ? item.trim() : textOrEmpty(item?.text || item?.label),
@@ -382,6 +591,42 @@ const compileTerminal = (section, errors, path) => {
       outputs,
       note: textOrEmpty(section.note || section.subtitle || section.description),
       accent: pickAccent(section.accent, 0, 'green'),
+    },
+  };
+};
+
+const compileEvidenceWall = (section, errors, path) => {
+  return {
+    data: {
+      heading: requireText(errors, `${path}.heading`, section.heading || section.title),
+      summary: textOrEmpty(section.summary || section.subtitle || section.description),
+      cards: normalizeEvidenceCards(
+        section.cards || section.evidence || section.sources || section.items,
+        errors,
+        `${path}.cards`,
+      ),
+      accent: pickAccent(section.accent, 0, 'yellow'),
+    },
+  };
+};
+
+const compileArchitectureMap = (section, errors, path) => {
+  return {
+    data: {
+      heading: requireText(errors, `${path}.heading`, section.heading || section.title),
+      centerTitle: requireText(
+        errors,
+        `${path}.centerTitle`,
+        section.centerTitle || section.keyword || section.core || section.title,
+      ),
+      centerDetail: textOrEmpty(section.centerDetail || section.subtitle || section.description),
+      nodes: normalizeArchitectureNodes(
+        section.nodes || section.modules || section.items || section.points,
+        errors,
+        `${path}.nodes`,
+      ),
+      accent: pickAccent(section.accent, 0, 'cyan'),
+      layout: textOrEmpty(section.layout) || 'radial',
     },
   };
 };
@@ -450,7 +695,11 @@ const FAMILY_COMPILERS = {
   focus: compileFocus,
   'number-strip': compileNumberStrip,
   'step-flow': compileStepFlow,
+  timeline: compileTimeline,
+  'compare-board': compileCompareBoard,
   terminal: compileTerminal,
+  'evidence-wall': compileEvidenceWall,
+  'architecture-map': compileArchitectureMap,
   'tag-matrix': compileTagMatrix,
   code: compileCode,
   metrics: compileMetrics,

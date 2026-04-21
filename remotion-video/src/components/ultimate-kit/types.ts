@@ -74,6 +74,40 @@ export interface UltimateStepFlowProps {
   steps: UltimateStepItem[];
 }
 
+export interface UltimateTimelineItem {
+  label: string;
+  title: string;
+  detail?: string;
+  icon?: string;
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimateTimelineProps {
+  heading: string;
+  summary?: string;
+  items: UltimateTimelineItem[];
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimateCompareBoardRow {
+  label: string;
+  left: string;
+  right: string;
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimateCompareBoardProps {
+  heading: string;
+  summary?: string;
+  leftTitle: string;
+  rightTitle: string;
+  leftEyebrow?: string;
+  rightEyebrow?: string;
+  rows: UltimateCompareBoardRow[];
+  leftAccent?: UltimateAccentTone;
+  rightAccent?: UltimateAccentTone;
+}
+
 export interface UltimateTerminalPanelProps {
   heading: string;
   windowTitle?: string;
@@ -113,6 +147,7 @@ export interface UltimateMetricItem {
   label: string;
   value: string;
   ratio: number;
+  icon?: string;
   accent?: UltimateAccentTone;
 }
 
@@ -120,6 +155,39 @@ export interface UltimateMetricBarsProps {
   heading: string;
   summary?: string;
   items: UltimateMetricItem[];
+  layout?: 'bars' | 'cards';
+}
+
+export interface UltimateEvidenceCard {
+  source: string;
+  quote: string;
+  detail?: string;
+  chips?: string[];
+  icon?: string;
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimateEvidenceWallProps {
+  heading: string;
+  summary?: string;
+  cards: UltimateEvidenceCard[];
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimateArchitectureNode {
+  label: string;
+  detail?: string;
+  icon?: string;
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimateArchitectureMapProps {
+  heading: string;
+  centerTitle: string;
+  centerDetail?: string;
+  nodes: UltimateArchitectureNode[];
+  accent?: UltimateAccentTone;
+  layout?: 'radial' | 'stack';
 }
 
 export interface UltimateCtaPanelProps {

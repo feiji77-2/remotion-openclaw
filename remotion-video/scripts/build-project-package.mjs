@@ -179,6 +179,7 @@ async function main() {
       comparisonSummaryZh: sanitizeText(shot.comparisonSummaryZh),
       mood: sanitizeText(shot.mood),
       style: sanitizeText(shot.style),
+      iconPack: Array.isArray(shot.iconPack) ? shot.iconPack.map((item) => sanitizeListItem(item)).filter(Boolean) : [],
       visual,
       comparisons,
       keywords: Array.isArray(shot.keywords) ? shot.keywords.map((item) => sanitizeListItem(item)).filter(Boolean) : [],
