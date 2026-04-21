@@ -47,12 +47,17 @@ export interface UltimateFocusDiagramProps {
 
 export interface UltimateStripItem {
   label: string;
+  detail?: string;
+  chips?: string[];
+  layout?: 'wide' | 'regular';
+  tag?: string;
   accent?: UltimateAccentTone;
 }
 
 export interface UltimateNumberStripProps {
   count: string;
   heading: string;
+  summary?: string;
   items: UltimateStripItem[];
   accent?: UltimateAccentTone;
 }
@@ -113,6 +118,7 @@ export interface UltimateMetricItem {
 
 export interface UltimateMetricBarsProps {
   heading: string;
+  summary?: string;
   items: UltimateMetricItem[];
 }
 
@@ -121,6 +127,7 @@ export interface UltimateCtaPanelProps {
   subtitle?: string;
   searchLabel?: string;
   badge?: string;
+  highlights?: string[];
 }
 
 export interface UltimateSubtitleBarProps {

@@ -1194,8 +1194,88 @@ function splitLandscapeLines(text, maxChars = 14, maxLines = 2) {
     .map((line, index) => index === maxLines - 1 ? truncate(line, maxChars + 6) : truncate(line, maxChars + 2));
 }
 
+function inferLandscapePlateProfile({
+  shotIndex = 0,
+  title,
+  subtitle,
+  visualSummary,
+  visualFocus,
+  comparisonSummary,
+  motifKey,
+}) {
+  const combined = localizeDisplayText(
+    `${title || ''} ${subtitle || ''} ${visualSummary || ''} ${visualFocus || ''} ${comparisonSummary || ''}`,
+  ).toLowerCase();
+
+  if (shotIndex === 0) {
+    return 'hero';
+  }
+
+  if (/评论|互动|最看重|下期|说说/.test(combined)) {
+    return 'cta';
+  }
+
+  if (/想象一下|场景|团队|部署|测试|全栈|模块|workflow|流程/.test(combined)) {
+    return 'workflow';
+  }
+
+  if (/不如gpt|benchmark|bench|humanity|基准|跑分|同一档|闭源/.test(combined)) {
+    return 'benchmark';
+  }
+
+  if (/烦|痛点|崩|上下文|调不动|不断裂|问题/.test(combined)) {
+    return 'problem';
+  }
+
+  if (/发布|开源|13小时|4000|300|月之暗面|模型/.test(combined)) {
+    return 'release';
+  }
+
+  if (motifKey === 'flow') {
+    return 'problem';
+  }
+
+  if (motifKey === 'timeline') {
+    return 'workflow';
+  }
+
+  if (motifKey === 'data') {
+    return 'benchmark';
+  }
+
+  return 'release';
+}
+
+function platePanel({x, y, w, h, r = 28, accent, fillOpacity = 0.08, strokeOpacity = 0.16, tilt = 0}) {
+  return `
+    <g transform="translate(${x} ${y}) rotate(${tilt} ${w / 2} ${h / 2})">
+      <rect x="0" y="0" width="${w}" height="${h}" rx="${r}" fill="rgba(7, 10, 18, ${fillOpacity})" stroke="${accent}" stroke-opacity="${strokeOpacity}" stroke-width="1.4"/>
+      <rect x="14" y="14" width="${w - 28}" height="${h - 28}" rx="${Math.max(14, r - 12)}" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    </g>
+  `;
+}
+
+function plateMeter({x, y, w, h, accent, level = 0.72, baseOpacity = 0.08}) {
+  return `
+    <g transform="translate(${x} ${y})">
+      <rect x="0" y="0" width="${w}" height="${h}" rx="${Math.round(h / 2)}" fill="rgba(255,255,255,${baseOpacity})"/>
+      <rect x="0" y="0" width="${Math.round(w * level)}" height="${h}" rx="${Math.round(h / 2)}" fill="${accent}" fill-opacity="0.88"/>
+    </g>
+  `;
+}
+
+function plateChip({x, y, w, h, accent, fillOpacity = 0.08}) {
+  return `
+    <g transform="translate(${x} ${y})">
+      <rect x="0" y="0" width="${w}" height="${h}" rx="${Math.round(h / 2)}" fill="rgba(7, 10, 18, ${fillOpacity})" stroke="${accent}" stroke-opacity="0.14" stroke-width="1"/>
+      <circle cx="${Math.round(h / 2)}" cy="${Math.round(h / 2)}" r="${Math.max(5, Math.round(h * 0.16))}" fill="${accent}" fill-opacity="0.9"/>
+      <rect x="${h}" y="${Math.round(h * 0.32)}" width="${Math.max(24, w - h - 18)}" height="${Math.max(6, Math.round(h * 0.16))}" rx="999" fill="rgba(255,255,255,0.16)"/>
+    </g>
+  `;
+}
+
 function buildLandscapeSvg({
-  id,
+  shotIndex = 0,
   title,
   subtitle,
   visualSummary,
@@ -1204,138 +1284,208 @@ function buildLandscapeSvg({
   dataHighlights,
   style,
   accent,
-  heroMark,
-  topLabel,
-  orbitLabels,
-  bottomLine,
   motifKey,
 }) {
-  const titleLines = splitLandscapeLines(title, 14, 2);
-  const subtitleText = esc(truncate(subtitle, 34));
-  const summaryLines = splitLandscapeLines(localizeDisplayText(visualSummary), 24, 2);
-  const footer = esc(buildBottomLine({bottomLine}));
-  const hero = esc(buildHeroMark({
+  const profile = inferLandscapePlateProfile({
+    shotIndex,
     title,
     subtitle,
+    visualSummary,
     visualFocus,
     comparisonSummary,
-    dataHighlights,
-    heroMark,
-    topLabel,
-  }));
-  const orbit = buildOrbitLabels({
-    orbitLabels,
-    visualFocus,
-    dataHighlights,
-    subtitle,
     motifKey,
-    visualSystem: 'ultimate-1080p',
-  }).slice(0, 4);
-  const infoCards = dedupeTextList([
-    ...toTextList(dataHighlights),
-    ...splitNarrationUnits(visualSummary),
-  ])
-    .filter((item) => item !== title)
-    .filter((item) => item !== subtitle)
-    .slice(0, 4);
-  const topChip = esc(cleanToken(topLabel));
-  const panelX = WIDTH - 760;
-  const panelY = 142;
-  const panelWidth = 620;
-  const panelHeight = 660;
-  const titleFontSize = titleLines[0]?.length > 10 ? 86 : 94;
+  });
+  const highlightCount = Math.max(3, Math.min(5, toTextList(dataHighlights).length || 3));
+  const bgStops = style === 'warm'
+    ? '<stop offset="0%" stop-color="#0d1017"/><stop offset="58%" stop-color="#11131a"/><stop offset="100%" stop-color="#171108"/>'
+    : '<stop offset="0%" stop-color="#080b14"/><stop offset="56%" stop-color="#0b1020"/><stop offset="100%" stop-color="#101322"/>';
+
+  const heroPlate = `
+    <circle cx="1380" cy="462" r="214" fill="url(#coreGlow)"/>
+    <circle cx="1380" cy="462" r="176" fill="none" stroke="${accent}" stroke-opacity="0.24" stroke-width="2"/>
+    <circle cx="1380" cy="462" r="116" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1.4"/>
+    <path d="M1090 462 C1170 334, 1590 334, 1670 462" fill="none" stroke="${accent}" stroke-opacity="0.18" stroke-width="1.6"/>
+    <path d="M1128 516 C1202 416, 1558 416, 1632 516" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1.2"/>
+    ${platePanel({x: 930, y: 188, w: 780, h: 548, r: 36, accent, fillOpacity: 0.06, strokeOpacity: 0.14, tilt: -3})}
+    ${platePanel({x: 242, y: 236, w: 402, h: 248, r: 28, accent, fillOpacity: 0.04, strokeOpacity: 0.1, tilt: -6})}
+    ${platePanel({x: 308, y: 558, w: 340, h: 188, r: 24, accent, fillOpacity: 0.05, strokeOpacity: 0.1, tilt: 4})}
+    ${plateChip({x: 284, y: 286, w: 210, h: 46, accent})}
+    ${plateChip({x: 284, y: 356, w: 242, h: 46, accent})}
+    ${plateChip({x: 1082, y: 602, w: 196, h: 42, accent})}
+    ${plateChip({x: 1312, y: 602, w: 204, h: 42, accent})}
+    ${plateChip({x: 1200, y: 664, w: 264, h: 42, accent})}
+  `;
+
+  const releasePlate = `
+    ${platePanel({x: 1040, y: 168, w: 664, h: 512, r: 34, accent, fillOpacity: 0.08, strokeOpacity: 0.16, tilt: -4})}
+    <circle cx="1372" cy="420" r="188" fill="url(#coreGlow)"/>
+    <circle cx="1372" cy="420" r="142" fill="none" stroke="${accent}" stroke-opacity="0.24" stroke-width="2"/>
+    <circle cx="1372" cy="420" r="88" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.2"/>
+    ${Array.from({length: 4}).map((_, index) => {
+      const column = index % 2;
+      const row = Math.floor(index / 2);
+      const x = 194 + column * 388;
+      const y = 348 + row * 194;
+      const tone = index % 2 === 0 ? '#ffb067' : '#73f6d8';
+      return `
+        ${platePanel({x, y, w: 324, h: 144, r: 24, accent: tone, fillOpacity: 0.06, strokeOpacity: 0.14, tilt: 0})}
+        ${plateMeter({x: x + 28, y: y + 94, w: 268, h: 10, accent: tone, level: 0.92 - index * 0.14})}
+        ${plateChip({x: x + 28, y: y + 34, w: 142 + index * 18, h: 34, accent: tone, fillOpacity: 0.06})}
+      `;
+    }).join('')}
+    ${Array.from({length: highlightCount}).map((_, index) => `
+      <line x1="1372" y1="420" x2="${1184 + index * 92}" y2="${640 + (index % 2) * 46}" stroke="${accent}" stroke-opacity="0.12" stroke-width="1.2"/>
+      <circle cx="${1184 + index * 92}" cy="${640 + (index % 2) * 46}" r="10" fill="${accent}" fill-opacity="0.72"/>
+    `).join('')}
+  `;
+
+  const problemPlate = `
+    <path d="M346 190 L1234 904" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="2"/>
+    <path d="M436 148 L1324 862" fill="none" stroke="${accent}" stroke-opacity="0.14" stroke-width="1.2"/>
+    ${platePanel({x: 180, y: 260, w: 462, h: 236, r: 26, accent: '#ff6b7d', fillOpacity: 0.06, strokeOpacity: 0.16, tilt: -6})}
+    ${platePanel({x: 244, y: 540, w: 424, h: 214, r: 24, accent: '#ff8b64', fillOpacity: 0.05, strokeOpacity: 0.14, tilt: 3})}
+    ${Array.from({length: 5}).map((_, index) => plateMeter({
+      x: 226 + index * 28,
+      y: 334 + index * 28,
+      w: 214 + (index % 2) * 66,
+      h: 10,
+      accent: index % 2 === 0 ? '#ff6b7d' : '#ff8b64',
+      level: 0.32 + index * 0.08,
+      baseOpacity: 0.06,
+    })).join('')}
+    ${platePanel({x: 1110, y: 196, w: 560, h: 274, r: 28, accent: '#63ddff', fillOpacity: 0.07, strokeOpacity: 0.18, tilt: -3})}
+    ${platePanel({x: 1214, y: 512, w: 404, h: 234, r: 24, accent: '#5df4bf', fillOpacity: 0.06, strokeOpacity: 0.16, tilt: 2})}
+    ${Array.from({length: 4}).map((_, index) => `
+      ${plateMeter({x: 1170, y: 286 + index * 42, w: 392, h: 12, accent: index < 2 ? '#63ddff' : '#5df4bf', level: 0.68 + index * 0.08})}
+      <circle cx="${1296 + index * 72}" cy="${566 + (index % 2) * 76}" r="18" fill="${index < 2 ? '#63ddff' : '#5df4bf'}" fill-opacity="0.18" stroke="${index < 2 ? '#63ddff' : '#5df4bf'}" stroke-opacity="0.34" stroke-width="1.2"/>
+    `).join('')}
+    <path d="M952 476 C1032 430, 1086 430, 1168 392" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="2.4" stroke-linecap="round"/>
+    <circle cx="950" cy="478" r="10" fill="#ffb067" fill-opacity="0.92"/>
+  `;
+
+  const benchmarkPlate = `
+    ${platePanel({x: 248, y: 250, w: 462, h: 456, r: 28, accent: 'rgba(255,255,255,0.48)', fillOpacity: 0.04, strokeOpacity: 0.12, tilt: -3})}
+    ${platePanel({x: 1110, y: 214, w: 524, h: 504, r: 30, accent, fillOpacity: 0.07, strokeOpacity: 0.2, tilt: 3})}
+    <circle cx="960" cy="204" r="98" fill="url(#coreGlow)"/>
+    <circle cx="960" cy="204" r="74" fill="none" stroke="${accent}" stroke-opacity="0.24" stroke-width="2"/>
+    <circle cx="960" cy="204" r="34" fill="rgba(255,255,255,0.18)"/>
+    ${Array.from({length: 5}).map((_, index) => `
+      ${plateMeter({x: 304, y: 336 + index * 58, w: 338, h: 12, accent: '#697386', level: 0.46 + index * 0.06, baseOpacity: 0.05})}
+      ${plateMeter({x: 1174, y: 318 + index * 62, w: 362, h: 12, accent, level: 0.68 + index * 0.05, baseOpacity: 0.07})}
+    `).join('')}
+    ${Array.from({length: 4}).map((_, index) => `
+      <line x1="710" y1="${360 + index * 86}" x2="1110" y2="${342 + index * 86}" stroke="rgba(255,255,255,0.08)" stroke-width="1.2"/>
+      <circle cx="836" cy="${354 + index * 86}" r="8" fill="${accent}" fill-opacity="0.7"/>
+    `).join('')}
+    ${plateChip({x: 320, y: 628, w: 180, h: 40, accent: '#697386', fillOpacity: 0.05})}
+    ${plateChip({x: 1184, y: 648, w: 220, h: 42, accent, fillOpacity: 0.06})}
+    ${plateChip({x: 1438, y: 648, w: 156, h: 42, accent, fillOpacity: 0.06})}
+  `;
+
+  const workflowPlate = `
+    ${platePanel({x: 240, y: 204, w: 912, h: 526, r: 30, accent, fillOpacity: 0.06, strokeOpacity: 0.16, tilt: -4})}
+    ${Array.from({length: 6}).map((_, index) => plateMeter({
+      x: 320,
+      y: 300 + index * 56,
+      w: index % 2 === 0 ? 420 : 560,
+      h: 10,
+      accent: index < 3 ? accent : '#5df4bf',
+      level: index % 2 === 0 ? 0.54 : 0.82,
+      baseOpacity: 0.06,
+    })).join('')}
+    ${Array.from({length: 4}).map((_, index) => platePanel({
+      x: 1242 + (index % 2) * 168,
+      y: 278 + Math.floor(index / 2) * 180,
+      w: 146,
+      h: 118,
+      r: 22,
+      accent: index % 2 === 0 ? '#63ddff' : '#5df4bf',
+      fillOpacity: 0.07,
+      strokeOpacity: 0.18,
+      tilt: index % 2 === 0 ? -3 : 3,
+    })).join('')}
+    ${Array.from({length: 4}).map((_, index) => `
+      <line x1="1152" y1="468" x2="${1314 + (index % 2) * 168}" y2="${338 + Math.floor(index / 2) * 180}" stroke="${accent}" stroke-opacity="0.16" stroke-width="1.4"/>
+      <circle cx="${1314 + (index % 2) * 168}" cy="${338 + Math.floor(index / 2) * 180}" r="10" fill="${accent}" fill-opacity="0.72"/>
+    `).join('')}
+    <path d="M248 846 L1520 846" stroke="rgba(255,255,255,0.10)" stroke-width="2" stroke-linecap="round"/>
+    ${Array.from({length: 5}).map((_, index) => `
+      <circle cx="${332 + index * 270}" cy="846" r="14" fill="${index < 3 ? accent : '#5df4bf'}" fill-opacity="0.82"/>
+      <rect x="${312 + index * 270}" y="892" width="40" height="10" rx="999" fill="rgba(255,255,255,0.14)"/>
+    `).join('')}
+  `;
+
+  const ctaPlate = `
+    <circle cx="960" cy="430" r="222" fill="url(#coreGlow)"/>
+    <circle cx="960" cy="430" r="166" fill="none" stroke="${accent}" stroke-opacity="0.18" stroke-width="2"/>
+    ${[248, 780, 1312].map((x, index) => platePanel({
+      x,
+      y: 292 - (index === 1 ? 28 : 0),
+      w: 360,
+      h: 188,
+      r: 26,
+      accent: index === 0 ? '#ffb067' : index === 1 ? '#73f6d8' : '#63ddff',
+      fillOpacity: 0.07,
+      strokeOpacity: 0.18,
+      tilt: index === 0 ? -4 : index === 2 ? 4 : 0,
+    })).join('')}
+    ${[248, 780, 1312].map((x, index) => plateMeter({
+      x: x + 34,
+      y: 412 - (index === 1 ? 28 : 0),
+      w: 286,
+      h: 10,
+      accent: index === 0 ? '#ffb067' : index === 1 ? '#73f6d8' : '#63ddff',
+      level: 0.78 - index * 0.08,
+      baseOpacity: 0.06,
+    })).join('')}
+    ${[356, 636, 922, 1192, 1452].map((x, index) => `
+      <g transform="translate(${x} ${698 + (index % 2) * 36})">
+        <rect x="0" y="0" width="${170 + (index % 2) * 20}" height="74" rx="32" fill="rgba(255,255,255,0.05)" stroke="${accent}" stroke-opacity="0.12" stroke-width="1"/>
+        <circle cx="34" cy="37" r="14" fill="${accent}" fill-opacity="0.82"/>
+        <rect x="62" y="24" width="${72 + (index % 2) * 24}" height="10" rx="999" fill="rgba(255,255,255,0.16)"/>
+        <rect x="62" y="42" width="${56 + (index % 2) * 18}" height="10" rx="999" fill="rgba(255,255,255,0.10)"/>
+      </g>
+    `).join('')}
+  `;
+
+  const plateContent = {
+    hero: heroPlate,
+    release: releasePlate,
+    problem: problemPlate,
+    benchmark: benchmarkPlate,
+    workflow: workflowPlate,
+    cta: ctaPlate,
+  }[profile] || releasePlate;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="${style === 'warm' ? '#10141a' : '#080b14'}"/>
-      <stop offset="56%" stop-color="${style === 'cool' ? '#091623' : '#0b1020'}"/>
-      <stop offset="100%" stop-color="${style === 'warm' ? '#1b1209' : '#121226'}"/>
+      ${bgStops}
     </linearGradient>
-    <linearGradient id="panelGlow" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="${accent}" stop-opacity="0.2"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.02"/>
-    </linearGradient>
-    <radialGradient id="heroGlow" cx="50%" cy="50%" r="56%">
-      <stop offset="0%" stop-color="${accent}" stop-opacity="0.28"/>
-      <stop offset="40%" stop-color="${accent}" stop-opacity="0.12"/>
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="56%">
+      <stop offset="0%" stop-color="${accent}" stop-opacity="0.24"/>
+      <stop offset="42%" stop-color="${accent}" stop-opacity="0.10"/>
       <stop offset="100%" stop-color="${accent}" stop-opacity="0"/>
     </radialGradient>
+    <pattern id="scanPattern" width="12" height="12" patternUnits="userSpaceOnUse">
+      <rect width="12" height="1" fill="rgba(255,255,255,0.018)"/>
+    </pattern>
     <filter id="softBlur">
-      <feGaussianBlur stdDeviation="28"/>
+      <feGaussianBlur stdDeviation="30"/>
     </filter>
   </defs>
 
   <rect width="${WIDTH}" height="${HEIGHT}" fill="url(#bg)"/>
-  <circle cx="${panelX + 320}" cy="${panelY + 320}" r="360" fill="url(#heroGlow)" filter="url(#softBlur)"/>
-  <circle cx="240" cy="210" r="180" fill="${accent}" fill-opacity="0.06" filter="url(#softBlur)"/>
-  <circle cx="${WIDTH - 220}" cy="${HEIGHT - 150}" r="220" fill="#f59e0b" fill-opacity="0.05" filter="url(#softBlur)"/>
-
-  <g opacity="0.13">
+  <rect width="${WIDTH}" height="${HEIGHT}" fill="url(#scanPattern)" opacity="0.18"/>
+  <circle cx="252" cy="176" r="180" fill="${accent}" fill-opacity="0.05" filter="url(#softBlur)"/>
+  <circle cx="${WIDTH - 260}" cy="${HEIGHT - 144}" r="220" fill="#63ddff" fill-opacity="0.05" filter="url(#softBlur)"/>
+  <g opacity="0.12">
     ${buildSubtleMotif(motifKey, accent)}
   </g>
-
-  <line x1="120" y1="860" x2="${WIDTH - 120}" y2="860" stroke="rgba(255,255,255,0.08)" stroke-width="1.2"/>
-  <line x1="120" y1="128" x2="480" y2="128" stroke="${accent}" stroke-opacity="0.22" stroke-width="2"/>
-
-  ${topChip ? `
-  <g transform="translate(128 144)">
-    <rect x="0" y="0" width="${Math.max(140, topChip.length * 28)}" height="52" rx="26"
-      fill="rgba(6,18,28,0.56)" stroke="${accent}" stroke-opacity="0.42" stroke-width="1.2"/>
-    <circle cx="24" cy="26" r="6" fill="${accent}"/>
-    <text x="42" y="34" fill="${accent}" font-size="22" font-weight="700"
-      font-family="PingFang SC, Microsoft YaHei, sans-serif">${topChip}</text>
-  </g>` : ''}
-
-  ${titleLines.map((line, index) => `
-  <text x="132" y="${topChip ? 304 + index * 110 : 256 + index * 110}" fill="#f5f7fb"
-    font-size="${titleFontSize}" font-weight="700" font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(line)}</text>
-  `).join('')}
-
-  ${subtitleText ? `
-  <text x="136" y="${topChip ? 542 : 494}" fill="${accent}" font-size="30" font-weight="600"
-    font-family="PingFang SC, Microsoft YaHei, sans-serif">${subtitleText}</text>` : ''}
-
-  ${summaryLines.map((line, index) => `
-  <text x="136" y="${(topChip ? 622 : 574) + index * 44}" fill="${index === 0 ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.64)'}" font-size="${index === 0 ? 32 : 28}" font-weight="500"
-    font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(line)}</text>`).join('')}
-
-  <g transform="translate(${panelX} ${panelY})">
-    <rect x="0" y="0" width="${panelWidth}" height="${panelHeight}" rx="36"
-      fill="rgba(7, 10, 18, 0.58)" stroke="rgba(194,219,255,0.18)" stroke-width="1.6"/>
-    <rect x="18" y="18" width="${panelWidth - 36}" height="${panelHeight - 36}" rx="28"
-      fill="url(#panelGlow)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <circle cx="${panelWidth / 2}" cy="250" r="180" fill="url(#heroGlow)"/>
-    <circle cx="${panelWidth / 2}" cy="250" r="148" fill="none" stroke="${accent}" stroke-opacity="0.2" stroke-width="2"/>
-    <circle cx="${panelWidth / 2}" cy="250" r="102" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.2"/>
-    <text x="${panelWidth / 2}" y="282" text-anchor="middle" fill="${accent}" font-size="${hero.length >= 3 ? 122 : 148}" font-weight="700"
-      font-family="Georgia, Times New Roman, serif" letter-spacing="-3">${hero}</text>
-    <text x="${panelWidth / 2}" y="446" text-anchor="middle" fill="#f5f7fb" font-size="42" font-weight="700"
-      font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(truncate(title, 20))}</text>
-    ${subtitle ? `
-    <text x="${panelWidth / 2}" y="508" text-anchor="middle" fill="${accent}" font-size="24" font-weight="600"
-      font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(truncate(subtitle, 22))}</text>` : ''}
-    ${orbit.map((item, index) => `
-    <g transform="translate(${78 + (index % 2) * 254} ${552 + Math.floor(index / 2) * 72})">
-      <rect x="0" y="0" width="210" height="46" rx="23" fill="rgba(255,255,255,0.05)" stroke="${accent}" stroke-opacity="0.16" stroke-width="1"/>
-      <circle cx="18" cy="23" r="5" fill="${accent}"/>
-      <text x="34" y="30" fill="rgba(255,255,255,0.88)" font-size="18" font-weight="600"
-        font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(truncate(item, 14))}</text>
-    </g>`).join('')}
-  </g>
-
-  ${infoCards.map((item, index) => `
-  <g transform="translate(${128 + index * 330} 902)">
-    <rect x="0" y="0" width="292" height="108" rx="24" fill="rgba(255,255,255,0.04)" stroke="${accent}" stroke-opacity="${index === 0 ? '0.36' : '0.14'}" stroke-width="1.2"/>
-    ${splitLandscapeLines(item, 10, 2).map((line, lineIndex) => `
-    <text x="24" y="${lineIndex === 0 ? 52 : 84}" fill="${lineIndex === 0 && index === 0 ? accent : '#f5f7fb'}" font-size="${lineIndex === 0 ? 26 : 24}" font-weight="700"
-      font-family="PingFang SC, Microsoft YaHei, sans-serif">${esc(line)}</text>`).join('')}
-  </g>`).join('')}
-
-  ${footer ? `
-  <text x="${WIDTH / 2}" y="${HEIGHT - 92}" text-anchor="middle" fill="#ffffff" font-size="34" font-weight="700"
-    font-family="PingFang SC, Microsoft YaHei, sans-serif">${footer}</text>` : ''}
+  <line x1="120" y1="126" x2="472" y2="126" stroke="${accent}" stroke-opacity="0.18" stroke-width="1.6"/>
+  <line x1="120" y1="892" x2="${WIDTH - 120}" y2="892" stroke="rgba(255,255,255,0.08)" stroke-width="1.2"/>
+  ${plateContent}
 </svg>`;
 }
 
@@ -1365,6 +1515,7 @@ function buildSvg({
 
   if (isLandscape) {
     return buildLandscapeSvg({
+      shotIndex,
       id,
       title: titlePresentation.title || title,
       subtitle: displaySubtitle,

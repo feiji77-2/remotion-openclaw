@@ -4,7 +4,6 @@ const ULTIMATE_DEFAULT_FPS = 30;
 const ULTIMATE_DEFAULT_WIDTH = 1920;
 const ULTIMATE_DEFAULT_HEIGHT = 1080;
 const ACCENT_ROTATION = ['cyan', 'green', 'yellow', 'orange', 'purple', 'red'];
-const SCENE_MEDIA_FAMILIES = new Set(['hero', 'focus', 'feature-rail', 'metrics', 'cta']);
 const PLACEHOLDER_TEXT_RE = /^(?:数据点|关键词|补充|标签|summary|scene|item|slot|point)\s*[0-9a-zA-Z一二三四五六七八九十]*$/i;
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -173,6 +172,188 @@ const splitTitleTokens = (value) => {
 
   return uniqueList(parts, 8);
 };
+
+const splitListPhrases = (value) => {
+  return uniqueList(
+    safeString(value)
+      .split(/[、/｜|]/u)
+      .map((item) => item.replace(/^[，；：,;:\-\s]+|[，；：,;:\-\s]+$/g, '').trim())
+      .filter(Boolean),
+    8,
+  );
+};
+
+const extractAsciiPhrases = (value) => {
+  return uniqueList(
+    (safeString(value).match(/\b[A-Za-z][A-Za-z0-9.+\-']*(?:\s+[A-Za-z][A-Za-z0-9.+\-']*){0,2}\b/g) || [])
+      .map((item) => item.replace(/\s+/g, ' ').trim())
+      .filter(Boolean),
+    8,
+  );
+};
+
+const normalizeEvidenceChip = (value) => {
+  const text = safeString(value);
+
+  if (!text) {
+    return '';
+  }
+
+  if (/^\d+(?:\.\d+)?$/.test(text)) {
+    return '';
+  }
+
+  if (/Humanity'?s Last Exam/i.test(text)) {
+    return 'HLE';
+  }
+
+  if (/SWE[- ]Bench Pro/i.test(text)) {
+    return 'SWE-Bench Pro';
+  }
+
+  if (/GPT-\d+(?:\.\d+)?/i.test(text)) {
+    return (text.match(/GPT-\d+(?:\.\d+)?/i) || [''])[0].toUpperCase();
+  }
+
+  if (/K2\.?6/i.test(text)) {
+    return 'K2.6';
+  }
+
+  return compactText(text, 18);
+};
+
+const extractEvidenceChips = (value, max = 3) => {
+  return uniqueList(
+    [
+      ...extractAsciiPhrases(value),
+      ...extractNumberTokens(value),
+      ...splitListPhrases(value),
+    ]
+      .map((item) => normalizeEvidenceChip(item))
+      .filter(Boolean)
+      .filter((item) => item.length <= 18)
+      .filter((item) => /[A-Za-z0-9]/.test(item) || item.length <= 12)
+      .filter((item) => !/^(?:实际上|很多人以为|开源模型第一次|不是喊口号|不是吹参数)$/u.test(item)),
+    max,
+  );
+};
+
+const extractTargetModel = (value) => {
+  const match = safeString(value).match(/\bGPT(?:-\d+(?:\.\d+)*)?\b/i);
+  return match ? match[0].toUpperCase() : '';
+};
+
+const buildStripItemLabel = (value) => {
+  const text = safeString(value);
+  const targetModel = extractTargetModel(text);
+
+  if (!text) {
+    return '';
+  }
+
+  if (/很多人以为.+不如/i.test(text)) {
+    const match = text.match(/很多人以为(.+?不如\s*GPT(?:-\d+(?:\.\d+)*)?)/i);
+    const normalized = safeString(match?.[1] || text.replace(/^很多人以为/u, ''));
+    return compactText(`${normalized.replace(/\s+/g, ' ')}？`, 18);
+  }
+
+  if (/连续编码|4000|300|Agent|并行|不断裂/.test(text) && extractEvidenceChips(text, 4).length >= 2) {
+    return '三类高频问题一起解决';
+  }
+
+  if (/(持平|优于)/.test(text) && targetModel) {
+    return compactText(`基准实测已到 ${targetModel} 同一档`, 20);
+  }
+
+  if (/同一档|第一次/.test(text) && /开源模型|闭源/.test(text)) {
+    return '开源第一次站上同一档';
+  }
+
+  if (/1个人.*3个人/.test(text)) {
+    return '1个人能顶以前3个人';
+  }
+
+  if (/质量.*稳/.test(text)) {
+    return '质量还更稳';
+  }
+
+  if (/不是.*口号|跑分/.test(text)) {
+    return '不是喊口号，是跑分跑出来的';
+  }
+
+  if (/不是.*参数|解决.*问题/.test(text)) {
+    return '不是吹参数，是解决问题';
+  }
+
+  return compactText(text, 20);
+};
+
+const buildStripHeading = (value, fallback = '') => {
+  const text = safeString(value);
+
+  if (!text) {
+    return compactText(fallback, 20);
+  }
+
+  if (/开发者平时最烦什么/.test(text)) {
+    return '开发者平时最烦什么';
+  }
+
+  if (/很多人以为.+不如/i.test(text)) {
+    return '国产代码模型不如 GPT？';
+  }
+
+  return compactText(buildStripItemLabel(text) || fallback || text, 20);
+};
+
+const buildStripItemDetail = (value) => {
+  const text = safeString(value);
+
+  if (!text) {
+    return '';
+  }
+
+  if (/连续编码|4000|300|Agent|并行|不断裂/.test(text) && extractEvidenceChips(text, 4).length >= 2) {
+    return '长任务、改大段代码、多 Agent 协作都更稳';
+  }
+
+  if (/(持平|优于)/.test(text) && /(bench|exam|基准)/i.test(text)) {
+    return 'SWE-Bench Pro、HLE 等基准测试';
+  }
+
+  if (/同一档|第一次/.test(text) && /开源模型|闭源/.test(text)) {
+    return '第一次贴到闭源顶级代码模型旁边';
+  }
+
+  if (/1个人.*3个人/.test(text)) {
+    return '交付更快，质量也更稳';
+  }
+
+  if (/不是.*口号|跑分/.test(text)) {
+    return '不是喊话，是公开基准跑出来的';
+  }
+
+  if (/不是.*参数|解决.*问题/.test(text)) {
+    return '重点是能不能真把问题解决掉';
+  }
+
+  return '';
+};
+
+const buildStripItemLayout = (value, itemIndex) => {
+  const text = safeString(value);
+
+  if (
+    itemIndex === 1
+    && (text.length >= 18 || extractEvidenceChips(text, 4).length >= 2 || /(持平|优于|4000|300|Agent|并行|同一档)/.test(text))
+  ) {
+    return 'wide';
+  }
+
+  return 'regular';
+};
+
+const SUPPORT_MARKER_RE = /^(?:不是|而是|所以|因此|评论|下期)|第一次|全行业|解决|跑分|更稳|同一档|开源发布|最看重哪个|值不值/u;
 
 const extractNumberTokens = (value) => {
   return uniqueList(
@@ -408,6 +589,105 @@ const buildMetricItems = (shot) => {
     }));
 };
 
+const buildSceneSummary = (shot, primaryText, max = 40) => {
+  const narrationUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+  const filtered = narrationUnits.filter((item) => !isCompactDuplicate(item, primaryText));
+
+  if (filtered.length === 0) {
+    return '';
+  }
+
+  for (let index = 0; index < filtered.length; index += 1) {
+    const current = filtered[index];
+    const next = filtered[index + 1] || '';
+    const previous = filtered[index - 1] || '';
+
+    if ((/^不是/.test(current) || /不是/.test(current)) && /^是/.test(next)) {
+      return compactText([current, next].join('，'), max);
+    }
+
+    if (/不是/.test(previous) && /^是/.test(current)) {
+      return compactText([previous, current].join('，'), max);
+    }
+  }
+
+  const hardPivotIndex = filtered.findIndex((item) => /^(?:评论|下期|最看重哪个|值不值)/.test(item));
+  if (hardPivotIndex >= 0) {
+    return compactText(filtered.slice(hardPivotIndex, hardPivotIndex + 2).join('，'), max);
+  }
+
+  const pivotIndex = filtered.findIndex((item) => SUPPORT_MARKER_RE.test(item));
+  if (pivotIndex >= 0) {
+    return compactText(filtered.slice(pivotIndex, pivotIndex + 2).join('，'), max);
+  }
+
+  return compactText(filtered.slice(-2).join('，') || filtered[0], max);
+};
+
+const inferStripTag = (value, index) => {
+  const text = safeString(value);
+
+  if (/烦|问题|痛点|崩|上下文丢|调不动/.test(text)) {
+    return index === 0 ? '核心问题' : '旧瓶颈';
+  }
+
+  if (/很多人以为|不如|误解|旧讲法/.test(text)) {
+    return index === 0 ? '旧认知' : '偏见';
+  }
+
+  if (/K2\.?6|持平|优于|基准|跑分|连续编码|4000|300|不断裂|并行/.test(text)) {
+    return '实测能力';
+  }
+
+  if (/3个人|质量|更稳|同一档|第一次|开源模型|全行业/.test(text)) {
+    return '结果影响';
+  }
+
+  if (/不是|而是|口号|解决|评论|最看重/.test(text)) {
+    return '结论';
+  }
+
+  return ['要点一', '要点二', '要点三', '要点四'][index] || `要点${index + 1}`;
+};
+
+const buildStripItems = (shot, summary) => {
+  const narrationUnits = splitNarrationUnits(shot?.narration);
+  const candidates = [];
+
+  for (const candidate of [...semanticArray(shot?.dataPoints), ...narrationUnits.slice(1)]) {
+    const value = safeString(candidate);
+    if (!value || isCompactDuplicate(value, summary)) {
+      continue;
+    }
+
+    if (/不是.*口号|跑分/.test(summary) && /不是.*口号|跑分/.test(value)) {
+      continue;
+    }
+
+    if (/不是.*参数|解决.*问题/.test(summary) && /不是.*参数|解决.*问题/.test(value)) {
+      continue;
+    }
+
+    if (candidates.some((entry) => isCompactDuplicate(entry, value))) {
+      continue;
+    }
+
+    candidates.push(value);
+    if (candidates.length >= 4) {
+      break;
+    }
+  }
+
+  return candidates.map((item, itemIndex) => ({
+    label: itemIndex === 0 ? item : buildStripItemLabel(item),
+    detail: buildStripItemDetail(item),
+    chips: extractEvidenceChips(item),
+    tag: inferStripTag(item, itemIndex),
+    accent: inferAccent(shot, itemIndex),
+    layout: buildStripItemLayout(item, itemIndex),
+  }));
+};
+
 const buildCodeLines = (shot) => {
   const narrativeUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
   const factSources = uniqueList(
@@ -572,6 +852,7 @@ const buildSceneData = (family, shot, index) => {
   const secondaryText = narrationUnits.slice(1).join('，') || shot?.narration || shot?.visualSummaryZh || '';
   const title = compactText(primaryText, 28);
   const subtitle = compactText(shot?.narration || shot?.visualSummaryZh, 72);
+  const summary = buildSceneSummary(shot, primaryText, 44);
   const keywords = uniqueList(
     [
       ...semanticArray(shot?.dataPoints),
@@ -614,26 +895,31 @@ const buildSceneData = (family, shot, index) => {
         items: buildFeatureItems(shot),
       };
     case 'number-strip': {
-      const displayPoints = compactUniqueItems(
-        [
-          ...semanticArray(shot?.dataPoints),
-          ...narrationUnits.slice(1),
-        ],
-        18,
-        4,
-      );
+      const displayItems = buildStripItems(shot, summary);
       const numericCount = toNumber(extractNumberTokens(title)[0], 0);
       return {
-        count: String(Math.max(2, displayPoints.length || points.length || numericCount || 2)),
-        heading: title,
-        items: displayPoints.length > 0
-          ? displayPoints.map((item, itemIndex) => ({
-              label: item,
-              accent: inferAccent(shot, itemIndex),
-            }))
+        count: String(Math.max(2, displayItems.length || points.length || numericCount || 2)),
+        heading: buildStripHeading(primaryText, title),
+        summary,
+        items: displayItems.length > 0
+          ? displayItems
           : [
-              {label: compactText(primaryText, 16), accent},
-              {label: compactText(secondaryText, 18), accent: inferAccent(shot, index + 1)},
+              {
+                label: compactText(primaryText, 16),
+                tag: inferStripTag(primaryText, 0),
+                accent,
+                chips: extractEvidenceChips(primaryText),
+                detail: buildStripItemDetail(primaryText),
+                layout: 'regular',
+              },
+              {
+                label: compactText(secondaryText, 18),
+                detail: buildStripItemDetail(secondaryText),
+                chips: extractEvidenceChips(secondaryText),
+                tag: inferStripTag(secondaryText, 1),
+                accent: inferAccent(shot, index + 1),
+                layout: buildStripItemLayout(secondaryText, 1),
+              },
         ],
         accent,
       };
@@ -665,12 +951,13 @@ const buildSceneData = (family, shot, index) => {
         filename: '',
         lines: buildCodeLines(shot),
         highlightLine: 2,
-        footer: compactText(secondaryText, 72),
+        footer: summary || compactText(secondaryText, 72),
         accent,
       };
     case 'metrics':
       return {
         heading: title,
+        summary,
         items: metricItems.length > 0
           ? metricItems
           : [
@@ -683,12 +970,39 @@ const buildSceneData = (family, shot, index) => {
             ],
       };
     case 'cta':
-      return {
-        heading: title,
-        subtitle: compactText(secondaryText, 88),
-        searchLabel: compactText(narrationUnits.find((item) => /[？?]/.test(item)) || '', 36),
-        badge: '',
-      };
+      {
+        const questionLine = narrationUnits.find((item) => /[？?]/.test(item) || /哪个|怎么选|怎么看|值不值/.test(item));
+        const sourceLine = narrationUnits[0] || shot?.narration || shot?.title || '';
+        const highlights = compactUniqueItems(
+          [
+            ...splitListPhrases(sourceLine),
+            ...semanticArray(shot?.dataPoints),
+          ].filter((item) => !/[？?]/.test(item)),
+          16,
+          3,
+        );
+        const supportText = compactText(
+          uniqueList(
+            [
+              ...narrationUnits.filter((item) => item !== sourceLine && item !== questionLine),
+              ...semanticArray(shot?.dataPoints).filter(
+                (item) => !highlights.some((entry) => isCompactDuplicate(entry, item))
+                  && !isCompactDuplicate(item, questionLine),
+              ),
+            ],
+            3,
+          ).join('，'),
+          40,
+        );
+
+        return {
+          heading: compactText(questionLine || '你最看重哪个', 18),
+          subtitle: supportText || compactText(secondaryText, 88),
+          searchLabel: '',
+          badge: '',
+          highlights,
+        };
+      }
     default:
       return {
         eyebrow: '',
@@ -707,11 +1021,7 @@ function textFromShot(shot) {
 
 function resolveSceneMediaSrc(family, shot) {
   const mediaSrc = safeString(shot?.imageUrl);
-  if (!mediaSrc) {
-    return null;
-  }
-
-  return SCENE_MEDIA_FAMILIES.has(family) ? mediaSrc : null;
+  return mediaSrc || null;
 }
 
 function isUltimateProject(project) {

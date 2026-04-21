@@ -12,7 +12,6 @@ import {
   UltimateSceneTransition,
   UltimateStage,
   UltimateStepFlow,
-  UltimateSubtitleBar,
   UltimateTagMatrix,
   UltimateTerminalPanel,
   type UltimatePlatformOverlayProps,
@@ -50,7 +49,7 @@ const renderSceneContent = (scene: ResolvedUltimateSceneConfig) => {
 
 const resolveSceneOverlay = (
   config: {defaultPlatformOverlay?: UltimatePlatformOverlayProps | false},
-  scene: Pick<ResolvedUltimateSceneConfig, 'overlay'>,
+  scene: Pick<ResolvedUltimateSceneConfig, 'family' | 'overlay'>,
 ) => {
   if (scene.overlay === false) {
     return null;
@@ -62,10 +61,14 @@ const resolveSceneOverlay = (
     return null;
   }
 
-  return {
+  const merged = {
     ...(baseOverlay ?? {}),
     ...(scene.overlay ?? {}),
   };
+
+  merged.searchLabel = '';
+
+  return merged;
 };
 
 const normalizeStaticAssetPath = (assetPath: string) => assetPath.replace(/^\/+/, '');
@@ -80,16 +83,21 @@ const resolveMediaSource = (src: string) => {
 
 const sceneMediaLayout: Partial<Record<ResolvedUltimateSceneConfig['family'], {
   top: number;
-  right: number;
+  right?: number;
+  left?: number;
   width: number;
   height: number;
   opacity?: number;
+  tiltDeg?: number;
+  mode?: 'frame' | 'ambient';
 }>> = {
-  hero: {top: 174, right: 72, width: 640, height: 360, opacity: 0.92},
-  focus: {top: 196, right: 74, width: 560, height: 315, opacity: 0.82},
-  'feature-rail': {top: 188, right: 74, width: 560, height: 315, opacity: 0.8},
-  metrics: {top: 214, right: 76, width: 520, height: 293, opacity: 0.78},
-  cta: {top: 188, right: 92, width: 580, height: 326, opacity: 0.72},
+  hero: {top: 186, right: 88, width: 704, height: 396, opacity: 0.74, tiltDeg: -3},
+  focus: {top: 214, right: 94, width: 600, height: 338, opacity: 0.68, tiltDeg: -3},
+  'feature-rail': {top: 214, right: 92, width: 612, height: 344, opacity: 0.64, tiltDeg: -3},
+  metrics: {top: 300, right: 102, width: 704, height: 412, opacity: 0.88, tiltDeg: -2, mode: 'frame'},
+  'number-strip': {top: 198, left: 116, width: 1688, height: 560, opacity: 0.28, tiltDeg: 0, mode: 'ambient'},
+  code: {top: 188, left: 778, width: 980, height: 608, opacity: 0.24, tiltDeg: -2, mode: 'ambient'},
+  cta: {top: 174, left: 148, width: 1624, height: 540, opacity: 0.24, tiltDeg: 0, mode: 'ambient'},
 };
 
 const UltimateSceneMediaCard: React.FC<{scene: ResolvedUltimateSceneConfig}> = ({scene}) => {
@@ -114,22 +122,28 @@ const UltimateSceneMediaCard: React.FC<{scene: ResolvedUltimateSceneConfig}> = (
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
+  const tilt = layout.tiltDeg ?? -2;
+  const mode = layout.mode ?? 'frame';
 
   return (
     <div
       style={{
         position: 'absolute',
         top: layout.top,
+        left: layout.left,
         right: layout.right,
         width: layout.width,
         height: layout.height,
-        borderRadius: 30,
+        borderRadius: mode === 'ambient' ? 44 : 30,
         overflow: 'hidden',
         opacity: (layout.opacity ?? 0.82) * reveal,
-        transform: `translateX(${translateX}px)`,
-        border: '1px solid rgba(194, 219, 255, 0.2)',
-        boxShadow: '0 26px 90px rgba(0,0,0,0.3), 0 0 56px rgba(99,221,255,0.12)',
-        background: 'rgba(6, 10, 18, 0.56)',
+        transform: mode === 'ambient' ? `translateY(${translateX * 0.3}px) rotate(${tilt}deg)` : `translateX(${translateX}px) rotate(${tilt}deg)`,
+        border: mode === 'ambient' ? 'none' : '1px solid rgba(194, 219, 255, 0.2)',
+        boxShadow:
+          mode === 'ambient'
+            ? '0 46px 120px rgba(0,0,0,0.22), 0 0 100px rgba(99,221,255,0.10)'
+            : '0 26px 90px rgba(0,0,0,0.3), 0 0 56px rgba(99,221,255,0.12)',
+        background: mode === 'ambient' ? 'transparent' : 'rgba(6, 10, 18, 0.56)',
       }}
     >
       <Img
@@ -139,23 +153,29 @@ const UltimateSceneMediaCard: React.FC<{scene: ResolvedUltimateSceneConfig}> = (
           height: '100%',
           objectFit: 'cover',
           transform: `scale(${scale})`,
+          filter: mode === 'ambient' ? 'saturate(1.08) brightness(0.88)' : 'none',
         }}
       />
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(180deg, rgba(4, 6, 12, 0.06), rgba(4, 6, 12, 0.18) 56%, rgba(4, 6, 12, 0.34) 100%)',
+          background:
+            mode === 'ambient'
+              ? 'linear-gradient(180deg, rgba(4, 6, 12, 0.22), rgba(4, 6, 12, 0.38) 50%, rgba(4, 6, 12, 0.62) 100%)'
+              : 'linear-gradient(180deg, rgba(4, 6, 12, 0.06), rgba(4, 6, 12, 0.18) 56%, rgba(4, 6, 12, 0.34) 100%)',
         }}
       />
-      <div
-        style={{
-          position: 'absolute',
-          inset: 10,
-          borderRadius: 22,
-          border: '1px solid rgba(255,255,255,0.12)',
-        }}
-      />
+      {mode === 'frame' ? (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 10,
+            borderRadius: 22,
+            border: '1px solid rgba(255,255,255,0.12)',
+          }}
+        />
+      ) : null}
     </div>
   );
 };
@@ -196,7 +216,6 @@ export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
                 {overlay ? <UltimatePlatformOverlay {...overlay} /> : null}
                 <UltimateSceneMediaCard scene={scene} />
                 {renderSceneContent(scene)}
-                <UltimateSubtitleBar text={scene.subtitle} />
               </UltimateStage>
             </UltimateSceneTransition>
           </Sequence>

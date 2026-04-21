@@ -46,16 +46,23 @@ test('number-strip scenes remove compacted duplicate labels', () => {
         '开源模型第一次在代码能力上和闭源顶级模型站在同一档',
         '实际上K2.6在SWE-Bench Pro、Humanity\'s Last Exam等基准测试里持平或优于GPT-5.4……',
       ],
+      imageUrl: '/assets/demo/number-strip.png',
       comparisons: [{left: '旧讲法', right: '当前方案'}],
     }),
   );
 
   const scene = config.scenes[1];
   const labels = scene.data.items.map((item) => item.label);
+  const tags = scene.data.items.map((item) => item.tag);
 
   assert.equal(scene.family, 'number-strip');
+  assert.equal(scene.mediaSrc, '/assets/demo/number-strip.png');
   assert.equal(new Set(labels).size, labels.length);
-  assert.equal(labels.filter((item) => item.includes('SWE-Bench')).length, 1);
+  assert.ok(labels.some((item) => item.includes('基准实测')));
+  assert.equal(scene.data.summary, '开源模型第一次在代码能力上和闭源顶级模型站在同一档');
+  assert.ok(tags.every(Boolean));
+  assert.ok(scene.data.items.some((item) => Array.isArray(item.chips) && item.chips.length > 0));
+  assert.ok(scene.data.items.some((item) => item.layout === 'wide'));
 });
 
 test('code scenes use narration facts instead of generic scene/claim/proof keys', () => {
@@ -85,4 +92,39 @@ test('code scenes use narration facts instead of generic scene/claim/proof keys'
   assert.match(lineTexts, /"原流程":/);
   assert.ok(/"提效结果":|"并行处理":/.test(lineTexts));
   assert.ok(!/"scene":|"claim":|"proof":/.test(lineTexts));
+  assert.equal(scene.data.footer, '开发者真正在乎的不是参数，是能不能解决真实问题');
+});
+
+test('cta scenes extract highlights and prioritize the question as heading', () => {
+  const config = buildUltimateProjectConfig({
+    ...buildProject({
+      id: 'shot-02',
+      title: '中段',
+      narration: '中段说明。',
+      durationSeconds: 4,
+    }),
+    shots: [
+      {
+        id: 'shot-01',
+        title: '开场',
+        narration: '开场。',
+        durationSeconds: 4,
+      },
+      {
+        id: 'shot-02',
+        title: '收尾互动',
+        narration: 'K2.6的代码能力、13小时连续编码、300子Agent调度，你最看重哪个？评论区说说，下期拆。',
+        durationSeconds: 5,
+        dataPoints: ['K2.6的代码能力', '13小时连续编码', '300子Agent调度'],
+        imageUrl: '/assets/demo/cta.png',
+      },
+    ],
+  });
+
+  const scene = config.scenes[1];
+
+  assert.equal(scene.family, 'cta');
+  assert.equal(scene.mediaSrc, '/assets/demo/cta.png');
+  assert.equal(scene.data.heading, '你最看重哪个');
+  assert.deepEqual(scene.data.highlights, ['K2.6的代码能力', '13小时连续编码', '300子Agent调度']);
 });

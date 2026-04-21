@@ -8,6 +8,7 @@ import {
   ultimateKitVideo,
 } from './tokens';
 import type {
+  UltimateCodeLine,
   UltimateCodePanelProps,
   UltimateCtaPanelProps,
   UltimateFeatureCardRailProps,
@@ -57,6 +58,161 @@ const buildReveal = (frame: number, delay = 0) => {
 
 const toneToColor = (tone?: Parameters<typeof resolveUltimateAccent>[0]) => {
   return resolveUltimateAccent(tone ?? 'cyan');
+};
+
+const measureText = (value?: string) => Array.from(String(value || '').trim()).length;
+
+const cleanDisplayText = (value?: string) => String(value || '').replace(/\s+/g, ' ').trim();
+
+const trimLineBreakPunctuation = (value: string) => {
+  return value.replace(/[，、：:]+$/u, '').trim();
+};
+
+const splitDisplayUnits = (value: string) => {
+  const text = cleanDisplayText(value);
+  const units: string[] = [];
+  let asciiBuffer = '';
+
+  for (const char of Array.from(text)) {
+    if (/[A-Za-z0-9.+\-']/u.test(char)) {
+      asciiBuffer += char;
+      continue;
+    }
+
+    if (asciiBuffer) {
+      units.push(asciiBuffer);
+      asciiBuffer = '';
+    }
+
+    units.push(char);
+  }
+
+  if (asciiBuffer) {
+    units.push(asciiBuffer);
+  }
+
+  return units.filter(Boolean);
+};
+
+const splitDisplayLines = (value: string, maxChars: number, maxLines = 2) => {
+  const text = cleanDisplayText(value);
+  if (!text) {
+    return [];
+  }
+
+  const units = splitDisplayUnits(text);
+  const countUnits = (items: string[]) =>
+    items.reduce((total, item) => total + (/^[A-Za-z0-9.+\-']+$/u.test(item) ? item.length : 1), 0);
+
+  if (countUnits(units) <= maxChars) {
+    return [text];
+  }
+
+  const lines: string[] = [];
+  let cursor = 0;
+
+  while (cursor < units.length && lines.length < maxLines) {
+    if (lines.length === maxLines - 1) {
+      const remainder = units.slice(cursor).join('').trim();
+      if (countUnits(splitDisplayUnits(remainder)) <= maxChars) {
+        lines.push(remainder);
+      } else {
+        let tailCount = 0;
+        const tailUnits: string[] = [];
+
+        for (let index = cursor; index < units.length; index += 1) {
+          const nextWeight = /^[A-Za-z0-9.+\-']+$/u.test(units[index]) ? units[index].length : 1;
+          if (tailCount + nextWeight > Math.max(1, maxChars - 1)) {
+            break;
+          }
+          tailUnits.push(units[index]);
+          tailCount += nextWeight;
+        }
+
+        lines.push(`${tailUnits.join('').trim()}…`);
+      }
+      break;
+    }
+
+    let splitIndex = cursor;
+    let currentCount = 0;
+
+    while (splitIndex < units.length) {
+      const nextWeight = /^[A-Za-z0-9.+\-']+$/u.test(units[splitIndex]) ? units[splitIndex].length : 1;
+      if (currentCount + nextWeight > maxChars) {
+        break;
+      }
+      currentCount += nextWeight;
+      splitIndex += 1;
+    }
+
+    for (let index = splitIndex; index > cursor + Math.floor(maxChars * 0.35); index -= 1) {
+      if (/[\s，、：:]/u.test(units[index - 1] || '')) {
+        splitIndex = index;
+        break;
+      }
+    }
+
+    const segment = trimLineBreakPunctuation(units.slice(cursor, splitIndex).join(''));
+    if (segment) {
+      lines.push(segment);
+    }
+    cursor = splitIndex;
+    while (cursor < units.length && /\s/u.test(units[cursor] || '')) {
+      cursor += 1;
+    }
+  }
+
+  return lines.filter(Boolean).slice(0, maxLines);
+};
+
+const splitDisplayLinesBalanced = (value: string, maxChars: number, maxLines = 2) => {
+  const initial = splitDisplayLines(value, maxChars, maxLines);
+
+  if (initial.length < 2) {
+    return initial;
+  }
+
+  const tail = cleanDisplayText(initial[initial.length - 1] || '');
+  const tailUnits = measureText(tail);
+  const isOrphanAscii = /^[A-Za-z0-9.+\-']+[？?]?$/u.test(tail);
+
+  if (!isOrphanAscii && tailUnits > Math.max(3, Math.floor(maxChars * 0.28))) {
+    return initial;
+  }
+
+  const expanded = splitDisplayLines(value, maxChars + 2, maxLines);
+  const expandedTailUnits = measureText(expanded[expanded.length - 1] || '');
+
+  if (expanded.length <= initial.length && expandedTailUnits >= tailUnits) {
+    return expanded;
+  }
+
+  return initial;
+};
+
+const lineClampStyle = (lines: number): CSSProperties => ({
+  display: '-webkit-box',
+  WebkitLineClamp: lines,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden',
+});
+
+const parseCodeFacts = (lines: UltimateCodeLine[]) => {
+  return lines
+    .map((line) => {
+      const match = cleanDisplayText(line.text).match(/^"?(.*?)"?\s*:\s*"(.+)"[,]?$/);
+      if (!match) {
+        return null;
+      }
+
+      return {
+        label: cleanDisplayText(match[1].replace(/^"+|"+$/g, '')),
+        value: cleanDisplayText(match[2].replace(/^"+|"+$/g, '')),
+        tone: line.tone,
+      };
+    })
+    .filter(Boolean) as Array<{label: string; value: string; tone?: UltimateCodeLine['tone']}>;
 };
 
 type FrameCorner = {
@@ -200,17 +356,28 @@ export const UltimatePlatformOverlay: React.FC<UltimatePlatformOverlayProps> = (
       <div
         style={{
           position: 'absolute',
-          top: 44,
-          left: 48,
+          top: 28,
+          left: 34,
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
+          gap: 8,
           opacity: reveal,
           transform: `translateY(${interpolate(reveal, [0, 1], [12, 0])}px)`,
         }}
       >
-        <div style={{display: 'flex', alignItems: 'center', gap: 14}}>
-          <div style={{position: 'relative', width: 28, height: 28}}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '10px 14px',
+            borderRadius: kit.radius.pill,
+            background: 'rgba(8, 10, 18, 0.42)',
+            border: '1px solid rgba(210, 222, 255, 0.12)',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          <div style={{position: 'relative', width: 24, height: 24}}>
             <div
               style={{
                 position: 'absolute',
@@ -223,35 +390,50 @@ export const UltimatePlatformOverlay: React.FC<UltimatePlatformOverlayProps> = (
             <div
               style={{
                 position: 'absolute',
-                width: 22,
-                height: 22,
-                right: -4,
-                bottom: -2,
+                width: 18,
+                height: 18,
+                right: -3,
+                bottom: -1,
                 borderRadius: '50%',
                 background: 'rgba(99, 221, 255, 0.92)',
                 mixBlendMode: 'screen',
               }}
             />
           </div>
-          <div style={{fontSize: 28, fontWeight: 800, letterSpacing: 0.3}}>{brand}</div>
+          <div style={{display: 'flex', alignItems: 'baseline', gap: 10}}>
+            <div style={{fontSize: 22, fontWeight: 800, letterSpacing: 0.3}}>{brand}</div>
+            <div style={{fontSize: 16, color: kit.colors.textMuted}}>{account}</div>
+          </div>
         </div>
-        <div style={{fontSize: 22, color: kit.colors.textMuted}}>{account}</div>
         {searchLabel ? (
           <div
             style={{
-              minWidth: 286,
-              padding: '12px 18px',
+              width: 430,
+              maxWidth: 430,
+              padding: '10px 16px',
               borderRadius: kit.radius.pill,
               border: '1px solid rgba(210, 222, 255, 0.14)',
               background: 'rgba(8, 10, 18, 0.56)',
               color: kit.colors.textMuted,
-              fontSize: 20,
+              fontSize: 16,
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
+              gap: 12,
+              backdropFilter: 'blur(8px)',
             }}
           >
-            <span>{searchLabel}</span>
+            <span
+              style={{
+                flex: 1,
+                minWidth: 0,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {searchLabel}
+            </span>
             <span style={{opacity: 0.72}}>Q</span>
           </div>
         ) : null}
@@ -259,19 +441,19 @@ export const UltimatePlatformOverlay: React.FC<UltimatePlatformOverlayProps> = (
       <div
         style={{
           position: 'absolute',
-          right: 52,
-          bottom: 34,
+          right: 34,
+          bottom: 24,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-end',
-          gap: 6,
+          gap: 4,
           opacity: reveal,
         }}
       >
-        <div style={{fontSize: 18, color: kit.colors.textSoft, letterSpacing: 3, textTransform: 'uppercase'}}>
+        <div style={{fontSize: 15, color: kit.colors.textSoft, letterSpacing: 3, textTransform: 'uppercase'}}>
           {watermark}
         </div>
-        <div style={{fontSize: 20, color: kit.colors.textMuted}}>{account}</div>
+        <div style={{fontSize: 16, color: kit.colors.textMuted}}>{account}</div>
       </div>
     </>
   );
@@ -300,14 +482,17 @@ export const UltimateSubtitleBar: React.FC<UltimateSubtitleBarProps> = ({text}) 
     >
       <div
         style={{
-          padding: '16px 28px 18px',
+          maxWidth: 1500,
+          padding: '14px 24px 16px',
           borderRadius: kit.radius.pill,
           background: 'rgba(8, 10, 18, 0.72)',
           border: '1px solid rgba(206, 218, 255, 0.16)',
           color: kit.colors.text,
-          fontSize: 22,
+          fontSize: 20,
           fontWeight: 600,
-          letterSpacing: 0.2,
+          lineHeight: 1.35,
+          letterSpacing: 0.1,
+          textAlign: 'center',
           backdropFilter: 'blur(10px)',
           boxShadow: '0 18px 40px rgba(0,0,0,0.20)',
         }}
@@ -824,100 +1009,287 @@ export const UltimateFocusDiagram: React.FC<UltimateFocusDiagramProps> = ({
 export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
   count,
   heading,
+  summary,
   items,
   accent = 'green',
 }) => {
   const frame = useCurrentFrame();
   const accentColor = toneToColor(accent);
   const reveal = buildReveal(frame, 0);
+  const headingLines = splitDisplayLinesBalanced(heading, 14, 2);
+  const summaryLines = splitDisplayLinesBalanced(summary || '', 24, 2);
+  const headingSize = headingLines.length > 1 ? 60 : measureText(heading) > 15 ? 62 : 68;
+  const primaryItem = items[0];
+  const secondaryItems = items.slice(1, 4);
+  const hasWideLeadCard =
+    secondaryItems.length >= 3 && secondaryItems[0]?.layout === 'wide';
+  const secondaryGridColumns =
+    secondaryItems.length === 3 && hasWideLeadCard
+      ? '1.32fr 1.32fr 1fr 1fr'
+      : secondaryItems.length === 3
+        ? '1.1fr 1fr 1fr'
+        : secondaryItems.length === 2
+          ? secondaryItems[0]?.layout === 'wide'
+            ? '1.25fr 1fr'
+            : '1fr 1fr'
+          : '1fr';
 
   return (
     <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
       <div
         style={{
           position: 'absolute',
-          top: 170,
-          left: 0,
-          right: 0,
+          top: 132,
+          left: 170,
+          right: 170,
           display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'baseline',
-          gap: 18,
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 14,
           opacity: reveal,
         }}
       >
         <div
           style={{
+            width: 92,
+            height: 92,
+            borderRadius: '50%',
+            border: `1px solid ${accentColor}55`,
+            background: `radial-gradient(circle at 35% 28%, rgba(255,255,255,0.22), ${accentColor} 26%, rgba(7, 11, 20, 0.96) 78%)`,
+            boxShadow: ultimateGlow(accentColor, 0.65),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             fontFamily: kit.fonts.display,
-            fontSize: 148,
+            fontSize: 66,
             lineHeight: 1,
-            color: accentColor,
-            textShadow: ultimateGlow(accentColor, 0.75),
+            color: '#091018',
+            textShadow: 'none',
           }}
         >
           {count}
         </div>
-        <div style={{fontSize: 60, fontWeight: 800, letterSpacing: -1}}>{heading}</div>
+        <div style={{maxWidth: 1240, textAlign: 'center'}}>
+          {headingLines.map((line, index) => (
+            <div
+              key={`${line}-${index}`}
+              style={{
+                fontSize: headingSize,
+                fontWeight: 800,
+                letterSpacing: -1.6,
+                lineHeight: 1.04,
+              }}
+            >
+              {line}
+            </div>
+          ))}
+        </div>
+        {summaryLines.length > 0 ? (
+          <div style={{maxWidth: 980, textAlign: 'center'}}>
+            {summaryLines.map((line, index) => (
+              <div
+                key={`${line}-${index}`}
+                style={{
+                  marginTop: index === 0 ? 0 : 4,
+                  fontSize: 24,
+                  lineHeight: 1.38,
+                  color: kit.colors.textMuted,
+                }}
+              >
+                {line}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
+      {primaryItem ? (
+        <div
+          style={{
+            position: 'absolute',
+            left: 210,
+            right: 210,
+            top: 336,
+            ...panelStyle(toneToColor(primaryItem.accent ?? accent)),
+            minHeight: 202,
+            padding: '24px 28px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            opacity: buildReveal(frame, 8),
+            transform: `translateY(${interpolate(buildReveal(frame, 8), [0, 1], [18, 0])}px)`,
+          }}
+        >
+          {(() => {
+            const allowPrimaryThreeLines = measureText(primaryItem.label) > 20;
+            const primaryLines = splitDisplayLinesBalanced(
+              primaryItem.label,
+              allowPrimaryThreeLines ? 16 : 20,
+              allowPrimaryThreeLines ? 3 : 2,
+            );
+            const primarySize = primaryLines.length > 2 ? 30 : primaryLines.length > 1 ? 36 : 44;
+
+            return (
+              <>
+                <div
+                  style={{
+                    fontSize: 18,
+                    letterSpacing: 2,
+                    color: toneToColor(primaryItem.accent ?? accent),
+                    textTransform: 'uppercase',
+                    fontWeight: 700,
+                  }}
+                >
+                  {primaryItem.tag || '核心判断'}
+                </div>
+                <div style={{marginTop: 12}}>
+                  {primaryLines.map((line, index) => (
+                    <div
+                      key={`${line}-${index}`}
+                      style={{
+                        fontSize: primarySize,
+                        fontWeight: 800,
+                        lineHeight: 1.12,
+                        color: kit.colors.text,
+                      }}
+                    >
+                      {line}
+                    </div>
+                  ))}
+                </div>
+                <div
+                  style={{
+                    marginTop: 20,
+                    height: 7,
+                    borderRadius: kit.radius.pill,
+                    background: `linear-gradient(90deg, ${toneToColor(primaryItem.accent ?? accent)}, rgba(255,255,255,0.08))`,
+                    boxShadow: ultimateGlow(toneToColor(primaryItem.accent ?? accent), 0.25),
+                  }}
+                />
+              </>
+            );
+          })()}
+        </div>
+      ) : null}
       <div
         style={{
           position: 'absolute',
-          left: 220,
-          right: 220,
-          bottom: 176,
+          left: 210,
+          right: 210,
+          top: 584,
+          bottom: 156,
           display: 'grid',
-          gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))`,
-          gap: 12,
+          gridTemplateColumns: secondaryGridColumns,
+          gap: 24,
         }}
       >
-        {items.map((item, index) => {
-          const color = toneToColor(item.accent ?? (index < 4 ? 'cyan' : 'purple'));
-          const chipReveal = buildReveal(frame, 10 + index * 4);
-          const avatarHeight = interpolate(index, [0, Math.max(items.length - 1, 1)], [84, 22]);
+        {secondaryItems.map((item, index) => {
+          const color = toneToColor(item.accent ?? (index === 0 ? 'cyan' : index === 1 ? 'green' : 'yellow'));
+          const chipReveal = buildReveal(frame, 14 + index * 4);
+          const isWide = item.layout === 'wide' && (secondaryItems.length >= 2);
+          const itemLines = splitDisplayLinesBalanced(item.label, isWide ? 18 : 12, isWide ? 2 : 3);
+          const detailLines = splitDisplayLinesBalanced(item.detail || '', isWide ? 18 : 14, 2);
+          const chips = (item.chips || []).slice(0, isWide ? 3 : 2);
+
           return (
             <div
               key={`${item.label}-${index}`}
               style={{
                 ...panelStyle(color),
-                height: 148,
-                padding: '18px 12px 16px',
+                minHeight: isWide ? 212 : 196,
+                padding: isWide ? '22px 24px 20px' : '22px 22px 20px',
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
                 justifyContent: 'space-between',
                 opacity: chipReveal,
-                transform: `translateY(${interpolate(chipReveal, [0, 1], [18, 0])}px)`,
+                transform: `translateY(${interpolate(chipReveal, [0, 1], [20, 0])}px)`,
+                gridColumn:
+                  secondaryItems.length === 3 && hasWideLeadCard && index === 0
+                    ? 'span 2'
+                    : undefined,
               }}
             >
-              <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5}}>
+              <div>
                 <div
                   style={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: '50%',
-                    background: color,
-                    boxShadow: ultimateGlow(color, 0.55),
+                    fontSize: 17,
+                    letterSpacing: 2,
+                    color,
+                    textTransform: 'uppercase',
+                    fontWeight: 700,
                   }}
-                />
-                <div
-                  style={{
-                    width: Math.max(14, avatarHeight * 0.35),
-                    height: avatarHeight,
-                    borderRadius: kit.radius.pill,
-                    background: `linear-gradient(180deg, ${color}, rgba(255,255,255,0.18))`,
-                  }}
-                />
+                >
+                  {item.tag || `补充 ${index + 1}`}
+                </div>
+                <div style={{marginTop: 14}}>
+                  {itemLines.map((line, lineIndex) => (
+                    <div
+                      key={`${line}-${lineIndex}`}
+                      style={{
+                        fontSize: isWide ? 34 : itemLines.length > 2 ? 26 : 30,
+                        fontWeight: 800,
+                        lineHeight: 1.14,
+                        color: kit.colors.text,
+                      }}
+                    >
+                      {line}
+                    </div>
+                  ))}
+                </div>
+                {detailLines.length > 0 ? (
+                  <div style={{marginTop: 12}}>
+                    {detailLines.map((line, lineIndex) => (
+                      <div
+                        key={`${line}-${lineIndex}`}
+                        style={{
+                          marginTop: lineIndex === 0 ? 0 : 4,
+                          fontSize: isWide ? 20 : 18,
+                          lineHeight: 1.35,
+                          color: kit.colors.textMuted,
+                        }}
+                      >
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-              <div
-                style={{
-                  fontSize: 18,
-                  fontWeight: 700,
-                  textAlign: 'center',
-                  color: kit.colors.textMuted,
-                  lineHeight: 1.2,
-                }}
-              >
-                {item.label}
+              <div>
+                {chips.length > 0 ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                      marginBottom: 16,
+                    }}
+                  >
+                    {chips.map((chip, chipIndex) => (
+                      <div
+                        key={`${chip}-${chipIndex}`}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: kit.radius.pill,
+                          border: `1px solid ${color}28`,
+                          background: `linear-gradient(180deg, ${color}14, rgba(10, 13, 24, 0.92))`,
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {chip}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <div
+                  style={{
+                    height: 6,
+                    borderRadius: kit.radius.pill,
+                    background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.08))`,
+                    boxShadow: ultimateGlow(color, 0.24),
+                  }}
+                />
               </div>
             </div>
           );
@@ -1237,22 +1609,124 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const accentColor = toneToColor(accent);
+  const headingLines = splitDisplayLines(heading, 14, 2);
+  const summaryLines = splitDisplayLines(footer || '', 28, 2);
+  const facts = parseCodeFacts(lines).slice(0, 4);
 
   return (
     <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
-      <div style={{position: 'absolute', top: 130, left: 0, right: 0}}>
-        <div style={eyebrowStyle(accentColor)}>{heading}</div>
+      <div style={{position: 'absolute', top: 128, left: 220, right: 220, textAlign: 'center'}}>
+        {headingLines.map((line, index) => (
+          <div
+            key={`${line}-${index}`}
+            style={{
+              fontFamily: kit.fonts.display,
+              fontSize: headingLines.length > 1 ? 58 : 66,
+              fontWeight: 800,
+              letterSpacing: -2,
+              lineHeight: 1.02,
+            }}
+          >
+            {line}
+          </div>
+        ))}
+        {summaryLines.length > 0 ? (
+          <div style={{marginTop: 16}}>
+            {summaryLines.map((line, index) => (
+              <div
+                key={`${line}-${index}`}
+                style={{
+                  marginTop: index === 0 ? 0 : 4,
+                  fontSize: 22,
+                  lineHeight: 1.36,
+                  color: kit.colors.textMuted,
+                }}
+              >
+                {line}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div
         style={{
           position: 'absolute',
-          left: 320,
-          right: 320,
-          bottom: 188,
-          ...panelStyle(accentColor),
+          left: 198,
+          right: 198,
+          top: 318,
+          bottom: 150,
+          display: 'grid',
+          gridTemplateColumns: '412px minmax(0, 1fr)',
+          gap: 28,
         }}
       >
-        {filename ? (
+        <div
+          style={{
+            ...panelStyle(accentColor),
+            padding: '24px 22px 22px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}
+        >
+          {facts.map((fact, index) => {
+            const factColor =
+              fact.tone === 'accent'
+                ? accentColor
+                : fact.tone === 'muted'
+                  ? resolveUltimateAccent('yellow')
+                  : index % 2 === 0
+                    ? accentColor
+                    : resolveUltimateAccent('cyan');
+            const reveal = buildReveal(frame, 8 + index * 4);
+
+            return (
+              <div
+                key={`${fact.label}-${index}`}
+                style={{
+                  padding: '18px 18px 16px',
+                  borderRadius: 22,
+                  border: `1px solid ${factColor}30`,
+                  background: `linear-gradient(180deg, ${factColor}10, rgba(10, 13, 24, 0.92))`,
+                  opacity: reveal,
+                  transform: `translateY(${interpolate(reveal, [0, 1], [14, 0])}px)`,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 17,
+                    letterSpacing: 2,
+                    color: factColor,
+                    textTransform: 'uppercase',
+                    fontWeight: 700,
+                  }}
+                >
+                  {fact.label}
+                </div>
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 26,
+                    lineHeight: 1.2,
+                    fontWeight: 800,
+                    color: kit.colors.text,
+                    ...lineClampStyle(3),
+                  }}
+                >
+                  {fact.value}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div
+          style={{
+            ...panelStyle(accentColor),
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
           <div
             style={{
               padding: '16px 22px',
@@ -1263,10 +1737,9 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
               background: 'rgba(255,255,255,0.05)',
             }}
           >
-            {filename}
+            {filename || 'agent-workflow.json'}
           </div>
-        ) : null}
-        <div style={{padding: '24px 0 24px 0', fontFamily: kit.fonts.mono}}>
+          <div style={{padding: '24px 0 18px 0', fontFamily: kit.fonts.mono, flex: 1}}>
           {lines.map((line, index) => {
             const reveal = buildReveal(frame, index * 3);
             const toneColor =
@@ -1276,71 +1749,91 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
                   ? kit.colors.textSoft
                   : kit.colors.text;
             return (
-              <div
-                key={`${line.text}-${index}`}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '62px 1fr',
-                  alignItems: 'start',
-                  padding: '8px 26px',
-                  background: highlightLine === index + 1 ? `${accentColor}14` : 'transparent',
-                  opacity: reveal,
-                  transform: `translateY(${interpolate(reveal, [0, 1], [6, 0])}px)`,
-                }}
-              >
+                <div
+                  key={`${line.text}-${index}`}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '62px 1fr',
+                    alignItems: 'start',
+                    padding: '8px 26px',
+                    background: highlightLine === index + 1 ? `${accentColor}14` : 'transparent',
+                    opacity: reveal,
+                    transform: `translateY(${interpolate(reveal, [0, 1], [6, 0])}px)`,
+                  }}
+                >
                 <div style={{color: 'rgba(255,255,255,0.28)', textAlign: 'right', paddingRight: 18}}>{index + 1}</div>
-                <div style={{color: toneColor, fontSize: 22, lineHeight: 1.45}}>{line.text}</div>
-              </div>
-            );
-          })}
+                <div style={{color: toneColor, fontSize: 24, lineHeight: 1.45}}>{line.text}</div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
-      {footer ? (
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 116,
-            textAlign: 'center',
-            color: kit.colors.textMuted,
-            fontSize: 24,
-          }}
-        >
-          {footer}
-        </div>
-      ) : null}
     </div>
   );
 };
 
-export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({heading, items}) => {
+export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({heading, summary, items}) => {
   const frame = useCurrentFrame();
+  const headingLines = splitDisplayLines(heading, 18, 2);
+  const summaryLines = splitDisplayLines(summary || '', 28, 2);
+  const headingSize = headingLines.length > 1 || measureText(heading) > 22 ? 58 : 66;
 
   return (
     <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
-      <div style={{position: 'absolute', top: 150, left: 0, right: 0}}>
-        <div
-          style={{
-            marginTop: 0,
-            textAlign: 'center',
-            fontFamily: kit.fonts.display,
-            fontSize: 72,
-            letterSpacing: -2,
-          }}
-        >
-          {heading}
-        </div>
+      <div
+        style={{
+          position: 'absolute',
+          top: 132,
+          left: 220,
+          right: 220,
+          textAlign: 'center',
+        }}
+      >
+        {headingLines.map((line, index) => (
+          <div
+            key={`${line}-${index}`}
+            style={{
+              marginTop: index === 0 ? 0 : 6,
+              fontFamily: kit.fonts.display,
+              fontSize: headingSize,
+              fontWeight: 800,
+              letterSpacing: -2,
+              lineHeight: 1.02,
+            }}
+          >
+            {line}
+          </div>
+        ))}
+        {summaryLines.length > 0 ? (
+          <div style={{marginTop: 18}}>
+            {summaryLines.map((line, index) => (
+              <div
+                key={`${line}-${index}`}
+                style={{
+                  marginTop: index === 0 ? 0 : 4,
+                  fontSize: 24,
+                  lineHeight: 1.35,
+                  color: kit.colors.textMuted,
+                }}
+              >
+                {line}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div
         style={{
           position: 'absolute',
-          left: 430,
-          right: 430,
-          top: 360,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 28,
+          left: 170,
+          right: 810,
+          top: 340,
+          bottom: 160,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gap: 24,
+          alignContent: 'center',
         }}
       >
         {items.map((item, index) => {
@@ -1350,11 +1843,51 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({heading, 
             extrapolateRight: 'clamp',
           });
           return (
-            <div key={`${item.label}-${index}`} style={{display: 'grid', gridTemplateColumns: '160px 1fr 120px', gap: 18, alignItems: 'center'}}>
-              <div style={{fontSize: 24, color: kit.colors.textMuted}}>{item.label}</div>
+            <div
+              key={`${item.label}-${index}`}
+              style={{
+                ...panelStyle(color),
+                minHeight: 196,
+                padding: '24px 24px 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
               <div
                 style={{
-                  height: 28,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 17,
+                    color,
+                    letterSpacing: 2,
+                    textTransform: 'uppercase',
+                    fontWeight: 700,
+                  }}
+                >
+                  {item.label}
+                </div>
+                <div style={{width: 14, height: 14, borderRadius: '50%', background: color, boxShadow: ultimateGlow(color, 0.45)}} />
+              </div>
+              <div
+                style={{
+                  fontSize: 58,
+                  lineHeight: 1,
+                  fontWeight: 800,
+                  color,
+                  textShadow: ultimateGlow(color, 0.35),
+                }}
+              >
+                {item.value}
+              </div>
+              <div
+                style={{
+                  height: 12,
                   borderRadius: kit.radius.pill,
                   background: 'rgba(255,255,255,0.06)',
                   overflow: 'hidden',
@@ -1365,12 +1898,12 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({heading, 
                     width: `${progress * 100}%`,
                     height: '100%',
                     borderRadius: kit.radius.pill,
-                    background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.9))`,
+                    background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.92))`,
                     boxShadow: ultimateGlow(color, 0.45),
                   }}
                 />
               </div>
-              <div style={{fontSize: 24, fontWeight: 700, color}}>{item.value}</div>
+              <div style={{fontSize: 17, color: kit.colors.textMuted}}>关键信号</div>
             </div>
           );
         })}
@@ -1384,9 +1917,12 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps> = ({
   subtitle,
   searchLabel = '',
   badge = '',
+  highlights = [],
 }) => {
   const frame = useCurrentFrame();
   const reveal = buildReveal(frame, 0);
+  const headingLines = splitDisplayLines(heading, 12, 2);
+  const subtitleLines = splitDisplayLines(subtitle || '', 22, 2);
 
   return (
     <div
@@ -1401,29 +1937,116 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps> = ({
         opacity: reveal,
         transform: `scale(${interpolate(reveal, [0, 1], [0.96, 1])})`,
       }}
-    >
+      >
       <div
         style={{
           position: 'absolute',
-          width: 320,
-          height: 320,
+          width: 400,
+          height: 400,
           borderRadius: '50%',
-          border: '1px solid rgba(216, 227, 255, 0.12)',
-          boxShadow: '0 0 0 24px rgba(110, 123, 255, 0.03)',
+          border: '1px solid rgba(216, 227, 255, 0.10)',
+          boxShadow: '0 0 0 30px rgba(110, 123, 255, 0.025)',
         }}
       />
+      {badge ? (
+        <div
+          style={{
+            marginBottom: 22,
+            padding: '10px 16px',
+            borderRadius: kit.radius.pill,
+            background: 'rgba(255,255,255,0.06)',
+            color: kit.colors.textMuted,
+            fontSize: 18,
+            letterSpacing: 2,
+            textTransform: 'uppercase',
+          }}
+        >
+          {badge}
+        </div>
+      ) : null}
       <div
         style={{
-          marginTop: 0,
+          maxWidth: 1120,
           fontFamily: kit.fonts.display,
-          fontSize: 78,
+          fontSize: headingLines.length > 1 ? 60 : 70,
+          fontWeight: 800,
+          lineHeight: 1.04,
           letterSpacing: -2,
         }}
       >
-        {heading}
+        {headingLines.map((line, index) => (
+          <div key={`${line}-${index}`}>{line}</div>
+        ))}
       </div>
-      {subtitle ? (
-        <div style={{marginTop: 16, fontSize: 28, color: kit.colors.textMuted, maxWidth: 720}}>{subtitle}</div>
+      {subtitleLines.length > 0 ? (
+        <div style={{marginTop: 16, maxWidth: 760}}>
+          {subtitleLines.map((line, index) => (
+            <div
+              key={`${line}-${index}`}
+              style={{
+                marginTop: index === 0 ? 0 : 4,
+                fontSize: 24,
+                color: kit.colors.textMuted,
+                lineHeight: 1.4,
+              }}
+            >
+              {line}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {highlights.length > 0 ? (
+        <div
+          style={{
+            marginTop: 42,
+            width: 1460,
+            maxWidth: 'calc(100% - 320px)',
+            display: 'grid',
+            gridTemplateColumns: `repeat(${Math.max(highlights.length, 1)}, minmax(0, 1fr))`,
+            gap: 22,
+          }}
+        >
+          {highlights.map((item, index) => {
+            const color = toneToColor(index === 0 ? 'orange' : index === 1 ? 'yellow' : 'cyan');
+            const chipReveal = buildReveal(frame, index * 4);
+            return (
+              <div
+                key={`${item}-${index}`}
+                style={{
+                  ...panelStyle(color),
+                  minHeight: 168,
+                  padding: '22px 18px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  opacity: chipReveal,
+                  transform: `translateY(${interpolate(chipReveal, [0, 1], [16, 0])}px)`,
+                }}
+              >
+                <div style={{fontSize: 16, letterSpacing: 2, color}}>关键元素</div>
+                <div
+                  style={{
+                    fontSize: 34,
+                    fontWeight: 800,
+                    lineHeight: 1.08,
+                    color: kit.colors.text,
+                    ...lineClampStyle(2),
+                  }}
+                >
+                  {item}
+                </div>
+                <div
+                  style={{
+                    height: 6,
+                    borderRadius: kit.radius.pill,
+                    background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.08))`,
+                    boxShadow: ultimateGlow(color, 0.28),
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
       ) : null}
       {searchLabel ? (
         <div
@@ -1443,22 +2066,6 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps> = ({
         >
           <span>{searchLabel}</span>
           <span style={{fontWeight: 700, color: resolveUltimateAccent('cyan')}}>GO</span>
-        </div>
-      ) : null}
-      {badge ? (
-        <div
-          style={{
-            marginTop: 24,
-            padding: '10px 16px',
-            borderRadius: kit.radius.pill,
-            background: 'rgba(255,255,255,0.06)',
-            color: kit.colors.textMuted,
-            fontSize: 18,
-            letterSpacing: 2,
-            textTransform: 'uppercase',
-          }}
-        >
-          {badge}
         </div>
       ) : null}
     </div>
