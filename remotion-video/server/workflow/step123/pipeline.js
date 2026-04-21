@@ -222,6 +222,68 @@ function deriveStep1ResearchFromSearch(context) {
   };
 }
 
+function deriveTopicEntity(topicQuery, facts) {
+  const combined = [
+    String(topicQuery || '').trim(),
+    ...(Array.isArray(facts) ? facts.map((item) => `${item?.sourceTitle || ''} ${item?.fact || ''}`.trim()) : []),
+  ].join(' ');
+
+  const matches = [
+    combined.match(/\bKimi\s*K\d+(?:\.\d+)?\b/i),
+    combined.match(/\bDeepSeek\b/i),
+    combined.match(/\bClaude\b/i),
+    combined.match(/\bGemini\b/i),
+    combined.match(/\bGPT[- ]?\d+(?:\.\d+)?\b/i),
+  ].filter(Boolean);
+
+  if (matches[0]?.[0]) {
+    return matches[0][0].replace(/\s+/g, ' ').trim();
+  }
+
+  return compactClause(topicQuery, 18) || '当前主题';
+}
+
+function deriveCompetitorLabel(topicQuery, facts) {
+  const combined = [
+    String(topicQuery || '').trim(),
+    ...(Array.isArray(facts) ? facts.map((item) => `${item?.sourceTitle || ''} ${item?.fact || ''}`.trim()) : []),
+  ].join(' ');
+
+  const match = combined.match(/\bGPT(?:-\d+(?:\.\d+)?)?\b/i)
+    || combined.match(/\bClaude(?:\s+Opus)?(?:\s+\d+(?:\.\d+)?)?\b/i)
+    || combined.match(/\bGemini(?:\s+\d+(?:\.\d+)?)?\b/i);
+
+  return match?.[0]?.replace(/\s+/g, ' ').trim() || '';
+}
+
+function deriveFocusPhrase(topicQuery, facts) {
+  const combined = [
+    String(topicQuery || '').trim(),
+    ...(Array.isArray(facts) ? facts.map((item) => `${item?.sourceTitle || ''} ${item?.fact || ''}`.trim()) : []),
+  ].join(' ');
+  const mappings = [
+    [/开源|open source/i, '开源路线'],
+    [/代码|编码|code|swe-bench/i, '代码能力'],
+    [/agent|智能体/i, 'Agent能力'],
+    [/长程|长上下文|long[- ]?horizon|context/i, '长程任务'],
+    [/视觉|多模态|video|image/i, '多模态'],
+    [/推理|reason/i, '推理能力'],
+  ];
+  const picked = [];
+
+  for (const [pattern, label] of mappings) {
+    if (pattern.test(combined) && !picked.includes(label)) {
+      picked.push(label);
+    }
+  }
+
+  if (picked.length === 0) {
+    return '真实竞争力';
+  }
+
+  return picked.slice(0, 2).join('和');
+}
+
 function deriveStep1AnalysisFromResearch(context, researchStagePayload) {
   const topicQuery = String(
     context?.topic?.query
@@ -236,49 +298,59 @@ function deriveStep1AnalysisFromResearch(context, researchStagePayload) {
   const primaryFact = facts[0]?.fact || `“${topicQuery}”已经具备可整理的公开讨论。`;
   const secondaryFact = facts[1]?.fact || `围绕“${topicQuery}”的讨论更适合拆成问题、影响和执行路径。`;
   const tertiaryFact = facts[2]?.fact || `这个主题可以直接沉淀成后续标题、文案和分镜的统一骨架。`;
+  const entity = deriveTopicEntity(topicQuery, facts);
+  const competitor = deriveCompetitorLabel(topicQuery, facts);
+  const focus = deriveFocusPhrase(topicQuery, facts);
+  const thesis = competitor
+    ? `${entity} 这次真正值得讲的，不是“又一个国产模型”，而是它在${focus}上开始正面给 ${competitor} 压力。`
+    : `${entity} 这次真正值得讲的，不是热闹本身，而是它把${focus}推进到了更能落地的阶段。`;
 
   return {
     analysis: {
-      thesis: `“${topicQuery}”这类主题最适合先提炼公开线索，再压缩成一个清晰判断，而不是直接堆背景信息。`,
-      audience: `想快速看懂“${topicQuery}”的普通用户、从业者，以及需要拿到清晰判断的人。`,
-      corePromise: `把“${topicQuery}”从零散搜索线索压成可直接进入标题、文案和分镜的短视频分析框架。`,
+      thesis,
+      audience: `想快速看懂 ${entity}、${focus} 和实际竞争格局的普通用户、从业者与开发者。`,
+      corePromise: `把 ${entity} 这次升级到底强在哪、为什么会形成压力、适合什么场景讲清楚。`,
       layers: [
         {
-          label: '话题入口',
-          insight: `先解释“${topicQuery}”为什么会被搜索，以及用户为什么愿意点开。`,
+          label: '升级事实',
+          insight: compactClause(primaryFact, 72) || thesis,
           evidence: facts[0]?.evidenceAnchor || topicQuery,
         },
         {
-          label: '关注焦点',
-          insight: secondaryFact,
+          label: '能力焦点',
+          insight: `${entity} 这次最该拆的是 ${focus}，而不是泛泛聊“厉害不厉害”。`,
           evidence: facts[1]?.evidenceAnchor || facts[0]?.evidenceAnchor || topicQuery,
         },
         {
-          label: '内容切口',
-          insight: tertiaryFact,
+          label: '竞争落点',
+          insight: competitor
+            ? `${entity} 为什么会让 ${competitor} 阵营感到压力，要落到真实能力和场景。`
+            : compactClause(tertiaryFact, 72),
           evidence: facts[2]?.evidenceAnchor || facts[1]?.evidenceAnchor || topicQuery,
         },
       ],
       process: [
         {
-          label: '检索公开线索',
-          detail: `先用“${topicQuery}”拿到公开搜索结果，确认这件事有哪些稳定讨论入口。`,
+          label: '确认升级事实',
+          detail: `先确认 ${entity} 这次到底发布了什么、公开信息里最硬的点是什么。`,
         },
         {
-          label: '抽出核心事实',
-          detail: primaryFact,
+          label: '拆能力重点',
+          detail: `${entity} 不是只看热度，重点要落到 ${focus}。`,
         },
         {
-          label: '压缩成主判断',
-          detail: `把“${topicQuery}”最值得讲的问题、价值和执行方向收成一条主线。`,
+          label: '收束竞争判断',
+          detail: competitor
+            ? `最后收成一句判断：${entity} 在${focus}上已经开始给 ${competitor} 压力。`
+            : `最后收成一句判断：${entity} 在${focus}上已经进入更值得关注的阶段。`,
         },
       ],
     },
     analysisBrief: {
-      mainQuestion: researchStagePayload?.mainQuestion || `围绕“${topicQuery}”，到底该先讲什么才不空？`,
-      audienceFocus: researchStagePayload?.audienceFocus || `用户想快速看懂主题本身、关键差异和现实影响。`,
-      narrativeApproach: `先给结论，再用公开线索拆问题，最后落到可继续执行的生成路径。`,
-      whyNow: researchStagePayload?.whyNow || `当前公开线索已经足够支撑一版稳定的主题分析。`,
+      mainQuestion: researchStagePayload?.mainQuestion || `${entity} 这次到底强在哪，为什么会被拿来和 ${competitor || '第一梯队模型'} 放在一起聊？`,
+      audienceFocus: researchStagePayload?.audienceFocus || `用户想快速看懂 ${entity} 的真实能力、竞争位置和使用价值。`,
+      narrativeApproach: `先抛判断，再拆 ${focus}，最后落到${competitor ? `${competitor} 竞争格局` : '现实使用价值'}。`,
+      whyNow: researchStagePayload?.whyNow || `${entity} 的公开线索已经足够形成一条明确的内容主线。`,
     },
   };
 }
@@ -338,17 +410,39 @@ function deriveStep2StrategyFromAnalysis(context) {
 function deriveStep2TitlesFromStrategy(context, strategyStagePayload) {
   const topicQuery = String(context?.topic?.query || '当前主题').trim();
   const analysis = context?.pipeline?.selectedAnalysis || {};
+  const facts = Array.isArray(analysis?.researchFacts) ? analysis.researchFacts : [];
   const skill = getCurrentStepSkill(context);
   const variant = getStep2Variant(context);
   const previousOptions = Array.isArray(context?.generation?.previousPayload?.options)
     ? context.generation.previousPayload.options
     : [];
+  const entity = deriveTopicEntity(topicQuery, facts);
+  const competitor = deriveCompetitorLabel(topicQuery, facts) || 'GPT';
+  const focus = deriveFocusPhrase(topicQuery, facts);
+  const angleTemplates = {
+    '结论先行': [
+      `${entity} 这次真上强度了，${focus}开始给${competitor}压力了`,
+      `${entity} 最该看的不是热闹，是${focus}`,
+    ],
+    '问题追问': [
+      `${entity} 真能给${competitor}压力吗？先看${focus}`,
+      `${entity} 值不值得重点盯？关键看${focus}`,
+    ],
+    '反差拆解': [
+      `很多人还把 ${entity} 当热闹，但它真正猛的是${focus}`,
+      `别只看 ${entity} 的名气，这次最狠的是${focus}`,
+    ],
+    '解释型': [
+      `${entity} 这次到底强在哪？我会先看${focus}`,
+      `如果只看 ${entity} 一个点，我会先看${focus}`,
+    ],
+  };
 
   const strategies = Array.isArray(strategyStagePayload?.strategies) ? strategyStagePayload.strategies : [];
   const options = strategies.map((strategy, index) => {
     const library = STEP2_STRATEGY_LIBRARY.find((item) => item.angle === strategy.angle) || STEP2_STRATEGY_LIBRARY[index % STEP2_STRATEGY_LIBRARY.length];
-    const titleTemplate = library.titleTemplates[(variant * 2 + index) % library.titleTemplates.length];
-    const title = fillTemplate(titleTemplate, {topic: topicQuery});
+    const candidateTemplates = angleTemplates[strategy.angle] || library.titleTemplates.map((template) => fillTemplate(template, {topic: topicQuery}));
+    const title = compactClause(candidateTemplates[(variant + index) % candidateTemplates.length], 34);
     const previousTitle = String(previousOptions[index]?.title || '').trim();
     const score = Math.max(76, 92 - index * 3 - (variant % 2));
 

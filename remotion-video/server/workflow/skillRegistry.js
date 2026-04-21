@@ -545,13 +545,58 @@ function getSelectedTitle(input, payload) {
   return options.find((item) => safeString(item?.id) === requestedSelectedId) || options[0] || null;
 }
 
+function splitNarrationClauses(text) {
+  const parts = safeString(text)
+    .replace(/\s+/g, ' ')
+    .split(/[。！？!?\n]|(?<=，)|(?<=；)|(?<=：)|(?<=,)|(?<=;)|(?<=:)/u)
+    .map((item) => item.replace(/^[，；：,;:\-\s]+|[，；：,;:\-\s]+$/g, '').trim())
+    .filter(Boolean);
+  const output = [];
+
+  for (let index = 0; index < parts.length; index += 1) {
+    const current = parts[index];
+    const next = parts[index + 1];
+
+    if (
+      next
+      && /^\d+(?:\.\d+)?月\d+日$/.test(current)
+      && !/\d/.test(next)
+    ) {
+      output.push(`${current} ${next}`.trim());
+      index += 1;
+      continue;
+    }
+
+    output.push(current);
+  }
+
+  return uniqueBy(output.map((item) => compactText(item, 26)), (item) => item.toLowerCase());
+}
+
 function extractDataPointsFromText(text) {
-  return [...String(text || '').matchAll(/(\d+(?:\.\d+)?%?|\d+月\d+日|\d+倍|\d+秒|\d+分钟?|\d+人|\d+个)/g)]
-    .slice(0, 3)
-    .map((match, index) => ({
-      number: match[1],
-      label: `数据点 ${index + 1}`,
-    }));
+  const clauses = splitNarrationClauses(text);
+  const scored = clauses
+    .map((item) => ({
+      text: item,
+      score: [
+        /\d/.test(item) ? 4 : 0,
+        /(开源|发布|编码|代码|Agent|优于|持平|测试|部署|效率|场景|团队)/i.test(item) ? 2 : 0,
+        item.length >= 6 ? 1 : 0,
+      ].reduce((sum, value) => sum + value, 0),
+    }))
+    .sort((left, right) => right.score - left.score);
+  const prioritized = uniqueBy(
+    scored
+      .map((item) => item.text)
+      .filter(Boolean),
+    (item) => item.toLowerCase(),
+  );
+
+  if (prioritized.length > 0) {
+    return prioritized.slice(0, 3);
+  }
+
+  return [];
 }
 
 function buildAngleExploration(topicLabel, thesis, facts, selectedTitle) {

@@ -5,6 +5,7 @@ const ULTIMATE_DEFAULT_WIDTH = 1920;
 const ULTIMATE_DEFAULT_HEIGHT = 1080;
 const ACCENT_ROTATION = ['cyan', 'green', 'yellow', 'orange', 'purple', 'red'];
 const SCENE_MEDIA_FAMILIES = new Set(['hero', 'focus', 'feature-rail', 'metrics', 'cta']);
+const PLACEHOLDER_TEXT_RE = /^(?:数据点|关键词|补充|标签|summary|scene|item|slot|point)\s*[0-9a-zA-Z一二三四五六七八九十]*$/i;
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -28,6 +29,28 @@ const asArray = (value) => {
   return Array.isArray(value) ? value.filter((item) => item !== null && item !== undefined) : [];
 };
 
+const isPlaceholderText = (value) => {
+  const text = safeString(value);
+
+  if (!text) {
+    return true;
+  }
+
+  if (PLACEHOLDER_TEXT_RE.test(text)) {
+    return true;
+  }
+
+  if (/^(?:scene ready|summary|detail|focus)$/i.test(text)) {
+    return true;
+  }
+
+  if (/^\d+(?:\.\d+)?$/.test(text) && text.length <= 4) {
+    return true;
+  }
+
+  return false;
+};
+
 const uniqueList = (items, max = Infinity) => {
   const seen = new Set();
   const output = [];
@@ -45,6 +68,15 @@ const uniqueList = (items, max = Infinity) => {
   }
 
   return output;
+};
+
+const semanticArray = (value, max = Infinity) => {
+  return uniqueList(
+    asArray(value)
+      .map((item) => safeString(item))
+      .filter((item) => !isPlaceholderText(item)),
+    max,
+  );
 };
 
 const splitTextUnits = (value) => {
@@ -76,7 +108,9 @@ const splitTitleTokens = (value) => {
 
 const extractNumberTokens = (value) => {
   return uniqueList(
-    safeString(value).match(/(?:20\d{2}[./-]\d{1,2}[./-]\d{1,2}|\d+(?:\.\d+)?%?|\d+\s*[年月日天次项版])/g) || [],
+    safeString(value).match(
+      /(?:20\d{2}[./-]\d{1,2}[./-]\d{1,2}|\d+月\d+日|\d+(?:\.\d+)?\+?\s*(?:小时|分钟|秒|人|个|天|次|项|行|版|Agent|子Agent)|\d+(?:\.\d+)?\+?%?)/g,
+    ) || [],
     8,
   );
 };
@@ -119,7 +153,7 @@ const normalizeDurationInFrames = (shot, fps) => {
 const collectListTokens = (shot, max = 4) => {
   return uniqueList(
     [
-      ...asArray(shot?.dataPoints),
+      ...semanticArray(shot?.dataPoints),
       ...asArray(shot?.keywords),
       ...splitTitleTokens(shot?.title),
       ...splitTitleTokens(shot?.visualFocusZh),
@@ -133,10 +167,10 @@ const buildFeatureItems = (shot) => {
   const baseItems = collectListTokens(shot, 4);
 
   return baseItems.map((item, index) => ({
-    title: compactText(item, 18),
-    eyebrow: `slot ${String.fromCharCode(97 + (index % 26))}`,
-    caption: compactText(
-      asArray(shot?.dataPoints)[index]
+      title: compactText(item, 18),
+      eyebrow: `slot ${String.fromCharCode(97 + (index % 26))}`,
+      caption: compactText(
+      semanticArray(shot?.dataPoints)[index]
         || asArray(shot?.keywords)[index]
         || splitTextUnits(shot?.narration)[index]
         || shot?.visualSummaryZh
@@ -150,7 +184,7 @@ const buildFeatureItems = (shot) => {
 
 const buildStepItems = (shot) => {
   const steps = uniqueList(
-    [...asArray(shot?.dataPoints), ...splitTextUnits(shot?.narration)],
+    [...semanticArray(shot?.dataPoints), ...splitTextUnits(shot?.narration)],
     5,
   );
 
@@ -164,7 +198,7 @@ const buildStepItems = (shot) => {
 
 const buildTagItems = (shot) => {
   return uniqueList(
-    [...asArray(shot?.keywords), ...asArray(shot?.dataPoints), ...splitTitleTokens(shot?.title)],
+    [...asArray(shot?.keywords), ...semanticArray(shot?.dataPoints), ...splitTitleTokens(shot?.title)],
     10,
   ).map((item, index) => ({
     label: compactText(item, 18),
@@ -172,35 +206,154 @@ const buildTagItems = (shot) => {
   }));
 };
 
-const buildMetricItems = (shot) => {
-  const numbers = uniqueList(
-    [...extractNumberTokens(shot?.title), ...extractNumberTokens(shot?.narration), ...asArray(shot?.dataPoints)],
-    4,
-  );
-  const labels = uniqueList([...asArray(shot?.keywords), ...splitTitleTokens(shot?.visualFocusZh), ...splitTitleTokens(shot?.title)], 4);
+const inferMetricLabel = (source, number, fallbackTitle, index) => {
+  const text = safeString(source);
+  const metricValue = safeString(number);
 
-  return numbers.map((item, index) => ({
-    label: compactText(labels[index] || `指标 ${index + 1}`, 16),
-    value: compactText(item, 18),
-    ratio: Number(clamp(0.92 - index * 0.13, 0.4, 0.95).toFixed(2)),
-    accent: inferAccent(shot, index),
-  }));
+  if (/小时|分钟|秒/.test(metricValue)) {
+    return '连续编码';
+  }
+
+  if (/Agent/i.test(text) && (/个/.test(metricValue) || /agent/i.test(metricValue))) {
+    return '并行调度';
+  }
+
+  if (/行/.test(metricValue)) {
+    return '改码规模';
+  }
+
+  if (/月\d+日|20\d{2}[./-]\d{1,2}[./-]\d{1,2}/.test(text)) {
+    return '发布时间';
+  }
+
+  if (/kimi|gpt|claude|gemini/i.test(text) && /\d/.test(text)) {
+    return index === 0 ? '版本节点' : '模型版本';
+  }
+
+  if (/连续编码|编码\d+小时|小时/.test(text)) {
+    return '连续编码';
+  }
+
+  if (/行代码|改代码|修改/.test(text)) {
+    return '改码规模';
+  }
+
+  if (/agent/i.test(text)) {
+    return '并行调度';
+  }
+
+  if (/基准|bench|exam|测试/.test(text)) {
+    return '基准表现';
+  }
+
+  if (/天|周期|模块/.test(text)) {
+    return '开发周期';
+  }
+
+  if (/人力|团队|个人/.test(text)) {
+    return '人力投入';
+  }
+
+  const stripped = compactText(
+    text
+      .replace(/\d+(?:\.\d+)?\+?\s*(?:小时|分钟|秒|人|个|天|次|项|行|版|Agent|子Agent|%|月\d+日)?/g, ' ')
+      .replace(/[，,、。；;:：]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim(),
+    16,
+  );
+
+  return stripped || compactText(fallbackTitle || `指标 ${index + 1}`, 16);
+};
+
+const metricPriority = (label) => {
+  switch (safeString(label)) {
+    case '发布时间':
+    case '连续编码':
+      return 5;
+    case '改码规模':
+    case '并行调度':
+    case '基准表现':
+      return 4;
+    case '开发周期':
+    case '人力投入':
+      return 3;
+    case '模型版本':
+    case '版本节点':
+      return 2;
+    default:
+      return 1;
+  }
+};
+
+const buildMetricItems = (shot) => {
+  const sourceItems = uniqueList(
+    [
+      ...semanticArray(shot?.dataPoints),
+      ...splitTextUnits(shot?.narration),
+      ...splitTextUnits(shot?.visualSummaryZh),
+    ],
+    8,
+  );
+  const pairs = [];
+  const seen = new Set();
+
+  for (const source of sourceItems) {
+    const numbers = extractNumberTokens(source);
+
+    for (const number of numbers) {
+      const label = inferMetricLabel(source, number, shot?.title, pairs.length);
+      const key = `${label}::${number}`.toLowerCase();
+
+      if (seen.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      pairs.push({
+        label: compactText(label, 16),
+        value: compactText(number, 18),
+        priority: metricPriority(label),
+      });
+
+    }
+
+    if (pairs.length >= 8) {
+      break;
+    }
+  }
+
+  return pairs
+    .sort((left, right) => right.priority - left.priority)
+    .slice(0, 4)
+    .map((item, index) => ({
+      label: item.label,
+      value: item.value,
+      ratio: Number(clamp(0.92 - index * 0.13, 0.4, 0.95).toFixed(2)),
+      accent: inferAccent(shot, index),
+    }));
 };
 
 const buildCodeLines = (shot) => {
-  const lines = splitTextUnits(shot?.promptZh)
-    .slice(0, 4)
-    .map((item) => compactText(item, 48));
-
-  if (lines.length === 0) {
-    lines.push(compactText(shot?.narration || shot?.visualSummaryZh || shot?.title, 48));
-  }
+  const narrativeUnits = splitTextUnits(shot?.narration || shot?.visualSummaryZh);
+  const claim = compactText(narrativeUnits[0] || shot?.narration || shot?.visualSummaryZh || shot?.title, 34);
+  const proof = compactText(
+    uniqueList(
+      [
+        ...semanticArray(shot?.dataPoints),
+        ...narrativeUnits.slice(1),
+        shot?.visualFocusZh,
+      ].filter(Boolean),
+      3,
+    ).join(' / ') || shot?.visualFocusZh || shot?.type || 'scene',
+    34,
+  );
 
   return [
     {text: '{', tone: 'base'},
     {text: `  "title": "${compactText(shot?.title, 24)}",`, tone: 'accent'},
-    {text: `  "focus": "${compactText(shot?.visualFocusZh || shot?.type || 'scene', 24)}",`, tone: 'base'},
-    {text: `  "summary": "${compactText(lines[0], 34)}"`, tone: 'muted'},
+    {text: `  "claim": "${claim}",`, tone: 'base'},
+    {text: `  "proof": "${proof}"`, tone: 'muted'},
     {text: '}', tone: 'base'},
   ];
 };
@@ -210,7 +363,7 @@ const buildTerminalOutputs = (shot) => {
     [
       ...splitTextUnits(shot?.visualSummaryZh),
       ...splitTextUnits(shot?.narration),
-      ...asArray(shot?.dataPoints),
+      ...semanticArray(shot?.dataPoints),
     ],
     4,
   );
@@ -242,8 +395,12 @@ const inferSceneFamily = (shot, index, total) => {
     return 'terminal';
   }
 
+  if ((Array.isArray(shot?.comparisons) && shot.comparisons.length > 0) || /(对比|差异|vs|不是.*而是)/.test(text)) {
+    return 'number-strip';
+  }
+
   if (
-    /(代码|配置|脚本|函数)/.test(text)
+    /(配置|脚本|函数|接口|参数)/.test(text)
     || ['schema', 'json', 'api', 'code'].some((token) => hasStandaloneAsciiToken(text, token))
   ) {
     return 'code';
@@ -253,8 +410,8 @@ const inferSceneFamily = (shot, index, total) => {
     return 'step-flow';
   }
 
-  if ((Array.isArray(shot?.comparisons) && shot.comparisons.length > 0) || /(对比|差异|vs|不是.*而是)/.test(text)) {
-    return 'number-strip';
+  if (/(场景|开发者|团队|问题|痛点|案例|想象一下)/.test(text) && buildFeatureItems(shot).length >= 3) {
+    return 'feature-rail';
   }
 
   if (extractNumberTokens(text).length >= 2) {
@@ -275,7 +432,7 @@ const inferSceneFamily = (shot, index, total) => {
 const buildSceneData = (family, shot, index) => {
   const accent = inferAccent(shot, index);
   const title = compactText(shot?.title || shot?.level || shot?.type || `Scene ${index + 1}`, 28);
-  const subtitle = compactText(shot?.visualSummaryZh || shot?.narration, 72);
+  const subtitle = compactText(shot?.narration || shot?.visualSummaryZh, 72);
   const keywords = uniqueList(asArray(shot?.keywords), 3);
   const points = collectListTokens(shot, 4);
   const metricItems = buildMetricItems(shot);
@@ -438,7 +595,7 @@ function buildUltimateProjectConfig(project) {
         id: safeString(shot?.id) || `shot-${String(index + 1).padStart(2, '0')}`,
         family,
         mediaSrc: resolveSceneMediaSrc(family, shot),
-        subtitle: compactText(shot?.visualSummaryZh || shot?.narration || shot?.visualFocusZh, 72),
+        subtitle: compactText(shot?.narration || shot?.visualSummaryZh || shot?.visualFocusZh, 72),
         durationInFrames: normalizeDurationInFrames(shot, fps),
         warm: /warm|里程碑|升级|结论|发布|收束/.test(`${safeString(shot?.style)} ${safeString(shot?.mood)} ${safeString(shot?.title)}`.toLowerCase()),
         showGrid: false,

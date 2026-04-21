@@ -80,19 +80,80 @@ function buildSearchTerms(query) {
   return [...terms.entries()].map(([value, weight]) => ({value, weight}));
 }
 
-function scoreSearchResult(item, terms) {
-  const haystack = stripHtml(`${item?.title || ''} ${item?.snippet || ''}`).toLowerCase();
+function normalizeSearchText(value) {
+  return stripHtml(String(value || ''))
+    .toLowerCase()
+    .replace(/[“”"'‘’]+/g, ' ')
+    .replace(/[^\p{L}\p{N}.+-]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildAnchorTokens(query) {
+  const rawTokens = String(query || '').match(/[A-Za-z0-9][A-Za-z0-9.+-]*/g) || [];
+  const stopwords = new Set(['ai']);
+  const seen = new Set();
+  const anchors = [];
+
+  for (const token of rawTokens) {
+    const normalized = token.toLowerCase().trim();
+    if (!normalized || stopwords.has(normalized)) {
+      continue;
+    }
+    if (!(normalized.length >= 3 || /\d/.test(normalized))) {
+      continue;
+    }
+    if (seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    anchors.push(normalized);
+  }
+
+  return anchors.slice(0, 4);
+}
+
+function buildSearchQueries(query) {
+  const normalizedQuery = String(query || '').trim();
+  const queries = new Set();
+  const anchorTokens = buildAnchorTokens(normalizedQuery);
+
+  if (normalizedQuery) {
+    queries.add(normalizedQuery);
+  }
+
+  if (anchorTokens.length >= 2) {
+    queries.add(anchorTokens.slice(0, 2).join(' '));
+    queries.add(`${anchorTokens.slice(0, 2).join(' ')} 官方`);
+  }
+
+  if (anchorTokens.length >= 3) {
+    queries.add(anchorTokens.slice(0, 3).join(' '));
+  }
+
+  return [...queries].filter(Boolean).slice(0, 4);
+}
+
+function scoreSearchResult(item, terms, anchorTokens = []) {
+  const haystack = normalizeSearchText(`${item?.title || ''} ${item?.snippet || ''}`);
   let score = 0;
   let matches = 0;
+  let anchorMatches = 0;
 
   for (const term of terms) {
-    if (term.value && haystack.includes(term.value)) {
+    if (term.value && haystack.includes(term.value.toLowerCase())) {
       score += term.weight;
       matches += 1;
     }
   }
 
-  return {score, matches};
+  for (const token of anchorTokens) {
+    if (token && haystack.includes(token)) {
+      anchorMatches += 1;
+    }
+  }
+
+  return {score, matches, anchorMatches};
 }
 
 function getInputTopic(input) {
@@ -199,10 +260,10 @@ function normalizeTopicResearch(candidateResearch, input) {
   };
 }
 
-async function searchTopicResearch(query) {
+async function fetchTopicResearchOnce(query) {
   const normalizedQuery = String(query || '').trim();
   if (!normalizedQuery) {
-    return null;
+    return [];
   }
 
   const response = await fetch(`https://www.bing.com/search?format=rss&q=${encodeURIComponent(normalizedQuery)}`, {
@@ -218,17 +279,58 @@ async function searchTopicResearch(query) {
   }
 
   const xml = await response.text();
-  const rawResults = parseBingRssItems(xml);
+  return parseBingRssItems(xml);
+}
+
+async function searchTopicResearch(query) {
+  const normalizedQuery = String(query || '').trim();
+  if (!normalizedQuery) {
+    return null;
+  }
+
+  const queries = buildSearchQueries(normalizedQuery);
+  const mergedResults = [];
+
+  for (const currentQuery of queries) {
+    try {
+      const items = await fetchTopicResearchOnce(currentQuery);
+      mergedResults.push(
+        ...items.map((item) => ({
+          ...item,
+          sourceQuery: currentQuery,
+        })),
+      );
+    } catch (error) {
+      continue;
+    }
+  }
+
+  const rawResults = [];
+  const seen = new Set();
+  for (const item of mergedResults) {
+    const key = `${String(item?.link || '').trim()}|${String(item?.title || '').trim()}`.toLowerCase();
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    rawResults.push(item);
+  }
+
   const terms = buildSearchTerms(normalizedQuery);
+  const anchorTokens = buildAnchorTokens(normalizedQuery);
   const strongTokenCount = terms.filter((term) => term.weight >= 2).length;
   const minScore = strongTokenCount <= 2 ? 3 : 4;
+  const minAnchorMatches = anchorTokens.length >= 2 ? 2 : anchorTokens.length;
   const scoredResults = rawResults
     .map((item) => ({
       ...item,
-      ...scoreSearchResult(item, terms),
+      ...scoreSearchResult(item, terms, anchorTokens),
     }))
-    .filter((item) => item.score >= minScore || item.matches >= 3)
-    .sort((left, right) => right.score - left.score || right.matches - left.matches);
+    .filter((item) => {
+      const anchorPass = minAnchorMatches === 0 ? true : item.anchorMatches >= minAnchorMatches;
+      return anchorPass && (item.score >= minScore || item.matches >= 3 || item.anchorMatches >= minAnchorMatches);
+    })
+    .sort((left, right) => right.anchorMatches - left.anchorMatches || right.score - left.score || right.matches - left.matches);
   const results = (terms.length > 0 ? scoredResults : rawResults)
     .slice(0, 5)
     .map(({title, link, snippet, publishedAt}) => ({title, link, snippet, publishedAt}));

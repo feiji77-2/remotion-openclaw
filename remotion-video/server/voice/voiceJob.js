@@ -5,6 +5,9 @@ const { spawnSync } = require('child_process');
 const PROJECT_ROOT = path.join(__dirname, '../..');
 const PUBLIC_DIR = path.join(PROJECT_ROOT, 'public');
 const VOICE_DIR = path.join(PUBLIC_DIR, 'assets/voice');
+const SYSTEM_SAY_BIN = '/usr/bin/say';
+const AFCONVERT_BIN = '/usr/bin/afconvert';
+const AFINFO_BIN = '/usr/bin/afinfo';
 
 // ─── Engine URLs ───────────────────────────────────────────────────────────────
 const ENGINES = {
@@ -27,6 +30,7 @@ const ENGINES = {
 
 // Fallback order
 const ENGINE_ORDER = ['chattts', 'melo', 'openvoice'];
+const SYSTEM_SAY_ENGINE = 'system-say';
 
 
 function clamp(value, min, max) {
@@ -52,10 +56,17 @@ function sanitizeFileSegment(value) {
     .toLowerCase() || 'clip';
 }
 
+function hasSystemSayRuntime() {
+  return fs.existsSync(SYSTEM_SAY_BIN) && fs.existsSync(AFCONVERT_BIN) && fs.existsSync(AFINFO_BIN);
+}
+
 function resolveEngine(engine, preset) {
   const requested = String(engine || '').trim().toLowerCase();
   if (requested && ENGINES[requested]) {
     return requested;
+  }
+  if (requested === 'say' || requested === 'system-say' || requested === 'macos-say') {
+    return SYSTEM_SAY_ENGINE;
   }
 
   const normalized = String(preset || '').toLowerCase();
@@ -67,6 +78,31 @@ function resolveEngine(engine, preset) {
   }
   if (!preset) return 'chattts';
   return 'melo';
+}
+
+function resolveVoiceSystemSay(voiceSettings) {
+  const explicitVoice = String(
+    voiceSettings?.voice
+    || voiceSettings?.speakerSeed
+    || voiceSettings?.speaker_seed
+    || '',
+  ).trim();
+  if (explicitVoice) {
+    return explicitVoice;
+  }
+
+  const normalized = String(voiceSettings?.preset || '').toLowerCase();
+  if (normalized.includes('male') || normalized.includes('男') || normalized.includes('eddy')) {
+    return 'Eddy (中文（中国大陆）)';
+  }
+  if (normalized.includes('flo')) {
+    return 'Flo (中文（中国大陆）)';
+  }
+  if (normalized.includes('meijia')) {
+    return 'Meijia';
+  }
+
+  return 'Tingting';
 }
 
 function resolveVoiceCode(value, fallback = 'zh') {
@@ -125,6 +161,11 @@ function resolveSpeed(speedValue) {
   return clamp(Number(raw) || 1, 0.5, 2.0);
 }
 
+function resolveSystemSayRate(speedValue) {
+  const normalizedSpeed = resolveSpeed(speedValue);
+  return Math.round(clamp(225 * normalizedSpeed, 140, 320));
+}
+
 function resolveShotText(shot, voiceSettings) {
   const byShotId = voiceSettings?.byShotId && typeof voiceSettings.byShotId === 'object'
     ? voiceSettings.byShotId
@@ -153,6 +194,22 @@ async function checkVoiceService(engine) {
 }
 
 async function resolveHealthyVoiceEngine(requestedEngine, update) {
+  if (requestedEngine === SYSTEM_SAY_ENGINE) {
+    if (!hasSystemSayRuntime()) {
+      throw new Error('system-say 不可用：缺少 macOS say/afconvert/afinfo');
+    }
+    update?.(5, '检查语音引擎 (system-say)...');
+    return {
+      engine: SYSTEM_SAY_ENGINE,
+      health: {
+        status: 'ok',
+        engine: SYSTEM_SAY_ENGINE,
+        source: 'macOS system say',
+      },
+      failures: [],
+    };
+  }
+
   const candidates = [requestedEngine, ...ENGINE_ORDER.filter((engine) => engine !== requestedEngine)];
   const failures = [];
 
@@ -170,10 +227,52 @@ async function resolveHealthyVoiceEngine(requestedEngine, update) {
     }
   }
 
+  if (hasSystemSayRuntime()) {
+    update?.(5, '本地 HTTP TTS 不可用，切换 system-say...');
+    return {
+      engine: SYSTEM_SAY_ENGINE,
+      health: {
+        status: 'ok',
+        engine: SYSTEM_SAY_ENGINE,
+        source: 'macOS system say',
+      },
+      failures,
+    };
+  }
+
   throw new Error(`没有可用的语音引擎。${failures.join(' | ')}`);
 }
 
 async function synthesizeClip({ text, engine, voice, speed, referenceUrl, outputPath, temperature, topP, topK }) {
+  if (engine === SYSTEM_SAY_ENGINE) {
+    const tempAiffPath = outputPath.replace(/\.wav$/i, '.aiff');
+    const sayRate = String(resolveSystemSayRate(speed));
+    const sayResult = spawnSync(
+      SYSTEM_SAY_BIN,
+      ['-v', voice || 'Tingting', '-r', sayRate, '-o', tempAiffPath, text],
+      { cwd: PROJECT_ROOT, encoding: 'utf8' },
+    );
+
+    if (sayResult.status !== 0) {
+      const detail = [sayResult.stdout, sayResult.stderr].filter(Boolean).join('\n').trim();
+      throw new Error(`system-say 合成失败: ${detail || `exit ${sayResult.status}`}`);
+    }
+
+    const convertResult = spawnSync(
+      AFCONVERT_BIN,
+      ['-f', 'WAVE', '-d', 'LEI16', tempAiffPath, outputPath],
+      { cwd: PROJECT_ROOT, encoding: 'utf8' },
+    );
+    fs.rmSync(tempAiffPath, {force: true});
+
+    if (convertResult.status !== 0) {
+      const detail = [convertResult.stdout, convertResult.stderr].filter(Boolean).join('\n').trim();
+      throw new Error(`system-say 音频转换失败: ${detail || `exit ${convertResult.status}`}`);
+    }
+
+    return outputPath;
+  }
+
   const cfg = ENGINES[engine];
   if (!cfg) throw new Error(`Unknown engine: ${engine}`);
 
@@ -225,11 +324,27 @@ function probeDurationSeconds(filePath) {
     ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', filePath],
     { cwd: PROJECT_ROOT, encoding: 'utf8' },
   );
-  if (ffprobe.status !== 0) {
-    const detail = [ffprobe.stdout, ffprobe.stderr].filter(Boolean).join('\n').trim();
-    throw new Error(`ffprobe failed for ${filePath}\n${detail}`);
+  if (ffprobe.status === 0) {
+    const duration = Number(ffprobe.stdout.trim());
+    if (Number.isFinite(duration) && duration > 0) {
+      return Math.round(duration * 1000) / 1000;
+    }
   }
-  const duration = Number(ffprobe.stdout.trim());
+
+  const afinfo = spawnSync(AFINFO_BIN, [filePath], {
+    cwd: PROJECT_ROOT,
+    encoding: 'utf8',
+  });
+  if (afinfo.status !== 0) {
+    const detail = [ffprobe.stdout, ffprobe.stderr, afinfo.stdout, afinfo.stderr]
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+    throw new Error(`无法探测音频时长: ${filePath}\n${detail}`);
+  }
+  const combined = [afinfo.stdout, afinfo.stderr].filter(Boolean).join('\n');
+  const match = combined.match(/estimated duration:\s*([0-9.]+)\s*sec/i);
+  const duration = match ? Number(match[1]) : NaN;
   if (!Number.isFinite(duration) || duration <= 0) {
     throw new Error(`Invalid audio duration for ${filePath}`);
   }
@@ -261,7 +376,9 @@ async function processVoiceJob(job, update) {
     ? resolveVoiceChatTTSSpeakerSeed(voiceSettings)
     : engine === 'melo'
       ? resolveVoiceMelo(voiceSettings)
-      : resolveVoiceOpenVoice(voiceSettings);
+      : engine === SYSTEM_SAY_ENGINE
+        ? resolveVoiceSystemSay(voiceSettings)
+        : resolveVoiceOpenVoice(voiceSettings);
   const voiceName = engine === 'chattts' ? `seed-${voiceRequest}` : voiceRequest;
 
   const referenceUrl = voiceSettings.referenceUrl || voiceSettings.reference_url || null;
@@ -348,7 +465,7 @@ async function processVoiceJob(job, update) {
 
   const manifestPath = path.join(jobVoiceDir, 'manifest.json');
   fs.writeFileSync(manifestPath, JSON.stringify({
-    engine: `${engine}-http`,
+    engine: engine === SYSTEM_SAY_ENGINE ? SYSTEM_SAY_ENGINE : `${engine}-http`,
     engineName: engine,
     voice: voiceName,
     referenceUrl,
@@ -365,7 +482,7 @@ async function processVoiceJob(job, update) {
   return {
     jobId: job.id,
     type: 'voice',
-    engine: `${engine}-http`,
+    engine: engine === SYSTEM_SAY_ENGINE ? SYSTEM_SAY_ENGINE : `${engine}-http`,
     engineName: engine,
     voice: voiceName,
     referenceUrl,
@@ -382,6 +499,13 @@ async function processVoiceJob(job, update) {
 function getVoiceCapabilities() {
   return {
     engines: {
+      'system-say': {
+        healthUrl: null,
+        synthUrl: null,
+        name: 'macOS system say',
+        description: '系统级中文 TTS 兜底，适合本地 HTTP 语音服务不可用时继续出声',
+        voices: ['Tingting', 'Eddy (中文（中国大陆）)', 'Flo (中文（中国大陆）)', 'Meijia'],
+      },
       melo: {
         healthUrl: ENGINES.melo.healthUrl,
         synthUrl: ENGINES.melo.synthUrl,

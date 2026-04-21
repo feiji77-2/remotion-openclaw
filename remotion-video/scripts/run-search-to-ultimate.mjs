@@ -23,12 +23,35 @@ const DEFAULT_QUALITY = 'high';
 const DEFAULT_FPS = 30;
 const DEFAULT_WIDTH = 1920;
 const DEFAULT_HEIGHT = 1080;
-const STEP_CACHE_VERSION = 2;
+const STEP_CACHE_VERSION = 3;
 const IMAGE_CACHE_VERSION = 2;
 const VOICE_CACHE_VERSION = 1;
 const RENDER_CACHE_VERSION = 1;
+const GENERIC_LABEL_RE = /^(?:数据点|关键词|补充|标签|point|item|slot|summary|scene)\s*[0-9a-zA-Z一二三四五六七八九十]*$/i;
 
 const safeString = (value) => String(value || '').trim();
+
+const isPlaceholderText = (value) => {
+  const text = safeString(value);
+
+  if (!text) {
+    return true;
+  }
+
+  if (GENERIC_LABEL_RE.test(text)) {
+    return true;
+  }
+
+  if (/^(?:scene ready|summary|detail|focus)$/i.test(text)) {
+    return true;
+  }
+
+  if (/^\d+(?:\.\d+)?$/.test(text) && text.length <= 4) {
+    return true;
+  }
+
+  return false;
+};
 
 const normalizeTextItem = (value) => {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -39,10 +62,9 @@ const normalizeTextItem = (value) => {
     return '';
   }
 
-  return safeString(
-    value.label
+  const preferred = safeString(
+    value.text
     || value.value
-    || value.text
     || value.title
     || value.name
     || value.point
@@ -51,6 +73,19 @@ const normalizeTextItem = (value) => {
     || value.source
     || '',
   );
+
+  if (preferred) {
+    return preferred;
+  }
+
+  const label = safeString(value.label);
+  const number = safeString(value.number);
+
+  if (number && (GENERIC_LABEL_RE.test(label) || !label)) {
+    return number;
+  }
+
+  return label || number;
 };
 
 const toNumber = (value, fallback = 0) => {
@@ -61,6 +96,16 @@ const toNumber = (value, fallback = 0) => {
 const roundTo = (value, digits = 2) => {
   const factor = 10 ** digits;
   return Math.round(Number(value) * factor) / factor;
+};
+
+const splitTextUnits = (value) => {
+  return Array.from(new Set(
+    safeString(value)
+      .replace(/\s+/g, ' ')
+      .split(/[。！？!?\n]|(?<=，)|(?<=；)|(?<=：)|(?<=,)|(?<=;)|(?<=:)/u)
+      .map((item) => item.replace(/^[，；：,;:\-\s]+|[，；：,;:\-\s]+$/g, '').trim())
+      .filter(Boolean),
+  ));
 };
 
 const normalizeList = (value, max = Infinity) => {
@@ -88,6 +133,19 @@ const normalizeList = (value, max = Infinity) => {
   }
 
   return output;
+};
+
+const extractNarrationDataPoints = (value, max = 4) => {
+  const units = splitTextUnits(value);
+  const prioritized = units.filter((item) => (
+    /\d/.test(item)
+    || /(开源|发布|编码|代码|Agent|优于|持平|测试|部署|效率|场景|团队|压力|能力)/i.test(item)
+  ));
+
+  return normalizeList(
+    (prioritized.length > 0 ? prioritized : units).filter((item) => !isPlaceholderText(item)),
+    max,
+  );
 };
 
 const printUsage = () => {
@@ -657,6 +715,77 @@ const mergeStepResult = ({stepId, result, projectState, shotsState, pipelineStat
   };
 };
 
+const upsertStepResult = (stepResults, stepResult) => {
+  const nextResults = Array.isArray(stepResults) ? [...stepResults] : [];
+  const targetStepId = Number(stepResult?.stepId);
+  const existingIndex = nextResults.findIndex((item) => Number(item?.stepId) === targetStepId);
+
+  if (existingIndex >= 0) {
+    nextResults[existingIndex] = stepResult;
+    return nextResults;
+  }
+
+  nextResults.push(stepResult);
+  return nextResults.sort((left, right) => Number(left?.stepId) - Number(right?.stepId));
+};
+
+const refreshDependentWorkflowStep = async ({
+  stepId,
+  projectDir,
+  allowResume,
+  projectState,
+  shotsState,
+  pipelineState,
+  explicitProjectName,
+}) => {
+  const stepFilePath = path.join(projectDir, 'steps', `step-${String(stepId).padStart(2, '0')}.json`);
+  const stepInputHash = hashValue(buildWorkflowStepCacheInput({
+    stepId,
+    projectState,
+    shotsState,
+    pipelineState,
+  }));
+  const cachedStep = allowResume ? await loadJsonIfExists(stepFilePath) : null;
+  let stepResult = null;
+  let reused = false;
+
+  if (allowResume && isValidStepResult(cachedStep, stepId) && readStepInputHash(cachedStep) === stepInputHash) {
+    stepResult = cachedStep;
+    reused = true;
+  } else {
+    const generatedStep = await generateWorkflowStep({
+      stepId,
+      generationMeta: {
+        mode: 'generate',
+        trigger: 'manual',
+        attempt: 0,
+      },
+      projectState,
+      shotsState,
+      pipelineState,
+    });
+    stepResult = wrapStepResultWithCacheMeta(generatedStep, stepInputHash);
+    await writeJson(stepFilePath, stepResult);
+  }
+
+  const merged = mergeStepResult({
+    stepId,
+    result: stepResult,
+    projectState,
+    shotsState,
+    pipelineState,
+    explicitProjectName,
+  });
+
+  return {
+    stepResult,
+    reused,
+    projectState: merged.projectState,
+    shotsState: merged.shotsState,
+    pipelineState: merged.pipelineState,
+  };
+};
+
 const buildProjectShots = (shotsState, pipelineState) => {
   const promptsByShotId = pipelineState?.prompts?.byShotId && typeof pipelineState.prompts.byShotId === 'object'
     ? pipelineState.prompts.byShotId
@@ -686,6 +815,12 @@ const buildProjectShots = (shotsState, pipelineState) => {
         }))
         .filter((item) => item.left || item.right)
       : [];
+    const rawDataPoints = Array.isArray(prompt.dataPoints) && prompt.dataPoints.length > 0
+      ? prompt.dataPoints
+      : shot.dataPoints;
+    const semanticDataPoints = normalizeList(rawDataPoints, 10)
+      .filter((item) => !isPlaceholderText(item));
+    const narrationDataPoints = extractNarrationDataPoints(voice.text || shot.narration, 6);
 
     return {
       id: safeString(shot.id) || `shot-${String(index + 1).padStart(2, '0')}`,
@@ -704,10 +839,7 @@ const buildProjectShots = (shotsState, pipelineState) => {
         Array.isArray(prompt.keywords) && prompt.keywords.length > 0 ? prompt.keywords : shot.keywords,
         10,
       ),
-      dataPoints: normalizeList(
-        Array.isArray(prompt.dataPoints) && prompt.dataPoints.length > 0 ? prompt.dataPoints : shot.dataPoints,
-        10,
-      ),
+      dataPoints: normalizeList([...narrationDataPoints, ...semanticDataPoints], 10),
       visual,
       comparisons,
       imageUrl: safeString(prompt.imageUrl) || null,
@@ -1045,6 +1177,7 @@ const buildVoiceManifestPayload = ({projectId, shotsState, pipelineState, voiceS
     version: VOICE_CACHE_VERSION,
     projectId,
     generatedAt: new Date().toISOString(),
+    mergedVoiceFile: safeString(pipelineState?.voice?.mergedVoiceFile) || null,
     settings: {
       engine: safeString(voiceSettings?.engine),
       speed: safeString(voiceSettings?.speed),
@@ -1101,7 +1234,7 @@ const planReusableVoiceQueue = async ({projectDir, shotsState, pipelineState, op
   };
 };
 
-const executeCommand = async (command, args, {cwd, label}) => {
+const executeCommand = async (command, args, {cwd, label, env = {}}) => {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
@@ -1109,6 +1242,7 @@ const executeCommand = async (command, args, {cwd, label}) => {
       shell: false,
       env: {
         ...process.env,
+        ...env,
       },
     });
 
@@ -1139,6 +1273,150 @@ const executeCommand = async (command, args, {cwd, label}) => {
       resolve({stdout, stderr});
     });
   });
+};
+
+const resolveBundledFfmpegPath = async () => {
+  const candidates = [
+    path.join(REMOTION_ROOT, 'node_modules', '@remotion', 'compositor-darwin-arm64', 'ffmpeg'),
+    path.join(REMOTION_ROOT, 'node_modules', '@remotion', 'compositor-darwin-x64', 'ffmpeg'),
+    path.join(REMOTION_ROOT, 'node_modules', '@remotion', 'compositor-linux-x64-gnu', 'ffmpeg'),
+    path.join(REMOTION_ROOT, 'node_modules', '@remotion', 'compositor-linux-arm64-gnu', 'ffmpeg'),
+  ];
+
+  for (const candidate of candidates) {
+    if (await fileExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error('未找到可用的 Remotion ffmpeg 二进制');
+};
+
+const buildBundledFfmpegEnv = (ffmpegPath) => {
+  const libDir = path.dirname(ffmpegPath);
+  if (process.platform === 'darwin') {
+    return {
+      DYLD_LIBRARY_PATH: libDir,
+    };
+  }
+  if (process.platform === 'win32') {
+    return {
+      PATH: `${libDir};${process.env.PATH || ''}`,
+    };
+  }
+  return {
+    LD_LIBRARY_PATH: libDir,
+  };
+};
+
+const buildMergedVoiceTrack = async ({
+  projectId,
+  audioSegments,
+  fps,
+  totalDurationSeconds,
+}) => {
+  const segments = Array.isArray(audioSegments)
+    ? audioSegments.filter((segment) => safeString(segment?.src))
+    : [];
+
+  if (segments.length === 0) {
+    return null;
+  }
+
+  const ffmpegPath = await resolveBundledFfmpegPath();
+  const outputRelativePath = `/assets/voice/${projectId}/full-narration.wav`;
+  const outputAbsolutePath = resolvePublicAssetFile(outputRelativePath);
+  await ensureDir(path.dirname(outputAbsolutePath));
+
+  const inputArgs = [];
+  const filterParts = [];
+  const mixInputs = [];
+  const durationLimit = Math.max(0.1, roundTo(totalDurationSeconds || 0, 3));
+
+  for (const [index, segment] of segments.entries()) {
+    const inputPath = resolvePublicAssetFile(segment.src);
+    if (!await fileExists(inputPath)) {
+      throw new Error(`缺少配音片段，无法合成长旁白：${segment.src}`);
+    }
+
+    inputArgs.push('-i', inputPath);
+    const delayMs = Math.max(
+      0,
+      Math.round((toNumber(segment.startFrame, 0) / Math.max(1, toNumber(fps, DEFAULT_FPS))) * 1000),
+    );
+    filterParts.push(`[${index}:a]aresample=22050,adelay=${delayMs},volume=1[a${index}]`);
+    mixInputs.push(`[a${index}]`);
+  }
+
+  const mixFilter = mixInputs.length === 1
+    ? `${mixInputs[0]}apad=pad_dur=${durationLimit},atrim=0:${durationLimit}[mixout]`
+    : `${mixInputs.join('')}amix=inputs=${mixInputs.length}:normalize=0,apad=pad_dur=${durationLimit},atrim=0:${durationLimit}[mixout]`;
+
+  await executeCommand(
+    ffmpegPath,
+    [
+      '-loglevel', 'error',
+      '-y',
+      ...inputArgs,
+      '-filter_complex', [...filterParts, mixFilter].join(';'),
+      '-map', '[mixout]',
+      '-ac', '1',
+      '-ar', '22050',
+      '-c:a', 'pcm_s16le',
+      outputAbsolutePath,
+    ],
+    {
+      cwd: REMOTION_ROOT,
+      label: 'merge-voice-track',
+      env: buildBundledFfmpegEnv(ffmpegPath),
+    },
+  );
+
+  return {
+    relativePath: outputRelativePath,
+    absolutePath: outputAbsolutePath,
+  };
+};
+
+const muxRenderedAudioTrack = async ({
+  videoPath,
+  audioRelativePath,
+}) => {
+  const resolvedVideoPath = safeString(videoPath);
+  const resolvedAudioPath = resolvePublicAssetFile(audioRelativePath);
+
+  if (!resolvedVideoPath || !resolvedAudioPath || !await fileExists(resolvedVideoPath) || !await fileExists(resolvedAudioPath)) {
+    return;
+  }
+
+  const ffmpegPath = await resolveBundledFfmpegPath();
+  const outputDir = path.dirname(resolvedVideoPath);
+  const baseName = path.basename(resolvedVideoPath, path.extname(resolvedVideoPath));
+  const tempMuxedPath = path.join(outputDir, `${baseName}.muxing.mp4`);
+
+  await executeCommand(
+    ffmpegPath,
+    [
+      '-loglevel', 'error',
+      '-y',
+      '-i', resolvedVideoPath,
+      '-i', resolvedAudioPath,
+      '-map', '0:v:0',
+      '-map', '1:a:0',
+      '-c:v', 'copy',
+      '-c:a', 'aac',
+      '-b:a', '192k',
+      '-shortest',
+      tempMuxedPath,
+    ],
+    {
+      cwd: REMOTION_ROOT,
+      label: 'mux-rendered-audio',
+      env: buildBundledFfmpegEnv(ffmpegPath),
+    },
+  );
+
+  await fs.rename(tempMuxedPath, resolvedVideoPath);
 };
 
 const parseJsonLines = (stdout) => {
@@ -1382,7 +1660,7 @@ async function main() {
   let pipelineState = workflowContext.pipelineState;
   const cacheManifestPath = path.join(projectDir, 'cache-manifest.json');
   const cacheManifest = await loadProjectCacheManifest(cacheManifestPath);
-  const stepResults = [];
+  let stepResults = [];
   const warnings = [];
   const stageTimings = {};
   const stepTimings = [];
@@ -1503,6 +1781,28 @@ async function main() {
     pipelineState = merged.pipelineState;
   }
 
+  if (Array.isArray(shotsState) && shotsState.length > 0) {
+    process.stdout.write('[workflow] syncing step 5 prompts with latest shot narration\n');
+    const promptSync = await refreshDependentWorkflowStep({
+      stepId: 5,
+      projectDir,
+      allowResume,
+      projectState,
+      shotsState,
+      pipelineState,
+      explicitProjectName,
+    });
+    stepResults = upsertStepResult(stepResults, promptSync.stepResult);
+    projectState = promptSync.projectState;
+    shotsState = promptSync.shotsState;
+    pipelineState = promptSync.pipelineState;
+    process.stdout.write(
+      promptSync.reused
+        ? '[workflow] step 5/8 prompt cache already matched latest narration\n'
+        : '[workflow] step 5/8 regenerated after narration update\n',
+    );
+  }
+
   resumedFromCache = resumedStepCount > 0;
   if (resumedFromCache) {
     process.stdout.write(`[resume] reused workflow steps: ${reusedWorkflowStepIds.join(', ')}\n`);
@@ -1596,6 +1896,18 @@ async function main() {
         estimatedDuration: sumShotDurations(shotsState),
       };
       pipelineState.audioSegments = adjusted.audioSegments;
+      const mergedVoiceTrack = await buildMergedVoiceTrack({
+        projectId,
+        audioSegments: adjusted.audioSegments,
+        fps: options.fps,
+        totalDurationSeconds: sumShotDurations(shotsState),
+      });
+      if (mergedVoiceTrack) {
+        pipelineState.voice = {
+          ...(pipelineState.voice && typeof pipelineState.voice === 'object' ? pipelineState.voice : {}),
+          mergedVoiceFile: mergedVoiceTrack.relativePath,
+        };
+      }
       await writeJson(
         voicePlan.voiceManifestPath,
         buildVoiceManifestPayload({
@@ -1637,6 +1949,7 @@ async function main() {
     packageVersion,
     template: DEFAULT_TEMPLATE,
     visualSystem: DEFAULT_VISUAL_SYSTEM,
+    voiceFile: safeString(pipelineState?.voice?.mergedVoiceFile) || null,
     render: {
       fps: options.fps,
       width: options.width,
@@ -1816,6 +2129,15 @@ async function main() {
         outputPath: resolvedOutputPath,
         updatedAt: new Date().toISOString(),
       };
+    }
+
+    if (options.voice && safeString(projectJson.voiceFile)) {
+      await measureAsync(stageTimings, 'audioMux', async () => {
+        await muxRenderedAudioTrack({
+          videoPath: resolvedOutputPath,
+          audioRelativePath: projectJson.voiceFile,
+        });
+      });
     }
   }
 
