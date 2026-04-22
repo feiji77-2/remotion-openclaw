@@ -14,6 +14,7 @@ import {
   ultimateKitTokens,
   ultimateKitVideo,
 } from './tokens';
+import {appendUltimateMicroJitter, createUltimateMicroJitter} from './motion';
 import type {
   UltimateArchitectureMapProps,
   UltimateCodeLine,
@@ -66,6 +67,12 @@ const buildReveal = (frame: number, delay = 0) => {
     config: {damping: 18, stiffness: 110},
   });
 };
+
+const withMicroJitter = (
+  frame: number,
+  baseTransform: string,
+  config?: Parameters<typeof createUltimateMicroJitter>[1],
+) => appendUltimateMicroJitter(baseTransform, createUltimateMicroJitter(frame, config));
 
 const toneToColor = (tone?: Parameters<typeof resolveUltimateAccent>[0]) => {
   return resolveUltimateAccent(tone ?? 'cyan');
@@ -305,6 +312,8 @@ const SemanticIconBadge: React.FC<{
   fallbackIndex?: number;
   family?: string;
   rounded?: number;
+  motionDelay?: number;
+  motionSeed?: number;
 }> = ({
   iconValue,
   semanticText,
@@ -314,31 +323,47 @@ const SemanticIconBadge: React.FC<{
   fallbackIndex = 0,
   family,
   rounded = 16,
-}) => (
-  <div
-    style={{
-      width: badgeSize,
-      height: badgeSize,
-      borderRadius: rounded,
-      border: `1px solid ${color}33`,
-      background: `linear-gradient(180deg, ${color}16 0%, rgba(10, 13, 24, 0.88) 100%)`,
-      boxShadow: ultimateGlow(color, 0.2),
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
-    }}
-  >
-    <SemanticIconGlyph
-      iconValue={iconValue}
-      semanticText={semanticText}
-      color={color}
-      size={size}
-      fallbackIndex={fallbackIndex}
-      family={family}
-    />
-  </div>
-);
+  motionDelay = 0,
+  motionSeed,
+}) => {
+  const frame = useCurrentFrame();
+  const transform = withMicroJitter(frame, '', {
+    delay: motionDelay,
+    seed: motionSeed ?? fallbackIndex,
+    amplitudeX: 0.9,
+    amplitudeY: 0.8,
+    rotateDeg: 0.32,
+    scaleDelta: 0.003,
+    settleFrames: 16,
+  });
+
+  return (
+    <div
+      style={{
+        width: badgeSize,
+        height: badgeSize,
+        borderRadius: rounded,
+        border: `1px solid ${color}33`,
+        background: `linear-gradient(180deg, ${color}16 0%, rgba(10, 13, 24, 0.88) 100%)`,
+        boxShadow: ultimateGlow(color, 0.2),
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        transform,
+      }}
+    >
+      <SemanticIconGlyph
+        iconValue={iconValue}
+        semanticText={semanticText}
+        color={color}
+        size={size}
+        fallbackIndex={fallbackIndex}
+        family={family}
+      />
+    </div>
+  );
+};
 
 const parseCodeFacts = (lines: UltimateCodeLine[]) => {
   return lines
@@ -700,6 +725,14 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps> = ({
             fontSize: 20,
             letterSpacing: 3,
             textTransform: 'uppercase',
+            transform: withMicroJitter(frame, '', {
+              delay: 10,
+              amplitudeX: 0.8,
+              amplitudeY: 0.8,
+              rotateDeg: 0.18,
+              scaleDelta: 0.002,
+              seed: 3,
+            }),
           }}
         >
           {badge}
@@ -734,17 +767,25 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps> = ({
               borderRadius: '50%',
               border: `1px solid ${accentColor}55`,
               background: `radial-gradient(circle at 35% 28%, #ffffff 0%, ${accentColor} 28%, rgba(16, 19, 28, 0.94) 82%)`,
-              boxShadow: ultimateGlow(accentColor, 0.7),
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#10131c',
-              fontSize: 30,
-              fontWeight: 800,
-            }}
-          >
-            {avatarLabel}
-          </div>
+            boxShadow: ultimateGlow(accentColor, 0.7),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#10131c',
+            fontSize: 30,
+            fontWeight: 800,
+            transform: withMicroJitter(frame, '', {
+              delay: 16,
+              amplitudeX: 0.9,
+              amplitudeY: 0.9,
+              rotateDeg: 0.24,
+              scaleDelta: 0.003,
+              seed: 8,
+            }),
+          }}
+        >
+          {avatarLabel}
+        </div>
         </div>
       ) : null}
     </div>
@@ -798,6 +839,18 @@ export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps> = (
         {items.map((item, index) => {
           const accentColor = toneToColor(item.accent);
           const reveal = buildReveal(frame, index * 10);
+          const jitterTransform = withMicroJitter(
+            frame,
+            `translateY(${interpolate(reveal, [0, 1], [24, 0])}px)`,
+            {
+              delay: index * 10,
+              amplitudeX: 1.3,
+              amplitudeY: 1.1,
+              rotateDeg: 0.34,
+              scaleDelta: 0.003,
+              seed: index,
+            },
+          );
           return (
             <div
               key={`${item.title}-${index}`}
@@ -806,7 +859,7 @@ export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps> = (
                 minHeight: 278,
                 padding: '30px 28px 26px',
                 opacity: reveal,
-                transform: `translateY(${interpolate(reveal, [0, 1], [24, 0])}px)`,
+                transform: jitterTransform,
               }}
             >
               <div
@@ -901,7 +954,23 @@ const FramingDiagram: React.FC<{accentColor: string}> = ({accentColor}) => {
   );
 
   return (
-    <div style={{position: 'absolute', right: 140, top: 220, width: 640, height: 440}}>
+    <div
+      style={{
+        position: 'absolute',
+        right: 140,
+        top: 220,
+        width: 640,
+        height: 440,
+        transform: withMicroJitter(frame, '', {
+          delay: 10,
+          amplitudeX: 0.8,
+          amplitudeY: 0.7,
+          rotateDeg: 0.18,
+          scaleDelta: 0.002,
+          seed: 101,
+        }),
+      }}
+    >
       <div style={{position: 'absolute', left: 184, top: 34, width: 260, height: 320}}>
         {boxScale.map((scale, index) => (
           <div
@@ -977,7 +1046,23 @@ const RingsDiagram: React.FC<{accentColor: string}> = ({accentColor}) => {
   const orbit = frame * 0.04;
 
   return (
-    <div style={{position: 'absolute', right: 170, top: 238, width: 520, height: 360}}>
+    <div
+      style={{
+        position: 'absolute',
+        right: 170,
+        top: 238,
+        width: 520,
+        height: 360,
+        transform: withMicroJitter(frame, '', {
+          delay: 12,
+          amplitudeX: 0.9,
+          amplitudeY: 0.8,
+          rotateDeg: 0.2,
+          scaleDelta: 0.002,
+          seed: 102,
+        }),
+      }}
+    >
       {[120, 200, 280].map((diameter) => (
         <div
           key={diameter}
@@ -1042,7 +1127,23 @@ const ScaleDiagram: React.FC<{accentColor: string}> = ({accentColor}) => {
   });
 
   return (
-    <div style={{position: 'absolute', right: 160, top: 230, width: 560, height: 360}}>
+    <div
+      style={{
+        position: 'absolute',
+        right: 160,
+        top: 230,
+        width: 560,
+        height: 360,
+        transform: withMicroJitter(frame, '', {
+          delay: 10,
+          amplitudeX: 0.8,
+          amplitudeY: 0.7,
+          rotateDeg: 0.18,
+          scaleDelta: 0.002,
+          seed: 103,
+        }),
+      }}
+    >
       <div
         style={{
           position: 'absolute',
@@ -1121,11 +1222,18 @@ export const UltimateFocusDiagram: React.FC<UltimateFocusDiagramProps> = ({
           position: 'absolute',
           left: 160,
           top: 220,
-        width: 760,
-        opacity: reveal,
-        transform: `translateY(${interpolate(reveal, [0, 1], [24, 0])}px)`,
-      }}
-    >
+          width: 760,
+          opacity: reveal,
+          transform: withMicroJitter(frame, `translateY(${interpolate(reveal, [0, 1], [24, 0])}px)`, {
+            delay: 0,
+            amplitudeX: 1,
+            amplitudeY: 0.9,
+            rotateDeg: 0.2,
+            scaleDelta: 0.002,
+            seed: 4,
+          }),
+        }}
+      >
         {eyebrow ? <div style={eyebrowStyle(accentColor, false)}>{eyebrow}</div> : null}
         <div
           style={{
@@ -1214,6 +1322,14 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
             lineHeight: 1,
             color: '#091018',
             textShadow: 'none',
+            transform: withMicroJitter(frame, '', {
+              delay: 0,
+              amplitudeX: 0.9,
+              amplitudeY: 0.8,
+              rotateDeg: 0.18,
+              scaleDelta: 0.003,
+              seed: 6,
+            }),
           }}
         >
           {count}
@@ -1265,7 +1381,18 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
             flexDirection: 'column',
             justifyContent: 'space-between',
             opacity: buildReveal(frame, 8),
-            transform: `translateY(${interpolate(buildReveal(frame, 8), [0, 1], [18, 0])}px)`,
+            transform: withMicroJitter(
+              frame,
+              `translateY(${interpolate(buildReveal(frame, 8), [0, 1], [18, 0])}px)`,
+              {
+                delay: 8,
+                amplitudeX: 1.2,
+                amplitudeY: 1,
+                rotateDeg: 0.24,
+                scaleDelta: 0.002,
+                seed: 8,
+              },
+            ),
           }}
         >
           {(() => {
@@ -1297,6 +1424,8 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                     badgeSize={38}
                     size={16}
                     family="number-strip"
+                    motionDelay={8}
+                    motionSeed={8}
                   />
                   {primaryItem.tag || '核心判断'}
                 </div>
@@ -1360,7 +1489,18 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                 flexDirection: 'column',
                 justifyContent: 'space-between',
                 opacity: chipReveal,
-                transform: `translateY(${interpolate(chipReveal, [0, 1], [20, 0])}px)`,
+                transform: withMicroJitter(
+                  frame,
+                  `translateY(${interpolate(chipReveal, [0, 1], [20, 0])}px)`,
+                  {
+                    delay: 14 + index * 4,
+                    amplitudeX: 1.2,
+                    amplitudeY: 1,
+                    rotateDeg: 0.28,
+                    scaleDelta: 0.003,
+                    seed: 20 + index,
+                  },
+                ),
                 gridColumn:
                   secondaryItems.length === 3 && hasWideLeadCard && index === 0
                     ? 'span 2'
@@ -1388,6 +1528,8 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                     fallbackIndex={index}
                     family="number-strip"
                     rounded={12}
+                    motionDelay={14 + index * 4}
+                    motionSeed={20 + index}
                   />
                   {item.tag || `补充 ${index + 1}`}
                 </div>
@@ -1511,7 +1653,18 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps> = ({heading, step
                   minHeight: 244,
                   padding: '26px 24px',
                   opacity: reveal,
-                  transform: `translateY(${interpolate(reveal, [0, 1], [20, 0])}px)`,
+                  transform: withMicroJitter(
+                    frame,
+                    `translateY(${interpolate(reveal, [0, 1], [20, 0])}px)`,
+                    {
+                      delay: index * 8,
+                      amplitudeX: 1.3,
+                      amplitudeY: 1.1,
+                      rotateDeg: 0.3,
+                      scaleDelta: 0.003,
+                      seed: 40 + index,
+                    },
+                  ),
                 }}
               >
                 <div
@@ -1667,7 +1820,14 @@ export const UltimateTimeline: React.FC<UltimateTimelineProps> = ({
                 background: itemColor,
                 boxShadow: ultimateGlow(itemColor, 0.8),
                 opacity: reveal,
-                transform: `scale(${interpolate(reveal, [0, 1], [0.8, 1])})`,
+                transform: withMicroJitter(frame, `scale(${interpolate(reveal, [0, 1], [0.8, 1])})`, {
+                  delay: 6 + index * 8,
+                  amplitudeX: 0.8,
+                  amplitudeY: 0.8,
+                  rotateDeg: 0.16,
+                  scaleDelta: 0.003,
+                  seed: 60 + index,
+                }),
               }}
             />
             <div
@@ -1679,7 +1839,18 @@ export const UltimateTimeline: React.FC<UltimateTimelineProps> = ({
                 minHeight: 180,
                 padding: '24px 22px 22px',
                 opacity: reveal,
-                transform: `translateY(${interpolate(reveal, [0, 1], [24, 0])}px)`,
+                transform: withMicroJitter(
+                  frame,
+                  `translateY(${interpolate(reveal, [0, 1], [24, 0])}px)`,
+                  {
+                    delay: 6 + index * 8,
+                    amplitudeX: 1.2,
+                    amplitudeY: 1.1,
+                    rotateDeg: 0.28,
+                    scaleDelta: 0.003,
+                    seed: 70 + index,
+                  },
+                ),
                 ...panelStyle(itemColor),
               }}
             >
@@ -1707,6 +1878,8 @@ export const UltimateTimeline: React.FC<UltimateTimelineProps> = ({
                   fallbackIndex={index}
                   family="timeline"
                   rounded={12}
+                  motionDelay={6 + index * 8}
+                  motionSeed={70 + index}
                 />
                 <span>{item.label}</span>
               </div>
@@ -1795,6 +1968,14 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps> = ({
           top: 266,
           width: 560,
           padding: '24px 28px',
+          transform: withMicroJitter(frame, '', {
+            delay: 6,
+            amplitudeX: 1,
+            amplitudeY: 0.9,
+            rotateDeg: 0.18,
+            scaleDelta: 0.002,
+            seed: 120,
+          }),
           ...panelStyle(leftColor),
         }}
       >
@@ -1809,6 +1990,14 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps> = ({
           width: 560,
           padding: '24px 28px',
           textAlign: 'right',
+          transform: withMicroJitter(frame, '', {
+            delay: 10,
+            amplitudeX: 1,
+            amplitudeY: 0.9,
+            rotateDeg: 0.18,
+            scaleDelta: 0.002,
+            seed: 121,
+          }),
           ...panelStyle(rightColor),
         }}
       >
@@ -1834,6 +2023,14 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps> = ({
           letterSpacing: 3,
           color: kit.colors.text,
           boxShadow: '0 18px 46px rgba(0,0,0,0.26)',
+          transform: withMicroJitter(frame, '', {
+            delay: 16,
+            amplitudeX: 0.9,
+            amplitudeY: 0.8,
+            rotateDeg: 0.22,
+            scaleDelta: 0.003,
+            seed: 122,
+          }),
         }}
       >
         VS
@@ -1861,7 +2058,18 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps> = ({
                 gap: 24,
                 alignItems: 'center',
                 opacity: reveal,
-                transform: `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
+                transform: withMicroJitter(
+                  frame,
+                  `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
+                  {
+                    delay: 8 + index * 6,
+                    amplitudeX: 1.1,
+                    amplitudeY: 1,
+                    rotateDeg: 0.22,
+                    scaleDelta: 0.002,
+                    seed: 130 + index,
+                  },
+                ),
               }}
             >
               <div style={{...panelStyle(leftColor), minHeight: 116, padding: '22px 24px'}}>
@@ -1956,7 +2164,18 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps> = ({
               minHeight: 238,
               padding: '24px 24px 22px',
               opacity: reveal,
-              transform: `translateY(${interpolate(reveal, [0, 1], [20, 0])}px) rotate(${position.rotate}deg)`,
+              transform: withMicroJitter(
+                frame,
+                `translateY(${interpolate(reveal, [0, 1], [20, 0])}px) rotate(${position.rotate}deg)`,
+                {
+                  delay: 8 + index * 7,
+                  amplitudeX: 1.5,
+                  amplitudeY: 1.3,
+                  rotateDeg: 0.32,
+                  scaleDelta: 0.003,
+                  seed: 150 + index,
+                },
+              ),
               ...panelStyle(cardColor),
             }}
           >
@@ -1985,6 +2204,8 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps> = ({
                   fallbackIndex={index}
                   family="evidence-wall"
                   rounded={12}
+                  motionDelay={8 + index * 7}
+                  motionSeed={150 + index}
                 />
                 <span>{card.source}</span>
               </div>
@@ -2090,6 +2311,14 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
           minHeight: centerBox.height,
           padding: '32px 36px',
           textAlign: 'center',
+          transform: withMicroJitter(frame, '', {
+            delay: 8,
+            amplitudeX: 1.1,
+            amplitudeY: 0.9,
+            rotateDeg: 0.18,
+            scaleDelta: 0.002,
+            seed: 170,
+          }),
           ...panelStyle(accentColor),
           boxShadow: `0 28px 90px rgba(0,0,0,0.24), 0 0 60px ${accentColor}18`,
         }}
@@ -2113,6 +2342,8 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
             size={16}
             family="architecture-map"
             rounded={12}
+            motionDelay={8}
+            motionSeed={170}
           />
           <span style={{fontSize: 16, letterSpacing: 2, textTransform: 'uppercase'}}>核心节点</span>
         </div>
@@ -2171,7 +2402,18 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
                     minHeight: 144,
                     padding: '20px 22px',
                     opacity: reveal,
-                    transform: `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
+                    transform: withMicroJitter(
+                      frame,
+                      `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
+                      {
+                        delay: 8 + index * 6,
+                        amplitudeX: 1.2,
+                        amplitudeY: 1,
+                        rotateDeg: 0.22,
+                        scaleDelta: 0.002,
+                        seed: 180 + index,
+                      },
+                    ),
                     ...panelStyle(nodeColor),
                   }}
                 >
@@ -2185,6 +2427,8 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
                       fallbackIndex={index}
                       family="architecture-map"
                       rounded={12}
+                      motionDelay={8 + index * 6}
+                      motionSeed={180 + index}
                     />
                     <div style={{fontSize: 26, fontWeight: 760, lineHeight: 1.15}}>{node.label}</div>
                   </div>
@@ -2219,7 +2463,18 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
                     minHeight: 160,
                     padding: '20px 22px',
                     opacity: reveal,
-                    transform: `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
+                    transform: withMicroJitter(
+                      frame,
+                      `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
+                      {
+                        delay: 8 + index * 6,
+                        amplitudeX: 1.1,
+                        amplitudeY: 1,
+                        rotateDeg: 0.22,
+                        scaleDelta: 0.002,
+                        seed: 190 + index,
+                      },
+                    ),
                     ...panelStyle(nodeColor),
                   }}
                 >
@@ -2233,6 +2488,8 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
                       fallbackIndex={index}
                       family="architecture-map"
                       rounded={12}
+                      motionDelay={8 + index * 6}
+                      motionSeed={190 + index}
                     />
                     <div style={{fontSize: 24, fontWeight: 760}}>{node.label}</div>
                   </div>
@@ -2274,6 +2531,14 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps> = ({
           left: 380,
           right: 380,
           top: 240,
+          transform: withMicroJitter(frame, '', {
+            delay: 10,
+            amplitudeX: 1.1,
+            amplitudeY: 0.9,
+            rotateDeg: 0.14,
+            scaleDelta: 0.002,
+            seed: 200,
+          }),
           ...panelStyle(accentColor),
           overflow: 'hidden',
         }}
@@ -2439,7 +2704,18 @@ export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps> = ({
                 justifyContent: 'center',
                 padding: '10px 14px',
                 opacity: reveal,
-                transform: `translateY(${interpolate(reveal, [0, 1], [14, 0])}px)`,
+                transform: withMicroJitter(
+                  frame,
+                  `translateY(${interpolate(reveal, [0, 1], [14, 0])}px)`,
+                  {
+                    delay: index * 2,
+                    amplitudeX: 1,
+                    amplitudeY: 0.8,
+                    rotateDeg: 0.18,
+                    scaleDelta: 0.002,
+                    seed: 210 + index,
+                  },
+                ),
               }}
             >
               <div
@@ -2528,6 +2804,14 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
+            transform: withMicroJitter(frame, '', {
+              delay: 8,
+              amplitudeX: 1,
+              amplitudeY: 0.9,
+              rotateDeg: 0.14,
+              scaleDelta: 0.002,
+              seed: 230,
+            }),
           }}
         >
           {facts.map((fact, index) => {
@@ -2550,7 +2834,18 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
                   border: `1px solid ${factColor}30`,
                   background: `linear-gradient(180deg, ${factColor}10, rgba(10, 13, 24, 0.92))`,
                   opacity: reveal,
-                  transform: `translateY(${interpolate(reveal, [0, 1], [14, 0])}px)`,
+                  transform: withMicroJitter(
+                    frame,
+                    `translateY(${interpolate(reveal, [0, 1], [14, 0])}px)`,
+                    {
+                      delay: 8 + index * 4,
+                      amplitudeX: 1,
+                      amplitudeY: 0.9,
+                      rotateDeg: 0.2,
+                      scaleDelta: 0.002,
+                      seed: 240 + index,
+                    },
+                  ),
                 }}
               >
                 <div
@@ -2573,6 +2868,8 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
                     fallbackIndex={index}
                     family="code"
                     rounded={12}
+                    motionDelay={8 + index * 4}
+                    motionSeed={240 + index}
                   />
                   {fact.label}
                 </div>
@@ -2598,6 +2895,14 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+            transform: withMicroJitter(frame, '', {
+              delay: 12,
+              amplitudeX: 1,
+              amplitudeY: 0.8,
+              rotateDeg: 0.12,
+              scaleDelta: 0.0016,
+              seed: 250,
+            }),
           }}
         >
           <div
@@ -2631,7 +2936,18 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps> = ({
                     padding: '8px 26px',
                     background: highlightLine === index + 1 ? `${accentColor}14` : 'transparent',
                     opacity: reveal,
-                    transform: `translateY(${interpolate(reveal, [0, 1], [6, 0])}px)`,
+                    transform: withMicroJitter(
+                      frame,
+                      `translateY(${interpolate(reveal, [0, 1], [6, 0])}px)`,
+                      {
+                        delay: index * 3,
+                        amplitudeX: 0.55,
+                        amplitudeY: 0.45,
+                        rotateDeg: 0.06,
+                        scaleDelta: 0.001,
+                        seed: 260 + index,
+                      },
+                    ),
                   }}
                 >
                 <div style={{color: 'rgba(255,255,255,0.28)', textAlign: 'right', paddingRight: 18}}>{index + 1}</div>
@@ -2733,6 +3049,14 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
+                  transform: withMicroJitter(frame, '', {
+                    delay: 10 + index * 8,
+                    amplitudeX: 1.1,
+                    amplitudeY: 0.9,
+                    rotateDeg: 0.18,
+                    scaleDelta: 0.002,
+                    seed: 270 + index,
+                  }),
                 }}
               >
                 <div
@@ -2753,6 +3077,8 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({
                       fallbackIndex={index}
                       family="metrics"
                       rounded={14}
+                      motionDelay={10 + index * 8}
+                      motionSeed={270 + index}
                     />
                     <div
                       style={{
@@ -2841,7 +3167,18 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({
                     alignItems: 'center',
                     gap: 28,
                     opacity: reveal,
-                    transform: `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
+                    transform: withMicroJitter(
+                      frame,
+                      `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
+                      {
+                        delay: 8 + index * 5,
+                        amplitudeX: 1.1,
+                        amplitudeY: 0.9,
+                        rotateDeg: 0.16,
+                        scaleDelta: 0.002,
+                        seed: 280 + index,
+                      },
+                    ),
                   }}
                 >
                   <div
@@ -2865,6 +3202,8 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps> = ({
                         fallbackIndex={index}
                         family="metrics"
                         rounded={18}
+                        motionDelay={8 + index * 5}
+                        motionSeed={280 + index}
                       />
                     ) : null}
                     <span>{item.label}</span>
@@ -3036,7 +3375,18 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps> = ({
                   flexDirection: 'column',
                   justifyContent: 'space-between',
                   opacity: chipReveal,
-                  transform: `translateY(${interpolate(chipReveal, [0, 1], [16, 0])}px)`,
+                  transform: withMicroJitter(
+                    frame,
+                    `translateY(${interpolate(chipReveal, [0, 1], [16, 0])}px)`,
+                    {
+                      delay: index * 4,
+                      amplitudeX: 1.1,
+                      amplitudeY: 0.9,
+                      rotateDeg: 0.18,
+                      scaleDelta: 0.002,
+                      seed: 290 + index,
+                    },
+                  ),
                 }}
               >
                 <div style={{display: 'flex', alignItems: 'center', gap: 12, fontSize: 16, letterSpacing: 2, color}}>
@@ -3048,6 +3398,8 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps> = ({
                     fallbackIndex={index}
                     family="cta"
                     rounded={12}
+                    motionDelay={index * 4}
+                    motionSeed={290 + index}
                   />
                   <span>关键元素</span>
                 </div>
@@ -3089,6 +3441,14 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps> = ({
             justifyContent: 'space-between',
             fontSize: 20,
             color: kit.colors.textMuted,
+            transform: withMicroJitter(frame, '', {
+              delay: 18,
+              amplitudeX: 0.9,
+              amplitudeY: 0.8,
+              rotateDeg: 0.12,
+              scaleDelta: 0.0016,
+              seed: 300,
+            }),
           }}
         >
           <span>{searchLabel}</span>

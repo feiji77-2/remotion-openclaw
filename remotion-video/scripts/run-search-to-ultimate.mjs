@@ -6,6 +6,8 @@ import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
+import {ensureXttsServiceReady} from './lib/voice-service-bootstrap.mjs';
+import {resolveWorkflowVoiceDefaults} from './lib/workflow-voice-defaults.mjs';
 
 const require = createRequire(import.meta.url);
 const {generateWorkflowStep} = require('../server/workflow/workflowGenerator');
@@ -25,7 +27,7 @@ const DEFAULT_WIDTH = 1920;
 const DEFAULT_HEIGHT = 1080;
 const STEP_CACHE_VERSION = 3;
 const IMAGE_CACHE_VERSION = 2;
-const VOICE_CACHE_VERSION = 1;
+const VOICE_CACHE_VERSION = 2;
 const RENDER_CACHE_VERSION = 1;
 const GENERIC_LABEL_RE = /^(?:数据点|关键词|补充|标签|point|item|slot|summary|scene)\s*[0-9a-zA-Z一二三四五六七八九十]*$/i;
 
@@ -160,9 +162,11 @@ Options:
   --fps <number>
   --width <number>
   --height <number>
-  --voice-engine <name>     chattts | melo | openvoice
+  --voice-engine <name>     chattts | melo | openvoice | xtts
   --voice-speed <number>    默认 1.0
   --speaker <value>         speaker seed / voice code
+  --reference <path|url>    参考音频路径或 URL（XTTS / OpenVoice）
+  --voice-language <code>   语言代码，例如 zh-cn / en / ja
   --package-version <ver>   指定打包版本号，默认读取 remotion-video/package.json
   --output <path>           指定最终视频输出路径
   --resume                  复用已有 step/voice/images/render 产物继续执行
@@ -172,9 +176,11 @@ Options:
   --help                    显示帮助
 
 Examples:
+  node scripts/run-search-to-ultimate.mjs "今天的 AI 头条"   # 有 runtime/voices/xtts/anchor.wav 时默认走 xtts
   node scripts/run-search-to-ultimate.mjs "Claude Code 和 Codex 区别"
   node scripts/run-search-to-ultimate.mjs --topic "AI agent 工作流" --no-render
   node scripts/run-search-to-ultimate.mjs "Remotion 自动视频" --voice-engine chattts --output out/agent.mp4
+  node scripts/run-search-to-ultimate.mjs "AI 行业日报" --voice-engine xtts --reference runtime/voices/xtts/anchor.wav --speaker anchor
 `);
 };
 
@@ -190,6 +196,8 @@ const parseArgs = (argv) => {
     height: DEFAULT_HEIGHT,
     voiceEngine: 'chattts',
     voiceSpeed: '1.0',
+    voiceLanguage: '',
+    reference: '',
   };
 
   let topic = '';
@@ -232,6 +240,7 @@ const parseArgs = (argv) => {
         break;
       case '--voice-engine':
         options.voiceEngine = safeString(argv[index + 1]) || 'chattts';
+        options.voiceEngineExplicit = true;
         index += 1;
         break;
       case '--voice-speed':
@@ -240,6 +249,19 @@ const parseArgs = (argv) => {
         break;
       case '--speaker':
         options.speaker = safeString(argv[index + 1]);
+        options.speakerExplicit = true;
+        index += 1;
+        break;
+      case '--reference':
+      case '--reference-url':
+        options.reference = safeString(argv[index + 1]);
+        options.referenceExplicit = true;
+        index += 1;
+        break;
+      case '--voice-language':
+      case '--language':
+        options.voiceLanguage = safeString(argv[index + 1]);
+        options.voiceLanguageExplicit = true;
         index += 1;
         break;
       case '--package-version':
@@ -1116,6 +1138,16 @@ const buildVoiceSettings = (options, pipelineState) => {
     ...(pipelineState?.voice && typeof pipelineState.voice === 'object' ? pipelineState.voice : {}),
     engine: options.voiceEngine,
     speed: options.voiceSpeed,
+    ...(safeString(options.voiceLanguage)
+      ? {
+          language: options.voiceLanguage,
+        }
+      : {}),
+    ...(safeString(options.reference)
+      ? {
+          referenceUrl: options.reference,
+        }
+      : {}),
     ...(safeString(options.speaker)
       ? {
           speakerSeed: options.speaker,
@@ -1138,6 +1170,7 @@ const buildVoiceShotInputHash = ({shot, pipelineState, voiceSettings}) => {
     text: resolveVoiceShotText(shot, pipelineState),
     engine: safeString(voiceSettings?.engine),
     speed: safeString(voiceSettings?.speed),
+    language: safeString(voiceSettings?.language),
     speakerSeed: safeString(voiceSettings?.speakerSeed),
     voice: safeString(voiceSettings?.voice),
     referenceUrl: safeString(voiceSettings?.referenceUrl || voiceSettings?.reference_url),
@@ -1181,6 +1214,7 @@ const buildVoiceManifestPayload = ({projectId, shotsState, pipelineState, voiceS
     settings: {
       engine: safeString(voiceSettings?.engine),
       speed: safeString(voiceSettings?.speed),
+      language: safeString(voiceSettings?.language),
       speakerSeed: safeString(voiceSettings?.speakerSeed),
       voice: safeString(voiceSettings?.voice),
       referenceUrl: safeString(voiceSettings?.referenceUrl || voiceSettings?.reference_url),
@@ -1616,7 +1650,10 @@ const markStageReused = (timingMap, key, details = {}) => {
 };
 
 async function main() {
-  const {topic, options} = parseArgs(process.argv.slice(2));
+  const parsed = parseArgs(process.argv.slice(2));
+  const voiceDefaults = await resolveWorkflowVoiceDefaults(parsed.options, {cwd: REMOTION_ROOT});
+  const topic = parsed.topic;
+  const options = voiceDefaults.options;
 
   if (options.help) {
     printUsage();
@@ -1626,6 +1663,20 @@ async function main() {
   if (!safeString(topic)) {
     printUsage();
     process.exit(1);
+  }
+
+  if (voiceDefaults.applied.autoSelectedEngine && voiceDefaults.profile) {
+    process.stdout.write(
+      `[voice-default] auto-select xtts speaker=${voiceDefaults.profile.speaker} reference=${voiceDefaults.profile.reference}\n`,
+    );
+  } else if (
+    safeString(options.voiceEngine).toLowerCase() === 'xtts'
+    && voiceDefaults.profile
+    && (voiceDefaults.applied.filledSpeaker || voiceDefaults.applied.filledReference || voiceDefaults.applied.filledLanguage)
+  ) {
+    process.stdout.write(
+      `[voice-default] xtts defaults speaker=${safeString(options.speaker)} reference=${safeString(options.reference)} language=${safeString(options.voiceLanguage)}\n`,
+    );
   }
 
   const projectId = buildProjectId(topic, options.projectId);
@@ -1856,6 +1907,22 @@ async function main() {
         reusedVoiceCount = voicePlan.reusableQueue.length;
         process.stdout.write(`[voice] reused=${reusedVoiceCount}\n`);
       } else {
+        if (safeString(voicePlan.voiceSettings?.engine).toLowerCase() === 'xtts') {
+          await measureAsync(stageTimings, 'voiceBootstrap', async () => {
+            const xttsBootstrap = await ensureXttsServiceReady({
+              update: (message) => {
+                process.stdout.write(`[voice] ${message}\n`);
+              },
+            });
+
+            if (xttsBootstrap.started) {
+              process.stdout.write(
+                `[voice] XTTS auto-started${xttsBootstrap.pid ? ` (pid=${xttsBootstrap.pid})` : ''}\n`,
+              );
+            }
+          });
+        }
+
         const voiceJobId = `voice_${Date.now()}`;
         const voiceResult = await processVoiceJob(
           {

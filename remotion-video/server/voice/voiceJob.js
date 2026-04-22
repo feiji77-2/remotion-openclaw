@@ -26,6 +26,11 @@ const ENGINES = {
     synthUrl: process.env.OV_HTTP_SYNTH_URL || 'http://127.0.0.1:18082/synthesize',
     defaultVoice: 'zh',
   },
+  xtts: {
+    healthUrl: process.env.XTTS_HTTP_HEALTH_URL || 'http://127.0.0.1:18083/health',
+    synthUrl: process.env.XTTS_HTTP_SYNTH_URL || 'http://127.0.0.1:18083/synthesize',
+    defaultVoice: 'speaker',
+  },
 };
 
 // Fallback order
@@ -72,6 +77,9 @@ function resolveEngine(engine, preset) {
   const normalized = String(preset || '').toLowerCase();
   if (normalized.includes('chattts') || normalized.includes('chat tts')) {
     return 'chattts';
+  }
+  if (normalized.includes('xtts') || normalized.includes('coqui')) {
+    return 'xtts';
   }
   if (normalized.includes('openvoice') || normalized.includes('ov') || normalized.includes('clone')) {
     return 'openvoice';
@@ -154,6 +162,33 @@ function resolveVoiceOpenVoice(voiceSettings) {
   if (normalized.includes('jp') || normalized.includes('japanese')) return 'jp';
   if (normalized.includes('kr') || normalized.includes('korean')) return 'kr';
   return 'zh';
+}
+
+function resolveVoiceXTTS(voiceSettings) {
+  const explicitVoice = String(
+    voiceSettings?.voice
+    || voiceSettings?.speaker
+    || voiceSettings?.speakerSeed
+    || voiceSettings?.speaker_seed
+    || '',
+  ).trim();
+
+  return explicitVoice || ENGINES.xtts.defaultVoice;
+}
+
+function resolveVoiceXTTSLanguage(voiceSettings) {
+  const normalized = String(voiceSettings?.language || voiceSettings?.voiceLanguage || 'zh-cn')
+    .trim()
+    .toLowerCase();
+
+  if (!normalized) return 'zh-cn';
+  if (normalized === 'zh' || normalized === 'zh-cn') return 'zh-cn';
+  if (normalized === 'en' || normalized === 'en-us') return 'en';
+  if (normalized === 'ja' || normalized === 'jp') return 'ja';
+  if (normalized === 'ko' || normalized === 'kr') return 'ko';
+  if (normalized === 'pt' || normalized === 'pt-br') return 'pt';
+
+  return normalized;
 }
 
 function resolveSpeed(speedValue) {
@@ -243,7 +278,7 @@ async function resolveHealthyVoiceEngine(requestedEngine, update) {
   throw new Error(`没有可用的语音引擎。${failures.join(' | ')}`);
 }
 
-async function synthesizeClip({ text, engine, voice, speed, referenceUrl, outputPath, temperature, topP, topK }) {
+async function synthesizeClip({ text, engine, voice, speed, language, referenceUrl, outputPath, temperature, topP, topK }) {
   if (engine === SYSTEM_SAY_ENGINE) {
     const tempAiffPath = outputPath.replace(/\.wav$/i, '.aiff');
     const sayRate = String(resolveSystemSayRate(speed));
@@ -297,6 +332,12 @@ async function synthesizeClip({ text, engine, voice, speed, referenceUrl, output
     payload.voice = voice || cfg.defaultVoice;
   } else if (engine === 'openvoice') {
     payload.voice = voice || cfg.defaultVoice;
+    if (referenceUrl) {
+      payload.reference_url = referenceUrl;
+    }
+  } else if (engine === 'xtts') {
+    payload.voice = voice || cfg.defaultVoice;
+    payload.language = resolveVoiceXTTSLanguage({language});
     if (referenceUrl) {
       payload.reference_url = referenceUrl;
     }
@@ -376,16 +417,23 @@ async function processVoiceJob(job, update) {
     ? resolveVoiceChatTTSSpeakerSeed(voiceSettings)
     : engine === 'melo'
       ? resolveVoiceMelo(voiceSettings)
+      : engine === 'xtts'
+        ? resolveVoiceXTTS(voiceSettings)
       : engine === SYSTEM_SAY_ENGINE
         ? resolveVoiceSystemSay(voiceSettings)
         : resolveVoiceOpenVoice(voiceSettings);
   const voiceName = engine === 'chattts' ? `seed-${voiceRequest}` : voiceRequest;
 
   const referenceUrl = voiceSettings.referenceUrl || voiceSettings.reference_url || null;
+  const requestLanguage = resolveVoiceXTTSLanguage(voiceSettings);
   const requestSpeed = resolveSpeed(voiceSettings.speed);
   const requestTemperature = clamp(toNumber(voiceSettings.temperature, 0.3), 0.05, 2.0);
   const requestTopP = clamp(toNumber(voiceSettings.topP ?? voiceSettings.top_p, 0.7), 0.1, 1.0);
   const requestTopK = Math.round(clamp(toNumber(voiceSettings.topK ?? voiceSettings.top_k, 20), 1, 100));
+
+  if (engine === 'xtts' && !referenceUrl && !String(voiceSettings?.voice || voiceSettings?.speaker || '').trim()) {
+    throw new Error('XTTS 需要提供参考音频 referenceUrl，或使用 --speaker 指定已缓存的本地音色别名。');
+  }
 
   const jobVoiceDir = path.join(VOICE_DIR, projectId, job.id);
   ensureDir(jobVoiceDir);
@@ -400,6 +448,7 @@ async function processVoiceJob(job, update) {
     engine,
     voiceName,
     referenceUrl,
+    requestLanguage: engine === 'xtts' ? requestLanguage : null,
     requestSpeed,
     requestTemperature: engine === 'chattts' ? requestTemperature : null,
     requestTopP: engine === 'chattts' ? requestTopP : null,
@@ -434,6 +483,7 @@ async function processVoiceJob(job, update) {
       engine,
       voice: voiceRequest,
       speed: requestSpeed,
+      language: requestLanguage,
       referenceUrl,
       outputPath,
       temperature: requestTemperature,
@@ -469,6 +519,7 @@ async function processVoiceJob(job, update) {
     engineName: engine,
     voice: voiceName,
     referenceUrl,
+    requestLanguage: engine === 'xtts' ? requestLanguage : null,
     requestSpeed,
     requestTemperature: engine === 'chattts' ? requestTemperature : null,
     requestTopP: engine === 'chattts' ? requestTopP : null,
@@ -486,6 +537,7 @@ async function processVoiceJob(job, update) {
     engineName: engine,
     voice: voiceName,
     referenceUrl,
+    requestLanguage: engine === 'xtts' ? requestLanguage : null,
     requestSpeed,
     manifestFile: `/assets/voice/${projectId}/${job.id}/manifest.json`,
     queue: generatedQueue,
@@ -527,6 +579,15 @@ function getVoiceCapabilities() {
         description: '本地语音克隆 + 多语言 TTS (支持参考音频音色克隆)',
         voices: ['zh', 'en', 'es', 'fr', 'jp', 'kr'],
         supportsCloning: true,
+      },
+      xtts: {
+        healthUrl: ENGINES.xtts.healthUrl,
+        synthUrl: ENGINES.xtts.synthUrl,
+        name: 'XTTS-v2',
+        description: '本地真人音色克隆 + 多语言配音，适合 macOS 本地部署',
+        voices: ['speaker-alias'],
+        supportsCloning: true,
+        requiresReference: true,
       },
     },
     defaultEngine: 'chattts',

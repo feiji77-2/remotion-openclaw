@@ -67,6 +67,8 @@ test('health remains public while API routes require auth', {concurrency: false}
   try {
     const health = await fetch(`${baseUrl}/health`);
     assert.equal(health.status, 200);
+    const healthJson = await health.json();
+    assert.ok(healthJson?.capabilities?.voice?.engines?.xtts);
 
     const {response} = await requestJson(baseUrl, '/api/jobs', {auth: false});
     assert.equal(response.status, 401);

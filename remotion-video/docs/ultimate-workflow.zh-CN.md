@@ -159,6 +159,12 @@ npm run workflow:ultimate -- "Claude Code 和 Codex 区别"
 - 默认尝试生成分镜配音
 - 默认直接调用 `render-project.mjs` 出最终 mp4
 
+默认语音规则现在是：
+
+- 如果存在 `runtime/voices/xtts/anchor.wav`，最简命令会默认启用 `xtts + anchor + zh-cn`
+- 如果这个默认真人样本不存在，才会继续走原来的默认语音引擎
+- 你一旦显式传了 `--voice-engine` / `--speaker` / `--reference` / `--voice-language`，就以你的参数为准
+
 常用变体：
 
 ```bash
@@ -170,7 +176,16 @@ npm run workflow:ultimate -- "Remotion 自动视频" --no-voice --no-render
 
 # 指定输出文件
 npm run workflow:ultimate -- "OpenAI 最新 Agent 能力" --output out/openai-agent.mp4
+
+# 使用 XTTS 真人克隆语音
+npm run workflow:ultimate -- "AI 行业日报" --voice-engine xtts --reference runtime/voices/xtts/anchor.wav --speaker anchor --voice-language zh-cn
 ```
+
+说明：
+
+- 如果本地 `XTTS` 服务还没启动，`workflow:ultimate` 现在会先自动拉起，再继续配音
+- 首次模型加载会慢一些，脚本会等待 `/health` 真正就绪后再进入语音步骤
+- 如果你已经手动启动了 `XTTS`，脚本不会重复拉起
 
 主要产物路径：
 
@@ -204,6 +219,17 @@ npm run workflow:ultimate -- "OpenAI 最新 Agent 能力" --output out/openai-ag
 直接看这份升级蓝图：
 
 - [`docs/ultimate-daily-tech-upgrade.zh-CN.md`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/ultimate-daily-tech-upgrade.zh-CN.md)
+
+如果你现在要处理的是：
+
+- 本地真人语音克隆怎么接
+- XTTS 服务怎么启动
+- 参考音频放哪里
+- 怎么直接在工作流里使用 `--voice-engine xtts`
+
+直接看这份文档：
+
+- [`docs/local-xtts-voice-clone.zh-CN.md`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/local-xtts-voice-clone.zh-CN.md)
 
 ## 推荐实战顺序
 

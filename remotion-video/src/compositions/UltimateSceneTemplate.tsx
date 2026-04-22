@@ -30,6 +30,7 @@ import {
   resolveUltimateIconPack,
   type UltimateIconName,
 } from '../components/ultimate-kit/iconography';
+import {appendUltimateMicroJitter, createUltimateMicroJitter} from '../components/ultimate-kit/motion';
 
 const renderSceneContent = (scene: ResolvedUltimateSceneConfig) => {
   switch (scene.family) {
@@ -347,6 +348,14 @@ const UltimateSceneIconOrbit: React.FC<{scene: ResolvedUltimateSceneConfig; scen
           extrapolateLeft: 'clamp',
           extrapolateRight: 'clamp',
         });
+        const jitter = createUltimateMicroJitter(frame, {
+          delay: node.delay,
+          amplitudeX: 1.4,
+          amplitudeY: 1.2,
+          rotateDeg: 0.7,
+          scaleDelta: 0.006,
+          seed: sceneIndex * 11 + index,
+        });
 
         return (
           <div
@@ -368,7 +377,10 @@ const UltimateSceneIconOrbit: React.FC<{scene: ResolvedUltimateSceneConfig; scen
               alignItems: 'center',
               justifyContent: 'center',
               opacity: (node.opacity ?? 0.84) * reveal,
-              transform: `translateY(${floatY}px) rotate(${node.rotate}deg) scale(${scale})`,
+              transform: appendUltimateMicroJitter(
+                `translateY(${floatY}px) rotate(${node.rotate}deg) scale(${scale})`,
+                jitter,
+              ),
             }}
           >
             <div
@@ -410,6 +422,18 @@ const UltimateSceneMediaCard: React.FC<{scene: ResolvedUltimateSceneConfig}> = (
   });
   const tilt = layout.tiltDeg ?? -2;
   const mode = layout.mode ?? 'frame';
+  const jitter = createUltimateMicroJitter(frame, {
+    delay: 6,
+    amplitudeX: mode === 'ambient' ? 1.1 : 1.4,
+    amplitudeY: mode === 'ambient' ? 0.9 : 1.2,
+    rotateDeg: mode === 'ambient' ? 0.24 : 0.5,
+    scaleDelta: mode === 'ambient' ? 0.002 : 0.003,
+    seed: layout.top + (layout.left ?? layout.right ?? 0),
+  });
+  const baseTransform =
+    mode === 'ambient'
+      ? `translateY(${translateX * 0.3}px) rotate(${tilt}deg)`
+      : `translateX(${translateX}px) rotate(${tilt}deg)`;
 
   return (
     <div
@@ -423,7 +447,7 @@ const UltimateSceneMediaCard: React.FC<{scene: ResolvedUltimateSceneConfig}> = (
         borderRadius: mode === 'ambient' ? 44 : 30,
         overflow: 'hidden',
         opacity: (layout.opacity ?? 0.82) * reveal,
-        transform: mode === 'ambient' ? `translateY(${translateX * 0.3}px) rotate(${tilt}deg)` : `translateX(${translateX}px) rotate(${tilt}deg)`,
+        transform: appendUltimateMicroJitter(baseTransform, jitter),
         border: mode === 'ambient' ? 'none' : '1px solid rgba(194, 219, 255, 0.2)',
         boxShadow:
           mode === 'ambient'
