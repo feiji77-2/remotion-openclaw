@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {spawn} from 'node:child_process';
+import {spawn, spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {ensureXttsServiceReady} from './lib/voice-service-bootstrap.mjs';
@@ -27,8 +27,10 @@ const DEFAULT_WIDTH = 1920;
 const DEFAULT_HEIGHT = 1080;
 const STEP_CACHE_VERSION = 3;
 const IMAGE_CACHE_VERSION = 2;
-const VOICE_CACHE_VERSION = 2;
+const VOICE_CACHE_VERSION = 4;
 const RENDER_CACHE_VERSION = 1;
+const VOICE_SAMPLE_RATE = 24000;
+const VOICE_PADDING_DEFAULT_SECONDS = 0.22;
 const GENERIC_LABEL_RE = /^(?:数据点|关键词|补充|标签|point|item|slot|summary|scene)\s*[0-9a-zA-Z一二三四五六七八九十]*$/i;
 
 const safeString = (value) => String(value || '').trim();
@@ -108,6 +110,28 @@ const splitTextUnits = (value) => {
       .map((item) => item.replace(/^[，；：,;:\-\s]+|[，；：,;:\-\s]+$/g, '').trim())
       .filter(Boolean),
   ));
+};
+
+const resolveNarrationTailPaddingSeconds = (value) => {
+  const text = safeString(value);
+
+  if (!text) {
+    return VOICE_PADDING_DEFAULT_SECONDS;
+  }
+
+  if (/[。！？!?]$/.test(text)) {
+    return 0.24;
+  }
+
+  if (/[：:；;]$/.test(text)) {
+    return 0.2;
+  }
+
+  if (/[，,]$/.test(text)) {
+    return 0.18;
+  }
+
+  return VOICE_PADDING_DEFAULT_SECONDS;
 };
 
 const normalizeList = (value, max = Infinity) => {
@@ -882,8 +906,9 @@ const applyVoiceDurations = (shotsState, voiceQueue, fps) => {
   for (const shot of Array.isArray(shotsState) ? shotsState : []) {
     const voiceItem = shotQueue.get(safeString(shot.id));
     const audioDurationSeconds = toNumber(voiceItem?.durationSeconds, 0);
+    const tailPaddingSeconds = resolveNarrationTailPaddingSeconds(shot?.narration);
     const nextDurationSeconds = audioDurationSeconds > 0
-      ? roundTo(Math.max(toNumber(shot.durationSeconds, 6), audioDurationSeconds + 0.18))
+      ? roundTo(Math.max(toNumber(shot.durationSeconds, 6), audioDurationSeconds + tailPaddingSeconds))
       : roundTo(Math.max(1.8, toNumber(shot.durationSeconds, 6)));
     const shotFrames = Math.max(1, Math.round(nextDurationSeconds * fps));
 
@@ -1343,6 +1368,37 @@ const buildBundledFfmpegEnv = (ffmpegPath) => {
   };
 };
 
+const hasWorkingFfmpegBinary = (command) => {
+  const result = spawnSync(command, ['-version'], {
+    cwd: REMOTION_ROOT,
+    encoding: 'utf8',
+    stdio: ['ignore', 'ignore', 'ignore'],
+    shell: false,
+    env: process.env,
+  });
+  return result.status === 0;
+};
+
+const resolveAudioFfmpegPath = async () => {
+  const explicitBinary = safeString(process.env.FFMPEG_BIN);
+  if (explicitBinary && hasWorkingFfmpegBinary(explicitBinary)) {
+    return explicitBinary;
+  }
+
+  if (hasWorkingFfmpegBinary('ffmpeg')) {
+    return 'ffmpeg';
+  }
+
+  return await resolveBundledFfmpegPath();
+};
+
+const buildFfmpegEnv = (ffmpegPath) => {
+  const normalized = safeString(ffmpegPath);
+  return normalized.includes(`${path.sep}@remotion${path.sep}compositor-`)
+    ? buildBundledFfmpegEnv(normalized)
+    : {};
+};
+
 const buildMergedVoiceTrack = async ({
   projectId,
   audioSegments,
@@ -1357,7 +1413,7 @@ const buildMergedVoiceTrack = async ({
     return null;
   }
 
-  const ffmpegPath = await resolveBundledFfmpegPath();
+  const ffmpegPath = await resolveAudioFfmpegPath();
   const outputRelativePath = `/assets/voice/${projectId}/full-narration.wav`;
   const outputAbsolutePath = resolvePublicAssetFile(outputRelativePath);
   await ensureDir(path.dirname(outputAbsolutePath));
@@ -1378,13 +1434,16 @@ const buildMergedVoiceTrack = async ({
       0,
       Math.round((toNumber(segment.startFrame, 0) / Math.max(1, toNumber(fps, DEFAULT_FPS))) * 1000),
     );
-    filterParts.push(`[${index}:a]aresample=22050,adelay=${delayMs},volume=1[a${index}]`);
+    filterParts.push(
+      `[${index}:a]aresample=${VOICE_SAMPLE_RATE},aformat=sample_fmts=s16:channel_layouts=mono,adelay=${delayMs},volume=1[a${index}]`,
+    );
     mixInputs.push(`[a${index}]`);
   }
 
-  const mixFilter = mixInputs.length === 1
-    ? `${mixInputs[0]}apad=pad_dur=${durationLimit},atrim=0:${durationLimit}[mixout]`
-    : `${mixInputs.join('')}amix=inputs=${mixInputs.length}:normalize=0,apad=pad_dur=${durationLimit},atrim=0:${durationLimit}[mixout]`;
+  const preMixFilter = mixInputs.length === 1
+    ? `${mixInputs[0]}apad=pad_dur=${durationLimit},atrim=0:${durationLimit}[premix]`
+    : `${mixInputs.join('')}amix=inputs=${mixInputs.length}:normalize=0,apad=pad_dur=${durationLimit},atrim=0:${durationLimit}[premix]`;
+  const masterFilter = `[premix]alimiter=limit=0.90,aresample=${VOICE_SAMPLE_RATE}[mixout]`;
 
   await executeCommand(
     ffmpegPath,
@@ -1392,17 +1451,17 @@ const buildMergedVoiceTrack = async ({
       '-loglevel', 'error',
       '-y',
       ...inputArgs,
-      '-filter_complex', [...filterParts, mixFilter].join(';'),
+      '-filter_complex', [...filterParts, preMixFilter, masterFilter].join(';'),
       '-map', '[mixout]',
       '-ac', '1',
-      '-ar', '22050',
+      '-ar', String(VOICE_SAMPLE_RATE),
       '-c:a', 'pcm_s16le',
       outputAbsolutePath,
     ],
     {
       cwd: REMOTION_ROOT,
       label: 'merge-voice-track',
-      env: buildBundledFfmpegEnv(ffmpegPath),
+      env: buildFfmpegEnv(ffmpegPath),
     },
   );
 
@@ -1423,7 +1482,7 @@ const muxRenderedAudioTrack = async ({
     return;
   }
 
-  const ffmpegPath = await resolveBundledFfmpegPath();
+  const ffmpegPath = await resolveAudioFfmpegPath();
   const outputDir = path.dirname(resolvedVideoPath);
   const baseName = path.basename(resolvedVideoPath, path.extname(resolvedVideoPath));
   const tempMuxedPath = path.join(outputDir, `${baseName}.muxing.mp4`);
@@ -1446,7 +1505,7 @@ const muxRenderedAudioTrack = async ({
     {
       cwd: REMOTION_ROOT,
       label: 'mux-rendered-audio',
-      env: buildBundledFfmpegEnv(ffmpegPath),
+      env: buildFfmpegEnv(ffmpegPath),
     },
   );
 

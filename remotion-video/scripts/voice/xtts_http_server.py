@@ -17,6 +17,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PUBLIC_DIR = PROJECT_ROOT / "public"
 DEFAULT_MODEL = "tts_models/multilingual/multi-dataset/xtts_v2"
 DEFAULT_SPEAKERS_DIR = PROJECT_ROOT / "runtime" / "voices" / "xtts"
+REFERENCE_TRIM_SECONDS = 12
+REFERENCE_START_TRIM_DB = -40
+REFERENCE_START_TRIM_SECONDS = 0.05
+OUTPUT_START_TRIM_DB = -42
+OUTPUT_START_TRIM_SECONDS = 0.03
+OUTPUT_END_TRIM_DB = -42
+OUTPUT_END_TRIM_SECONDS = 0.12
+OUTPUT_FADE_IN_SECONDS = 0.018
+OUTPUT_FADE_OUT_SECONDS = 0.03
 
 STATE = {
     "status": "loading",
@@ -227,32 +236,86 @@ def resolve_reference_audio(payload, speakers_dir):
     return None, cleanup_dirs
 
 
-def apply_speed_if_needed(source_path, speed):
-    try:
-        normalized_speed = float(speed)
-    except (TypeError, ValueError):
-        normalized_speed = 1.0
-
-    if abs(normalized_speed - 1.0) < 0.001:
-        return source_path
-
-    normalized_speed = max(0.5, min(2.0, normalized_speed))
-    output_path = source_path.with_name(f"{source_path.stem}-atempo.wav")
+def run_ffmpeg_audio_transform(source_path, output_path, filter_chain, sample_rate=24000):
     command = [
         "ffmpeg",
+        "-loglevel",
+        "error",
         "-y",
         "-i",
         str(source_path),
+        "-vn",
+        "-ac",
+        "1",
+        "-ar",
+        str(sample_rate),
         "-filter:a",
-        f"atempo={normalized_speed}",
+        filter_chain,
+        "-c:a",
+        "pcm_s16le",
         str(output_path),
     ]
     result = subprocess.run(command, capture_output=True, text=True, cwd=PROJECT_ROOT)
     if result.returncode != 0:
         detail = "\n".join(item for item in [result.stdout, result.stderr] if item).strip()
-        raise RuntimeError(f"ffmpeg speed adjust failed: {detail or result.returncode}")
+        raise RuntimeError(f"ffmpeg audio transform failed: {detail or result.returncode}")
 
     return output_path
+
+
+def preprocess_reference_audio(source_path, output_dir):
+    output_path = Path(output_dir) / "reference-prep.wav"
+    filter_chain = ",".join(
+        [
+            f"silenceremove=start_periods=1:start_duration={REFERENCE_START_TRIM_SECONDS}:"
+            f"start_threshold={REFERENCE_START_TRIM_DB}dB",
+            "areverse",
+            f"silenceremove=start_periods=1:start_duration={REFERENCE_START_TRIM_SECONDS}:"
+            f"start_threshold={REFERENCE_START_TRIM_DB}dB",
+            "areverse",
+            "highpass=f=55",
+            "lowpass=f=10000",
+            f"atrim=0:{REFERENCE_TRIM_SECONDS}",
+        ]
+    )
+    return run_ffmpeg_audio_transform(source_path, output_path, filter_chain, sample_rate=24000)
+
+
+def finalize_synthesized_audio(source_path, speed):
+    try:
+        normalized_speed = float(speed)
+    except (TypeError, ValueError):
+        normalized_speed = 1.0
+
+    normalized_speed = max(0.5, min(2.0, normalized_speed))
+    output_path = source_path.with_name(f"{source_path.stem}-mastered.wav")
+    filters = []
+
+    if abs(normalized_speed - 1.0) >= 0.001:
+        filters.append(f"atempo={normalized_speed}")
+
+    filters.extend(
+        [
+            f"silenceremove=start_periods=1:start_duration={OUTPUT_START_TRIM_SECONDS}:"
+            f"start_threshold={OUTPUT_START_TRIM_DB}dB",
+            "areverse",
+            f"silenceremove=start_periods=1:start_duration={OUTPUT_END_TRIM_SECONDS}:"
+            f"start_threshold={OUTPUT_END_TRIM_DB}dB",
+            "areverse",
+            "highpass=f=65",
+            "lowpass=f=12000",
+            "deesser=i=0.12:m=0.5:f=0.55:s=o",
+            "acompressor=threshold=0.125:ratio=2.2:attack=5:release=80:makeup=2",
+            f"afade=t=in:st=0:d={OUTPUT_FADE_IN_SECONDS}:c=qsin",
+            "areverse",
+            f"afade=t=in:st=0:d={OUTPUT_FADE_OUT_SECONDS}:c=qsin",
+            "areverse",
+            "loudnorm=I=-16:LRA=7:TP=-1.5:dual_mono=true",
+            "alimiter=limit=0.94",
+        ]
+    )
+
+    return run_ffmpeg_audio_transform(source_path, output_path, ",".join(filters), sample_rate=24000)
 
 
 class XTTSRequestHandler(BaseHTTPRequestHandler):
@@ -308,12 +371,13 @@ class XTTSRequestHandler(BaseHTTPRequestHandler):
 
             work_dir = Path(tempfile.mkdtemp(prefix="xtts-out-"))
             cleanup_dirs.append(work_dir)
+            prepared_reference = preprocess_reference_audio(reference_audio, work_dir)
             raw_output = work_dir / "synth.wav"
 
             with MODEL_LOCK:
-                synthesize_to_file(text, reference_audio, language, raw_output)
+                synthesize_to_file(text, prepared_reference, language, raw_output)
 
-            final_output = apply_speed_if_needed(raw_output, speed)
+            final_output = finalize_synthesized_audio(raw_output, speed)
             with open(final_output, "rb") as audio_file:
                 audio_bytes = audio_file.read()
 
