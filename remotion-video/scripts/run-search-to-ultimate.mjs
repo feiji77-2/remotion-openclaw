@@ -893,15 +893,26 @@ const buildProjectShots = (shotsState, pipelineState) => {
       id: safeString(shot.id) || `shot-${String(index + 1).padStart(2, '0')}`,
       level: safeString(shot.level),
       type: safeString(shot.type),
-      title: safeString(shot.title) || `镜头 ${index + 1}`,
+      title: safeString(shot.title) || `场景 ${index + 1}`,
       narration: safeString(voice.text || shot.narration),
       durationSeconds: roundTo(Math.max(1.8, toNumber(shot.durationSeconds, 6))),
+      family: safeString(prompt.family || prompt.sceneFamily || shot.family || shot.sceneFamily),
+      sceneFamily: safeString(prompt.sceneFamily || prompt.family || shot.sceneFamily || shot.family),
+      templateCandidates: normalizeList(
+        Array.isArray(prompt.templateCandidates) && prompt.templateCandidates.length > 0
+          ? prompt.templateCandidates
+          : shot.templateCandidates,
+        6,
+      ),
       promptZh: safeString(prompt.promptZh || prompt.imagePrompt || prompt.prompt),
       visualSummaryZh: safeString(prompt.visualSummaryZh || visual?.description),
       visualFocusZh: safeString(prompt.visualFocusZh || visual?.focus),
       comparisonSummaryZh: safeString(prompt.comparisonSummaryZh),
       mood: safeString(prompt.mood),
       style: safeString(prompt.style),
+      canvasRatio: safeString(prompt.canvasRatio),
+      canvasWidth: toNumber(prompt.canvasWidth, 0),
+      canvasHeight: toNumber(prompt.canvasHeight, 0),
       keywords: normalizeList(
         Array.isArray(prompt.keywords) && prompt.keywords.length > 0 ? prompt.keywords : shot.keywords,
         10,

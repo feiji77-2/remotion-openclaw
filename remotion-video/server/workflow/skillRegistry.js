@@ -4,6 +4,7 @@ const path = require('path');
 
 const HOME_DIR = os.homedir();
 const REMOTION_PROJECT_ROOT = path.resolve(__dirname, '../..');
+const WORKFLOW_SKILLS_DIR = path.join(REMOTION_PROJECT_ROOT, 'docs', 'workflow-skills');
 const REMOTION_BUILD_FILES = [
   'src/Root.tsx',
   'src/OpenClawVideo.tsx',
@@ -15,8 +16,8 @@ const STEP_TO_SKILL_ID = {
   1: 'video-pipeline-analysis',
   2: 'video-pipeline-title',
   3: 'video-pipeline-content',
-  4: 'video-pipeline-storyboard',
-  5: 'video-pipeline-storyboard',
+  4: 'video-pipeline-scene-planner',
+  5: 'video-pipeline-scene-prompts',
   6: 'video-pipeline-audio',
   7: 'remotion-video-maker',
   8: 'video-pipeline-video',
@@ -137,38 +138,73 @@ const SKILL_DEFINITIONS = [
     ],
   },
   {
-    skillId: 'video-pipeline-storyboard',
+    skillId: 'video-pipeline-scene-planner',
     category: 'step',
     stepId: 4,
-    stepLabel: 'Step 4 / 5 · 分镜与视觉 Prompt',
-    name: 'video-pipeline-storyboard',
-    sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-storyboard', 'SKILL.md'),
-    displaySummary: '固定 6 镜头结构，先拆内容层级，再给每镜视觉和图像提示词。',
+    stepLabel: 'Step 4 · 场景编排',
+    name: 'video-pipeline-scene-planner',
+    sourcePath: path.join(WORKFLOW_SKILLS_DIR, 'video-pipeline-scene-planner.SKILL.md'),
+    displaySummary: '把文案编排成可变场景数的 Ultimate 横版场景计划，并为每段预分配 20 模板 family。',
     inputs: ['copy.hook', 'copy.body[]', 'copy.cta', 'analysis.keyDataPoints'],
-    outputs: ['shots[]', 'shots[].level', 'shots[].visual', 'prompts.byShotId', 'prompts.byShotId[].imagePrompt'],
+    outputs: ['shots[]', 'shots[].sceneFamily', 'shots[].templateCandidates', 'scenePlan', 'templateCatalog'],
     defaults: {
-      goal: '把文案拆成固定 6 镜头结构，并给每镜完整视觉信息。',
-      style: '层级清楚、便于渲染、适合竖屏解释类短视频。',
-      emphasis: '开场钩子、核心信息、对比、案例、CTA。',
-      avoid: '镜头数量漂移、层级错位、无视觉焦点。',
-      notes: 'Step 4 和 Step 5 共用同一个 storyboard 真源。',
+      goal: '把文案拆成 Ultimate 1920x1080 横版场景计划，而不是固定 6 镜头。',
+      style: '章节化、讲解型、适合科技 AI 视频的横版信息结构。',
+      emphasis: 'Hero 开场、信息拆解、证据支撑、节奏分层、模板多样性。',
+      avoid: '固定 6 镜头、family 重复、画面语义漂移、竖屏旧提示词。',
+      notes: 'Step 4 负责场景数、场景角色和 template family 预命中。',
     },
     constraints: [
-      '固定 6 个镜头，顺序不可乱。',
-      '每镜都要有层级、类型和时长。',
-      'Step 5 提示词要承接 Step 4 镜头语义。',
+      '第一屏固定 hero，最后一屏固定 cta。',
+      '中段场景数可变，但必须保持 20 模板系统兼容。',
+      '每个场景都要有层级、类型、时长、sceneFamily 和候选 family。',
     ],
     qualityRules: [
-      'shots 长度必须为 6。',
-      '每镜 durationSeconds 控制在 3-15s 区间附近。',
-      '提示词数量与镜头数量一致。',
+      'shots 长度至少为 6，且不能只是旧 6 镜头模板复写。',
+      '每个场景都要有 16:9 横版语义和可复用的结构化字段。',
+      'scenePlan 需要给出 familiesUsed / sceneCount / visualSystem。',
     ],
     uiHints: [
-      'Step 4 适合镜头卡片列表。',
-      'Step 5 适合每镜 prompt 卡片 + 状态。',
+      'Step 4 适合按 scene family 展示场景卡和时长分配。',
+      '可把 templateCandidates 作为“命中备选”展示。',
     ],
     evalRules: [
-      '时长准确、节奏分配、画面感、完整性。',
+      'family 多样性、节奏分配、结构完整性、Ultimate 对齐度。',
+    ],
+  },
+  {
+    skillId: 'video-pipeline-scene-prompts',
+    category: 'step',
+    stepId: 5,
+    stepLabel: 'Step 5 · 视觉提示词',
+    name: 'video-pipeline-scene-prompts',
+    sourcePath: path.join(WORKFLOW_SKILLS_DIR, 'video-pipeline-scene-prompts.SKILL.md'),
+    displaySummary: '基于 Ultimate 场景计划生成 16:9 横版视觉提示词、画面重点和图片任务字段。',
+    inputs: ['shots[]', 'shots[].sceneFamily', 'analysis.keyDataPoints', 'copy'],
+    outputs: ['prompts.byShotId', 'prompts.byShotId[].imagePrompt', 'prompts.byShotId[].sceneFamily', 'templateCatalog'],
+    defaults: {
+      goal: '为每个场景生成适合 1920x1080 的视觉提示词和画面摘要。',
+      style: '科技信息视频、横版卡片化、适合 Ultimate 20 模板命中。',
+      emphasis: '结构清晰、画面重点明确、可服务图片和后续渲染。',
+      avoid: '9:16 竖屏语义、抽象海报词、family 与画面内容错位。',
+      notes: 'Step 5 只做视觉和图片任务语义，不再退回旧 storyboard prompt。',
+    },
+    constraints: [
+      '每个 prompt 都必须和对应 sceneFamily 对齐。',
+      '默认使用 16:9 横版、1920x1080、科技讲解视频语义。',
+      '图片提示词数量必须和场景数量一致。',
+    ],
+    qualityRules: [
+      'prompts.byShotId 不能为空。',
+      '每个 prompt 至少包含画面重点、摘要、negativePrompt 和 sceneFamily。',
+      '每条提示词都要能支撑后续图片任务和 Ultimate 场景复用。',
+    ],
+    uiHints: [
+      '适合按 scene family 展示 prompt 卡片和图片状态。',
+      '可直接展示 visualSummaryZh / visualFocusZh / comparisonSummaryZh。',
+    ],
+    evalRules: [
+      '覆盖率、family 一致性、横版语义、数据完整性。',
     ],
   },
   {
@@ -178,7 +214,7 @@ const SKILL_DEFINITIONS = [
     stepLabel: 'Step 6 · 配音脚本',
     name: 'video-pipeline-audio',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-audio', 'SKILL.md'),
-    displaySummary: '根据镜头结构产出配音引擎、参数、逐镜脚本和时长统计。',
+    displaySummary: '根据场景结构产出配音引擎、参数、逐场景脚本和时长统计。',
     inputs: ['shots[]', 'copy', 'targetDuration'],
     outputs: ['voice.engine', 'voice.language', 'voice.speed', 'voice.pitch', 'voice.script[]', 'voice.totalDuration', 'voice.totalChars'],
     defaults: {
@@ -186,15 +222,15 @@ const SKILL_DEFINITIONS = [
       language: 'zh-CN',
       speed: '1.0',
       pitch: 0,
-      goal: '生成可直接提交 TTS 的逐镜脚本。',
+      goal: '生成可直接提交 TTS 的逐场景脚本。',
       style: '口语化、节奏稳定、适合 ChatTTS。',
-      emphasis: '镜头时长匹配、总时长统计、脚本清晰。',
-      avoid: '书面腔、镜头间时长失衡。',
+      emphasis: '场景时长匹配、总时长统计、脚本清晰。',
+      avoid: '书面腔、场景间时长失衡。',
       notes: 'ChatTTS 为默认引擎，Melo / OpenVoice 为回退。',
     },
     constraints: [
-      '脚本数量要和镜头数量对齐。',
-      '每镜文本长度和镜头时长要大致匹配。',
+      '脚本数量要和场景数量对齐。',
+      '每个场景文本长度和时长要大致匹配。',
     ],
     qualityRules: [
       'voice.script 不能为空。',
@@ -202,7 +238,7 @@ const SKILL_DEFINITIONS = [
       '默认引擎为 ChatTTS。',
     ],
     uiHints: [
-      '展示引擎、总时长、总字数和逐镜脚本。',
+      '展示引擎、总时长、总字数和逐场景脚本。',
     ],
     evalRules: [
       '时长匹配、口语化、停顿节奏。',
@@ -253,19 +289,19 @@ const SKILL_DEFINITIONS = [
     inputs: ['script', 'shots.length', 'template', 'quality'],
     outputs: ['render.template', 'render.quality', 'render.fps', 'render.width', 'render.height', 'render.format', 'render.codec', 'render.bitrate', 'render.estimatedDuration', 'render.estimatedSize', 'render.notes'],
     defaults: {
-      template: 'caption',
+      template: 'ultimate',
       quality: 'high',
       fps: 30,
-      width: 1080,
-      height: 1920,
+      width: 1920,
+      height: 1080,
       format: 'mp4',
       codec: 'h264',
-      bitrate: 8000,
+      bitrate: 12000,
       goal: '给出面向最终导出的渲染参数。',
       style: '参数清楚、推荐理由简洁。',
       emphasis: '模板、质量、预计时长、大小和导出说明。',
       avoid: '把项目生成职责继续塞进 Step 8。',
-      notes: '默认 9:16 竖屏发布级参数；横版 1920x1080 可选 ultimate 模板。',
+      notes: '默认采用 Ultimate 1920x1080 横版参数。',
     },
     constraints: [
       'Step 8 只输出渲染语义。',
@@ -346,6 +382,51 @@ const EVAL_FORBIDDEN_WORDS = {
   copy: ['最强', '第一', '顶级', '国家级', '100%', '绝对'],
   cta: ['立即', '赶紧', '马上', '立刻'],
 };
+
+const ULTIMATE_TEMPLATE_CATALOG = [
+  { family: 'hero', label: 'Hero', style: '大标题封面', bestFor: '开场、章节起势', hitSignals: ['首屏', '开场', '章节'] },
+  { family: 'feature-rail', label: 'Feature Rail', style: '2x2 四卡拆解', bestFor: '场景、角色、能力拆解', hitSignals: ['场景', '团队', '案例', '痛点'] },
+  { family: 'focus', label: 'Focus', style: '单概念聚焦', bestFor: '核心概念、关键词定义', hitSignals: ['单一焦点', '短 visualFocus'] },
+  { family: 'step-flow', label: 'Step Flow', style: '3+2 步骤流', bestFor: '流程、工作流、操作步骤', hitSignals: ['第一', '第二', '步骤', '先再后'] },
+  { family: 'timeline', label: 'Timeline', style: '时间轴', bestFor: '发布时间线、版本推进', hitSignals: ['发布时间', 'roadmap', 'release', '日期'] },
+  { family: 'compare-board', label: 'Compare Board', style: '左右对照', bestFor: '方案对比、A/B 差异', hitSignals: ['对比', 'VS', '差异', 'before/after'] },
+  { family: 'number-strip', label: 'Number Strip', style: '条带式反转卡', bestFor: '认知反转、误区纠正', hitSignals: ['很多人以为', '不是…而是…', '误解'] },
+  { family: 'terminal', label: 'Terminal', style: '终端日志窗', bestFor: '命令、日志、脚本执行', hitSignals: ['终端', 'shell', 'cli', 'render'] },
+  { family: 'evidence-wall', label: 'Evidence Wall', style: '证据墙', bestFor: '来源、GitHub、论文、实测', hitSignals: ['官方', 'GitHub', 'docs', 'benchmark', '证据'] },
+  { family: 'tag-matrix', label: 'Tag Matrix', style: '主模块 + 标签带', bestFor: '关键词归类、能力盘点', hitSignals: ['keywords', 'dataPoints 丰富'] },
+  { family: 'code', label: 'Code', style: 'JSON / schema 面板', bestFor: '配置、接口、JSON、代码证据', hitSignals: ['json', 'schema', 'api', '配置'] },
+  { family: 'architecture-map', label: 'Architecture Map', style: '中心节点拓扑图', bestFor: '架构、模块、Agent 分层', hitSignals: ['架构', '系统', '模块', 'agent'] },
+  { family: 'metrics', label: 'Metrics', style: '大数字与指标条', bestFor: '时间、成本、效率结果', hitSignals: ['数字', '效率', '成本', '%'] },
+  { family: 'data-stream', label: 'Data Stream', style: '实时流面板', bestFor: '吞吐、QPS、tokens/s', hitSignals: ['实时', 'stream', 'monitor', '吞吐'] },
+  { family: 'memory-graph', label: 'Memory Graph', style: '知识图谱', bestFor: '上下文、记忆、检索链路', hitSignals: ['memory', '上下文', '检索', 'graph'] },
+  { family: 'pipeline-flow', label: 'Pipeline Flow', style: '阶段管线图', bestFor: '处理链路、编排管线', hitSignals: ['pipeline', 'flow', '链路', 'stage'] },
+  { family: 'benchmark-chart', label: 'Benchmark Chart', style: '跑分图表', bestFor: '性能、benchmark、实测对打', hitSignals: ['benchmark', '跑分', 'HLE', 'SWE-Bench'] },
+  { family: 'quote-highlight', label: 'Quote Highlight', style: '大字金句', bestFor: '核心判断、压轴句', hitSignals: ['一句话', '核心结论', '引号'] },
+  { family: 'glossary-term', label: 'Glossary Term', style: '术语解释卡', bestFor: '术语定义、名词解释', hitSignals: ['是什么', '定义', '可以理解成'] },
+  { family: 'cta', label: 'CTA', style: '结束页', bestFor: '收尾提问、行动引导', hitSignals: ['最后一屏', '互动', '追更'] },
+];
+
+const ULTIMATE_SCENE_FAMILIES = new Set(ULTIMATE_TEMPLATE_CATALOG.map((item) => item.family));
+const ULTIMATE_MIDDLE_SCENE_ROTATION = [
+  'focus',
+  'feature-rail',
+  'architecture-map',
+  'tag-matrix',
+  'metrics',
+  'timeline',
+  'data-stream',
+  'benchmark-chart',
+  'memory-graph',
+  'pipeline-flow',
+  'glossary-term',
+  'quote-highlight',
+  'evidence-wall',
+  'compare-board',
+  'step-flow',
+  'code',
+  'terminal',
+  'number-strip',
+];
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -791,6 +872,259 @@ function createShotId(index, existingId) {
   return safeString(existingId) || `shot-${String(index + 1).padStart(2, '0')}`;
 }
 
+function hasStandaloneAsciiToken(text, token) {
+  return new RegExp(`(?:^|[^a-z])${token}(?:[^a-z]|$)`, 'i').test(safeString(text).toLowerCase());
+}
+
+function countNumberSignals(text) {
+  return (safeString(text).match(/\d+(?:\.\d+)?(?:%|x|倍|月|日|小时|分钟|年)?/g) || []).length;
+}
+
+function shouldUseSceneOverride(overrideText, fallbackText) {
+  const override = safeString(overrideText);
+  const fallback = safeString(fallbackText);
+
+  if (!override) {
+    return false;
+  }
+
+  if (/^(?:占位|镜头|场景)\s*\d+/i.test(override)) {
+    return false;
+  }
+
+  if (/^(?:先抛问题|再去噪|然后展开关系|再补证据|最后总结|顺手提醒)：占位内容/i.test(override)) {
+    return false;
+  }
+
+  if (fallback.length >= 24 && override.length <= Math.max(18, Math.floor(fallback.length * 0.45))) {
+    return false;
+  }
+
+  return true;
+}
+
+function buildStep4TargetDurationSeconds(copy, input) {
+  const explicitRenderDuration = toNumber(input?.pipelineState?.render?.estimatedDuration, 0);
+  const readingTime = toNumber(copy?.readingTime, 0);
+  return clamp(explicitRenderDuration || readingTime || 75, 45, 210);
+}
+
+function buildStep4SceneType(role, text) {
+  const safeText = safeString(text);
+  if (role === 'hook') return '开场';
+  if (role === 'cta') return '结尾CTA';
+  if (/对比|差异|vs|versus|before|after/i.test(safeText)) return '对比';
+  if (/流程|步骤|工作流|pipeline|process|stage/i.test(safeText)) return '流程';
+  if (/案例|场景|开发者|团队/.test(safeText)) return '案例';
+  if (/官方|GitHub|docs|paper|证据|benchmark/i.test(safeText)) return '证据';
+  return '信息传递';
+}
+
+function splitSceneBlock(block, sceneCharBudget = 48) {
+  const clauses = splitNarrationClauses(block?.narration);
+  const rawNarration = safeString(block?.narration);
+
+  if (clauses.length <= 1 || rawNarration.length <= sceneCharBudget) {
+    return [{...block, narration: rawNarration}];
+  }
+
+  const output = [];
+  let current = [];
+  let currentLength = 0;
+
+  for (const clause of clauses) {
+    const nextLength = currentLength + clause.length;
+    if (current.length > 0 && nextLength > sceneCharBudget) {
+      output.push(current.join('，'));
+      current = [clause];
+      currentLength = clause.length;
+      continue;
+    }
+
+    current.push(clause);
+    currentLength = nextLength;
+  }
+
+  if (current.length > 0) {
+    output.push(current.join('，'));
+  }
+
+  return output.map((text, index) => ({
+    ...block,
+    title: index === 0 ? block.title : `${block.title} · ${index + 1}`,
+    narration: text,
+  }));
+}
+
+function mergeStep4Segments(segments, maxCount) {
+  const output = [...segments];
+
+  while (output.length > maxCount) {
+    let mergeIndex = output.findIndex((item, index) => (
+      index > 0
+      && index < output.length - 2
+      && item.role === 'body'
+      && output[index + 1]?.role === 'body'
+    ));
+    if (mergeIndex === -1) {
+      mergeIndex = Math.max(1, output.length - 3);
+    }
+
+    const current = output[mergeIndex];
+    const next = output[mergeIndex + 1];
+    output.splice(mergeIndex, 2, {
+      ...current,
+      title: compactText(`${current.title} / ${next.title}`, 24),
+      narration: compactText(`${current.narration} ${next.narration}`, 220),
+      type: buildStep4SceneType(current.role, `${current.narration} ${next.narration}`),
+      role: 'body',
+    });
+  }
+
+  return output;
+}
+
+function inferUltimateSceneFamily(segment, index, total) {
+  const requestedFamily = safeString(segment?.family || segment?.sceneFamily).toLowerCase();
+  if (ULTIMATE_SCENE_FAMILIES.has(requestedFamily)) {
+    return requestedFamily;
+  }
+  if (index === 0) {
+    return 'hero';
+  }
+  if (index === total - 1) {
+    return 'cta';
+  }
+
+  const text = [
+    safeString(segment?.title),
+    safeString(segment?.narration),
+    safeString(segment?.type),
+    safeString(segment?.level),
+    ...(Array.isArray(segment?.keywords) ? segment.keywords : []),
+    ...(Array.isArray(segment?.dataPoints) ? segment.dataPoints : []),
+  ].join(' ').toLowerCase();
+
+  if (/(命令|终端|日志|运行)/.test(text) || ['shell', 'bash', 'terminal', 'cli', 'render'].some((token) => hasStandaloneAsciiToken(text, token))) {
+    return 'terminal';
+  }
+  if (/(实时|数据流|stream|feed|signal|monitor|qps|tps|throughput|tokens?\/s|吞吐)/.test(text)) {
+    return 'data-stream';
+  }
+  if (/(benchmark|bench|跑分|基准|实测|hle|swe[- ]bench)/.test(text) && countNumberSignals(text) >= 2) {
+    return 'benchmark-chart';
+  }
+  if ((/(发布时间|时间线|roadmap|里程碑|版本演进|发布|launch|release|history)/.test(text) || countNumberSignals(text) >= 2) && /(月|日|年|release|launch|roadmap|里程碑)/.test(text)) {
+    return 'timeline';
+  }
+  if (Array.isArray(segment?.comparisons) && segment.comparisons.length > 0) {
+    return 'compare-board';
+  }
+  if (/(对比|差异|vs|versus|before|after|battle)/.test(text)) {
+    return 'compare-board';
+  }
+  if (/(很多人以为|很多人觉得|不是.*而是|认知反转|误解|偏见)/.test(text)) {
+    return 'number-strip';
+  }
+  if (/(官方|来源|博客|release|benchmark|paper|docs|github|hugging\s*face|实测|证据)/.test(text)) {
+    return 'evidence-wall';
+  }
+  if (/(配置|脚本|函数|接口|参数)/.test(text) || ['schema', 'json', 'api', 'code'].some((token) => hasStandaloneAsciiToken(text, token))) {
+    return 'code';
+  }
+  if (/(架构|系统|模块|分层|拓扑|工具链|agent|router|memory|orchestr|stack|toolchain)/.test(text)) {
+    return 'architecture-map';
+  }
+  if (/(memory|context|上下文|记忆|知识图谱|graph|embedding|召回|检索|知识库)/.test(text)) {
+    return 'memory-graph';
+  }
+  if (/(管线|pipeline|\bflow\b|链路|dispatch|compile|render|\bprocess\b|\bstage\b)/.test(text)) {
+    return 'pipeline-flow';
+  }
+  if (/(步骤|流程|工作流|依次|第一|第二|第三|先|再|最后)/.test(text)) {
+    return 'step-flow';
+  }
+  if (/(是什么|什么意思|本质上|指的是|可以理解成|术语|定义)/.test(text) && safeString(segment?.title).length <= 20) {
+    return 'glossary-term';
+  }
+  if (/(场景|开发者|团队|问题|痛点|案例|角色)/.test(text)) {
+    return 'feature-rail';
+  }
+  if (countNumberSignals(text) >= 2) {
+    return 'metrics';
+  }
+  if ((Array.isArray(segment?.keywords) ? segment.keywords.length : 0) + (Array.isArray(segment?.dataPoints) ? segment.dataPoints.length : 0) >= 5) {
+    return 'tag-matrix';
+  }
+  if (/[“”"']|一句话|关键判断|核心结论|真正该讲的是|最狠的一句/.test(text)) {
+    return 'quote-highlight';
+  }
+  if (safeString(segment?.visual?.focus || segment?.visualFocusZh).length > 0 && safeString(segment?.visual?.focus || segment?.visualFocusZh).length <= 24) {
+    return 'focus';
+  }
+
+  return ULTIMATE_MIDDLE_SCENE_ROTATION[(index - 1) % ULTIMATE_MIDDLE_SCENE_ROTATION.length];
+}
+
+function buildStep4TemplateCandidates(primaryFamily, index) {
+  const rotationOffset = ((index - 1) % ULTIMATE_MIDDLE_SCENE_ROTATION.length + ULTIMATE_MIDDLE_SCENE_ROTATION.length) % ULTIMATE_MIDDLE_SCENE_ROTATION.length;
+  const rotated = [
+    ...ULTIMATE_MIDDLE_SCENE_ROTATION.slice(rotationOffset),
+    ...ULTIMATE_MIDDLE_SCENE_ROTATION.slice(0, rotationOffset),
+  ];
+  return uniqueBy(
+    [
+      primaryFamily,
+      ...rotated,
+    ].filter((family) => ULTIMATE_SCENE_FAMILIES.has(family)),
+    (family) => family,
+  ).slice(0, 6);
+}
+
+function getSceneFocusForFamily(family) {
+  return {
+    hero: '主标题 + 单一核心对象',
+    'feature-rail': '2x2 模块卡 + 中心判断',
+    focus: '单概念聚焦 + 明确术语',
+    'step-flow': '流程节点 + 阅读路径',
+    timeline: '时间节点 + 事件推进',
+    'compare-board': '左右对照信息层',
+    'number-strip': '反转观点 + 条带重点',
+    terminal: '终端窗口 + 日志高亮',
+    'evidence-wall': '来源卡片 + 证据芯片',
+    'tag-matrix': '主模块标题 + 次级标签带',
+    code: '英文 JSON 结构 + 关键字段高亮',
+    'architecture-map': '中心节点 + 周边模块连接',
+    metrics: '大数字 + 指标条',
+    'data-stream': '实时指标 + 流动信号',
+    'memory-graph': '关系节点 + 连线',
+    'pipeline-flow': '阶段箭头 + 数据流',
+    'benchmark-chart': '图表对打 + 数值标签',
+    'quote-highlight': '一句话结论 + 大字压轴',
+    'glossary-term': '术语卡 + 白话解释',
+    cta: '收尾提问 + 互动引导',
+  }[family] || '主体清晰 + 信息层次明确';
+}
+
+function buildStep4ScenePlanMetadata(shots, input) {
+  const familiesUsed = uniqueBy(
+    shots
+      .map((shot) => safeString(shot?.sceneFamily || shot?.family))
+      .filter(Boolean),
+    (family) => family,
+  );
+
+  return {
+    system: 'ultimate-20-template',
+    visualSystem: 'ultimate-1080p',
+    renderWidth: 1920,
+    renderHeight: 1080,
+    sceneCount: shots.length,
+    familiesUsed,
+    title: compactText(getSelectedTitle(input, null)?.title || input?.pipelineState?.inputTitleKeywords || '当前主题', 42),
+  };
+}
+
 function buildStep4Slots(payload, input) {
   const payloadShots = Array.isArray(payload?.shots) ? payload.shots : (Array.isArray(payload) ? payload : []);
   const copy = input?.pipelineState?.copy || {};
@@ -798,72 +1132,185 @@ function buildStep4Slots(payload, input) {
   const title = getSelectedTitle(input, payload);
   const body = Array.isArray(copy?.body) ? copy.body : [];
   const facts = Array.isArray(analysis?.researchFacts) ? analysis.researchFacts : [];
-  const segments = [
-    {
-      level: '开场钩子',
-      type: '开场',
-      title: payloadShots[0]?.title || '开场钩子',
-      narration: payloadShots[0]?.narration || copy?.hook || '先抛出一个足够抓人的判断。',
-    },
-    {
-      level: '核心信息①',
-      type: '信息传递',
-      title: payloadShots[1]?.title || body[0]?.label || '核心信息 1',
-      narration: payloadShots[1]?.narration || body[0]?.text || facts[0]?.fact || '先给第一条硬信息。',
-    },
-    {
-      level: '核心信息②',
-      type: '信息传递',
-      title: payloadShots[2]?.title || body[1]?.label || '核心信息 2',
-      narration: payloadShots[2]?.narration || body[1]?.text || facts[1]?.fact || '继续推进第二条信息。',
-    },
-    {
-      level: '核心信息③',
-      type: '对比',
-      title: payloadShots[3]?.title || body[2]?.label || '对比拆解',
-      narration: payloadShots[3]?.narration || body[2]?.text || '把差异和判断讲透。',
-    },
-    {
-      level: '核心信息④',
-      type: '案例',
-      title: payloadShots[4]?.title || body[3]?.label || '案例落地',
-      narration: payloadShots[4]?.narration || facts[2]?.fact || analysis?.corePromise || '给一个真实场景或价值落点。',
-    },
-    {
-      level: '收尾互动',
-      type: '结尾CTA',
-      title: payloadShots[5]?.title || '收尾互动',
-      narration: payloadShots[5]?.narration || copy?.cta || '最后收口并推动互动。',
-    },
-  ];
+  const process = Array.isArray(analysis?.process) ? analysis.process : [];
+  const layers = Array.isArray(analysis?.layers) ? analysis.layers : [];
+  const targetDurationSeconds = buildStep4TargetDurationSeconds(copy, input);
+  const targetSceneCount = clamp(Math.round(targetDurationSeconds / 8), 6, 12);
+  const topicTitle = compactText(title?.title || input?.pipelineState?.inputTitleKeywords || '当前主题', 24);
 
-  return segments.map((segment, index) => {
-    const source = payloadShots[index] || {};
-    const dataPoints = extractDataPointsFromText(segment.narration);
-    const titleKeywords = tokenizeKeywords(`${segment.title} ${segment.narration}`);
+  let baseSegments = [];
+
+  if (!safeString(copy?.hook) && body.length === 0 && !safeString(copy?.cta) && payloadShots.length > 0) {
+    baseSegments = payloadShots.map((shot, index) => ({
+      role: index === 0 ? 'hook' : index === payloadShots.length - 1 ? 'cta' : 'body',
+      level: index === 0 ? '开场 Hook' : index === payloadShots.length - 1 ? '收尾互动' : `中段场景 ${index}`,
+      type: buildStep4SceneType(index === 0 ? 'hook' : index === payloadShots.length - 1 ? 'cta' : 'body', shot?.narration || shot?.title),
+      title: safeString(shot?.title) || `场景 ${index + 1}`,
+      narration: safeString(shot?.narration) || safeString(shot?.title),
+      family: safeString(shot?.family || shot?.sceneFamily),
+      templateCandidates: Array.isArray(shot?.templateCandidates) ? shot.templateCandidates : [],
+      dataPoints: Array.isArray(shot?.dataPoints) ? shot.dataPoints : [],
+      comparisons: Array.isArray(shot?.comparisons) ? shot.comparisons : [],
+      keywords: Array.isArray(shot?.keywords) ? shot.keywords : [],
+      visual: shot?.visual,
+      sourceShot: shot,
+    }));
+  } else {
+    const sourceBlocks = [
+      {
+        role: 'hook',
+        level: '开场 Hook',
+        type: '开场',
+        title: shouldUseSceneOverride(payloadShots[0]?.title, copy?.hookMeta?.title)
+          ? payloadShots[0]?.title
+          : (copy?.hookMeta?.title || '开场钩子'),
+        narration: shouldUseSceneOverride(payloadShots[0]?.narration, copy?.hook)
+          ? payloadShots[0]?.narration
+          : (copy?.hook || '先抛出一个足够抓人的判断。'),
+      },
+      ...body
+        .map((item, index) => ({
+          role: 'body',
+          level: `中段场景 ${index + 1}`,
+          type: buildStep4SceneType('body', item?.text),
+          title: shouldUseSceneOverride(payloadShots[index + 1]?.title, item?.label)
+            ? payloadShots[index + 1]?.title
+            : (item?.label || `核心信息 ${index + 1}`),
+          narration: shouldUseSceneOverride(payloadShots[index + 1]?.narration, item?.text)
+            ? payloadShots[index + 1]?.narration
+            : (item?.text || ''),
+        }))
+        .filter((item) => safeString(item.narration)),
+      {
+        role: 'cta',
+        level: '收尾互动',
+        type: '结尾CTA',
+        title: shouldUseSceneOverride(payloadShots[payloadShots.length - 1]?.title, copy?.ctaMeta?.intent)
+          ? payloadShots[payloadShots.length - 1]?.title
+          : '收尾互动',
+        narration: shouldUseSceneOverride(payloadShots[payloadShots.length - 1]?.narration, copy?.cta)
+          ? payloadShots[payloadShots.length - 1]?.narration
+          : (copy?.cta || '最后收口并推动互动。'),
+      },
+    ].filter((item) => safeString(item?.narration));
+
+    baseSegments = sourceBlocks.flatMap((block) => splitSceneBlock(block, block.role === 'body' ? 46 : 40));
+
+    const existingTexts = new Set(baseSegments.map((item) => safeString(item.narration)));
+    const supplements = [
+      ...facts.map((item, index) => ({
+        role: 'body',
+        level: `证据补充 ${index + 1}`,
+        type: '证据',
+        title: compactText(item?.evidenceAnchor || item?.sourceTitle || `证据 ${index + 1}`, 24),
+        narration: item?.fact,
+      })),
+      ...process.map((item, index) => ({
+        role: 'body',
+        level: `流程补充 ${index + 1}`,
+        type: '流程',
+        title: compactText(item?.label || `步骤 ${index + 1}`, 24),
+        narration: item?.detail,
+      })),
+      ...layers.map((item, index) => ({
+        role: 'body',
+        level: `判断层 ${index + 1}`,
+        type: '信息传递',
+        title: compactText(item?.label || `角度 ${index + 1}`, 24),
+        narration: item?.insight,
+      })),
+    ].filter((item) => safeString(item?.narration) && !existingTexts.has(safeString(item.narration)));
+
+    const fallbackSupplements = [
+      safeString(analysis?.corePromise),
+      safeString(analysis?.thesis),
+      ...(Array.isArray(copy?.keywords) ? copy.keywords : []).map((item) => `关键词：${item}`),
+    ]
+      .filter((item) => item && !existingTexts.has(item))
+      .map((item, index) => ({
+        role: 'body',
+        level: `补充场景 ${index + 1}`,
+        type: '信息传递',
+        title: compactText(item, 24),
+        narration: item,
+      }));
+
+    if (baseSegments.length < targetSceneCount) {
+      const ctaBlock = baseSegments.pop();
+      baseSegments.push(...supplements.slice(0, targetSceneCount - baseSegments.length));
+      if (baseSegments.length < targetSceneCount) {
+        baseSegments.push(...fallbackSupplements.slice(0, targetSceneCount - baseSegments.length));
+      }
+      if (ctaBlock) {
+        baseSegments.push(ctaBlock);
+      }
+    }
+  }
+
+  const normalizedSegments = mergeStep4Segments(baseSegments, targetSceneCount);
+  const total = normalizedSegments.length;
+
+  return normalizedSegments.map((segment, index) => {
+    const source = segment.sourceShot || payloadShots[index] || {};
+    const family = inferUltimateSceneFamily({
+      ...segment,
+      ...source,
+      family: safeString(source?.family || segment?.family || source?.sceneFamily || segment?.sceneFamily),
+      sceneFamily: safeString(source?.sceneFamily || segment?.sceneFamily || source?.family || segment?.family),
+    }, index, total);
+    const templateCandidates = Array.isArray(source?.templateCandidates) && source.templateCandidates.length > 0
+      ? uniqueBy(source.templateCandidates.filter((item) => ULTIMATE_SCENE_FAMILIES.has(item)), (item) => item).slice(0, 6)
+      : buildStep4TemplateCandidates(family, index);
+    const narration = compactText(source?.narration || segment.narration, 220);
+    const sceneType = safeString(source?.type || segment.type || buildStep4SceneType(segment.role, narration));
+    const level = index === 0
+      ? '开场 Hook'
+      : index === total - 1
+        ? '收尾互动'
+        : safeString(source?.level || segment.level || `中段场景 ${index}`);
+    const dataPoints = Array.isArray(source?.dataPoints) && source.dataPoints.length > 0
+      ? source.dataPoints
+      : extractDataPointsFromText(narration);
+    const keywords = Array.isArray(source?.keywords) && source.keywords.length > 0
+      ? source.keywords
+      : tokenizeKeywords(`${segment.title} ${narration}`).slice(0, 6);
+    const focus = safeString(source?.visual?.focus || segment?.visual?.focus) || getSceneFocusForFamily(family);
+    const comparisons = Array.isArray(source?.comparisons) && source.comparisons.length > 0
+      ? source.comparisons
+      : sceneType === '对比'
+        ? [{left: '旧方案', right: '当前方案'}]
+        : [];
+
     return {
+      ...source,
       id: createShotId(index, source.id),
-      level: segment.level,
-      type: segment.type,
-      title: compactText(segment.title || segment.level, 24),
-      narration: compactText(segment.narration, 220),
-      durationSeconds: clamp(toNumber(source.durationSeconds || Math.max(4, Math.ceil(safeString(segment.narration).length / 22)), 5), 3, 15),
+      level,
+      type: sceneType,
+      title: compactText(source?.title || segment.title || level, 24),
+      narration,
+      durationSeconds: clamp(toNumber(source?.durationSeconds || Math.max(4, Math.ceil(narration.length / 18)), 6), 3, 15),
+      family,
+      sceneFamily: family,
+      templateCandidates,
       visual: {
-        description: `${segment.level}镜头，围绕「${compactText(title?.title || input?.pipelineState?.inputTitleKeywords || '当前主题', 22)}」呈现 ${compactText(segment.narration, 40)}`,
-        focus: segment.type === '对比' ? '左右对比信息层' : segment.type === '案例' ? '真实场景和结果' : '单一主体 + 核心文案',
+        ...(source?.visual && typeof source.visual === 'object' ? source.visual : {}),
+        description: safeString(source?.visual?.description) || `16:9 横版场景，围绕「${topicTitle}」用 ${family} 模板呈现 ${compactText(narration, 48)}`,
+        focus,
       },
       dataPoints,
-      comparisons: segment.type === '对比'
-        ? [{ left: '旧讲法', right: '当前方案' }]
-        : [],
-      keywords: titleKeywords.slice(0, 5),
+      comparisons,
+      keywords,
     };
   });
 }
 
 function normalizeStep4Payload(payload, input) {
+  const shots = buildStep4Slots(payload, input);
   return {
-    shots: buildStep4Slots(payload, input),
+    shots,
+    scenePlan: buildStep4ScenePlanMetadata(shots, input),
+    templateCatalog: clone(ULTIMATE_TEMPLATE_CATALOG),
+    visualSystem: 'ultimate-1080p',
   };
 }
 
@@ -900,31 +1347,59 @@ function summarizePromptComparisonsZh(comparisons, shot) {
   return `对比关系：${compactText(first.left || '旧方案', 14)} vs ${compactText(first.right || '当前方案', 14)}`;
 }
 
+function normalizeUltimateCanvasText(text) {
+  return safeString(text)
+    .replace(/9:16\s*竖屏画面/gi, '16:9 横版画面')
+    .replace(/9:16\s*竖屏视觉/gi, '16:9 横版视觉')
+    .replace(/9:16\s*竖屏/gi, '16:9 横版')
+    .replace(/竖屏主画面/g, '横版主画面')
+    .replace(/竖屏视觉/g, '横版视觉')
+    .replace(/镜头/g, '场景');
+}
+
+function ensureUltimateCanvasPrompt(text) {
+  const normalized = normalizeUltimateCanvasText(text);
+  if (!normalized) {
+    return '';
+  }
+  if (/16:9/i.test(normalized) && /1920x1080/i.test(normalized)) {
+    return normalized;
+  }
+  if (/16:9/i.test(normalized)) {
+    return `1920x1080，${normalized}`;
+  }
+  return `16:9 横版，1920x1080，${normalized}`;
+}
+
 function buildStep5DisplayFields(shot, current) {
   const shotTitle = compactText(
-    safeString(current?.shotTitle || shot?.title || shot?.level || shot?.id || '镜头'),
+    safeString(current?.shotTitle || shot?.title || shot?.level || shot?.id || '场景'),
     24,
   );
   const visual = current?.visual && typeof current.visual === 'object'
     ? current.visual
     : (shot?.visual && typeof shot.visual === 'object' ? shot.visual : {});
+  const family = safeString(current?.sceneFamily || current?.family || shot?.sceneFamily || shot?.family)
+    || inferUltimateSceneFamily(shot, 0, 1);
   const focus = safeString(current?.visualFocusZh || current?.visualFocus || visual.focus || shot?.visual?.focus)
+    || getSceneFocusForFamily(family)
     || (shot?.type === '对比' ? '左右信息对照 + 核心判断' : '主体清晰 + 信息层次明确');
-  const description = safeString(current?.visualSummaryZh || current?.promptZh || visual.description || shot?.visual?.description)
-    || `围绕「${shotTitle}」呈现 ${compactText(shot?.narration || '当前内容重点', 34)}`;
+  const description = normalizeUltimateCanvasText(safeString(current?.visualSummaryZh || current?.promptZh || visual.description || shot?.visual?.description))
+    || `围绕「${shotTitle}」在 16:9 横版画面里呈现 ${compactText(shot?.narration || '当前内容重点', 34)}`;
   const dataHighlightsZh = normalizePromptDataHighlightsZh(current?.dataPoints || shot?.dataPoints, shot);
   const comparisonSummaryZh = safeString(current?.comparisonSummaryZh)
     || summarizePromptComparisonsZh(current?.comparisons || shot?.comparisons, shot);
-  const promptZh = safeString(current?.promptZh)
-    || `9:16 竖屏画面，${description}，重点突出 ${focus}，保留标题留白，保证主体和信息一眼能看懂。`;
+  const promptZh = ensureUltimateCanvasPrompt(safeString(current?.promptZh))
+    || `16:9 横版画面，1920x1080，采用 ${family} 模板风格，${description}，重点突出 ${focus}，保留标题留白，保证主体和信息一眼能看懂。`;
   const negativePromptZh = safeString(current?.negativePromptZh)
     || [
       '避免主体模糊',
       '避免画面元素堆叠',
       '避免文字不可读',
+      '避免竖屏构图',
       shot?.type === '对比' ? '避免左右信息失衡' : '避免焦点分散',
     ].join('、');
-  const visualSummaryZh = safeString(current?.visualSummaryZh)
+  const visualSummaryZh = normalizeUltimateCanvasText(safeString(current?.visualSummaryZh))
     || [description, focus ? `画面重点是 ${focus}` : '', comparisonSummaryZh].filter(Boolean).join('，');
 
   return {
@@ -944,20 +1419,35 @@ function normalizeStep5Payload(payload, input) {
     ? nextPayload.prompts
     : {};
   const byShotId = prompts.byShotId && typeof prompts.byShotId === 'object' ? prompts.byShotId : {};
-  const shots = buildStep4Slots({ shots: input?.shotsState }, input);
+  const shots = Array.isArray(nextPayload.shots)
+    ? nextPayload.shots
+    : (Array.isArray(input?.shotsState) && input.shotsState.length > 0 ? input.shotsState : buildStep4Slots({shots: input?.shotsState}, input));
 
   prompts.byShotId = shots.reduce((acc, shot) => {
     const current = byShotId[shot.id] && typeof byShotId[shot.id] === 'object'
       ? byShotId[shot.id]
       : {};
-    const promptText = safeString(current.imagePrompt || current.prompt)
-      || `9:16 竖屏，${compactText(shot.visual?.description, 56)}，${compactText(shot.narration, 40)}，${shot.visual?.focus}`;
+    const family = safeString(current?.sceneFamily || current?.family || shot?.sceneFamily || shot?.family)
+      || inferUltimateSceneFamily(shot, 0, 1);
+    const templateCandidates = Array.isArray(current?.templateCandidates) && current.templateCandidates.length > 0
+      ? uniqueBy(current.templateCandidates.filter((item) => ULTIMATE_SCENE_FAMILIES.has(item)), (item) => item).slice(0, 6)
+      : Array.isArray(shot?.templateCandidates) && shot.templateCandidates.length > 0
+        ? uniqueBy(shot.templateCandidates.filter((item) => ULTIMATE_SCENE_FAMILIES.has(item)), (item) => item).slice(0, 6)
+        : buildStep4TemplateCandidates(family, 1);
+    const promptText = ensureUltimateCanvasPrompt(safeString(current.imagePrompt || current.prompt))
+      || `16:9 横版，1920x1080，${compactText(shot.visual?.description, 56)}，${compactText(shot.narration, 40)}，重点突出 ${shot.visual?.focus || getSceneFocusForFamily(family)}`;
     const display = buildStep5DisplayFields(shot, current);
     acc[shot.id] = {
       ...current,
       ...display,
       prompt: promptText,
       imagePrompt: promptText,
+      family,
+      sceneFamily: family,
+      templateCandidates,
+      canvasRatio: '16:9',
+      canvasWidth: 1920,
+      canvasHeight: 1080,
       visual: current.visual || shot.visual,
       dataPoints: Array.isArray(current.dataPoints) ? current.dataPoints : shot.dataPoints,
       comparisons: Array.isArray(current.comparisons) ? current.comparisons : shot.comparisons,
@@ -966,6 +1456,10 @@ function normalizeStep5Payload(payload, input) {
     return acc;
   }, {});
   nextPayload.prompts = prompts;
+  nextPayload.shots = shots;
+  nextPayload.scenePlan = buildStep4ScenePlanMetadata(shots, input);
+  nextPayload.templateCatalog = clone(ULTIMATE_TEMPLATE_CATALOG);
+  nextPayload.visualSystem = 'ultimate-1080p';
   return nextPayload;
 }
 
@@ -1023,7 +1517,7 @@ function resolveStylePreset(input) {
 
 function buildProjectBuildPayload(input) {
   const projectId = safeString(input?.projectState?.id) || 'default';
-  const template = safeString(input?.pipelineState?.render?.template) || 'caption';
+  const template = safeString(input?.pipelineState?.render?.template) || 'ultimate';
   const quality = safeString(input?.pipelineState?.render?.quality) || 'high';
   const stylePreset = resolveStylePreset(input);
   const compositionId = template === 'ultimate' ? 'UltimateSceneTemplate' : 'OpenClawVideo';
@@ -1064,7 +1558,7 @@ function normalizeStep8Payload(payload, input) {
     : {};
   const shotDuration = (Array.isArray(input?.shotsState) ? input.shotsState : [])
     .reduce((sum, shot) => sum + toNumber(shot?.durationSeconds, 0), 0);
-  const template = safeString(render.template) || 'caption';
+  const template = safeString(render.template) || 'ultimate';
   const isUltimate = template === 'ultimate';
 
   render.template = template;
@@ -1238,21 +1732,34 @@ function evaluateStep3(payload) {
 
 function evaluateStep4(payload) {
   const shots = Array.isArray(payload?.shots) ? payload.shots : [];
+  const families = uniqueBy(
+    shots
+      .map((shot) => safeString(shot?.sceneFamily || shot?.family))
+      .filter((family) => family && family !== 'hero' && family !== 'cta'),
+    (family) => family,
+  );
   const issues = [];
   const suggestions = [];
-  if (shots.length !== 6) issues.push('分镜未对齐固定 6 镜头结构');
+  if (shots.length < 6) issues.push('场景数量不足，尚未形成完整的 Ultimate 章节化结构');
+  if (!shots.every((shot) => ULTIMATE_SCENE_FAMILIES.has(safeString(shot?.sceneFamily || shot?.family)))) {
+    issues.push('存在未命中 Ultimate family 的场景');
+  }
+  if (families.length < Math.min(4, Math.max(1, shots.length - 2))) {
+    suggestions.push('中段 family 多样性偏低，建议增加对比、证据、架构、图表类模板');
+  }
   if (shots.some((shot) => toNumber(shot?.durationSeconds, 0) < 3 || toNumber(shot?.durationSeconds, 0) > 15)) {
-    suggestions.push('建议把镜头时长继续压到 3-15 秒区间');
+    suggestions.push('建议把场景时长继续压到 3-15 秒区间');
   }
 
   return buildEvaluation(
     4,
-    'video-pipeline-storyboard',
+    'video-pipeline-scene-planner',
     {
-      durationAccuracy: shots.length === 6 ? 86 : 60,
+      durationAccuracy: shots.length >= 6 ? 88 : 56,
       rhythm: shots.every((shot) => toNumber(shot?.durationSeconds, 0) >= 3) ? 84 : 64,
-      structure: shots.every((shot) => safeString(shot?.level) && safeString(shot?.type)) ? 90 : 66,
-      completeness: shots.length === 6 && shots.every((shot) => Array.isArray(shot?.keywords)) ? 88 : 68,
+      structure: shots.every((shot) => safeString(shot?.level) && safeString(shot?.type) && safeString(shot?.sceneFamily || shot?.family)) ? 92 : 64,
+      completeness: shots.every((shot) => Array.isArray(shot?.keywords) && Array.isArray(shot?.templateCandidates)) ? 90 : 66,
+      diversity: families.length >= 4 ? 88 : families.length >= 3 ? 74 : 58,
     },
     issues,
     suggestions,
@@ -1266,20 +1773,25 @@ function evaluateStep5(payload, input) {
   const promptList = Object.values(prompts);
   const targetCount = Array.isArray(input?.shotsState) ? input.shotsState.length : 0;
   const issues = [];
-  if (promptList.length === 0) issues.push('没有生成任何分镜 prompt');
-  if (targetCount > 0 && promptList.length !== targetCount) issues.push('prompt 数量与镜头数量不一致');
+  if (promptList.length === 0) issues.push('没有生成任何场景 prompt');
+  if (targetCount > 0 && promptList.length !== targetCount) issues.push('prompt 数量与场景数量不一致');
+  if (!promptList.every((item) => safeString(item?.sceneFamily || item?.family))) issues.push('存在缺少 family 的视觉 prompt');
+  if (!promptList.every((item) => safeString(item?.canvasRatio || '').includes('16:9') || (toNumber(item?.canvasWidth, 0) >= toNumber(item?.canvasHeight, 0) && toNumber(item?.canvasWidth, 0) > 0))) {
+    issues.push('存在未对齐 16:9 横版的视觉 prompt');
+  }
 
   return buildEvaluation(
     5,
-    'video-pipeline-storyboard',
+    'video-pipeline-scene-prompts',
     {
       specificity: promptList.every((item) => safeString(item?.imagePrompt || item?.prompt).length >= 24) ? 88 : 64,
       coverage: targetCount > 0 && promptList.length === targetCount ? 90 : 62,
-      structure: promptList.every((item) => Array.isArray(item?.keywords) && item?.keywords.length > 0) ? 86 : 66,
-      consistency: promptList.every((item) => item?.visual && item?.dataPoints) ? 84 : 68,
+      structure: promptList.every((item) => Array.isArray(item?.keywords) && item?.keywords.length > 0 && safeString(item?.sceneFamily || item?.family)) ? 88 : 64,
+      consistency: promptList.every((item) => item?.visual && item?.dataPoints && safeString(item?.promptZh || item?.prompt).includes('16:9')) ? 86 : 66,
+      canvasFit: promptList.every((item) => safeString(item?.canvasRatio || '').includes('16:9')) ? 92 : 60,
     },
     issues,
-    ['建议继续补充 visual / dataPoints / comparisons，方便图像和 Step 7 复用。'],
+    ['建议继续补充 visual / dataPoints / comparisons / templateCandidates，方便图像和 Ultimate 渲染复用。'],
   );
 }
 
@@ -1288,8 +1800,8 @@ function evaluateStep6(payload, input) {
   const script = Array.isArray(voice.script) ? voice.script : [];
   const shotCount = Array.isArray(input?.shotsState) ? input.shotsState.length : 0;
   const issues = [];
-  if (script.length === 0) issues.push('缺少逐镜配音脚本');
-  if (shotCount > 0 && script.length !== shotCount) issues.push('配音脚本数量与镜头数量不一致');
+  if (script.length === 0) issues.push('缺少逐场景配音脚本');
+  if (shotCount > 0 && script.length !== shotCount) issues.push('配音脚本数量与场景数量不一致');
 
   return buildEvaluation(
     6,

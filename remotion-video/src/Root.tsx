@@ -2,13 +2,11 @@ import {registerRoot} from 'remotion';
 import {Composition} from 'remotion';
 import {FPS, TOTAL_DURATION_SEC, VIDEO_HEIGHT, VIDEO_WIDTH} from './data/storyboard';
 import type {SRTSubtitle} from './components/SRTParser';
-import Video1v4 from './compositions/Video1v4';
 import FileBackedOpenClawVideo from './compositions/FileBackedOpenClawVideo';
 import FileBackedUltimateSceneTemplate from './compositions/FileBackedUltimateSceneTemplate';
 import UltimateElementsLibrary, {ULTIMATE_ELEMENTS_LIBRARY_DURATION} from './compositions/UltimateElementsLibrary';
 import {type UltimateProjectConfig, getUltimateProjectDuration} from './components/ultimate-kit';
 import {ULTIMATE_SCENE_DEMO} from './data/ultimateSceneDemo';
-import {SEGMENTS, TRANSITION_FRAMES} from './data/segments_meta_v4h';
 
 export type AudioSegmentProps = {
   src: string;
@@ -148,11 +146,6 @@ const resolvePositiveInt = (value: number | undefined, fallback: number) => {
 
 const ROOT_DURATION_IN_FRAMES = resolvePositiveInt(TOTAL_DURATION_SEC * FPS, FPS);
 
-// Video1v4 总帧数：从合同计算
-const VIDEO1V4_TOTAL_FRAMES = SEGMENTS.length > 0
-  ? SEGMENTS[SEGMENTS.length - 1].start + SEGMENTS[SEGMENTS.length - 1].frames + TRANSITION_FRAMES
-  : 7169;
-
 export const RemotionRoot: React.FC = () => {
   return (
     <>
@@ -179,16 +172,6 @@ export const RemotionRoot: React.FC = () => {
         }}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         defaultProps={DEFAULT_PROPS as any}
-      />
-      {/* Video1v4 生产合同（video-gen 迁移） */}
-      <Composition
-        id="Video1v4"
-        component={Video1v4}
-        durationInFrames={VIDEO1V4_TOTAL_FRAMES}
-        fps={FPS}
-        width={1080}
-        height={1920}
-        defaultProps={{directorPresetId: 'clean-tiktok'}}
       />
       <Composition
         id="UltimateElementsLibrary"

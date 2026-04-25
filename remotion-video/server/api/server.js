@@ -771,7 +771,7 @@ function resolveImageDisplayPayload(item, shotMeta, shotId) {
     || shotMeta?.visual?.description
     || shotMeta?.narration
     || item?.prompt
-    || '围绕当前镜头生成竖屏视觉',
+    || '围绕当前场景生成 16:9 横版视觉',
   ).trim();
   const focus = String(
     item?.visualFocusZh
@@ -799,15 +799,15 @@ function resolveImageDisplayPayload(item, shotMeta, shotId) {
 }
 
 function buildInlineFallbackImageSvg({ title, subtitle, contentText, shotId }) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920">
-<rect width="1080" height="1920" fill="#09070d"/>
-<rect x="72" y="100" width="936" height="1720" rx="32" fill="rgba(9,7,13,0.68)" stroke="#8b5cf6" stroke-opacity="0.4"/>
-<text x="120" y="220" fill="#fff" font-size="58" font-weight="800" font-family="PingFang SC,Microsoft YaHei,Arial">${escapeXml(title || '镜头')}</text>
-${subtitle ? `<text x="120" y="300" fill="#c4b5fd" font-size="30" font-weight="600" font-family="PingFang SC,Microsoft YaHei,Arial">${escapeXml(subtitle)}</text>` : ''}
-<foreignObject x="100" y="360" width="880" height="1240">
-<div xmlns="http://www.w3.org/1999/xhtml" style="color:#ddd6fe;font-size:28px;line-height:1.72;font-family:PingFang SC,Microsoft YaHei,Arial;white-space:pre-wrap;word-break:break-word;">${escapeXml(contentText || '等待镜头内容')}</div>
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080">
+<rect width="1920" height="1080" fill="#09070d"/>
+<rect x="96" y="72" width="1728" height="936" rx="36" fill="rgba(9,7,13,0.68)" stroke="#38bdf8" stroke-opacity="0.45"/>
+<text x="144" y="188" fill="#fff" font-size="58" font-weight="800" font-family="PingFang SC,Microsoft YaHei,Arial">${escapeXml(title || '场景')}</text>
+${subtitle ? `<text x="144" y="258" fill="#7dd3fc" font-size="30" font-weight="600" font-family="PingFang SC,Microsoft YaHei,Arial">${escapeXml(subtitle)}</text>` : ''}
+<foreignObject x="132" y="316" width="1656" height="548">
+<div xmlns="http://www.w3.org/1999/xhtml" style="color:#e0f2fe;font-size:30px;line-height:1.7;font-family:PingFang SC,Microsoft YaHei,Arial;white-space:pre-wrap;word-break:break-word;">${escapeXml(contentText || '等待场景内容')}</div>
 </foreignObject>
-<text x="120" y="1780" fill="rgba(255,255,255,0.5)" font-size="24" font-family="PingFang SC,Microsoft YaHei,Arial">镜头 ${escapeXml(shotId || '')}</text>
+<text x="144" y="944" fill="rgba(255,255,255,0.5)" font-size="24" font-family="PingFang SC,Microsoft YaHei,Arial">Scene ${escapeXml(shotId || '')}</text>
 </svg>`;
 }
 

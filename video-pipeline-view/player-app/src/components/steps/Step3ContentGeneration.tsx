@@ -606,8 +606,8 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
         <div className="wf-confirm-row">
           <div className="wf-confirm-note">
             {confirmed
-              ? '当前文案已确认，可继续拆成分镜结构。'
-              : '确认后，Step 4 将直接按这版 Hook / Body / CTA 拆分镜。'}
+              ? '当前文案已确认，可继续拆成场景结构。'
+              : '确认后，Step 4 将直接按这版 Hook / Body / CTA 拆场景。'}
           </div>
           <button
             type="button"

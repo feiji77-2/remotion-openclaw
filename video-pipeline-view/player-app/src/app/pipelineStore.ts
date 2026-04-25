@@ -111,7 +111,7 @@ function createInitialPipelineSessionState(): PipelineSessionState {
     selectedAnalysis: null,
     selectedTitleId: null,
     stepConfirmed: {},
-    selectedShotId: DEFAULT_SHOTS[0].id,
+    selectedShotId: DEFAULT_SHOTS[0]?.id || '',
     playbackResetKey: 0,
     hasHydrated: false,
   };

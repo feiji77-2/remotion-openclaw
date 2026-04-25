@@ -137,7 +137,7 @@ export const Step4ShotStructure: React.FC<Step4ShotStructureProps> = ({
                   className="wf-edit-textarea"
                   value={shot.narration || ''}
                   onChange={e => updateShot(idx, 'narration', e.target.value)}
-                  placeholder="旁白台词 / 镜头描述"
+                  placeholder="旁白台词 / 场景描述"
                   rows={3}
                 />
               </>
@@ -158,8 +158,8 @@ export const Step4ShotStructure: React.FC<Step4ShotStructureProps> = ({
 
         {display.length === 0 && !editing && (
           <div className="wf-empty-visual">
-            <div className="wf-empty-title">暂无分镜数据</div>
-            <div className="wf-empty-text">生成后将在这里展示分镜结构</div>
+            <div className="wf-empty-title">暂无场景数据</div>
+            <div className="wf-empty-text">生成后将在这里展示场景编排结果</div>
           </div>
         )}
       </div>
@@ -168,10 +168,10 @@ export const Step4ShotStructure: React.FC<Step4ShotStructureProps> = ({
         {editing ? (
           <>
             <button type="button" className="wf-btn wf-btn-add-block" onClick={addShot}>
-              + 添加镜头
+              + 添加场景
             </button>
             <button type="button" className="wf-btn wf-btn-save" onClick={saveEditor}>
-              保存分镜
+              保存场景
             </button>
             <button type="button" className="wf-btn wf-btn-cancel" onClick={cancelEditor}>
               取消
@@ -193,7 +193,7 @@ export const Step4ShotStructure: React.FC<Step4ShotStructureProps> = ({
               onClick={onConfirm}
               disabled={loading}
             >
-              {confirmed ? '✓ 已确认分镜' : '确认当前分镜'}
+              {confirmed ? '✓ 已确认场景' : '确认当前场景'}
             </button>
           </>
         ) : null}

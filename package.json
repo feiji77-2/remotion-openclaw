@@ -32,6 +32,6 @@
     "typecheck": "npm --prefix video-pipeline-view/player-app run typecheck && npm --prefix remotion-video run typecheck && node --check remotion-video/server/api/server.js && node --check remotion-video/server/workers/renderWorker.js && node --check remotion-video/server/workflow/skillRegistry.js && node --check remotion-video/server/workflow/step123/pipeline.js",
     "build:video": "npm --prefix remotion-video run build",
     "build": "npm --prefix video-pipeline-view/player-app run build",
-    "release:check": "npm run clean && npm run test && npm run typecheck && npm run build && node remotion-video/scripts/clean-runtime.mjs --check"
+    "release:check": "npm run clean && npm run test && npm run typecheck && npm run build && npm run remotion-video:clean:runtime && node remotion-video/scripts/clean-runtime.mjs --check"
   }
 }

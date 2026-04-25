@@ -272,8 +272,10 @@ export function getSelectedTitle(options: PipelineTitleOption[] | undefined, sel
 
 export function normalizeShots(updated: Array<Partial<Shot>>, currentShots: Shot[]) {
   return updated.map((shot, index) => ({
+    ...(currentShots.find((item) => item.id === shot.id) || currentShots[index] || {}),
+    ...(shot || {}),
     id: shot.id || currentShots[index]?.id || `shot-${String(index + 1).padStart(2, '0')}`,
-    title: shot.title || currentShots[index]?.title || `镜头 ${index + 1}`,
+    title: shot.title || currentShots[index]?.title || `场景 ${index + 1}`,
     narration: shot.narration || currentShots[index]?.narration || '',
     durationSeconds: Math.max(0.1, Number(shot.durationSeconds ?? currentShots[index]?.durationSeconds ?? 5) || 5),
   }));

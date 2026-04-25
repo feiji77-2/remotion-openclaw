@@ -8,6 +8,20 @@ export interface Shot {
   title: string;
   narration: string;
   durationSeconds: number;
+  level?: string;
+  type?: string;
+  family?: string;
+  sceneFamily?: string;
+  templateCandidates?: string[];
+  dataPoints?: string[];
+  keywords?: string[];
+  comparisons?: Array<{left?: string; right?: string; [key: string]: any}>;
+  visual?: {
+    description?: string;
+    focus?: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
 }
 
 export interface ProjectState {

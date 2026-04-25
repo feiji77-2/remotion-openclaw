@@ -684,21 +684,21 @@ export const Step6VoiceScript: React.FC<Step6VoiceScriptProps> = ({
             <span style={{width: `${Math.max(4, voiceProgress)}%`}} />
           </div>
           <div className="wf-image-progress-meta">
-            <span>正在逐镜生成音频，可继续查看脚本与已完成片段。</span>
+            <span>正在逐场景生成音频，可继续查看脚本与已完成片段。</span>
           </div>
         </div>
       ) : null}
 
       <div className="wf-voice-script-list">
         <div className="wf-copy-block-label" style={{marginBottom: 8}}>
-          <span>逐镜配音脚本</span>
+          <span>逐场景配音脚本</span>
         </div>
         {currentScript.map((shot, index) => {
           const shotMeta = shots.find((item) => item.id === shot.shotId);
           return (
             <div key={shot.shotId} className="wf-voice-shot-item">
               <div className="wf-voice-shot-header">
-                <span className="wf-shot-badge">镜 {index + 1}</span>
+                <span className="wf-shot-badge">场景 {index + 1}</span>
                 <span className="wf-shot-title">{shotMeta?.title || shot.shotId}</span>
                 <span className="wf-shot-duration">~{Math.round(toNumber(shot.duration, shotMeta?.durationSeconds || 5))}s</span>
               </div>

@@ -591,7 +591,7 @@ export function usePipelineOrchestrator() {
     setSelectedAnalysis(null);
     setSelectedTitleId(null);
     setShotsState(DEFAULT_SHOTS);
-    setSelectedShotId(DEFAULT_SHOTS[0].id);
+    setSelectedShotId(DEFAULT_SHOTS[0]?.id || '');
     setVoiceJobId(null);
     setVoiceJobResult(null);
     setVoiceJobStatus('idle');
@@ -694,13 +694,13 @@ export function usePipelineOrchestrator() {
       const shotIds = byShotId ? Object.keys(byShotId) : [];
       if (!shotIds.length) {
         setImageStatus('error');
-        throw new Error('请先生成 Step 5 的提示词（需要先有分镜结构）');
+        throw new Error('请先生成 Step 5 的视觉提示词（需要先有场景编排）');
       }
 
       const missingShots = shotIds.filter((id) => !byShotId?.[id]?.prompt?.trim());
       if (missingShots.length > 0) {
         setImageStatus('error');
-        throw new Error(`以下镜头缺少 prompt 内容：${missingShots.join(', ')}。请先确认 Step 5 内容完整。`);
+        throw new Error(`以下场景缺少 prompt 内容：${missingShots.join(', ')}。请先确认 Step 5 内容完整。`);
       }
 
       const data = await callJson(`${apiBase}/api/images/generate`, {

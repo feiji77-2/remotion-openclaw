@@ -1,106 +1,134 @@
 # OpenClaw Remotion Video Pipeline Architecture
 
-> 更新：2026-04-11
+> 更新：2026-04-25
 
-当前仓库已经收成独立发布形态：前端工作台负责 Step 1-8 编排，`remotion-video` 负责 Skill 解析、工作流生成、配音、图片、项目构建和渲染导出；仓库根只保留当前主链路与少量升级归档。
+当前仓库的主运行链路已经统一为 Ultimate 横版场景系统。Step 4 / 5 不再使用 `video-pipeline-storyboard` 固定 6 镜头合同，而是改为可变场景数的 `scene planner + scene prompts`。
 
 ## 1. 工程分层
 
 | 层 | 目录 | 职责 |
-|---|---|---|
+| --- | --- | --- |
 | 前端工作台 | `video-pipeline-view/player-app` | Step 1-8 UI、localStorage 持久化、任务轮询、结果确认 |
 | API / Worker | `remotion-video/server` | Workflow、Skill catalog、图片任务、配音任务、渲染任务 |
-| Remotion 运行时 | `remotion-video/src` | 组合、字幕、镜头渲染、动态 render plan |
-| 运行时素材 | `remotion-video/src/assets` | Remotion 运行时实际使用的图标和视觉资源 |
-| 升级归档 | `docs/archive/` | 少量保留的升级计划文档，不参与 CI 和运行链路 |
+| Remotion 运行时 | `remotion-video/src` | `UltimateSceneTemplate`、`OpenClawVideo`、动态 render plan |
+| 运行时素材 | `remotion-video/src/assets` | 图标、视觉素材、运行时资源 |
+| 文档 / 审计 | `remotion-video/docs` | 20 模板表、风格命中表、主链路说明 |
 
 ## 2. 总体链路
 
 ```mermaid
 flowchart LR
   UI["player-app<br/>Step 1-8 工作台"] --> API["Pipeline API<br/>Express"]
-  API --> SKILLS["Skill Registry<br/>9 个 SKILL.md adapter"]
+  API --> SKILLS["Skill Registry<br/>scene planner / scene prompts / audio / render"]
   API --> WF["Workflow Generator<br/>Step 1-8 payload"]
   API --> IMG["Image Jobs<br/>/api/images"]
-  API --> VOICE["Voice Jobs<br/>ChatTTS / Melo / OpenVoice"]
+  API --> VOICE["Voice Jobs<br/>ChatTTS / Melo / OpenVoice / XTTS / Qwen / CosyVoice"]
   API --> QUEUE["Queue<br/>FileQueue / BullMQ"]
   QUEUE --> WORKER["Render Worker"]
-  WORKER --> REMOTION["Remotion Runtime<br/>PipelineStoryboardVideo"]
+  WORKER --> REMOTION["Remotion Runtime<br/>UltimateSceneTemplate"]
   REMOTION --> OUTPUT["MP4 / WebM / GIF<br/>预览 + 下载"]
 ```
 
 ## 3. Step 1-8 职责
 
 | Step | 名称 | 真源 Skill | 当前职责 |
-|---|---|---|---|
-| 1 | 逻辑分析 | `video-pipeline-analysis` | 标题相关检索、事实提炼、分析骨架 |
-| 2 | 标题生成 | `video-pipeline-title` | 标题策略、多角度标题池、入选标题 |
+| --- | --- | --- | --- |
+| 1 | 逻辑分析 | `video-pipeline-analysis` | 搜索、事实提炼、分析骨架 |
+| 2 | 标题生成 | `video-pipeline-title` | 多角度标题池、入选标题 |
 | 3 | 内容生成 | `video-pipeline-content` | Hook / Body / CTA、目标口播时长、去 AI 味控制 |
-| 4 | 分镜结构 | `video-pipeline-storyboard` | 固定 6 镜头结构、时长与层级 |
-| 5 | 分镜图提示词 | `video-pipeline-storyboard` | 每镜视觉语义、中文提示词、图片任务状态 |
-| 6 | 配音脚本 | `video-pipeline-audio` | 中文音色配置、逐镜脚本、时长统计、TTS 提交 |
+| 4 | 场景编排 | `video-pipeline-scene-planner` | 生成 `6-12` 个横版场景，预分配 `sceneFamily` 与 `templateCandidates` |
+| 5 | 视觉提示词 | `video-pipeline-scene-prompts` | 为每个场景生成 `16:9 / 1920x1080` 的视觉提示词与图片任务字段 |
+| 6 | 配音脚本 | `video-pipeline-audio` | 中文音色配置、逐场景脚本、时长统计、TTS 提交 |
 | 7 | Remotion 项目生成 | `remotion-video-maker` | 复用现有工程、composition、buildStatus、renderCommand |
-| 8 | 渲染设置 | `video-pipeline-video` | 模板、格式、质量、预览与下载导出 |
+| 8 | 渲染设置 | `video-pipeline-video` | 默认 `ultimate` 模板、最终参数、预览与导出 |
 
 ## 4. Skill 真源层
 
-后端通过 `remotion-video/server/workflow/skillRegistry.js` 显式注册 9 个已知 Skill，而不是做通用 Markdown 猜测解析。
+后端通过 `remotion-video/server/workflow/skillRegistry.js` 显式注册 Skill，并把每个 Skill 归一化成统一 `SkillSpec`。
 
 固定映射：
 
 - Step 1：`video-pipeline-analysis`
 - Step 2：`video-pipeline-title`
 - Step 3：`video-pipeline-content`
-- Step 4 / 5：`video-pipeline-storyboard`
+- Step 4：`video-pipeline-scene-planner`
+- Step 5：`video-pipeline-scene-prompts`
 - Step 6：`video-pipeline-audio`
 - Step 7：`remotion-video-maker`
 - Step 8：`video-pipeline-video`
 - 主控：`video-pipeline-master`
 - 质检：`video-pipeline-eval`
 
-每个 Skill 会被归一化成统一 `SkillSpec`，供以下位置复用：
+Step 4 / 5 的 skill source 不再依赖用户本机 `~/.openclaw` 里的旧文件，而是直接指向仓库内文档：
 
-- `GET /api/skills/catalog`
-- `GET /api/skills/:skillId`
-- `POST /api/workflow/generate`
-- 右侧“当前 Step 作战台”
+- `remotion-video/docs/workflow-skills/video-pipeline-scene-planner.SKILL.md`
+- `remotion-video/docs/workflow-skills/video-pipeline-scene-prompts.SKILL.md`
 
-## 5. 当前生成策略
+## 5. 20 模板系统
 
-### Step 1-3
+当前主链路使用 `Ultimate 20` 模板 family：
 
-- 已改成快响应链路
-- 生成前先读当前 Step Skill 覆盖层
-- Step 1 真实使用标题关键词与检索结果
-- Step 2 依赖已确认的 Step 1
-- Step 3 依赖已确认标题，并支持：
-  - 目标口播时长
-  - 自动折算常规口播字数
-  - 去 AI 味强度
-  - 拟人口播人设
+- `hero`
+- `feature-rail`
+- `focus`
+- `step-flow`
+- `timeline`
+- `compare-board`
+- `number-strip`
+- `terminal`
+- `evidence-wall`
+- `tag-matrix`
+- `code`
+- `architecture-map`
+- `metrics`
+- `data-stream`
+- `memory-graph`
+- `pipeline-flow`
+- `benchmark-chart`
+- `quote-highlight`
+- `glossary-term`
+- `cta`
 
-### Step 4-5
+硬规则：
 
-- 以固定 6 镜头结构为主线
-- Step 4 负责镜头结构
-- Step 5 负责中文视觉描述与图片任务
-- 图片任务通过 `/api/images/generate` 提交，`/api/images/:jobId` 轮询
+- 第一屏固定 `hero`
+- 最后一屏固定 `cta`
+- 中段场景优先保持 family 多样性
+- Step 5 默认输出 `16:9 / 1920x1080`
 
-### Step 6
+详细说明见：
 
-- 默认引擎：`ChatTTS`
-- 回退顺序：`ChatTTS -> Melo -> OpenVoice`
-- 后端真实读取前端中文配置，不再只看旧 preset 文本
+- [remotion-video/docs/ultimate-20-template-audit.zh-CN.md](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/ultimate-20-template-audit.zh-CN.md)
+- [remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md)
 
-### Step 7-8
+## 6. 关键数据合同
 
-- Step 7 只负责项目构建摘要，不自动渲染
-- Step 8 只负责最终渲染参数、播放、下载
-- 渲染时直接消费当前 Step 4 / 5 / 6 的真实结果，而不是写死旧分镜
+Step 4 输出重点：
 
-## 6. API 面
+- `shots[]`
+- `shots[].sceneFamily`
+- `shots[].templateCandidates`
+- `scenePlan`
+- `templateCatalog`
 
-核心接口如下：
+Step 5 输出重点：
+
+- `prompts.byShotId`
+- `prompts.byShotId[].sceneFamily`
+- `prompts.byShotId[].prompt`
+- `prompts.byShotId[].promptZh`
+- `prompts.byShotId[].canvasRatio`
+- `prompts.byShotId[].canvasWidth`
+- `prompts.byShotId[].canvasHeight`
+
+编译到 Ultimate 时：
+
+- `run-search-to-ultimate.mjs` 会继续保留 `family / sceneFamily / templateCandidates`
+- `ultimate-project-adapter.js` 根据这些字段和内容语义生成最终 scenes
+
+## 7. API 面
+
+核心接口：
 
 - `GET /health`
 - `GET /api/skills/catalog`
@@ -125,41 +153,32 @@ flowchart LR
 - `POST /api/render/:jobId/retry`
 - `POST /api/voice/:jobId/retry`
 
-这些接口建议使用独立 `PIPELINE_ADMIN_KEY`，不要和普通提交/状态查询流量共用权限。
+## 8. 默认发布出口
 
-## 7. 持久化与产物
+- 默认 Composition：`UltimateSceneTemplate`
+- 默认 build / preview 脚本：`remotion-video/package.json`
+- 默认横版参数：`1920x1080 / 30fps`
+- 图片回退 SVG 也已切到横版
 
-前端：
+仓库里仍保留部分历史组合代码作为存量资产，但它们不再是主线工作流的默认出口。
 
-- `pipelineState`
-- Step 级编辑草稿
-- 当前任务状态与最近渲染结果
+## 9. 发布校验
 
-后端运行时产物：
-
-- `remotion-video/public/assets/`
-- `remotion-video/runtime/jobs/`
-- `remotion-video/public/voice/`
-
-这些目录现在视为本地产物，不再属于发布面的一部分，已由根目录 `.gitignore` 屏蔽。
-
-## 8. 发布校验
-
-当前仓库对外只保留真实可执行的公开脚本：
+对外公开的主校验脚本：
 
 - `npm run clean`
+- `npm run test`
 - `npm run typecheck`
 - `npm run build`
 - `npm run build:video`
 - `npm run release:check`
 
-其中 `release:check` 是提交 GitHub 前唯一主校验入口，会执行：
+其中 `release:check` 会执行：
 
 - 运行产物清理
+- 后端测试
 - 前端 typecheck
 - Remotion typecheck
 - 后端关键文件 `node --check`
 - 前端 build
-- 运行目录只剩 `.gitkeep` 的最终校验
-
-GitHub Actions 也只跑这条真实链路，不再保留假 `lint`、假 `test` 或临时命令拼装。
+- 运行目录清洁检查

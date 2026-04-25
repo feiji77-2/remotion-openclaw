@@ -1,5 +1,5 @@
 /**
- * Step 5 可视化：分镜图提示词与生成进度
+ * Step 5 可视化：视觉提示词与生成进度
  */
 
 import React, {useMemo, useState} from 'react';
@@ -90,8 +90,8 @@ function getPromptSummary(prompt: ShotPrompt, shot: PromptShotMeta) {
   const explicitSummary = prompt.visualSummaryZh || prompt.promptZh || prompt.visual?.description || shot.visual?.description;
   if (explicitSummary) return explicitSummary;
   if (prompt.prompt && !looksMostlyEnglish(prompt.prompt)) return prompt.prompt;
-  if (shot.narration) return `围绕这段镜头内容生成竖屏画面：${shot.narration}`;
-  return '当前镜头已生成可用画面提示，可直接继续出图。';
+  if (shot.narration) return `围绕这段场景内容生成 16:9 横版画面：${shot.narration}`;
+  return '当前场景已生成可用画面提示，可直接继续出图。';
 }
 
 function getPromptFocus(prompt: ShotPrompt, shot: PromptShotMeta) {
@@ -161,10 +161,10 @@ export const Step5Prompts: React.FC<Step5PromptsProps> = ({
   if (!hasContent) {
     return (
       <div className="wf-empty-visual">
-        <div className="wf-empty-title">分镜图工作台</div>
+        <div className="wf-empty-title">视觉场景工作台</div>
         <div className="wf-empty-text">
           先生成 Step 5 结果，再批量出图。<br />
-          这里会直接显示中文画面内容、图片进度和每镜状态。
+          这里会直接显示中文画面内容、图片进度和每个场景的状态。
         </div>
       </div>
     );

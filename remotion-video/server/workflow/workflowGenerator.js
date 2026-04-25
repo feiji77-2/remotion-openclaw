@@ -315,8 +315,8 @@ function getStepDescription(stepId) {
     1: '逻辑分析',
     2: '标题生成',
     3: '内容生成',
-    4: '内容结构',
-    5: '图片提示词',
+    4: '场景编排',
+    5: '视觉提示词',
     6: '配音脚本',
     7: 'Remotion 项目生成',
     8: '视频渲染设置',
@@ -403,7 +403,7 @@ function summarizeStepPayload(stepId, payload) {
 
   if (stepId === 4) {
     const shots = Array.isArray(payload) ? payload.slice(0, 6).map((shot) => `${shot.title || shot.id}(${shot.durationSeconds || 0}s)`) : [];
-    return truncate(`当前分镜：${shots.join(' / ')}`, 320);
+    return truncate(`当前场景：${shots.join(' / ')}`, 320);
   }
 
   if (stepId === 5) {
@@ -411,7 +411,7 @@ function summarizeStepPayload(stepId, payload) {
     const prompts = Object.entries(byShotId)
       .slice(0, 3)
       .map(([shotId, item]) => `${shotId}:${truncate(item?.prompt || '', 48)}`);
-    return truncate(`当前提示词：${prompts.join(' / ')}`, 320);
+    return truncate(`当前视觉提示词：${prompts.join(' / ')}`, 320);
   }
 
   if (stepId === 6) {
@@ -479,8 +479,8 @@ function buildWorkflowContext(stepId, input) {
       id: project.id || 'default',
       name: project.name || '未命名项目',
       fps: project.fps || 30,
-      width: project.width || 1080,
-      height: project.height || 1920,
+      width: project.width || 1920,
+      height: project.height || 1080,
     },
     shots: shots.map((shot) => ({
       id: shot.id,
@@ -541,8 +541,8 @@ function buildStepSchemaPrompt(stepId, context) {
         1: '新的逻辑分析不能沿用上一版 thesis 的句式，必须换一个问题框架或解释路径。',
         2: '新的标题池必须和上一版明显不同，优先输出不同角度和不同主标题，不要只替换少量词语。',
         3: '新的文案必须换 Hook 句式和主体推进顺序，不要只是润色上一版。',
-        4: '新的分镜必须调整镜头标题、叙事节奏或镜头组织方式，不要只改个别词语。',
-        5: '新的提示词必须换构图、视觉焦点或氛围设定，不要只替换单个形容词。',
+        4: '新的场景编排必须调整 scene family、叙事节奏或场景组织方式，不要只改个别词语。',
+        5: '新的视觉提示词必须换构图、scene family、视觉焦点或氛围设定，不要只替换单个形容词。',
         6: '新的配音脚本必须调整话术节奏、语气或重音安排，不要只做同义改写。',
         8: '新的渲染建议必须给出不同的模板或质量侧重点，不要重复上一版组合。',
       }[stepId] || '新的结果必须与上一版明显不同。')
@@ -596,28 +596,42 @@ function buildStepSchemaPrompt(stepId, context) {
       },
     },
     4: {
-      description: '生成按镜头组织的结构结果，保持 shot id 不变，可更新 title / narration / durationSeconds。',
+      description: '生成 Ultimate 场景编排结果，保持 shot id 不变，并补充 sceneFamily / templateCandidates / 横版结构信息。',
       shape: {
         shots: shotShape.map((shot) => ({
           id: shot.id,
           title: 'string',
           narration: 'string',
           durationSeconds: 'number',
+          level: 'string',
+          type: 'string',
+          sceneFamily: 'string',
+          templateCandidates: ['string'],
+          dataPoints: ['string'],
+          keywords: ['string'],
         })),
       },
     },
     5: {
-      description: '生成每个镜头对应的图片提示词。',
+      description: '生成每个场景对应的 16:9 横版视觉提示词。',
       shape: {
         prompts: {
           byShotId: Object.fromEntries(shotShape.map((shot) => [
             shot.id,
             {
               prompt: 'string',
+              promptZh: 'string',
               negativePrompt: 'string',
+              negativePromptZh: 'string',
               style: 'string',
               mood: 'string',
               visualFocus: 'string',
+              visualFocusZh: 'string',
+              visualSummaryZh: 'string',
+              sceneFamily: 'string',
+              templateCandidates: ['string'],
+              dataPoints: ['string'],
+              keywords: ['string'],
             },
           ])),
         },
@@ -764,10 +778,11 @@ function normalizeShotsPayload(candidate, input) {
   const currentShots = Array.isArray(input.shotsState) ? input.shotsState : [];
   const nextShots = Array.isArray(candidate.shots) ? candidate.shots : [];
 
-  // If currentShots is empty (first run), use nextShots directly
-  if (currentShots.length === 0 && nextShots.length > 0) {
+  if (nextShots.length > 0) {
     return {
       shots: nextShots.map((shot) => ({
+        ...(currentShots.find((item) => item.id === shot.id) || {}),
+        ...(shot && typeof shot === 'object' ? shot : {}),
         id: String(shot.id || '').trim() || undefined,
         title: String(shot.title || '').trim(),
         narration: String(shot.narration || '').trim(),
@@ -777,15 +792,12 @@ function normalizeShotsPayload(candidate, input) {
   }
 
   return {
-    shots: currentShots.map((shot, index) => {
-      const incoming = nextShots.find((item) => item.id === shot.id) || nextShots[index] || {};
-      return {
-        ...shot,
-        title: String(incoming.title || shot.title || '').trim(),
-        narration: String(incoming.narration || shot.narration || '').trim(),
-        durationSeconds: Math.max(0.1, toNumber(incoming.durationSeconds, shot.durationSeconds || 5)),
-      };
-    }),
+    shots: currentShots.map((shot) => ({
+      ...shot,
+      title: String(shot.title || '').trim(),
+      narration: String(shot.narration || '').trim(),
+      durationSeconds: Math.max(0.1, toNumber(shot.durationSeconds, 5)),
+    })),
   };
 }
 
@@ -800,11 +812,35 @@ function normalizePromptsPayload(candidate, input) {
     const currentPrompt = current.byShotId?.[shot.id] || {};
     const incoming = nextPrompts[shot.id] || {};
     nextByShotId[shot.id] = {
+      ...currentPrompt,
+      ...incoming,
       prompt: String(incoming.prompt || currentPrompt.prompt || '').trim(),
       negativePrompt: String(incoming.negativePrompt || currentPrompt.negativePrompt || '').trim(),
       style: String(incoming.style || currentPrompt.style || '').trim(),
       mood: String(incoming.mood || currentPrompt.mood || '').trim(),
       visualFocus: String(incoming.visualFocus || currentPrompt.visualFocus || '').trim(),
+      promptZh: String(incoming.promptZh || currentPrompt.promptZh || '').trim(),
+      visualSummaryZh: String(incoming.visualSummaryZh || currentPrompt.visualSummaryZh || '').trim(),
+      visualFocusZh: String(incoming.visualFocusZh || currentPrompt.visualFocusZh || '').trim(),
+      negativePromptZh: String(incoming.negativePromptZh || currentPrompt.negativePromptZh || '').trim(),
+      comparisonSummaryZh: String(incoming.comparisonSummaryZh || currentPrompt.comparisonSummaryZh || '').trim(),
+      family: String(incoming.family || incoming.sceneFamily || currentPrompt.family || currentPrompt.sceneFamily || shot.family || shot.sceneFamily || '').trim(),
+      sceneFamily: String(incoming.sceneFamily || incoming.family || currentPrompt.sceneFamily || currentPrompt.family || shot.sceneFamily || shot.family || '').trim(),
+      templateCandidates: Array.isArray(incoming.templateCandidates)
+        ? incoming.templateCandidates
+        : Array.isArray(currentPrompt.templateCandidates)
+          ? currentPrompt.templateCandidates
+          : Array.isArray(shot.templateCandidates)
+            ? shot.templateCandidates
+            : [],
+      canvasRatio: String(incoming.canvasRatio || currentPrompt.canvasRatio || '').trim(),
+      canvasWidth: toNumber(incoming.canvasWidth || currentPrompt.canvasWidth, 0),
+      canvasHeight: toNumber(incoming.canvasHeight || currentPrompt.canvasHeight, 0),
+      visual: incoming.visual || currentPrompt.visual || shot.visual || null,
+      dataPoints: Array.isArray(incoming.dataPoints) ? incoming.dataPoints : Array.isArray(currentPrompt.dataPoints) ? currentPrompt.dataPoints : shot.dataPoints,
+      comparisons: Array.isArray(incoming.comparisons) ? incoming.comparisons : Array.isArray(currentPrompt.comparisons) ? currentPrompt.comparisons : shot.comparisons,
+      keywords: Array.isArray(incoming.keywords) ? incoming.keywords : Array.isArray(currentPrompt.keywords) ? currentPrompt.keywords : shot.keywords,
+      imageUrl: String(incoming.imageUrl || currentPrompt.imageUrl || '').trim(),
     };
   }
 
@@ -876,7 +912,7 @@ function normalizeRenderPayload(candidate, input) {
 
   const template = ['caption', 'split', 'fullscreen', 'ultimate'].includes(nextRender.template)
     ? nextRender.template
-    : current.template || 'caption';
+    : current.template || 'ultimate';
   const quality = ['low', 'medium', 'high'].includes(nextRender.quality)
     ? nextRender.quality
     : current.quality || 'high';
@@ -1036,7 +1072,7 @@ function buildStep5FallbackProfile(skill, variant) {
   }
 
   return {
-    style: skill.style || '解释类竖屏视觉',
+    style: skill.style || '解释类横版视觉',
     mood: ['信息张力', '冷静拆解', '强对比', '未来感解释'][variant],
     visualFocus: ['主体人物 + 结构信息', '问题标题 + 核心对象', '结论文本 + 对比画面', '产品场景 + 信息层次'][variant],
     negativePrompt: skill.avoid || '模糊主体, 低清晰度, 构图混乱',
@@ -1181,7 +1217,7 @@ function createFallbackWorkflowPayload(stepId, input) {
     ];
     const ctaOptions = [
       `如果你也在关注“${topicQuery}”，接下来就按这个结构继续拆标题、文案和分镜。`,
-      `如果这条思路讲清楚了“${topicQuery}”，下一步就可以直接把它压进标题池和分镜结构。`,
+      `如果这条思路讲清楚了“${topicQuery}”，下一步就可以直接把它压进标题池和场景结构。`,
       `看懂“${topicQuery}”之后，接下来就用这套逻辑继续做标题和镜头设计。`,
       `如果你想把“${topicQuery}”讲成一条能传播的视频，下一步就继续把这套判断做成标题和镜头。`,
     ];
@@ -1260,15 +1296,18 @@ function createFallbackWorkflowPayload(stepId, input) {
     shots.forEach((shot) => {
       byShotId[shot.id] = {
         prompt: [
-          `为镜头“${shot.title}”生成 9:16 竖屏视觉，重点表现 ${truncate(shot.narration, 32)}，采用${profile.style}表达，突出 ${currentSkill.emphasis || profile.visualFocus}，主体清晰，信息层次明确。`,
-          `围绕“${shot.title}”设计竖屏主画面，核心呈现 ${truncate(shot.narration, 32)}，整体走${profile.style}方向，保留标题留白与强视觉焦点。`,
-          `给“${shot.title}”生成高识别度的 9:16 视觉，画面围绕 ${truncate(shot.narration, 32)} 展开，用${profile.style}强化首屏理解和传播感。`,
-          `把“${shot.title}”做成适合短视频解释的主画面，强调 ${truncate(shot.narration, 32)}，视觉风格采用${profile.style}，重点突出 ${currentSkill.emphasis || profile.visualFocus}。`,
+          `为场景“${shot.title}”生成 16:9 横版视觉，重点表现 ${truncate(shot.narration, 32)}，采用${profile.style}表达，突出 ${currentSkill.emphasis || profile.visualFocus}，主体清晰，信息层次明确。`,
+          `围绕“${shot.title}”设计 1920x1080 横版主画面，核心呈现 ${truncate(shot.narration, 32)}，整体走${profile.style}方向，保留标题留白与强视觉焦点。`,
+          `给“${shot.title}”生成高识别度的 16:9 视觉，画面围绕 ${truncate(shot.narration, 32)} 展开，用${profile.style}强化首屏理解和传播感。`,
+          `把“${shot.title}”做成适合科技讲解视频的 16:9 横版主画面，强调 ${truncate(shot.narration, 32)}，视觉风格采用${profile.style}，重点突出 ${currentSkill.emphasis || profile.visualFocus}。`,
         ][variant],
         negativePrompt: [profile.negativePrompt, currentSkill.avoid].filter(Boolean).join(', '),
         style: profile.style,
         mood: currentSkill.style || profile.mood,
         visualFocus: currentSkill.emphasis || profile.visualFocus,
+        canvasRatio: '16:9',
+        canvasWidth: 1920,
+        canvasHeight: 1080,
       };
     });
     return normalizePromptsPayload({ prompts: { byShotId } }, input);

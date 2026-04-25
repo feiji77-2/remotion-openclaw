@@ -162,7 +162,7 @@ const CONTROL_RULES: Array<{
   },
   {
     title: '短视频先看配额',
-    body: '6 镜头视频只有 4 个中段位。重点是 4 个中段位尽量 4 个不同模板，不是乱铺满屏。',
+    body: '日更技术讲解视频先看场景配额。通常是 hero + 4 到 10 个中段场景 + cta，重点是让中段模板尽量多样，而不是乱铺满屏。',
     accent: 'purple',
   },
 ];
@@ -183,7 +183,7 @@ const THEFT_CASES: Array<{
     accent: 'orange',
   },
   {
-    title: '中段镜头看整条片子，不再只看单屏',
+    title: '中段场景看整条片子，不再只看单屏',
     body: '现在是先拿候选池，再按整条视频的多样性去分配，不再是谁先匹配就永远霸屏。',
     accent: 'purple',
   },
@@ -689,7 +689,7 @@ const CoverScene: React.FC = () => {
 
           <div style={{display: 'flex', gap: SPACE.md, flexWrap: 'wrap'}}>
             <MetricCard value="20" label="usable families" accent="cyan" />
-            <MetricCard value="4" label="middle slots in 6 shots" accent="orange" />
+            <MetricCard value="6-12" label="default scene window" accent="orange" />
             <MetricCard value="V2" label="candidate pool planner" accent="green" />
           </div>
         </div>
@@ -802,8 +802,8 @@ const PlannerScene: React.FC = () => {
         <div style={entryStyle(revealA, 28, 0.988)}>
           <SectionHeading
             eyebrow="hit planner"
-            title="中段镜头现在先拿候选池，再从整条片子里做全局分配。"
-            body="这一步才是避免重复的关键。系统先收每个镜头的可用模板，再从全片视角优先做中段去重、避免连撞、最后才微调首选偏差。"
+            title="中段场景现在先拿候选池，再从整条片子里做全局分配。"
+            body="这一步才是避免重复的关键。系统先收每个场景的可用模板，再从全片视角优先做中段去重、避免连撞、最后才微调首选偏差。"
             accent="green"
           />
         </div>
@@ -813,8 +813,8 @@ const PlannerScene: React.FC = () => {
             <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: SPACE.sm}}>
               {[
                 ['01', '内容意图', '先看 narration / type / comparisons / dataPoints'],
-                ['02', '候选模板', '每个镜头先收集自己的可用 family'],
-                ['03', '全局规划', '优先让中段镜头尽量不重复'],
+                ['02', '候选模板', '每个场景先收集自己的可用 family'],
+                ['03', '全局规划', '优先让中段场景尽量不重复'],
                 ['04', '最终落位', '最后才决定每一屏真正用哪个模板'],
               ].map(([index, title, body]) => (
                 <div key={index} style={{...glassPanelStyle('cyan', 'medium', 0.08), minHeight: 188}}>
@@ -841,22 +841,22 @@ const PlannerScene: React.FC = () => {
             <div style={{...glassPanelStyle('orange', 'large', 0.16), display: 'flex', flexDirection: 'column', gap: SPACE.md}}>
               <div>
                 <div style={{fontSize: 13, letterSpacing: 2.4, textTransform: 'uppercase', color: resolveUltimateAccent('orange')}}>
-                  short-video quota
+                  scene allocation
                 </div>
-                <div style={{fontFamily: kit.fonts.display, fontSize: 64, lineHeight: 0.92, marginTop: 10}}>6 镜头 = 4 个中段位</div>
+                <div style={{fontFamily: kit.fonts.display, fontSize: 64, lineHeight: 0.92, marginTop: 10}}>6-12 场景 = 可变中段位</div>
                 <div style={{fontSize: 21, lineHeight: 1.54, color: kit.colors.textMuted, marginTop: 14}}>
-                  短视频真正要优化的是中段 4 屏的结构利用率，而不是幻想一条视频把 20 个模板全用一遍。
+                  讲解型视频真正要优化的是中段场景的结构利用率和去重分配，而不是幻想一条视频把 20 个模板全用一遍。
                 </div>
               </div>
 
               <div style={{display: 'flex', flexDirection: 'column', gap: SPACE.xs}}>
-                {['hero', 'timeline', 'feature-rail', 'compare-board', 'metrics', 'cta'].map((family, index) => {
+                {['hero', 'timeline', 'feature-rail', 'compare-board', 'metrics', 'evidence-wall', 'cta'].map((family, index) => {
                   const accent = FAMILY_ACCENT_MAP[family] ?? 'cyan';
                   return (
                     <div
                       key={family}
                       style={{
-                        ...glassPanelStyle(accent, index === 0 || index === 5 ? 'medium' : 'small', 0.1),
+                        ...glassPanelStyle(accent, index === 0 || index === 6 ? 'medium' : 'small', 0.1),
                         display: 'grid',
                         gridTemplateColumns: '56px 1fr auto',
                         alignItems: 'center',
@@ -1033,10 +1033,10 @@ const ControlScene: React.FC = () => {
             </div>
 
             <div style={{...glassPanelStyle('cyan', 'medium', 0.1)}}>
-            <div style={{fontWeight: 800, fontSize: 20}}>6 镜头短视频的正确目标</div>
+            <div style={{fontWeight: 800, fontSize: 20}}>技术讲解视频的正确目标</div>
             <div style={{fontSize: 18, lineHeight: 1.54, color: kit.colors.textMuted, marginTop: 10}}>
-                <span style={{fontFamily: kit.fonts.mono}}>hero -&gt; 4 个尽量不同的中段模板 -&gt; cta</span>
-                。短视频要优化的是配额利用率，不是幻想把 20 个模板塞满一条视频。
+                <span style={{fontFamily: kit.fonts.mono}}>hero -&gt; 4~10 个尽量不重复的中段 family -&gt; cta</span>
+                。要优化的是场景多样性、信息密度和节奏，不是强行把 20 个模板塞满一条视频。
               </div>
             </div>
           </div>

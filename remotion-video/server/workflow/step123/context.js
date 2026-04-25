@@ -378,8 +378,8 @@ function buildStep123Context(stepId, input) {
       id: project.id || 'default',
       name: project.name || '未命名项目',
       fps: project.fps || 30,
-      width: project.width || 1080,
-      height: project.height || 1920,
+      width: project.width || 1920,
+      height: project.height || 1080,
     },
     shots: shots.map((shot) => ({
       id: shot.id,

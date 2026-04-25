@@ -2,22 +2,26 @@
 
 English | [简体中文](README.md)
 
-An open-source workflow studio and Remotion render pipeline for Chinese short-form video production.
+An open-source workflow studio and Remotion render pipeline for Chinese tech / AI explainer videos.
 
-This repository packages the Step 1-8 workflow UI, workflow API, voice/image/render jobs, and the `Video1v4` production composition into one public-facing codebase. It can serve as:
+The active mainline is now:
 
-- a short-form video workflow product prototype
-- a Remotion-based video generation starter
-- an async job orchestration example for voice, image, and render pipelines
-- a reusable base for Chinese content production tooling
+- Step 1-3: search, analysis, title, script
+- Step 4: `video-pipeline-scene-planner` for variable scene planning
+- Step 5: `video-pipeline-scene-prompts` for 16:9 visual prompts
+- Step 6: narration and TTS
+- Step 7: Remotion project packaging
+- Step 8: Ultimate widescreen rendering
+
+The old `video-pipeline-storyboard` fixed 6-shot path has been removed from the live workflow. Some legacy composition code still exists in the repository as historical assets, but it is no longer the default skill source, default build target, or default render entrypoint.
 
 ## Highlights
 
-- Two-app structure: player UI + Remotion/API runtime
-- Mainline release surface is cleaned up and legacy scripts are archived under `docs/archive/`
-- Supports either OpenAI-compatible APIs or a local OpenClaw CLI workflow provider
-- Includes async image, voice, and render job flows
-- Ships with a single public-release validation command: `npm run release:check`
+- Two-app structure: player UI + Remotion / API runtime
+- Mainline defaults to the `Ultimate 1920x1080` widescreen system
+- Step 4 / 5 is aligned to `20` reusable template families instead of a fixed 6-shot storyboard
+- Async image, voice, and render job flow
+- Single public validation entrypoint: `npm run release:check`
 
 ## Repository Layout
 
@@ -25,12 +29,7 @@ This repository packages the Step 1-8 workflow UI, workflow API, voice/image/ren
 .
 ├── .github/
 ├── ARCHITECTURE.md
-├── CONTRIBUTING.md
-├── LICENSE
-├── SECURITY.md
 ├── docs/
-│   ├── archive/
-│   └── release-metadata.md
 ├── remotion-video/
 └── video-pipeline-view/player-app/
 ```
@@ -38,11 +37,25 @@ This repository packages the Step 1-8 workflow UI, workflow API, voice/image/ren
 ## Main Modules
 
 - `video-pipeline-view/player-app`
-  Step 1-8 workflow UI, local persistence, task polling, and result review
+  Step 1-8 workflow UI, local persistence, job polling, and result review
 - `remotion-video/server`
-  Express API, skill registry, image/voice/render jobs, and worker integration
+  Express API, skill registry, image / voice / render jobs, and worker integration
 - `remotion-video/src`
-  Remotion compositions, render families, visual components, and runtime contracts
+  Remotion compositions, Ultimate template components, and runtime contracts
+
+## Current Video Path
+
+- `20` means `20` Ultimate template families, not a fixed `20`-shot storyboard
+- Step 4 expands the script into `6-12` widescreen scenes and preassigns `sceneFamily`
+- Step 5 generates `16:9 / 1920x1080` visual prompts per scene
+- `hero` is fixed as the first scene, `cta` is fixed as the final scene
+- Middle-scene families are selected with a diversity bias
+
+See:
+
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [remotion-video/docs/ultimate-20-template-audit.zh-CN.md](remotion-video/docs/ultimate-20-template-audit.zh-CN.md)
+- [remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md](remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md)
 
 ## Requirements
 
@@ -98,44 +111,35 @@ npm run dev:player
   Start the render worker
 - `npm run dev:video`
   Open Remotion Studio
-- `npm run typecheck`
-  Run frontend TypeScript, Remotion TypeScript, and backend syntax checks
 - `npm run build`
   Build the player app
 - `npm run build:video`
-  Run one render using the default production composition
+  Run a demo render using `UltimateSceneTemplate`
+- `npm run typecheck`
+  Run frontend TS, Remotion TS, and backend syntax checks
+- `npm run test`
+  Run backend tests
 - `npm run release:check`
-  Main public-release validation entrypoint
-
-## Release Check
-
-`npm run release:check` runs:
-
-```bash
-npm run clean
-npm run typecheck
-npm run build
-node remotion-video/scripts/clean-runtime.mjs --check
-```
-
-Goals:
-
-- public scripts resolve correctly
-- key backend files pass syntax checks
-- the player app builds successfully
-- runtime directories remain clean after validation
+  Run the main public-release validation
 
 ## Workflow Scope
 
-The active pipeline is organized as Step 1-8:
+- Step 1: `video-pipeline-analysis`
+- Step 2: `video-pipeline-title`
+- Step 3: `video-pipeline-content`
+- Step 4: `video-pipeline-scene-planner`
+- Step 5: `video-pipeline-scene-prompts`
+- Step 6: `video-pipeline-audio`
+- Step 7: `remotion-video-maker`
+- Step 8: `video-pipeline-video`
 
-- Step 1-3: analysis, title generation, script generation
-- Step 4-5: storyboard structure and image prompts
-- Step 6: narration and TTS preparation
-- Step 7: Remotion project/build summary
-- Step 8: final render parameters, preview, and export
+Step 4 / 5 now produces the Ultimate scene source of truth:
 
-For deeper architecture details, see [ARCHITECTURE.md](ARCHITECTURE.md).
+- `shots[].sceneFamily`
+- `shots[].templateCandidates`
+- `scenePlan`
+- `prompts.byShotId`
+- `prompts.byShotId[].sceneFamily`
 
 ## API Surface
 
@@ -143,6 +147,7 @@ For deeper architecture details, see [ARCHITECTURE.md](ARCHITECTURE.md).
 - `GET /api/skills/catalog`
 - `GET /api/skills/:skillId`
 - `POST /api/workflow/generate`
+- `GET /api/workflow/:jobId`
 - `POST /api/images/generate`
 - `GET /api/images/:jobId`
 - `POST /api/voice`
@@ -151,42 +156,27 @@ For deeper architecture details, see [ARCHITECTURE.md](ARCHITECTURE.md).
 - `GET /api/render/:jobId`
 - `GET /api/render/:jobId/download`
 
-## Environment Variables
-
-See [remotion-video/.env.example](remotion-video/.env.example) for the full variable list.
-
-Common variables:
-
-- `PIPELINE_QUEUE_MODE`
-- `OPENAI_API_KEY`
-- `OPENAI_BASE_URL`
-- `OPENAI_WORKFLOW_MODEL`
-- `OPENCLAW_CLI_PATH`
-- `CHATTTS_HTTP_HEALTH_URL`
-- `CHATTTS_HTTP_SYNTH_URL`
-- `MELO_HTTP_HEALTH_URL`
-- `MELO_HTTP_SYNTH_URL`
-- `REDIS_URL`
-
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
-  Mainline architecture, Step ownership, and API surface
+  Current architecture, Step ownership, and API surface
+- [remotion-video/docs/ultimate-20-template-audit.zh-CN.md](remotion-video/docs/ultimate-20-template-audit.zh-CN.md)
+  Audit summary for the active 20-template mainline
+- [remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md](remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md)
+  Full family table and hit rules
+- [remotion-video/docs/ultimate-style-hit-guide.zh-CN.md](remotion-video/docs/ultimate-style-hit-guide.zh-CN.md)
+  Style hit rules and practical control notes
 - [CONTRIBUTING.md](CONTRIBUTING.md)
-  Contribution rules and validation workflow
+  Contribution workflow and validation rules
 - [SECURITY.md](SECURITY.md)
   Security reporting guidance
-- [docs/release-metadata.md](docs/release-metadata.md)
-  Ready-to-use GitHub/Gitee descriptions, topics, and release copy
-- [docs/archive/README.md](docs/archive/README.md)
-  Archive policy
 
 ## Release Notes
 
-- Current production composition: `Video1v4`
-- Legacy helper scripts are preserved only under `docs/archive/`
-- Local generated project packages under `remotion-video/projects/` are excluded from version control
-- Root `package.json` remains `private: true`; this repository is not intended for npm package publishing by default
+- Default production composition: `UltimateSceneTemplate`
+- Default widescreen output: `1920x1080 / 30fps`
+- Local generated packages under `remotion-video/projects/` stay out of version control
+- Root `package.json` remains `private: true`
 
 ## License
 
