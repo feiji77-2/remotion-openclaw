@@ -17,6 +17,12 @@ const ULTIMATE_SCENE_FAMILIES = new Set([
   'tag-matrix',
   'code',
   'metrics',
+  'data-stream',
+  'memory-graph',
+  'pipeline-flow',
+  'benchmark-chart',
+  'quote-highlight',
+  'glossary-term',
   'cta',
 ]);
 const ACCENT_ROTATION = ['cyan', 'green', 'yellow', 'orange', 'purple', 'red'];
@@ -828,6 +834,108 @@ const buildMetricItems = (shot) => {
     }));
 };
 
+const inferRatioFromText = (value, fallback = 0.72) => {
+  const token = extractNumberTokens(value)[0] || safeString(value);
+
+  if (!token) {
+    return fallback;
+  }
+
+  if (/%/.test(token)) {
+    return Number(clamp(toNumber(token.replace(/[^0-9.]/g, ''), fallback * 100) / 100, 0.12, 0.98).toFixed(2));
+  }
+
+  const numericValue = toNumber(token.replace(/[^0-9.]/g, ''), NaN);
+
+  if (!Number.isFinite(numericValue)) {
+    return fallback;
+  }
+
+  if (numericValue >= 100) {
+    return Number(clamp(numericValue / 140, 0.18, 0.98).toFixed(2));
+  }
+
+  if (numericValue >= 10) {
+    return Number(clamp(numericValue / 20, 0.18, 0.95).toFixed(2));
+  }
+
+  return Number(clamp(numericValue / 10, 0.18, 0.9).toFixed(2));
+};
+
+const buildDataStreamItems = (shot) => {
+  const metricItems = buildMetricItems(shot);
+  const detailUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+
+  if (metricItems.length >= 2) {
+    return metricItems.slice(0, 3).map((item, index) => ({
+      label: item.label,
+      value: item.value,
+      detail: compactText(detailUnits[index + 1] || detailUnits[index] || '', 34),
+      trend: index === 0 ? 'up' : index === 1 ? 'steady' : 'alert',
+      accent: item.accent,
+    }));
+  }
+
+  return collectListTokens(shot, 3).map((item, index) => ({
+    label: compactText(item, 16),
+    value: extractNumberTokens(item)[0] || String(80 - index * 14),
+    detail: compactText(detailUnits[index + 1] || '', 34),
+    trend: index === 0 ? 'up' : index === 1 ? 'steady' : 'alert',
+    accent: inferAccent(shot, index),
+  }));
+};
+
+const buildMemoryGraphNodes = (shot) => {
+  return buildArchitectureNodes(shot)
+    .slice(0, 4)
+    .map((node, index) => ({
+      ...node,
+      detail: compactText(node.detail || semanticArray(shot?.keywords)[index] || '', 28),
+      accent: node.accent || inferAccent(shot, index),
+    }));
+};
+
+const buildPipelineStages = (shot) => {
+  const stepItems = buildStepItems(shot);
+
+  if (stepItems.length >= 3) {
+    return stepItems.slice(0, 4);
+  }
+
+  return collectListTokens(shot, 4).map((item, index) => ({
+    label: compactText(item, 18),
+    detail: compactText(splitNarrationUnits(shot?.narration || shot?.visualSummaryZh)[index + 1] || '', 28),
+    icon: '',
+    accent: inferAccent(shot, index),
+  }));
+};
+
+const buildBenchmarkItems = (shot) => {
+  const compareRows = buildCompareRows(shot);
+
+  if (compareRows.length > 0) {
+    return compareRows.slice(0, 3).map((row, index) => ({
+      label: compactText(row.label || `Benchmark ${index + 1}`, 18),
+      primaryValue: compactText(row.right, 16),
+      secondaryValue: compactText(row.left, 16),
+      primaryRatio: inferRatioFromText(row.right, 0.8 - index * 0.08),
+      secondaryRatio: inferRatioFromText(row.left, 0.54 - index * 0.06),
+      accent: inferAccent(shot, index),
+    }));
+  }
+
+  return buildMetricItems(shot)
+    .slice(0, 3)
+    .map((item, index) => ({
+      label: item.label,
+      primaryValue: item.value,
+      secondaryValue: `${Math.max(1, Math.round((1 - index * 0.12) * 10))}${/%/.test(item.value) ? '%' : ''}`,
+      primaryRatio: item.ratio,
+      secondaryRatio: Number(clamp(item.ratio - 0.2, 0.18, 0.76).toFixed(2)),
+      accent: item.accent,
+    }));
+};
+
 const buildSceneSummary = (shot, primaryText, max = 40) => {
   const narrationUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
   const filtered = narrationUnits.filter((item) => !isCompactDuplicate(item, primaryText));
@@ -1288,103 +1396,295 @@ const sceneCycle = [
   'tag-matrix',
   'metrics',
   'timeline',
-  'feature-rail',
+  'data-stream',
+  'benchmark-chart',
+  'memory-graph',
+  'pipeline-flow',
+  'glossary-term',
+  'quote-highlight',
   'evidence-wall',
 ];
 const hasStandaloneAsciiToken = (text, token) => new RegExp(`(?:^|[^a-z])${token}(?:[^a-z]|$)`).test(text);
+const SCENE_FAMILY_LIST = Array.from(ULTIMATE_SCENE_FAMILIES);
+const DIVERSITY_EXCLUDED_FAMILIES = new Set(['hero', 'cta']);
+const FAMILY_DIVERSITY_BITS = new Map(
+  SCENE_FAMILY_LIST
+    .filter((family) => !DIVERSITY_EXCLUDED_FAMILIES.has(family))
+    .map((family, index) => [family, 1 << index]),
+);
 
-const inferSceneFamily = (shot, index, total) => {
+const buildSceneIntentText = (shot) => {
+  const comparisonText = asArray(shot?.comparisons)
+    .flatMap((item) => [
+      safeString(item?.label || item?.title),
+      safeString(item?.left || item?.before || item?.old || item?.a),
+      safeString(item?.right || item?.after || item?.new || item?.b),
+    ])
+    .filter(Boolean);
+
+  return [
+    safeString(shot?.title),
+    safeString(shot?.narration),
+    safeString(shot?.type),
+    safeString(shot?.level),
+    safeString(shot?.comparisonSummaryZh),
+    ...semanticArray(shot?.dataPoints, 8),
+    ...semanticArray(shot?.keywords, 8),
+    ...comparisonText,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+};
+
+const buildSceneCycleCandidates = (index) => {
+  const offset = ((index - 1) % sceneCycle.length + sceneCycle.length) % sceneCycle.length;
+  return [
+    ...sceneCycle.slice(offset),
+    ...sceneCycle.slice(0, offset),
+  ];
+};
+
+const collectSceneFamilyCandidates = (shot, index, total) => {
   const title = safeString(shot?.title);
-  const text = `${title} ${safeString(shot?.narration)} ${safeString(shot?.visualSummaryZh)} ${safeString(shot?.visualFocusZh)} ${safeString(shot?.type)} ${safeString(shot?.level)}`.toLowerCase();
+  const text = buildSceneIntentText(shot);
   const requestedFamily = safeString(shot?.family || shot?.sceneFamily).toLowerCase();
+  const comparisonSummary = safeString(shot?.comparisonSummaryZh).toLowerCase();
+  const hasCompareSummary = /(vs|versus|对比|差异|旧讲法|当前方案|before|after|battle)/.test(comparisonSummary);
+  const hasCompareType = /对比|comparison|versus|battle/.test(safeString(shot?.type).toLowerCase());
+  const compareRows = buildCompareRows(shot);
+  const hasStructuredCompare = compareRows.length >= 1;
+  const hasNumberStripIntent = /(很多人以为|很多人觉得|不是.*而是|认知反转|旧认知|新事实|误解|偏见)/.test(text);
   const timelineTokenCount = extractNumberTokens(text).filter((token) => /20\d{2}[./-]\d{1,2}[./-]\d{1,2}|\d+月\d+日/.test(token)).length;
+  const hasBenchmarkIntent = /(benchmark|bench|exam|跑分|基准|实测|hle|swe[- ]bench)/.test(text);
+  const hasDataStreamIntent = /(实时|数据流|stream|feed|signal|monitor|qps|tps|throughput|tokens?\/s|吞吐|流量)/.test(text);
+  const hasMemoryIntent = /(memory|context|上下文|记忆|知识图谱|graph|embedding|召回|检索|知识库)/.test(text);
+  const hasPipelineIntent = /(管线|pipeline|\bflow\b|链路|ingest|dispatch|compile|render|\bprocess\b|\bstage\b|分发链路|处理链路)/.test(text);
+  const hasQuoteIntent = /[“”"']|一句话|关键判断|核心结论|真正该讲的是|最狠的一句/.test(text);
+  const hasGlossaryIntent = /(是什么|什么意思|本质上|指的是|可以理解成|术语|定义)/.test(text);
+  const candidates = [];
 
   if (ULTIMATE_SCENE_FAMILIES.has(requestedFamily)) {
-    return requestedFamily;
+    return [requestedFamily];
   }
 
   if (index === 0) {
-    return 'hero';
+    return ['hero'];
   }
 
   if (index === total - 1) {
-    return 'cta';
+    return ['cta'];
   }
 
   if (
     /(命令|终端|日志|运行)/.test(text)
     || ['shell', 'bash', 'terminal', 'cli', 'render'].some((token) => hasStandaloneAsciiToken(text, token))
   ) {
-    return 'terminal';
+    candidates.push('terminal');
+  }
+
+  if (hasDataStreamIntent && buildDataStreamItems(shot).length >= 2) {
+    candidates.push('data-stream');
+  }
+
+  if (hasBenchmarkIntent && buildBenchmarkItems(shot).length >= 2) {
+    candidates.push('benchmark-chart');
   }
 
   if (
     (
-      /(发布时间|时间线|roadmap|里程碑|版本节点|版本演进|发布节奏|launch|release|history)/.test(text)
+      /(发布时间|时间线|roadmap|里程碑|版本节点|版本演进|发布节奏|开源发布|刚发|刚发布|前脚|后脚|上线|launch|release|history|rollout|发布)/.test(text)
       || timelineTokenCount >= 2
     )
     && buildTimelineItems(shot).length >= 3
   ) {
-    return 'timeline';
+    candidates.push('timeline');
   }
 
-  if (/(很多人以为|不是.*而是|认知反转|旧认知|新事实|误解|偏见)/.test(text)) {
-    return 'number-strip';
+  if (
+    compareRows.length >= 2
+    || (hasStructuredCompare && hasCompareSummary)
+    || (hasCompareSummary && hasCompareType)
+    || (
+      /(对比|差异|vs|versus|battle)/.test(text)
+      && extractModelTokens(text).length >= 2
+      && !/(很多人以为|很多人觉得|误解|旧认知|新事实)/.test(text)
+    )
+  ) {
+    candidates.push('compare-board');
+  }
+
+  if (hasNumberStripIntent) {
+    candidates.push('number-strip');
   }
 
   if (
     /(官方|来源|博客|release|benchmark|bench|exam|paper|docs|github|hugging\s*face|实测|证据)/.test(text)
     && buildEvidenceCards(shot).length >= 2
   ) {
-    return 'evidence-wall';
-  }
-
-  if (
-    buildCompareRows(shot).length >= 2
-    || (
-      /(对比|差异|vs|versus|battle)/.test(text)
-      && extractModelTokens(text).length >= 2
-      && !/(很多人以为|误解|旧认知|新事实)/.test(text)
-    )
-  ) {
-    return 'compare-board';
+    candidates.push('evidence-wall');
   }
 
   if (
     /(配置|脚本|函数|接口|参数)/.test(text)
     || ['schema', 'json', 'api', 'code'].some((token) => hasStandaloneAsciiToken(text, token))
   ) {
-    return 'code';
+    candidates.push('code');
   }
 
   if (
-    /(架构|系统|模块|分层|拓扑|agent|router|memory|tool|orchestr|stack)/.test(text)
+    /(架构|系统|模块|分层|拓扑|工具链|agent|router|memory|orchestr|stack|toolchain)/.test(text)
     && buildArchitectureNodes(shot).length >= 4
   ) {
-    return 'architecture-map';
+    candidates.push('architecture-map');
+  }
+
+  if (hasMemoryIntent && buildMemoryGraphNodes(shot).length >= 3) {
+    candidates.push('memory-graph');
+  }
+
+  if (hasPipelineIntent && buildPipelineStages(shot).length >= 3) {
+    candidates.push('pipeline-flow');
   }
 
   if (/(步骤|流程|工作流|依次|第一|第二|第三|先|再|最后|pipeline|process)/.test(text) && buildStepItems(shot).length >= 3) {
-    return 'step-flow';
+    candidates.push('step-flow');
+  }
+
+  if (hasGlossaryIntent && title.length <= 20) {
+    candidates.push('glossary-term');
   }
 
   if (/(场景|开发者|团队|问题|痛点|案例|想象一下)/.test(text) && buildFeatureItems(shot).length >= 3) {
-    return 'feature-rail';
+    candidates.push('feature-rail');
   }
 
   if (extractNumberTokens(text).length >= 2) {
-    return 'metrics';
+    candidates.push('metrics');
   }
 
   if (asArray(shot?.keywords).length + asArray(shot?.dataPoints).length >= 5) {
-    return 'tag-matrix';
+    candidates.push('tag-matrix');
+  }
+
+  if (hasQuoteIntent && splitNarrationUnits(shot?.narration || shot?.title).length <= 3) {
+    candidates.push('quote-highlight');
   }
 
   if (safeString(shot?.visualFocusZh).length > 0 && safeString(shot?.visualFocusZh).length <= 24) {
+    candidates.push('focus');
+  }
+
+  return uniqueList([
+    ...candidates,
+    ...buildSceneCycleCandidates(index),
+    'focus',
+  ]);
+};
+
+const inferSceneFamily = (shot, index, total, previousFamily = '') => {
+  const requestedFamily = safeString(shot?.family || shot?.sceneFamily).toLowerCase();
+  const candidates = collectSceneFamilyCandidates(shot, index, total);
+
+  if (candidates.length === 0) {
     return 'focus';
   }
 
-  return sceneCycle[(index - 1) % sceneCycle.length] || 'focus';
+  if (
+    index === 0
+    || index === total - 1
+    || !previousFamily
+    || ULTIMATE_SCENE_FAMILIES.has(requestedFamily)
+  ) {
+    return candidates[0];
+  }
+
+  return candidates.find((family) => family !== previousFamily) || candidates[0];
+};
+
+const compareFamilyPlans = (left, right) => {
+  if (!right) {
+    return 1;
+  }
+
+  if (left.uniqueCount !== right.uniqueCount) {
+    return left.uniqueCount > right.uniqueCount ? 1 : -1;
+  }
+
+  if (left.repeatCount !== right.repeatCount) {
+    return left.repeatCount < right.repeatCount ? 1 : -1;
+  }
+
+  if (left.adjacentRepeatCount !== right.adjacentRepeatCount) {
+    return left.adjacentRepeatCount < right.adjacentRepeatCount ? 1 : -1;
+  }
+
+  if (left.weightedCost !== right.weightedCost) {
+    return left.weightedCost < right.weightedCost ? 1 : -1;
+  }
+
+  if (left.rawCost !== right.rawCost) {
+    return left.rawCost < right.rawCost ? 1 : -1;
+  }
+
+  return 0;
+};
+
+const selectSceneFamilies = (shots) => {
+  const total = shots.length;
+  const candidateMatrix = shots.map((shot, index) => collectSceneFamilyCandidates(shot, index, total));
+  const memo = new Map();
+
+  const solve = (index, previousFamily, usedMask) => {
+    if (index >= total) {
+      return {
+        uniqueCount: 0,
+        repeatCount: 0,
+        adjacentRepeatCount: 0,
+        weightedCost: 0,
+        rawCost: 0,
+        families: [],
+      };
+    }
+
+    const memoKey = `${index}::${previousFamily || '-'}::${usedMask}`;
+    const cached = memo.get(memoKey);
+    if (cached) {
+      return cached;
+    }
+
+    const candidates = candidateMatrix[index];
+    let bestPlan = null;
+
+    for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+      const family = candidates[candidateIndex];
+      const isMiddleScene = index > 0 && index < total - 1;
+      const diversityBit = FAMILY_DIVERSITY_BITS.get(family) || 0;
+      const isRepeatedFamily = isMiddleScene && diversityBit !== 0 && (usedMask & diversityBit) !== 0;
+      const uniqueGain = isMiddleScene && diversityBit !== 0 && !isRepeatedFamily ? 1 : 0;
+      const nextMask = isMiddleScene && diversityBit !== 0 ? (usedMask | diversityBit) : usedMask;
+      const deviationWeight = isMiddleScene ? Math.max(1, total - index) : 0;
+      const suffixPlan = solve(index + 1, family, nextMask);
+      const candidatePlan = {
+        uniqueCount: uniqueGain + suffixPlan.uniqueCount,
+        repeatCount: (isRepeatedFamily ? 1 : 0) + suffixPlan.repeatCount,
+        adjacentRepeatCount:
+          (isMiddleScene && previousFamily && family === previousFamily ? 1 : 0) + suffixPlan.adjacentRepeatCount,
+        weightedCost: candidateIndex * deviationWeight + suffixPlan.weightedCost,
+        rawCost: candidateIndex + suffixPlan.rawCost,
+        families: [family, ...suffixPlan.families],
+      };
+
+      if (compareFamilyPlans(candidatePlan, bestPlan) > 0) {
+        bestPlan = candidatePlan;
+      }
+    }
+
+    memo.set(memoKey, bestPlan);
+    return bestPlan;
+  };
+
+  return solve(0, '', 0).families;
 };
 
 const buildSceneData = (family, shot, index) => {
@@ -1415,6 +1715,11 @@ const buildSceneData = (family, shot, index) => {
   const compareTitles = inferCompareSideTitles(shot);
   const evidenceCards = buildEvidenceCards(shot);
   const architectureNodes = buildArchitectureNodes(shot);
+  const tagItems = buildTagItems(shot);
+  const dataStreamItems = buildDataStreamItems(shot);
+  const memoryGraphNodes = buildMemoryGraphNodes(shot);
+  const pipelineStages = buildPipelineStages(shot);
+  const benchmarkItems = buildBenchmarkItems(shot);
 
   switch (family) {
     case 'hero':
@@ -1591,6 +1896,94 @@ const buildSceneData = (family, shot, index) => {
               },
             ],
       };
+    case 'data-stream':
+      return {
+        heading: title,
+        summary,
+        items: dataStreamItems.length > 0
+          ? dataStreamItems
+          : [
+              {
+                label: compactText(keywords[0] || primaryText, 16),
+                value: extractNumberTokens(primaryText)[0] || '92%',
+                detail: compactText(secondaryText, 34),
+                trend: 'up',
+                accent,
+              },
+            ],
+        accent,
+      };
+    case 'memory-graph':
+      return {
+        heading: title,
+        summary,
+        centerTitle: compactText(shot?.title || primaryText, 22),
+        centerDetail: summary || compactText(secondaryText, 52),
+        nodes: memoryGraphNodes.length > 0
+          ? memoryGraphNodes
+          : [
+              {
+                label: compactText(primaryText, 18),
+                detail: compactText(secondaryText, 28),
+                icon: '',
+                accent,
+              },
+            ],
+        accent,
+      };
+    case 'pipeline-flow':
+      return {
+        heading: title,
+        summary,
+        stages: pipelineStages.length > 0
+          ? pipelineStages
+          : [
+              {
+                label: compactText(primaryText, 18),
+                detail: compactText(secondaryText, 28),
+                icon: '',
+                accent,
+              },
+            ],
+        accent,
+      };
+    case 'benchmark-chart':
+      return {
+        heading: title,
+        summary,
+        primaryLabel: compareTitles.rightTitle || extractTargetModel(textFromShot(shot)) || 'Current',
+        secondaryLabel: compareTitles.leftTitle || 'Baseline',
+        items: benchmarkItems.length > 0
+          ? benchmarkItems
+          : [
+              {
+                label: compactText(primaryText, 18),
+                primaryValue: extractNumberTokens(primaryText)[0] || '92%',
+                secondaryValue: '68%',
+                primaryRatio: 0.92,
+                secondaryRatio: 0.68,
+                accent,
+              },
+            ],
+        accent: 'yellow',
+      };
+    case 'quote-highlight':
+      return {
+        heading: compactText(shot?.title || '关键判断', 18),
+        quote: compactText(primaryText || shot?.narration || shot?.title, 72),
+        attribution: compactText(summary || secondaryText, 44),
+        tags: tagItems.slice(0, 3),
+        accent,
+      };
+    case 'glossary-term':
+      return {
+        heading: compactText(shot?.title || '术语解释', 18),
+        term: compactText(shot?.title || primaryText, 18),
+        pronunciation: '',
+        definition: compactText(summary || secondaryText || shot?.narration, 88),
+        related: tagItems.slice(0, 4),
+        accent,
+      };
     case 'cta':
       {
         const questionLine = narrationUnits.find((item) => /[？?]/.test(item) || /哪个|怎么选|怎么看|值不值/.test(item));
@@ -1670,6 +2063,7 @@ function buildUltimateProjectConfig(project) {
   const shots = asArray(project?.shots);
   const overlay = buildOverlay(project, width, height);
   const title = safeString(project?.title) || safeString(project?.projectId) || 'Ultimate Project';
+  const selectedFamilies = selectSceneFamilies(shots);
 
   return {
     title,
@@ -1679,7 +2073,7 @@ function buildUltimateProjectConfig(project) {
       durationInFrames: 12,
     },
     scenes: shots.map((shot, index) => {
-      const family = inferSceneFamily(shot, index, shots.length);
+      const family = selectedFamilies[index] || inferSceneFamily(shot, index, shots.length, selectedFamilies[index - 1] || '');
       const accent = inferAccent(shot, index);
 
       return {

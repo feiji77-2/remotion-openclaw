@@ -4,7 +4,7 @@ export type { SegmentMeta } from './video-gen';
 
 
 export type TemplateType = 'caption' | 'split' | 'fullscreen' | 'ultimate';
-export type VoiceType = 'chattts' | 'melo' | 'openvoice' | 'xtts' | 'azure';
+export type VoiceType = 'chattts' | 'melo' | 'openvoice' | 'xtts' | 'qwen-tts' | 'cosyvoice' | 'azure';
 export type RenderStatus = 'pending' | 'running' | 'done' | 'error';
 
 export interface SubtitleWord {

@@ -49,6 +49,12 @@ type UltimateSceneFamilyKey =
   | 'tag-matrix'
   | 'code'
   | 'metrics'
+  | 'data-stream'
+  | 'memory-graph'
+  | 'pipeline-flow'
+  | 'benchmark-chart'
+  | 'quote-highlight'
+  | 'glossary-term'
   | 'cta';
 
 type IconRegistryEntry = {
@@ -319,6 +325,12 @@ const FAMILY_FALLBACK_ORDER: Record<UltimateSceneFamilyKey, UltimateIconName[]> 
   'tag-matrix': ['layers', 'database', 'list', 'box', 'puzzle', 'folder'],
   code: ['code', 'terminal', 'gitBranch', 'wrench', 'fileText', 'server'],
   metrics: ['clock', 'zap', 'layoutDashboard', 'code', 'checkCircle', 'cpu'],
+  'data-stream': ['zap', 'layoutDashboard', 'database', 'repeat', 'server', 'arrowRight'],
+  'memory-graph': ['database', 'layers', 'cpu', 'gitBranch', 'sparkles', 'server'],
+  'pipeline-flow': ['arrowRight', 'gitMerge', 'repeat', 'list', 'toggleRight', 'settings'],
+  'benchmark-chart': ['layoutDashboard', 'clock', 'checkCircle', 'zap', 'code', 'fileText'],
+  'quote-highlight': ['messagesSquare', 'sparkles', 'fileText', 'heart', 'checkCircle', 'flame'],
+  'glossary-term': ['fileText', 'layers', 'sparkles', 'puzzle', 'database', 'messagesSquare'],
   cta: ['messagesSquare', 'sparkles', 'save', 'arrowRight', 'heart', 'checkCircle'],
 };
 

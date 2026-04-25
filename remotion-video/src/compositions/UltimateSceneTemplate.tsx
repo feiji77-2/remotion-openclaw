@@ -2,16 +2,22 @@ import React from 'react';
 import {Audio, Img, Sequence, interpolate, spring, staticFile, useCurrentFrame} from 'remotion';
 import {
   UltimateArchitectureMap,
+  UltimateBenchmarkChart,
   UltimateCodePanel,
   UltimateCompareBoard,
   UltimateCtaPanel,
+  UltimateDataStream,
   UltimateEvidenceWall,
   UltimateFeatureCardRail,
   UltimateFocusDiagram,
+  UltimateGlossaryTerm,
   UltimateHeroPanel,
+  UltimateMemoryGraph,
   UltimateMetricBars,
   UltimateNumberStrip,
   UltimatePlatformOverlay,
+  UltimatePipelineFlow,
+  UltimateQuoteHighlight,
   UltimateSceneTransition,
   UltimateStage,
   UltimateStepFlow,
@@ -60,6 +66,18 @@ const renderSceneContent = (scene: ResolvedUltimateSceneConfig) => {
       return <UltimateCodePanel {...scene.data} />;
     case 'metrics':
       return <UltimateMetricBars {...scene.data} />;
+    case 'data-stream':
+      return <UltimateDataStream {...scene.data} />;
+    case 'memory-graph':
+      return <UltimateMemoryGraph {...scene.data} />;
+    case 'pipeline-flow':
+      return <UltimatePipelineFlow {...scene.data} />;
+    case 'benchmark-chart':
+      return <UltimateBenchmarkChart {...scene.data} />;
+    case 'quote-highlight':
+      return <UltimateQuoteHighlight {...scene.data} />;
+    case 'glossary-term':
+      return <UltimateGlossaryTerm {...scene.data} />;
     case 'cta':
       return <UltimateCtaPanel {...scene.data} />;
     default:
@@ -68,7 +86,7 @@ const renderSceneContent = (scene: ResolvedUltimateSceneConfig) => {
 };
 
 const resolveSceneOverlay = (
-  config: {defaultPlatformOverlay?: UltimatePlatformOverlayProps | false},
+  config: {title?: string; defaultPlatformOverlay?: UltimatePlatformOverlayProps | false},
   scene: Pick<ResolvedUltimateSceneConfig, 'family' | 'overlay'>,
 ) => {
   if (scene.overlay === false) {
@@ -87,6 +105,7 @@ const resolveSceneOverlay = (
   };
 
   merged.searchLabel = '';
+  merged.brand = merged.brand ?? config.title ?? 'Studio';
 
   return merged;
 };
@@ -121,6 +140,12 @@ const sceneMediaLayout: Partial<Record<ResolvedUltimateSceneConfig['family'], {
   'architecture-map': {top: 186, left: 160, width: 1600, height: 680, opacity: 0.14, tiltDeg: 0, mode: 'ambient'},
   'number-strip': {top: 198, left: 116, width: 1688, height: 560, opacity: 0.28, tiltDeg: 0, mode: 'ambient'},
   code: {top: 188, left: 778, width: 980, height: 608, opacity: 0.24, tiltDeg: -2, mode: 'ambient'},
+  'data-stream': {top: 236, left: 210, width: 1500, height: 560, opacity: 0.16, tiltDeg: 0, mode: 'ambient'},
+  'memory-graph': {top: 196, left: 160, width: 1600, height: 660, opacity: 0.14, tiltDeg: 0, mode: 'ambient'},
+  'pipeline-flow': {top: 268, left: 140, width: 1640, height: 520, opacity: 0.16, tiltDeg: 0, mode: 'ambient'},
+  'benchmark-chart': {top: 230, left: 180, width: 1560, height: 620, opacity: 0.16, tiltDeg: 0, mode: 'ambient'},
+  'quote-highlight': {top: 180, left: 280, width: 1360, height: 640, opacity: 0.14, tiltDeg: 0, mode: 'ambient'},
+  'glossary-term': {top: 214, left: 180, width: 1560, height: 620, opacity: 0.16, tiltDeg: 0, mode: 'ambient'},
   cta: {top: 174, left: 148, width: 1624, height: 540, opacity: 0.24, tiltDeg: 0, mode: 'ambient'},
 };
 
@@ -179,6 +204,34 @@ const sceneIconOrbitLayout: Partial<Record<ResolvedUltimateSceneConfig['family']
     {top: 230, right: 124, badgeSize: 78, size: 31, rotate: 7, delay: 0, opacity: 0.88},
     {bottom: 182, right: 164, badgeSize: 66, size: 25, rotate: -7, delay: 7, opacity: 0.82},
     {bottom: 214, left: 126, badgeSize: 60, size: 22, rotate: 5, delay: 11, opacity: 0.76},
+  ],
+  'data-stream': [
+    {top: 220, left: 142, badgeSize: 70, size: 28, rotate: -6, delay: 0, opacity: 0.82},
+    {top: 220, right: 152, badgeSize: 70, size: 28, rotate: 6, delay: 6, opacity: 0.82},
+    {bottom: 162, right: 262, badgeSize: 58, size: 22, rotate: -4, delay: 11, opacity: 0.74},
+  ],
+  'memory-graph': [
+    {top: 210, left: 144, badgeSize: 72, size: 28, rotate: -7, delay: 0, opacity: 0.82},
+    {top: 170, right: 144, badgeSize: 72, size: 28, rotate: 6, delay: 6, opacity: 0.82},
+    {bottom: 156, left: 920, badgeSize: 60, size: 22, rotate: -2, delay: 12, opacity: 0.74},
+  ],
+  'pipeline-flow': [
+    {top: 246, left: 132, badgeSize: 70, size: 28, rotate: -6, delay: 0, opacity: 0.82},
+    {top: 246, right: 132, badgeSize: 70, size: 28, rotate: 6, delay: 6, opacity: 0.82},
+    {bottom: 166, left: 926, badgeSize: 58, size: 22, rotate: -2, delay: 12, opacity: 0.72},
+  ],
+  'benchmark-chart': [
+    {top: 230, left: 140, badgeSize: 70, size: 28, rotate: -6, delay: 0, opacity: 0.82},
+    {top: 214, right: 140, badgeSize: 70, size: 28, rotate: 6, delay: 6, opacity: 0.82},
+    {bottom: 170, right: 240, badgeSize: 58, size: 22, rotate: -3, delay: 12, opacity: 0.72},
+  ],
+  'quote-highlight': [
+    {top: 216, left: 160, badgeSize: 66, size: 26, rotate: -5, delay: 0, opacity: 0.8},
+    {top: 216, right: 160, badgeSize: 66, size: 26, rotate: 5, delay: 6, opacity: 0.8},
+  ],
+  'glossary-term': [
+    {top: 220, left: 142, badgeSize: 70, size: 28, rotate: -6, delay: 0, opacity: 0.82},
+    {top: 220, right: 142, badgeSize: 70, size: 28, rotate: 6, delay: 6, opacity: 0.82},
   ],
   cta: [
     {top: 202, left: 166, badgeSize: 72, size: 28, rotate: -8, delay: 0, opacity: 0.86},
@@ -250,6 +303,18 @@ const collectSceneIconHints = (scene: ResolvedUltimateSceneConfig) => {
       return [scene.data.heading, scene.data.footer, ...scene.data.lines.map((line) => line.text), scene.subtitle];
     case 'metrics':
       return [scene.data.heading, scene.data.summary, ...scene.data.items.map((item) => `${item.label} ${item.value}`), scene.subtitle];
+    case 'data-stream':
+      return [scene.data.heading, scene.data.summary, ...scene.data.items.map((item) => `${item.label} ${item.value} ${item.detail || ''}`), scene.subtitle];
+    case 'memory-graph':
+      return [scene.data.heading, scene.data.summary, scene.data.centerTitle, scene.data.centerDetail, ...scene.data.nodes.map((node) => `${node.label} ${node.detail || ''}`), scene.subtitle];
+    case 'pipeline-flow':
+      return [scene.data.heading, scene.data.summary, ...scene.data.stages.map((stage) => `${stage.label} ${stage.detail || ''}`), scene.subtitle];
+    case 'benchmark-chart':
+      return [scene.data.heading, scene.data.summary, scene.data.primaryLabel, scene.data.secondaryLabel, ...scene.data.items.map((item) => `${item.label} ${item.primaryValue} ${item.secondaryValue}`), scene.subtitle];
+    case 'quote-highlight':
+      return [scene.data.heading, scene.data.quote, scene.data.attribution, ...(scene.data.tags ?? []).map((item) => item.label), scene.subtitle];
+    case 'glossary-term':
+      return [scene.data.heading, scene.data.term, scene.data.pronunciation, scene.data.definition, ...(scene.data.related ?? []).map((item) => item.label), scene.subtitle];
     case 'cta':
       return [scene.data.heading, scene.data.subtitle, ...(scene.data.highlights ?? []), scene.subtitle];
   }
@@ -276,6 +341,12 @@ const collectSceneIconRequests = (scene: ResolvedUltimateSceneConfig) => {
       break;
     case 'metrics':
       requested.push(...scene.data.items.map((item) => item.icon));
+      break;
+    case 'memory-graph':
+      requested.push(...scene.data.nodes.map((node) => node.icon));
+      break;
+    case 'pipeline-flow':
+      requested.push(...scene.data.stages.map((stage) => stage.icon));
       break;
     default:
       break;
@@ -306,6 +377,18 @@ const resolveSceneOrbitAccent = (scene: ResolvedUltimateSceneConfig) => {
       return resolveUltimateAccent(scene.data.accent ?? 'purple');
     case 'metrics':
       return resolveUltimateAccent('yellow');
+    case 'data-stream':
+      return resolveUltimateAccent(scene.data.accent ?? 'cyan');
+    case 'memory-graph':
+      return resolveUltimateAccent(scene.data.accent ?? 'cyan');
+    case 'pipeline-flow':
+      return resolveUltimateAccent(scene.data.accent ?? 'green');
+    case 'benchmark-chart':
+      return resolveUltimateAccent(scene.data.accent ?? 'yellow');
+    case 'quote-highlight':
+      return resolveUltimateAccent(scene.data.accent ?? 'orange');
+    case 'glossary-term':
+      return resolveUltimateAccent(scene.data.accent ?? 'cyan');
     case 'cta':
       return resolveUltimateAccent('orange');
     default:

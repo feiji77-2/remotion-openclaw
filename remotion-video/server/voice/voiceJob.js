@@ -1,6 +1,22 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const {
+  ensureQwenCloneVoice,
+  getQwenTtsHealth,
+  resolveQwenCloneModel,
+  resolveQwenSynthesisModel,
+  resolveQwenTtsDefaultVoice,
+  synthesizeQwenTtsToFile,
+} = require('./qwenTtsClient');
+const {
+  getCosyVoiceHealth,
+  resolveCosyVoiceInstruction,
+  resolveCosyVoiceModel,
+  resolveCosyVoiceRate,
+  resolveCosyVoiceVoiceId,
+  synthesizeCosyVoiceToFile,
+} = require('./cosyvoiceBailianClient');
 
 const PROJECT_ROOT = path.join(__dirname, '../..');
 const PUBLIC_DIR = path.join(PROJECT_ROOT, 'public');
@@ -31,11 +47,52 @@ const ENGINES = {
     synthUrl: process.env.XTTS_HTTP_SYNTH_URL || 'http://127.0.0.1:18083/synthesize',
     defaultVoice: 'speaker',
   },
+  'qwen-tts': {
+    healthUrl: null,
+    synthUrl: null,
+    defaultVoice: resolveQwenTtsDefaultVoice(process.env),
+  },
+  cosyvoice: {
+    healthUrl: null,
+    synthUrl: null,
+    defaultVoice: resolveCosyVoiceVoiceId({}, process.env),
+  },
 };
 
 // Fallback order
 const ENGINE_ORDER = ['chattts', 'melo', 'openvoice'];
 const SYSTEM_SAY_ENGINE = 'system-say';
+const CHINESE_DIGITS = {
+  '0': '零',
+  '1': '一',
+  '2': '二',
+  '3': '三',
+  '4': '四',
+  '5': '五',
+  '6': '六',
+  '7': '七',
+  '8': '八',
+  '9': '九',
+};
+const ZH_PRONUNCIATION_MAP = [
+  [/\bChatGPT\b/gi, 'Chat G P T'],
+  [/\bOpenAI\b/gi, 'Open A I'],
+  [/\bDeepSeek\b/gi, 'Deep Seek'],
+  [/\bClaude\b/gi, '克劳德'],
+  [/\bGemini\b/gi, '杰米奈'],
+  [/\bCopilot\b/gi, 'Co pilot'],
+  [/\bCursor\b/gi, 'Cursor'],
+  [/\bGithub\b/gi, 'Git Hub'],
+  [/\bGitHub\b/g, 'Git Hub'],
+  [/\bAPI\b/g, 'A P I'],
+  [/\bSDK\b/g, 'S D K'],
+  [/\bGPU\b/g, 'G P U'],
+  [/\bCPU\b/g, 'C P U'],
+  [/\bNPU\b/g, 'N P U'],
+  [/\bAIGC\b/g, 'A I G C'],
+  [/\bAGI\b/g, 'A G I'],
+  [/\bAI\b/g, 'A I'],
+];
 
 
 function clamp(value, min, max) {
@@ -80,6 +137,12 @@ function resolveEngine(engine, preset) {
   }
   if (normalized.includes('xtts') || normalized.includes('coqui')) {
     return 'xtts';
+  }
+  if (normalized.includes('cosyvoice') || normalized.includes('cosy')) {
+    return 'cosyvoice';
+  }
+  if (normalized.includes('qwen') || normalized.includes('dashscope') || normalized.includes('bailian')) {
+    return 'qwen-tts';
   }
   if (normalized.includes('openvoice') || normalized.includes('ov') || normalized.includes('clone')) {
     return 'openvoice';
@@ -182,8 +245,11 @@ function resolveVoiceXTTSLanguage(voiceSettings) {
     .toLowerCase();
 
   if (!normalized) return 'zh-cn';
+  if (normalized === 'auto') return 'auto';
   if (normalized === 'zh' || normalized === 'zh-cn') return 'zh-cn';
+  if (normalized === 'chinese') return 'zh-cn';
   if (normalized === 'en' || normalized === 'en-us') return 'en';
+  if (normalized === 'english') return 'en';
   if (normalized === 'ja' || normalized === 'jp') return 'ja';
   if (normalized === 'ko' || normalized === 'kr') return 'ko';
   if (normalized === 'pt' || normalized === 'pt-br') return 'pt';
@@ -194,6 +260,20 @@ function resolveVoiceXTTSLanguage(voiceSettings) {
 function resolveSpeed(speedValue) {
   const raw = String(speedValue || '1.0').trim().replace(/x$/i, '');
   return clamp(Number(raw) || 1, 0.5, 2.0);
+}
+
+function resolveVoiceQwenTts(voiceSettings) {
+  return String(
+    voiceSettings?.voice
+    || voiceSettings?.speaker
+    || voiceSettings?.speakerSeed
+    || voiceSettings?.speaker_seed
+    || '',
+  ).trim();
+}
+
+function resolveVoiceCosyVoice(voiceSettings) {
+  return resolveCosyVoiceVoiceId(voiceSettings, process.env);
 }
 
 function resolveSystemSayRate(speedValue) {
@@ -212,6 +292,172 @@ function resolveShotText(shot, voiceSettings) {
       ? shot.narration.trim()
       : '';
   return text;
+}
+
+function countMatches(value, pattern) {
+  return (String(value || '').match(pattern) || []).length;
+}
+
+function spaceUppercaseToken(token) {
+  const safe = String(token || '').trim();
+  return safe ? safe.toUpperCase().split('').join(' ') : '';
+}
+
+function normalizeVersionForZh(value) {
+  const prepared = String(value || '')
+    .replace(/mini/gi, ' 迷你 ')
+    .replace(/turbo/gi, ' turbo ')
+    .replace(/plus/gi, ' plus ')
+    .replace(/max/gi, ' max ')
+    .replace(/pro/gi, ' pro ')
+    .replace(/ultra/gi, ' ultra ');
+
+  return prepared
+    .split('')
+    .map((char) => {
+      if (CHINESE_DIGITS[char]) {
+        return CHINESE_DIGITS[char];
+      }
+      if (char === '.') {
+        return '点';
+      }
+      if (char === '-' || char === '_' || char === '/') {
+        return ' ';
+      }
+      if (char === 'o' || char === 'O') {
+        return '欧';
+      }
+      if (/[A-Za-z]/.test(char)) {
+        return char.toUpperCase();
+      }
+      return char;
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeVersionForEn(value) {
+  return String(value || '')
+    .replace(/\./g, ' point ')
+    .replace(/([0-9])([A-Za-z])/g, '$1 $2')
+    .replace(/([A-Za-z])([0-9])/g, '$1 $2')
+    .replace(/[-_/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeSpeechTextForTts(value, { language } = {}) {
+  const text = String(value || '')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!text) {
+    return '';
+  }
+
+  const normalizedLanguage = resolveVoiceXTTSLanguage({language});
+  let next = text;
+
+  if (normalizedLanguage === 'zh-cn') {
+    for (const [pattern, replacement] of ZH_PRONUNCIATION_MAP) {
+      next = next.replace(pattern, replacement);
+    }
+
+    next = next.replace(/\b([A-Z]{2,8})\s*[- ]\s*([0-9][A-Za-z0-9.+-]*)/g, (_, acronym, version) => {
+      return `${spaceUppercaseToken(acronym)} ${normalizeVersionForZh(version)}`.trim();
+    });
+    next = next.replace(/\b([A-Z][A-Za-z]{0,2}|o)\s*([0-9][A-Za-z0-9.+-]*)\b/g, (_, token, version) => {
+      return `${spaceUppercaseToken(token)} ${normalizeVersionForZh(version)}`.trim();
+    });
+
+    next = next.replace(/\b([A-Z]{2,8})(?=\d)/g, (token) => spaceUppercaseToken(token));
+    next = next.replace(/\b([A-Z]{2,8})\b/g, (token) => spaceUppercaseToken(token));
+  } else if (normalizedLanguage === 'en') {
+    next = next.replace(/\b([A-Z]{2,8})\s*[- ]\s*([0-9][A-Za-z0-9.+-]*)/g, (_, acronym, version) => {
+      return `${spaceUppercaseToken(acronym)} ${normalizeVersionForEn(version)}`.trim();
+    });
+    next = next.replace(/\b([A-Z][A-Za-z]{0,2}|o)\s*([0-9][A-Za-z0-9.+-]*)\b/g, (_, token, version) => {
+      return `${spaceUppercaseToken(token)} ${normalizeVersionForEn(version)}`.trim();
+    });
+    next = next.replace(/\bAI\b/g, 'A I');
+    next = next.replace(/\bAPI\b/g, 'A P I');
+    next = next.replace(/\bGPU\b/g, 'G P U');
+    next = next.replace(/\bCPU\b/g, 'C P U');
+  }
+
+  return next
+    .replace(/\s+([,.!?;:])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function resolveTtsLanguageForText(text, voiceSettings, engine) {
+  if (engine === 'cosyvoice') {
+    if (voiceSettings?.languageExplicit) {
+      return resolveVoiceXTTSLanguage(voiceSettings);
+    }
+
+    const latinCount = countMatches(text, /[A-Za-z]/g);
+    const cjkCount = countMatches(text, /[\u3400-\u9FFF]/g);
+    if (latinCount >= 12 && latinCount > cjkCount * 1.5) {
+      return 'en';
+    }
+    if (cjkCount > 0) {
+      return 'zh-cn';
+    }
+    return 'auto';
+  }
+
+  if (engine === 'qwen-tts') {
+    if (voiceSettings?.languageExplicit) {
+      return resolveVoiceXTTSLanguage(voiceSettings);
+    }
+
+    const latinCount = countMatches(text, /[A-Za-z]/g);
+    const cjkCount = countMatches(text, /[\u3400-\u9FFF]/g);
+    if (latinCount >= 12 && latinCount > cjkCount * 1.5) {
+      return 'en';
+    }
+    if (cjkCount > 0) {
+      return 'zh-cn';
+    }
+    return 'auto';
+  }
+
+  if (engine !== 'xtts') {
+    return engine === 'openvoice'
+      ? resolveVoiceCode(voiceSettings?.language, 'zh')
+      : resolveVoiceXTTSLanguage(voiceSettings);
+  }
+
+  const fallbackLanguage = resolveVoiceXTTSLanguage(voiceSettings);
+  if (voiceSettings?.languageExplicit) {
+    return fallbackLanguage;
+  }
+
+  const latinCount = countMatches(text, /[A-Za-z]/g);
+  const cjkCount = countMatches(text, /[\u3400-\u9FFF]/g);
+  const englishWordCount = countMatches(text, /\b[A-Za-z][A-Za-z0-9.+-]*\b/g);
+
+  if (latinCount >= 12 && englishWordCount >= 4 && latinCount > cjkCount * 1.5) {
+    return 'en';
+  }
+
+  return fallbackLanguage;
+}
+
+function resolveShotSpeechPlan(shot, voiceSettings, engine) {
+  const rawText = resolveShotText(shot, voiceSettings);
+  const language = resolveTtsLanguageForText(rawText, voiceSettings, engine);
+  const spokenText = normalizeSpeechTextForTts(rawText, {language});
+  return {
+    rawText,
+    spokenText,
+    language,
+  };
 }
 
 async function checkVoiceService(engine) {
@@ -241,6 +487,32 @@ async function resolveHealthyVoiceEngine(requestedEngine, update) {
         engine: SYSTEM_SAY_ENGINE,
         source: 'macOS system say',
       },
+      failures: [],
+    };
+  }
+
+  if (requestedEngine === 'qwen-tts') {
+    update?.(5, '检查语音引擎 (qwen-tts)...');
+    const health = getQwenTtsHealth(process.env);
+    if (health.status !== 'ok') {
+      throw new Error(`Qwen TTS 不可用：${health.message || '未完成配置'}`);
+    }
+    return {
+      engine: 'qwen-tts',
+      health,
+      failures: [],
+    };
+  }
+
+  if (requestedEngine === 'cosyvoice') {
+    update?.(5, '检查语音引擎 (cosyvoice)...');
+    const health = getCosyVoiceHealth(process.env);
+    if (health.status !== 'ok') {
+      throw new Error(`CosyVoice 不可用：${health.message || '未完成配置'}`);
+    }
+    return {
+      engine: 'cosyvoice',
+      health,
       failures: [],
     };
   }
@@ -278,7 +550,7 @@ async function resolveHealthyVoiceEngine(requestedEngine, update) {
   throw new Error(`没有可用的语音引擎。${failures.join(' | ')}`);
 }
 
-async function synthesizeClip({ text, engine, voice, speed, language, referenceUrl, outputPath, temperature, topP, topK }) {
+async function synthesizeClip({ text, engine, voice, speed, language, referenceUrl, outputPath, temperature, topP, topK, model, instruction }) {
   if (engine === SYSTEM_SAY_ENGINE) {
     const tempAiffPath = outputPath.replace(/\.wav$/i, '.aiff');
     const sayRate = String(resolveSystemSayRate(speed));
@@ -310,6 +582,31 @@ async function synthesizeClip({ text, engine, voice, speed, language, referenceU
 
   const cfg = ENGINES[engine];
   if (!cfg) throw new Error(`Unknown engine: ${engine}`);
+
+  if (engine === 'qwen-tts') {
+    return await synthesizeQwenTtsToFile({
+      text,
+      voice: voice || resolveQwenTtsDefaultVoice(process.env),
+      language,
+      outputPath,
+      model,
+      speed,
+      env: process.env,
+    }).then(() => outputPath);
+  }
+
+  if (engine === 'cosyvoice') {
+    return await synthesizeCosyVoiceToFile({
+      text,
+      voice,
+      language,
+      outputPath,
+      model,
+      speed,
+      instruction,
+      env: process.env,
+    }).then(() => outputPath);
+  }
 
   const payload = {
     text,
@@ -413,16 +710,19 @@ async function processVoiceJob(job, update) {
     engine = resolvedEngine.engine;
   }
 
-  const voiceRequest = engine === 'chattts'
+  let voiceRequest = engine === 'chattts'
     ? resolveVoiceChatTTSSpeakerSeed(voiceSettings)
     : engine === 'melo'
       ? resolveVoiceMelo(voiceSettings)
       : engine === 'xtts'
-        ? resolveVoiceXTTS(voiceSettings)
+      ? resolveVoiceXTTS(voiceSettings)
+      : engine === 'qwen-tts'
+        ? resolveVoiceQwenTts(voiceSettings)
+      : engine === 'cosyvoice'
+        ? resolveVoiceCosyVoice(voiceSettings)
       : engine === SYSTEM_SAY_ENGINE
         ? resolveVoiceSystemSay(voiceSettings)
         : resolveVoiceOpenVoice(voiceSettings);
-  const voiceName = engine === 'chattts' ? `seed-${voiceRequest}` : voiceRequest;
 
   const referenceUrl = voiceSettings.referenceUrl || voiceSettings.reference_url || null;
   const requestLanguage = resolveVoiceXTTSLanguage(voiceSettings);
@@ -430,10 +730,55 @@ async function processVoiceJob(job, update) {
   const requestTemperature = clamp(toNumber(voiceSettings.temperature, 0.3), 0.05, 2.0);
   const requestTopP = clamp(toNumber(voiceSettings.topP ?? voiceSettings.top_p, 0.7), 0.1, 1.0);
   const requestTopK = Math.round(clamp(toNumber(voiceSettings.topK ?? voiceSettings.top_k, 20), 1, 100));
+  let requestModel = engine === 'qwen-tts'
+    ? resolveQwenSynthesisModel({
+        voiceSettings,
+        voice: voiceRequest,
+        referenceUrl,
+        env: process.env,
+      })
+    : null;
+  const requestInstruction = engine === 'cosyvoice'
+    ? resolveCosyVoiceInstruction(voiceSettings, process.env)
+    : null;
+  if (engine === 'cosyvoice') {
+    requestModel = resolveCosyVoiceModel(voiceSettings, process.env);
+  }
 
   if (engine === 'xtts' && !referenceUrl && !String(voiceSettings?.voice || voiceSettings?.speaker || '').trim()) {
     throw new Error('XTTS 需要提供参考音频 referenceUrl，或使用 --speaker 指定已缓存的本地音色别名。');
   }
+  if (engine === 'cosyvoice' && !String(voiceRequest).trim()) {
+    throw new Error('CosyVoice 需要提供现成的 voice id，例如 cosyvoice-v3.5-plus-bailian-...。');
+  }
+  if (engine === 'qwen-tts' && referenceUrl && !String(voiceRequest).trim()) {
+    update?.(8, '准备 Qwen 克隆音色...');
+    const clonedVoice = await ensureQwenCloneVoice({
+      referenceUrl,
+      preferredName: String(
+        voiceSettings?.cloneVoiceName
+        || voiceSettings?.preferredName
+        || voiceSettings?.clone_name
+        || path.basename(String(referenceUrl)).replace(path.extname(String(referenceUrl)), ''),
+      ).trim() || 'qwen-clone',
+      targetModel: resolveQwenCloneModel(voiceSettings, process.env),
+      referenceText: voiceSettings?.referenceText || voiceSettings?.cloneText || '',
+      referenceLanguage: voiceSettings?.referenceLanguage || requestLanguage,
+      env: process.env,
+    });
+    voiceRequest = clonedVoice.voice;
+    requestModel = clonedVoice.targetModel || resolveQwenCloneModel(voiceSettings, process.env);
+  }
+  if (engine === 'qwen-tts' && !String(voiceRequest).trim()) {
+    voiceRequest = resolveQwenTtsDefaultVoice(process.env);
+    requestModel = resolveQwenSynthesisModel({
+      voiceSettings,
+      voice: voiceRequest,
+      referenceUrl,
+      env: process.env,
+    });
+  }
+  const voiceName = engine === 'chattts' ? `seed-${voiceRequest}` : voiceRequest;
 
   const jobVoiceDir = path.join(VOICE_DIR, projectId, job.id);
   ensureDir(jobVoiceDir);
@@ -448,25 +793,33 @@ async function processVoiceJob(job, update) {
     engine,
     voiceName,
     referenceUrl,
-    requestLanguage: engine === 'xtts' ? requestLanguage : null,
+    requestLanguage: engine === 'xtts' || engine === 'qwen-tts' || engine === 'cosyvoice' ? requestLanguage : null,
     requestSpeed,
     requestTemperature: engine === 'chattts' ? requestTemperature : null,
     requestTopP: engine === 'chattts' ? requestTopP : null,
     requestTopK: engine === 'chattts' ? requestTopK : null,
+    requestModel,
+    requestInstruction,
     generatedAt: new Date().toISOString(),
-    shots: shots.map((shot) => ({
-      id: shot.id,
-      title: shot.title,
-      text: resolveShotText(shot, voiceSettings),
-    })),
+    shots: shots.map((shot) => {
+      const speech = resolveShotSpeechPlan(shot, voiceSettings, engine);
+      return {
+        id: shot.id,
+        title: shot.title,
+        text: speech.rawText,
+        spokenText: speech.spokenText,
+        language: speech.language,
+      };
+    }),
   };
   const scriptsManifestPath = path.join(jobVoiceDir, 'voice-job.json');
   fs.writeFileSync(scriptsManifestPath, JSON.stringify(manifestData, null, 2));
 
   for (let index = 0; index < shots.length; index += 1) {
     const shot = shots[index];
-    const text = resolveShotText(shot, voiceSettings);
-    if (!text) {
+    const speech = resolveShotSpeechPlan(shot, voiceSettings, engine);
+    const text = speech.spokenText;
+    if (!speech.rawText) {
       throw new Error(`Shot ${shot.id} has no narration text`);
     }
 
@@ -483,12 +836,14 @@ async function processVoiceJob(job, update) {
       engine,
       voice: voiceRequest,
       speed: requestSpeed,
-      language: requestLanguage,
+      language: speech.language || requestLanguage,
       referenceUrl,
       outputPath,
       temperature: requestTemperature,
       topP: requestTopP,
       topK: requestTopK,
+      model: requestModel,
+      instruction: requestInstruction,
     });
 
     const durationSeconds = probeDurationSeconds(outputPath);
@@ -496,7 +851,8 @@ async function processVoiceJob(job, update) {
 
     segments.push({
       id: shot.id,
-      text,
+      text: speech.rawText,
+      spokenText: text,
       outputPath,
       relativeAssetPath,
       durationSeconds,
@@ -508,6 +864,7 @@ async function processVoiceJob(job, update) {
       status: 'done',
       durationSeconds,
       voiceFile: relativeAssetPath,
+      language: speech.language || requestLanguage,
     });
   }
 
@@ -519,11 +876,13 @@ async function processVoiceJob(job, update) {
     engineName: engine,
     voice: voiceName,
     referenceUrl,
-    requestLanguage: engine === 'xtts' ? requestLanguage : null,
+    requestLanguage: engine === 'xtts' || engine === 'qwen-tts' || engine === 'cosyvoice' ? requestLanguage : null,
     requestSpeed,
     requestTemperature: engine === 'chattts' ? requestTemperature : null,
     requestTopP: engine === 'chattts' ? requestTopP : null,
     requestTopK: engine === 'chattts' ? requestTopK : null,
+    requestModel,
+    requestInstruction,
     health,
     generatedAt: new Date().toISOString(),
     queue: generatedQueue,
@@ -537,8 +896,10 @@ async function processVoiceJob(job, update) {
     engineName: engine,
     voice: voiceName,
     referenceUrl,
-    requestLanguage: engine === 'xtts' ? requestLanguage : null,
+    requestLanguage: engine === 'xtts' || engine === 'qwen-tts' || engine === 'cosyvoice' ? requestLanguage : null,
     requestSpeed,
+    requestModel,
+    requestInstruction,
     manifestFile: `/assets/voice/${projectId}/${job.id}/manifest.json`,
     queue: generatedQueue,
     totalClips: generatedQueue.length,
@@ -589,6 +950,25 @@ function getVoiceCapabilities() {
         supportsCloning: true,
         requiresReference: true,
       },
+      'qwen-tts': {
+        healthUrl: null,
+        synthUrl: null,
+        name: 'Qwen TTS (DashScope)',
+        description: '阿里云百炼千问语音合成，支持自定义克隆音色并直接落地为 wav',
+        voices: ['system-voice', 'cloned-voice'],
+        supportsCloning: true,
+        requiresReference: false,
+      },
+      cosyvoice: {
+        healthUrl: null,
+        synthUrl: null,
+        name: 'CosyVoice (DashScope)',
+        description: '阿里云百炼 CosyVoice 合成，支持现成 voice id、语速 rate 和 instruct 控制',
+        voices: ['cosyvoice-v3.5-plus-bailian-*'],
+        supportsCloning: false,
+        requiresReference: false,
+        supportsInstruction: true,
+      },
     },
     defaultEngine: 'chattts',
   };
@@ -597,4 +977,6 @@ function getVoiceCapabilities() {
 module.exports = {
   processVoiceJob,
   getVoiceCapabilities,
+  normalizeSpeechTextForTts,
+  resolveTtsLanguageForText,
 };

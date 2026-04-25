@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawn, spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
+import dotenv from 'dotenv';
 import {ensureXttsServiceReady} from './lib/voice-service-bootstrap.mjs';
 import {resolveWorkflowVoiceDefaults} from './lib/workflow-voice-defaults.mjs';
 
@@ -19,6 +20,9 @@ const REMOTION_ROOT = path.resolve(__dirname, '..');
 const PROJECTS_DIR = path.join(REMOTION_ROOT, 'projects');
 const REMOTION_PACKAGE_JSON_PATH = path.join(REMOTION_ROOT, 'package.json');
 
+dotenv.config({path: path.join(REMOTION_ROOT, '.env.local'), override: false});
+dotenv.config({path: path.join(REMOTION_ROOT, '.env'), override: false});
+
 const DEFAULT_TEMPLATE = 'ultimate';
 const DEFAULT_VISUAL_SYSTEM = 'ultimate-1080p';
 const DEFAULT_QUALITY = 'high';
@@ -27,7 +31,7 @@ const DEFAULT_WIDTH = 1920;
 const DEFAULT_HEIGHT = 1080;
 const STEP_CACHE_VERSION = 3;
 const IMAGE_CACHE_VERSION = 2;
-const VOICE_CACHE_VERSION = 4;
+const VOICE_CACHE_VERSION = 8;
 const RENDER_CACHE_VERSION = 1;
 const VOICE_SAMPLE_RATE = 24000;
 const VOICE_PADDING_DEFAULT_SECONDS = 0.22;
@@ -186,11 +190,13 @@ Options:
   --fps <number>
   --width <number>
   --height <number>
-  --voice-engine <name>     chattts | melo | openvoice | xtts
+  --voice-engine <name>     chattts | melo | openvoice | xtts | qwen-tts | cosyvoice
   --voice-speed <number>    默认 1.0
   --speaker <value>         speaker seed / voice code
   --reference <path|url>    参考音频路径或 URL（XTTS / OpenVoice）
   --voice-language <code>   语言代码，例如 zh-cn / en / ja
+  --voice-model <name>      指定云端 TTS 模型，例如 qwen3-tts-vc-2026-01-22
+  --voice-instruction <text> 语音指令，例如“性格直率，情绪易激动且外露”
   --package-version <ver>   指定打包版本号，默认读取 remotion-video/package.json
   --output <path>           指定最终视频输出路径
   --resume                  复用已有 step/voice/images/render 产物继续执行
@@ -200,11 +206,13 @@ Options:
   --help                    显示帮助
 
 Examples:
-  node scripts/run-search-to-ultimate.mjs "今天的 AI 头条"   # 有 runtime/voices/xtts/anchor.wav 时默认走 xtts
+  node scripts/run-search-to-ultimate.mjs "今天的 AI 头条"   # 有 runtime/voices/xtts/daman-business-001.wav 时默认走 xtts
   node scripts/run-search-to-ultimate.mjs "Claude Code 和 Codex 区别"
   node scripts/run-search-to-ultimate.mjs --topic "AI agent 工作流" --no-render
   node scripts/run-search-to-ultimate.mjs "Remotion 自动视频" --voice-engine chattts --output out/agent.mp4
-  node scripts/run-search-to-ultimate.mjs "AI 行业日报" --voice-engine xtts --reference runtime/voices/xtts/anchor.wav --speaker anchor
+  node scripts/run-search-to-ultimate.mjs "AI 行业日报" --voice-engine xtts --reference runtime/voices/xtts/daman-business-001.wav --speaker daman-business-001
+  node scripts/run-search-to-ultimate.mjs "阿里云百炼语音" --voice-engine qwen-tts --reference /path/to/ref.wav --speaker my-qwen-clone
+  node scripts/run-search-to-ultimate.mjs "情绪化口播" --voice-engine cosyvoice --speaker cosyvoice-v3.5-plus-bailian-xxxx --voice-speed 1.1 --voice-instruction "性格直率，情绪易激动且外露"
 `);
 };
 
@@ -221,6 +229,8 @@ const parseArgs = (argv) => {
     voiceEngine: 'chattts',
     voiceSpeed: '1.0',
     voiceLanguage: '',
+    voiceModel: '',
+    voiceInstruction: '',
     reference: '',
   };
 
@@ -269,6 +279,7 @@ const parseArgs = (argv) => {
         break;
       case '--voice-speed':
         options.voiceSpeed = safeString(argv[index + 1]) || '1.0';
+        options.voiceSpeedExplicit = true;
         index += 1;
         break;
       case '--speaker':
@@ -286,6 +297,16 @@ const parseArgs = (argv) => {
       case '--language':
         options.voiceLanguage = safeString(argv[index + 1]);
         options.voiceLanguageExplicit = true;
+        index += 1;
+        break;
+      case '--voice-model':
+        options.voiceModel = safeString(argv[index + 1]);
+        options.voiceModelExplicit = true;
+        index += 1;
+        break;
+      case '--voice-instruction':
+        options.voiceInstruction = safeString(argv[index + 1]);
+        options.voiceInstructionExplicit = true;
         index += 1;
         break;
       case '--package-version':
@@ -1163,9 +1184,20 @@ const buildVoiceSettings = (options, pipelineState) => {
     ...(pipelineState?.voice && typeof pipelineState.voice === 'object' ? pipelineState.voice : {}),
     engine: options.voiceEngine,
     speed: options.voiceSpeed,
+    languageExplicit: Boolean(options.voiceLanguageExplicit),
     ...(safeString(options.voiceLanguage)
       ? {
           language: options.voiceLanguage,
+        }
+      : {}),
+    ...(safeString(options.voiceModel)
+      ? {
+          model: options.voiceModel,
+        }
+      : {}),
+    ...(safeString(options.voiceInstruction)
+      ? {
+          instruction: options.voiceInstruction,
         }
       : {}),
     ...(safeString(options.reference)
@@ -1196,6 +1228,9 @@ const buildVoiceShotInputHash = ({shot, pipelineState, voiceSettings}) => {
     engine: safeString(voiceSettings?.engine),
     speed: safeString(voiceSettings?.speed),
     language: safeString(voiceSettings?.language),
+    languageExplicit: Boolean(voiceSettings?.languageExplicit),
+    model: safeString(voiceSettings?.model),
+    instruction: safeString(voiceSettings?.instruction),
     speakerSeed: safeString(voiceSettings?.speakerSeed),
     voice: safeString(voiceSettings?.voice),
     referenceUrl: safeString(voiceSettings?.referenceUrl || voiceSettings?.reference_url),
@@ -1240,6 +1275,9 @@ const buildVoiceManifestPayload = ({projectId, shotsState, pipelineState, voiceS
       engine: safeString(voiceSettings?.engine),
       speed: safeString(voiceSettings?.speed),
       language: safeString(voiceSettings?.language),
+      languageExplicit: Boolean(voiceSettings?.languageExplicit),
+      model: safeString(voiceSettings?.model),
+      instruction: safeString(voiceSettings?.instruction),
       speakerSeed: safeString(voiceSettings?.speakerSeed),
       voice: safeString(voiceSettings?.voice),
       referenceUrl: safeString(voiceSettings?.referenceUrl || voiceSettings?.reference_url),

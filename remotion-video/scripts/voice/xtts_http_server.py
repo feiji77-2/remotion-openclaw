@@ -17,15 +17,33 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PUBLIC_DIR = PROJECT_ROOT / "public"
 DEFAULT_MODEL = "tts_models/multilingual/multi-dataset/xtts_v2"
 DEFAULT_SPEAKERS_DIR = PROJECT_ROOT / "runtime" / "voices" / "xtts"
-REFERENCE_TRIM_SECONDS = 12
-REFERENCE_START_TRIM_DB = -40
-REFERENCE_START_TRIM_SECONDS = 0.05
+REFERENCE_TRIM_SECONDS = 18
+REFERENCE_START_TRIM_DB = -38
+REFERENCE_START_TRIM_SECONDS = 0.04
+REFERENCE_END_TRIM_DB = -38
+REFERENCE_END_TRIM_SECONDS = 0.08
+REFERENCE_HIGHPASS_HZ = 35
+REFERENCE_LOWPASS_HZ = 14000
+REFERENCE_WINDOW_SECONDS = 4.8
+REFERENCE_WINDOW_STRIDE_SECONDS = 3.2
+REFERENCE_MAX_WINDOWS = 4
+XTTS_MAX_REF_LEN = 18
+XTTS_GPT_COND_LEN = 12
+XTTS_GPT_COND_CHUNK_LEN = 4
+XTTS_TEMPERATURE = 0.55
+XTTS_TOP_P = 0.82
+XTTS_TOP_K = 40
+XTTS_REPETITION_PENALTY = 6.0
+XTTS_LENGTH_PENALTY = 1.0
+XTTS_SOUND_NORM_REFS = True
 OUTPUT_START_TRIM_DB = -42
 OUTPUT_START_TRIM_SECONDS = 0.03
 OUTPUT_END_TRIM_DB = -42
 OUTPUT_END_TRIM_SECONDS = 0.12
 OUTPUT_FADE_IN_SECONDS = 0.018
 OUTPUT_FADE_OUT_SECONDS = 0.03
+OUTPUT_HIGHPASS_HZ = 50
+OUTPUT_LOWPASS_HZ = 14500
 
 STATE = {
     "status": "loading",
@@ -103,13 +121,24 @@ def should_retry_on_cpu(exc):
 
 def synthesize_to_file(text, reference_audio, language, output_path):
     assert STATE["tts"] is not None
+    speaker_wav = [str(item) for item in reference_audio] if isinstance(reference_audio, list) else str(reference_audio)
 
     try:
         STATE["tts"].tts_to_file(
             text=text,
-            speaker_wav=str(reference_audio),
+            speaker_wav=speaker_wav,
             language=language,
             file_path=str(output_path),
+            split_sentences=False,
+            temperature=XTTS_TEMPERATURE,
+            top_p=XTTS_TOP_P,
+            top_k=XTTS_TOP_K,
+            repetition_penalty=XTTS_REPETITION_PENALTY,
+            length_penalty=XTTS_LENGTH_PENALTY,
+            gpt_cond_len=XTTS_GPT_COND_LEN,
+            gpt_cond_chunk_len=XTTS_GPT_COND_CHUNK_LEN,
+            max_ref_len=XTTS_MAX_REF_LEN,
+            sound_norm_refs=XTTS_SOUND_NORM_REFS,
         )
     except Exception as exc:
         if not should_retry_on_cpu(exc):
@@ -121,9 +150,19 @@ def synthesize_to_file(text, reference_audio, language, output_path):
         assert STATE["tts"] is not None
         STATE["tts"].tts_to_file(
             text=text,
-            speaker_wav=str(reference_audio),
+            speaker_wav=speaker_wav,
             language=language,
             file_path=str(output_path),
+            split_sentences=False,
+            temperature=XTTS_TEMPERATURE,
+            top_p=XTTS_TOP_P,
+            top_k=XTTS_TOP_K,
+            repetition_penalty=XTTS_REPETITION_PENALTY,
+            length_penalty=XTTS_LENGTH_PENALTY,
+            gpt_cond_len=XTTS_GPT_COND_LEN,
+            gpt_cond_chunk_len=XTTS_GPT_COND_CHUNK_LEN,
+            max_ref_len=XTTS_MAX_REF_LEN,
+            sound_norm_refs=XTTS_SOUND_NORM_REFS,
         )
 
 
@@ -264,21 +303,75 @@ def run_ffmpeg_audio_transform(source_path, output_path, filter_chain, sample_ra
 
 
 def preprocess_reference_audio(source_path, output_dir):
-    output_path = Path(output_dir) / "reference-prep.wav"
+    output_path = Path(output_dir) / "reference-prep-full.wav"
     filter_chain = ",".join(
         [
             f"silenceremove=start_periods=1:start_duration={REFERENCE_START_TRIM_SECONDS}:"
             f"start_threshold={REFERENCE_START_TRIM_DB}dB",
             "areverse",
-            f"silenceremove=start_periods=1:start_duration={REFERENCE_START_TRIM_SECONDS}:"
-            f"start_threshold={REFERENCE_START_TRIM_DB}dB",
+            f"silenceremove=start_periods=1:start_duration={REFERENCE_END_TRIM_SECONDS}:"
+            f"start_threshold={REFERENCE_END_TRIM_DB}dB",
             "areverse",
-            "highpass=f=55",
-            "lowpass=f=10000",
+            f"highpass=f={REFERENCE_HIGHPASS_HZ}",
+            f"lowpass=f={REFERENCE_LOWPASS_HZ}",
             f"atrim=0:{REFERENCE_TRIM_SECONDS}",
         ]
     )
-    return run_ffmpeg_audio_transform(source_path, output_path, filter_chain, sample_rate=24000)
+    full_reference = run_ffmpeg_audio_transform(source_path, output_path, filter_chain, sample_rate=24000)
+
+    duration_command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=nw=1:nk=1",
+        str(full_reference),
+    ]
+    duration_result = subprocess.run(duration_command, capture_output=True, text=True, cwd=PROJECT_ROOT)
+    try:
+        duration_seconds = float(duration_result.stdout.strip())
+    except (TypeError, ValueError):
+        duration_seconds = 0.0
+
+    if duration_seconds <= 0:
+        return [full_reference]
+
+    if duration_seconds <= REFERENCE_WINDOW_SECONDS + 0.4:
+        return [full_reference]
+
+    window_seconds = min(REFERENCE_WINDOW_SECONDS, max(2.8, duration_seconds))
+    stride_seconds = min(REFERENCE_WINDOW_STRIDE_SECONDS, max(1.8, window_seconds - 0.8))
+    windows = []
+    start_seconds = 0.0
+
+    while start_seconds < duration_seconds and len(windows) < REFERENCE_MAX_WINDOWS:
+        end_seconds = min(duration_seconds, start_seconds + window_seconds)
+        if end_seconds - start_seconds >= 2.2:
+            windows.append((round(start_seconds, 3), round(end_seconds, 3)))
+        if end_seconds >= duration_seconds:
+            break
+        start_seconds += stride_seconds
+
+    if windows and windows[-1][1] < duration_seconds - 0.35 and len(windows) < REFERENCE_MAX_WINDOWS:
+        windows.append((round(max(0.0, duration_seconds - window_seconds), 3), round(duration_seconds, 3)))
+
+    deduped = []
+    for start_seconds, end_seconds in windows:
+        if deduped and abs(start_seconds - deduped[-1][0]) < 0.2 and abs(end_seconds - deduped[-1][1]) < 0.2:
+            continue
+        deduped.append((start_seconds, end_seconds))
+
+    references = []
+    for index, (start_seconds, end_seconds) in enumerate(deduped, start=1):
+        chunk_path = Path(output_dir) / f"reference-prep-{index:02d}.wav"
+        chunk_filter = f"atrim={start_seconds}:{end_seconds},asetpts=N/SR/TB"
+        references.append(
+            run_ffmpeg_audio_transform(full_reference, chunk_path, chunk_filter, sample_rate=24000)
+        )
+
+    return references or [full_reference]
 
 
 def finalize_synthesized_audio(source_path, speed):
@@ -302,16 +395,14 @@ def finalize_synthesized_audio(source_path, speed):
             f"silenceremove=start_periods=1:start_duration={OUTPUT_END_TRIM_SECONDS}:"
             f"start_threshold={OUTPUT_END_TRIM_DB}dB",
             "areverse",
-            "highpass=f=65",
-            "lowpass=f=12000",
-            "deesser=i=0.12:m=0.5:f=0.55:s=o",
-            "acompressor=threshold=0.125:ratio=2.2:attack=5:release=80:makeup=2",
+            f"highpass=f={OUTPUT_HIGHPASS_HZ}",
+            f"lowpass=f={OUTPUT_LOWPASS_HZ}",
+            "acompressor=threshold=0.18:ratio=1.5:attack=8:release=120:makeup=1",
             f"afade=t=in:st=0:d={OUTPUT_FADE_IN_SECONDS}:c=qsin",
             "areverse",
             f"afade=t=in:st=0:d={OUTPUT_FADE_OUT_SECONDS}:c=qsin",
             "areverse",
-            "loudnorm=I=-16:LRA=7:TP=-1.5:dual_mono=true",
-            "alimiter=limit=0.94",
+            "alimiter=limit=0.96",
         ]
     )
 

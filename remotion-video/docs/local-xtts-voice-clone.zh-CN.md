@@ -15,7 +15,7 @@
 - 支持 `--voice-language <语言代码>`
 - 支持 `--speaker <音色别名>`
 - `workflow:ultimate` 在发现 `XTTS` 未启动时会自动拉起本地服务
-- 如果存在 `runtime/voices/xtts/anchor.wav`，`workflow:ultimate` 最简命令会默认走 `xtts + anchor`
+- 如果存在 `runtime/voices/xtts/daman-business-001.wav`，`workflow:ultimate` 最简命令会默认走 `xtts + daman-business-001`
 - 服务能力会出现在 `/health` 的 `capabilities.voice.engines.xtts`
 
 相关文件：
@@ -46,7 +46,7 @@
 
 推荐命名：
 
-- `anchor.wav`
+- `daman-business-001.wav`
 - `host-a.wav`
 - `female-tech.wav`
 
@@ -73,8 +73,8 @@ chmod +x scripts/voice/start-xtts-server.sh
 ```bash
 npm run workflow:ultimate -- "你的标题" \
   --voice-engine xtts \
-  --speaker anchor \
-  --reference runtime/voices/xtts/anchor.wav \
+  --speaker daman-business-001 \
+  --reference runtime/voices/xtts/daman-business-001.wav \
   --voice-language zh-cn
 ```
 
@@ -82,7 +82,7 @@ npm run workflow:ultimate -- "你的标题" \
 
 如果你已经把默认样本放在：
 
-- `runtime/voices/xtts/anchor.wav`
+- `runtime/voices/xtts/daman-business-001.wav`
 
 那么以后最简命令可以直接变成：
 
@@ -93,8 +93,8 @@ npm run workflow:ultimate -- "你的标题"
 这时工作流会默认命中：
 
 - `voice-engine = xtts`
-- `speaker = anchor`
-- `reference = runtime/voices/xtts/anchor.wav`
+- `speaker = daman-business-001`
+- `reference = runtime/voices/xtts/daman-business-001.wav`
 - `voice-language = zh-cn`
 
 这个脚本会做这些事：
@@ -170,8 +170,8 @@ curl http://127.0.0.1:18083/health
 ```bash
 npm run workflow:ultimate -- "国产 AI 开源王炸" \
   --voice-engine xtts \
-  --reference runtime/voices/xtts/anchor.wav \
-  --speaker anchor \
+  --reference runtime/voices/xtts/daman-business-001.wav \
+  --speaker daman-business-001 \
   --voice-language zh-cn \
   --no-resume \
   --output out/xtts-demo.mp4
@@ -187,16 +187,16 @@ npm run workflow:ultimate -- "国产 AI 开源王炸" \
 
 前提是目录里已经有：
 
-- `runtime/voices/xtts/anchor.wav`
+- `runtime/voices/xtts/daman-business-001.wav`
 
 然后可以直接：
 
 ```bash
 npm run workflow:ultimate -- "今日 AI 资讯" \
   --voice-engine xtts \
-  --speaker anchor \
+  --speaker daman-business-001 \
   --voice-language zh-cn \
-  --output out/xtts-anchor.mp4
+  --output out/xtts-daman-business-001.mp4
 ```
 
 服务会自动去 `runtime/voices/xtts/` 下找同名音频。
@@ -228,7 +228,7 @@ npm run workflow:ultimate -- "今日 AI 资讯" \
 ## 失败时先查这几个点
 
 - `curl http://127.0.0.1:18083/health` 是否返回 `status=ok`
-- `runtime/voices/xtts/anchor.wav` 是否真的存在
+- `runtime/voices/xtts/daman-business-001.wav` 是否真的存在
 - 参考音频是不是太短、太吵、太糊
 - 当前 Python 环境是不是误用了系统 Python 3.9
 - 是否出现 `numpy 2.x` 兼容问题
@@ -246,14 +246,14 @@ npm run workflow:ultimate -- "今日 AI 资讯" \
 
 先固定一个真人主播样本，比如：
 
-- `runtime/voices/xtts/anchor.wav`
+- `runtime/voices/xtts/daman-business-001.wav`
 
 之后每天出片直接用：
 
 ```bash
 npm run workflow:ultimate -- "你的标题" \
   --voice-engine xtts \
-  --speaker anchor \
+  --speaker daman-business-001 \
   --voice-language zh-cn
 ```
 

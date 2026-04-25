@@ -1,15 +1,21 @@
 import type {
   UltimateArchitectureMapProps,
+  UltimateBenchmarkChartProps,
   UltimateCodePanelProps,
   UltimateCompareBoardProps,
   UltimateCtaPanelProps,
+  UltimateDataStreamProps,
   UltimateEvidenceWallProps,
   UltimateFeatureCardRailProps,
   UltimateFocusDiagramProps,
+  UltimateGlossaryTermProps,
   UltimateHeroPanelProps,
+  UltimateMemoryGraphProps,
   UltimateMetricBarsProps,
   UltimateNumberStripProps,
   UltimatePlatformOverlayProps,
+  UltimatePipelineFlowProps,
+  UltimateQuoteHighlightProps,
   UltimateStepFlowProps,
   UltimateTagMatrixProps,
   UltimateTerminalPanelProps,
@@ -30,6 +36,12 @@ export type UltimateSceneFamily =
   | 'tag-matrix'
   | 'code'
   | 'metrics'
+  | 'data-stream'
+  | 'memory-graph'
+  | 'pipeline-flow'
+  | 'benchmark-chart'
+  | 'quote-highlight'
+  | 'glossary-term'
   | 'cta';
 
 export type UltimateTransitionPreset = 'fade' | 'lift' | 'flash';
@@ -118,6 +130,36 @@ export type UltimateMetricsScene = UltimateSceneBase & {
   data: UltimateMetricBarsProps;
 };
 
+export type UltimateDataStreamScene = UltimateSceneBase & {
+  family: 'data-stream';
+  data: UltimateDataStreamProps;
+};
+
+export type UltimateMemoryGraphScene = UltimateSceneBase & {
+  family: 'memory-graph';
+  data: UltimateMemoryGraphProps;
+};
+
+export type UltimatePipelineFlowScene = UltimateSceneBase & {
+  family: 'pipeline-flow';
+  data: UltimatePipelineFlowProps;
+};
+
+export type UltimateBenchmarkChartScene = UltimateSceneBase & {
+  family: 'benchmark-chart';
+  data: UltimateBenchmarkChartProps;
+};
+
+export type UltimateQuoteHighlightScene = UltimateSceneBase & {
+  family: 'quote-highlight';
+  data: UltimateQuoteHighlightProps;
+};
+
+export type UltimateGlossaryTermScene = UltimateSceneBase & {
+  family: 'glossary-term';
+  data: UltimateGlossaryTermProps;
+};
+
 export type UltimateCtaScene = UltimateSceneBase & {
   family: 'cta';
   data: UltimateCtaPanelProps;
@@ -137,6 +179,12 @@ export type UltimateSceneConfig =
   | UltimateTagMatrixScene
   | UltimateCodeScene
   | UltimateMetricsScene
+  | UltimateDataStreamScene
+  | UltimateMemoryGraphScene
+  | UltimatePipelineFlowScene
+  | UltimateBenchmarkChartScene
+  | UltimateQuoteHighlightScene
+  | UltimateGlossaryTermScene
   | UltimateCtaScene;
 
 export type UltimateProjectConfig = {
@@ -176,6 +224,12 @@ export type ResolvedUltimateArchitectureMapScene = WithResolvedTiming<UltimateAr
 export type ResolvedUltimateTagMatrixScene = WithResolvedTiming<UltimateTagMatrixScene>;
 export type ResolvedUltimateCodeScene = WithResolvedTiming<UltimateCodeScene>;
 export type ResolvedUltimateMetricsScene = WithResolvedTiming<UltimateMetricsScene>;
+export type ResolvedUltimateDataStreamScene = WithResolvedTiming<UltimateDataStreamScene>;
+export type ResolvedUltimateMemoryGraphScene = WithResolvedTiming<UltimateMemoryGraphScene>;
+export type ResolvedUltimatePipelineFlowScene = WithResolvedTiming<UltimatePipelineFlowScene>;
+export type ResolvedUltimateBenchmarkChartScene = WithResolvedTiming<UltimateBenchmarkChartScene>;
+export type ResolvedUltimateQuoteHighlightScene = WithResolvedTiming<UltimateQuoteHighlightScene>;
+export type ResolvedUltimateGlossaryTermScene = WithResolvedTiming<UltimateGlossaryTermScene>;
 export type ResolvedUltimateCtaScene = WithResolvedTiming<UltimateCtaScene>;
 
 export type ResolvedUltimateSceneConfig =
@@ -192,6 +246,12 @@ export type ResolvedUltimateSceneConfig =
   | ResolvedUltimateTagMatrixScene
   | ResolvedUltimateCodeScene
   | ResolvedUltimateMetricsScene
+  | ResolvedUltimateDataStreamScene
+  | ResolvedUltimateMemoryGraphScene
+  | ResolvedUltimatePipelineFlowScene
+  | ResolvedUltimateBenchmarkChartScene
+  | ResolvedUltimateQuoteHighlightScene
+  | ResolvedUltimateGlossaryTermScene
   | ResolvedUltimateCtaScene;
 
 export type ResolvedUltimateProjectConfig = Omit<UltimateProjectConfig, 'defaultTransition' | 'scenes'> & {
@@ -335,6 +395,72 @@ const readSceneComplexity = (scene: UltimateSceneConfig) => {
           0,
         )
       );
+    case 'data-stream':
+      return (
+        countMany([scene.data.heading, scene.data.summary, scene.subtitle]) +
+        scene.data.items.length * 16 +
+        scene.data.items.reduce(
+          (total, item) => total + countMany([item.label, item.value, item.detail]),
+          0,
+        )
+      );
+    case 'memory-graph':
+      return (
+        countMany([
+          scene.data.heading,
+          scene.data.summary,
+          scene.data.centerTitle,
+          scene.data.centerDetail,
+          scene.subtitle,
+        ]) +
+        scene.data.nodes.length * 16 +
+        scene.data.nodes.reduce(
+          (total, node) => total + countMany([node.label, node.detail]),
+          0,
+        )
+      );
+    case 'pipeline-flow':
+      return (
+        countMany([scene.data.heading, scene.data.summary, scene.subtitle]) +
+        scene.data.stages.length * 18 +
+        scene.data.stages.reduce(
+          (total, stage) => total + countMany([stage.label, stage.detail]),
+          0,
+        )
+      );
+    case 'benchmark-chart':
+      return (
+        countMany([
+          scene.data.heading,
+          scene.data.summary,
+          scene.data.primaryLabel,
+          scene.data.secondaryLabel,
+          scene.subtitle,
+        ]) +
+        scene.data.items.length * 18 +
+        scene.data.items.reduce(
+          (total, item) =>
+            total + countMany([item.label, item.primaryValue, item.secondaryValue]),
+          0,
+        )
+      );
+    case 'quote-highlight':
+      return countMany([
+        scene.data.heading,
+        scene.data.quote,
+        scene.data.attribution,
+        ...((scene.data.tags ?? []).map((tag) => tag.label)),
+        scene.subtitle,
+      ]);
+    case 'glossary-term':
+      return countMany([
+        scene.data.heading,
+        scene.data.term,
+        scene.data.pronunciation,
+        scene.data.definition,
+        ...((scene.data.related ?? []).map((tag) => tag.label)),
+        scene.subtitle,
+      ]);
     case 'cta':
       return countMany([
         scene.data.heading,
@@ -360,6 +486,12 @@ const sceneBaseDurations: Record<UltimateSceneFamily, {base: number; max: number
   'tag-matrix': {base: 78, max: 168},
   code: {base: 74, max: 162},
   metrics: {base: 66, max: 144},
+  'data-stream': {base: 80, max: 174},
+  'memory-graph': {base: 88, max: 192},
+  'pipeline-flow': {base: 84, max: 180},
+  'benchmark-chart': {base: 84, max: 180},
+  'quote-highlight': {base: 68, max: 144},
+  'glossary-term': {base: 74, max: 156},
   cta: {base: 72, max: 150},
 };
 
@@ -395,6 +527,18 @@ export const deriveUltimateSceneSubtitle = (scene: UltimateSceneConfig) => {
       return scene.data.footer ?? scene.data.heading;
     case 'metrics':
       return scene.data.heading;
+    case 'data-stream':
+      return scene.data.summary ?? scene.data.heading;
+    case 'memory-graph':
+      return scene.data.centerDetail ?? scene.data.heading;
+    case 'pipeline-flow':
+      return scene.data.summary ?? scene.data.heading;
+    case 'benchmark-chart':
+      return scene.data.summary ?? scene.data.heading;
+    case 'quote-highlight':
+      return scene.data.heading ?? scene.data.quote;
+    case 'glossary-term':
+      return scene.data.definition ?? scene.data.term;
     case 'cta':
       return scene.data.subtitle ?? scene.data.heading;
   }

@@ -158,6 +158,21 @@ export interface UltimateMetricBarsProps {
   layout?: 'bars' | 'cards';
 }
 
+export interface UltimateDataStreamItem {
+  label: string;
+  value: string;
+  detail?: string;
+  trend?: 'up' | 'steady' | 'alert';
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimateDataStreamProps {
+  heading: string;
+  summary?: string;
+  items: UltimateDataStreamItem[];
+  accent?: UltimateAccentTone;
+}
+
 export interface UltimateEvidenceCard {
   source: string;
   quote: string;
@@ -188,6 +203,71 @@ export interface UltimateArchitectureMapProps {
   nodes: UltimateArchitectureNode[];
   accent?: UltimateAccentTone;
   layout?: 'radial' | 'stack';
+}
+
+export interface UltimateMemoryGraphNode {
+  label: string;
+  detail?: string;
+  icon?: string;
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimateMemoryGraphProps {
+  heading: string;
+  summary?: string;
+  centerTitle: string;
+  centerDetail?: string;
+  nodes: UltimateMemoryGraphNode[];
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimatePipelineStage {
+  label: string;
+  detail?: string;
+  icon?: string;
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimatePipelineFlowProps {
+  heading: string;
+  summary?: string;
+  stages: UltimatePipelineStage[];
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimateBenchmarkItem {
+  label: string;
+  primaryValue: string;
+  secondaryValue: string;
+  primaryRatio: number;
+  secondaryRatio: number;
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimateBenchmarkChartProps {
+  heading: string;
+  summary?: string;
+  primaryLabel: string;
+  secondaryLabel: string;
+  items: UltimateBenchmarkItem[];
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimateQuoteHighlightProps {
+  heading?: string;
+  quote: string;
+  attribution?: string;
+  tags?: UltimateTagChip[];
+  accent?: UltimateAccentTone;
+}
+
+export interface UltimateGlossaryTermProps {
+  heading: string;
+  term: string;
+  pronunciation?: string;
+  definition: string;
+  related?: UltimateTagChip[];
+  accent?: UltimateAccentTone;
 }
 
 export interface UltimateCtaPanelProps {

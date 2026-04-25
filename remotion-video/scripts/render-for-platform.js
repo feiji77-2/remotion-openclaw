@@ -15,6 +15,7 @@
 const { execSync, spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const {buildPreferredRemotionFlags} = require("./render-defaults.js");
 
 const PROJECT_DIR = path.resolve(__dirname, "..");
 const OUT_DIR = path.join(PROJECT_DIR, "out", "platforms");
@@ -29,6 +30,15 @@ const SANDBOX_HINTS = [
   "Sandbox(Signal(6))",
   "current execution environment is blocking Chromium/Chrome startup",
 ];
+const PREFERRED_RENDER_FLAGS = buildPreferredRemotionFlags();
+
+function shellEscape(value) {
+  return `"${String(value).replace(/(["\\$`])/g, "\\$1")}"`;
+}
+
+function renderFlagsToShell(flags) {
+  return flags.map((flag) => shellEscape(flag)).join(" ");
+}
 
 // 平台配置（与 platform-adapter.ts 保持同步）
 // 原则：master 固定 9:16 (1080x1920)，横屏平台由 ffmpeg 裁剪派生
@@ -130,7 +140,7 @@ function ensureMasterVideo() {
   ensureRenderEnvironment();
 
   run(
-    `npx remotion render "${SRC_ENTRY}" "${COMPOSITION}" "${MASTER_VIDEO}" --concurrency=8 --crf=20 2>&1 | tail -5`,
+    `npx remotion render "${SRC_ENTRY}" "${COMPOSITION}" "${MASTER_VIDEO}" ${renderFlagsToShell(PREFERRED_RENDER_FLAGS.flags)} --concurrency=8 --crf=20 2>&1 | tail -5`,
     { maxBuffer: 50 * 1024 * 1024 }
   );
 

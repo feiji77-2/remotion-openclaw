@@ -12,6 +12,12 @@ const ALLOWED_FAMILIES = new Set([
   'tag-matrix',
   'code',
   'metrics',
+  'data-stream',
+  'memory-graph',
+  'pipeline-flow',
+  'benchmark-chart',
+  'quote-highlight',
+  'glossary-term',
   'cta',
 ]);
 
@@ -33,6 +39,12 @@ const sceneBaseDurations = {
   'tag-matrix': {base: 78, max: 168},
   code: {base: 74, max: 162},
   metrics: {base: 66, max: 144},
+  'data-stream': {base: 80, max: 174},
+  'memory-graph': {base: 88, max: 192},
+  'pipeline-flow': {base: 84, max: 180},
+  'benchmark-chart': {base: 84, max: 180},
+  'quote-highlight': {base: 68, max: 144},
+  'glossary-term': {base: 74, max: 156},
   cta: {base: 72, max: 150},
 };
 
@@ -80,6 +92,18 @@ export const deriveSceneSubtitle = (scene) => {
       return data.footer || data.heading || '';
     case 'metrics':
       return data.heading || '';
+    case 'data-stream':
+      return data.summary || data.heading || '';
+    case 'memory-graph':
+      return data.centerDetail || data.heading || '';
+    case 'pipeline-flow':
+      return data.summary || data.heading || '';
+    case 'benchmark-chart':
+      return data.summary || data.heading || '';
+    case 'quote-highlight':
+      return data.heading || data.quote || '';
+    case 'glossary-term':
+      return data.definition || data.term || '';
     case 'cta':
       return data.subtitle || data.heading || '';
     default:
@@ -216,6 +240,68 @@ export const estimateSceneDuration = (scene) => {
               0,
             )
           : 0);
+      break;
+    case 'data-stream':
+      complexity +=
+        countMany([data.heading, data.summary]) +
+        (Array.isArray(data.items) ? data.items.length * 16 : 0) +
+        (Array.isArray(data.items)
+          ? data.items.reduce(
+              (total, item) => total + countMany([item?.label, item?.value, item?.detail]),
+              0,
+            )
+          : 0);
+      break;
+    case 'memory-graph':
+      complexity +=
+        countMany([data.heading, data.summary, data.centerTitle, data.centerDetail]) +
+        (Array.isArray(data.nodes) ? data.nodes.length * 16 : 0) +
+        (Array.isArray(data.nodes)
+          ? data.nodes.reduce(
+              (total, node) => total + countMany([node?.label, node?.detail]),
+              0,
+            )
+          : 0);
+      break;
+    case 'pipeline-flow':
+      complexity +=
+        countMany([data.heading, data.summary]) +
+        (Array.isArray(data.stages) ? data.stages.length * 18 : 0) +
+        (Array.isArray(data.stages)
+          ? data.stages.reduce(
+              (total, stage) => total + countMany([stage?.label, stage?.detail]),
+              0,
+            )
+          : 0);
+      break;
+    case 'benchmark-chart':
+      complexity +=
+        countMany([data.heading, data.summary, data.primaryLabel, data.secondaryLabel]) +
+        (Array.isArray(data.items) ? data.items.length * 18 : 0) +
+        (Array.isArray(data.items)
+          ? data.items.reduce(
+              (total, item) =>
+                total + countMany([item?.label, item?.primaryValue, item?.secondaryValue]),
+              0,
+            )
+          : 0);
+      break;
+    case 'quote-highlight':
+      complexity += countMany([
+        data.heading,
+        data.quote,
+        data.attribution,
+        ...(Array.isArray(data.tags) ? data.tags.map((tag) => tag?.label) : []),
+      ]);
+      break;
+    case 'glossary-term':
+      complexity += countMany([
+        data.heading,
+        data.term,
+        data.pronunciation,
+        data.definition,
+        ...(Array.isArray(data.related) ? data.related.map((tag) => tag?.label) : []),
+      ]);
       break;
     case 'cta':
       complexity += countMany([data.heading, data.subtitle, data.searchLabel, data.badge]);
@@ -402,6 +488,88 @@ const validateSceneData = (errors, scene, index) => {
           validateAccent(errors, `${path}.data.items[${itemIndex}].accent`, item?.accent);
         });
       }
+      break;
+    case 'data-stream':
+      requireString(errors, `${path}.data.heading`, data.heading);
+      if (!Array.isArray(data.items) || data.items.length === 0) {
+        pushError(errors, `${path}.data.items`, 'expected a non-empty array');
+      } else {
+        data.items.forEach((item, itemIndex) => {
+          requireString(errors, `${path}.data.items[${itemIndex}].label`, item?.label);
+          requireString(errors, `${path}.data.items[${itemIndex}].value`, item?.value);
+          validateAccent(errors, `${path}.data.items[${itemIndex}].accent`, item?.accent);
+        });
+      }
+      validateAccent(errors, `${path}.data.accent`, data.accent);
+      break;
+    case 'memory-graph':
+      requireString(errors, `${path}.data.heading`, data.heading);
+      requireString(errors, `${path}.data.centerTitle`, data.centerTitle);
+      if (!Array.isArray(data.nodes) || data.nodes.length === 0) {
+        pushError(errors, `${path}.data.nodes`, 'expected a non-empty array');
+      } else {
+        data.nodes.forEach((node, nodeIndex) => {
+          requireString(errors, `${path}.data.nodes[${nodeIndex}].label`, node?.label);
+          validateAccent(errors, `${path}.data.nodes[${nodeIndex}].accent`, node?.accent);
+        });
+      }
+      validateAccent(errors, `${path}.data.accent`, data.accent);
+      break;
+    case 'pipeline-flow':
+      requireString(errors, `${path}.data.heading`, data.heading);
+      if (!Array.isArray(data.stages) || data.stages.length === 0) {
+        pushError(errors, `${path}.data.stages`, 'expected a non-empty array');
+      } else {
+        data.stages.forEach((stage, stageIndex) => {
+          requireString(errors, `${path}.data.stages[${stageIndex}].label`, stage?.label);
+          validateAccent(errors, `${path}.data.stages[${stageIndex}].accent`, stage?.accent);
+        });
+      }
+      validateAccent(errors, `${path}.data.accent`, data.accent);
+      break;
+    case 'benchmark-chart':
+      requireString(errors, `${path}.data.heading`, data.heading);
+      requireString(errors, `${path}.data.primaryLabel`, data.primaryLabel);
+      requireString(errors, `${path}.data.secondaryLabel`, data.secondaryLabel);
+      if (!Array.isArray(data.items) || data.items.length === 0) {
+        pushError(errors, `${path}.data.items`, 'expected a non-empty array');
+      } else {
+        data.items.forEach((item, itemIndex) => {
+          requireString(errors, `${path}.data.items[${itemIndex}].label`, item?.label);
+          requireString(errors, `${path}.data.items[${itemIndex}].primaryValue`, item?.primaryValue);
+          requireString(errors, `${path}.data.items[${itemIndex}].secondaryValue`, item?.secondaryValue);
+          if (!Number.isFinite(item?.primaryRatio) || item.primaryRatio < 0 || item.primaryRatio > 1) {
+            pushError(errors, `${path}.data.items[${itemIndex}].primaryRatio`, 'must be a number between 0 and 1');
+          }
+          if (!Number.isFinite(item?.secondaryRatio) || item.secondaryRatio < 0 || item.secondaryRatio > 1) {
+            pushError(errors, `${path}.data.items[${itemIndex}].secondaryRatio`, 'must be a number between 0 and 1');
+          }
+          validateAccent(errors, `${path}.data.items[${itemIndex}].accent`, item?.accent);
+        });
+      }
+      validateAccent(errors, `${path}.data.accent`, data.accent);
+      break;
+    case 'quote-highlight':
+      requireString(errors, `${path}.data.quote`, data.quote);
+      if (Array.isArray(data.tags)) {
+        data.tags.forEach((tag, tagIndex) => {
+          requireString(errors, `${path}.data.tags[${tagIndex}].label`, tag?.label);
+          validateAccent(errors, `${path}.data.tags[${tagIndex}].accent`, tag?.accent);
+        });
+      }
+      validateAccent(errors, `${path}.data.accent`, data.accent);
+      break;
+    case 'glossary-term':
+      requireString(errors, `${path}.data.heading`, data.heading);
+      requireString(errors, `${path}.data.term`, data.term);
+      requireString(errors, `${path}.data.definition`, data.definition);
+      if (Array.isArray(data.related)) {
+        data.related.forEach((tag, tagIndex) => {
+          requireString(errors, `${path}.data.related[${tagIndex}].label`, tag?.label);
+          validateAccent(errors, `${path}.data.related[${tagIndex}].accent`, tag?.accent);
+        });
+      }
+      validateAccent(errors, `${path}.data.accent`, data.accent);
       break;
     case 'cta':
       requireString(errors, `${path}.data.heading`, data.heading);

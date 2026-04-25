@@ -5,11 +5,15 @@ import {existsSync} from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
+import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
-import {detectPreferredBrowserExecutable, resolveChromeMode} from './browser-paths.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..');
+const require = createRequire(import.meta.url);
+const {
+  buildPreferredRemotionFlags,
+} = require('./render-defaults.js');
 
 const hasCliFlag = (args, flag) => {
   return args.some((arg, index) => {
@@ -123,9 +127,6 @@ async function main() {
   const outputPath = outputArg
     ? path.resolve(process.cwd(), outputArg)
     : path.resolve(process.cwd(), 'out', `${projectId}${versionSuffix ? `-v${versionSuffix}` : ''}.mp4`);
-  const requestedBrowserExecutable = String(process.env.REMOTION_BROWSER_EXECUTABLE || '').trim();
-  const browserExecutable = detectPreferredBrowserExecutable();
-  const chromeMode = resolveChromeMode(browserExecutable);
   const hasCustomPort = hasCliFlag(passthroughArgs, '--port');
   const renderPort = hasCustomPort
     ? null
@@ -158,14 +159,9 @@ async function main() {
     '--props',
     JSON.stringify(inlineProps),
   ];
+  const preferredRender = buildPreferredRemotionFlags({existingArgs: passthroughArgs});
 
-  if (browserExecutable) {
-    remotionArgs.push('--browser-executable', browserExecutable);
-  }
-
-  if (chromeMode) {
-    remotionArgs.push('--chrome-mode', chromeMode);
-  }
+  remotionArgs.push(...preferredRender.flags);
 
   if (renderPort) {
     remotionArgs.push('--port', renderPort);
@@ -181,11 +177,12 @@ async function main() {
       `[render-project] output=${outputPath}`,
       `[render-project] props-file=${inlineProps.propsFile}`,
       `[render-project] cli=${launch.displayCommand}`,
-      `[render-project] browser=${browserExecutable ?? 'auto-download'}`,
+      `[render-project] browser=${preferredRender.browserExecutable ?? 'auto-download'}`,
       renderPort ? `[render-project] port=${renderPort}` : '',
-      chromeMode ? `[render-project] chrome-mode=${chromeMode}` : '',
-      requestedBrowserExecutable && !browserExecutable
-        ? '[render-project] ignored system browser path and using Remotion-managed browser (set REMOTION_ALLOW_SYSTEM_BROWSER=1 to force it)'
+      preferredRender.chromeMode ? `[render-project] chrome-mode=${preferredRender.chromeMode}` : '',
+      preferredRender.gl ? `[render-project] gl=${preferredRender.gl}` : '',
+      preferredRender.hardwareAcceleration
+        ? `[render-project] hardware-acceleration=${preferredRender.hardwareAcceleration}`
         : '',
     ].filter(Boolean).join('\n') + '\n',
   );

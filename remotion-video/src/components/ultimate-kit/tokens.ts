@@ -17,10 +17,10 @@ export const ultimateKitVideo = {
 
 export const ultimateKitTokens = {
   colors: {
-    bg: '#05070d',
-    bgSoft: '#0b1020',
-    panel: '#0f1628',
-    panelSoft: 'rgba(17, 24, 40, 0.84)',
+    bg: '#0c0f1e',
+    bgSoft: '#111828',
+    panel: '#141d32',
+    panelSoft: 'rgba(20, 28, 50, 0.84)',
     line: 'rgba(140, 176, 255, 0.18)',
     text: '#f5f7ff',
     textMuted: 'rgba(228, 236, 255, 0.62)',

@@ -216,3 +216,250 @@ test('architecture-map scenes can be forced and build node structures', () => {
   assert.equal(scene.data.centerTitle, '多 Agent 系统');
   assert.ok(scene.data.nodes.length >= 4);
 });
+
+test('benchmark-chart scenes are inferred for benchmark-heavy numeric comparisons', () => {
+  const config = buildUltimateProjectConfig(
+    buildProject({
+      id: 'shot-02',
+      title: '基准对比',
+      narration:
+        '这次别空聊热度，直接看 benchmark。SWE-Bench Pro 79%，HLE 71%，对照组 64%，这才是最有压力的地方。',
+      durationSeconds: 9,
+      dataPoints: ['SWE-Bench Pro 79%', 'HLE 71%', '对照组 64%', '公开 benchmark'],
+      comparisons: [
+        {label: 'SWE-Bench Pro', left: '64%', right: '79%'},
+        {label: 'HLE', left: '58%', right: '71%'},
+      ],
+    }),
+  );
+
+  const scene = config.scenes[1];
+
+  assert.equal(scene.family, 'benchmark-chart');
+  assert.ok(scene.data.items.length >= 2);
+  assert.ok(scene.data.primaryLabel);
+  assert.ok(scene.data.secondaryLabel);
+});
+
+test('data-stream scenes are inferred for realtime throughput narration', () => {
+  const config = buildUltimateProjectConfig(
+    buildProject({
+      id: 'shot-02',
+      title: '实时吞吐',
+      narration:
+        '现在看的不是静态结果，而是实时数据流：tokens/s 往上冲，QPS 在变，吞吐和延迟一起盯，才知道系统稳不稳。',
+      durationSeconds: 8,
+      dataPoints: ['tokens/s 128', 'QPS 42', '延迟 1.2 秒', '实时数据流'],
+    }),
+  );
+
+  const scene = config.scenes[1];
+
+  assert.equal(scene.family, 'data-stream');
+  assert.ok(scene.data.items.length >= 2);
+});
+
+test('glossary-term scenes can be forced and build definition panels', () => {
+  const config = buildUltimateProjectConfig(
+    buildProject({
+      id: 'shot-02',
+      family: 'glossary-term',
+      title: 'RAG',
+      narration: 'RAG 本质上指的是检索增强生成，不是单纯搜索，而是先拿外部知识再生成答案。',
+      durationSeconds: 8,
+      dataPoints: ['检索增强生成', '先检索再生成', '外部知识'],
+      keywords: ['RAG', 'retrieval', 'generation'],
+    }),
+  );
+
+  const scene = config.scenes[1];
+
+  assert.equal(scene.family, 'glossary-term');
+  assert.equal(scene.data.term, 'RAG');
+  assert.ok(scene.data.related.length >= 2);
+});
+
+test('family routing ignores visual tool keywords and restores compare scenes', () => {
+  const config = buildUltimateProjectConfig({
+    projectId: 'gpt55-worker-impact',
+    title: 'GPT-5.5 Family Routing',
+    template: 'ultimate',
+    visualSystem: 'ultimate-1080p',
+    render: {
+      fps: 30,
+      width: 1920,
+      height: 1080,
+    },
+    shots: [
+      {
+        id: 'shot-01',
+        title: '开场结论',
+        narration: 'GPT-5.5发布，打工人的好日子到头了，这次真不是狼来了。',
+        durationSeconds: 4,
+      },
+      {
+        id: 'shot-02',
+        title: '震撼发布',
+        narration: 'GPT-5.5前脚刚发，后脚一堆公司已经开始用它替代初级岗位了。不是试点，是直接砍人。这次真不是狼来了，狼已经进门了。',
+        durationSeconds: 10,
+        dataPoints: ['GPT-5.5前脚刚发', '后脚一堆公司已经开始用它替代初级岗位了', '这次真不是狼来了'],
+      },
+      {
+        id: 'shot-03',
+        title: '能力痛点',
+        narration: '它能帮你做方案，写代码、分析数据、生成报告。以前要一个团队干的活，现在一个GPT-5.5全包了。',
+        durationSeconds: 10,
+        dataPoints: ['写代码、分析数据、生成报告', '以前要一个团队干的活', '现在一个GPT-5.5全包了'],
+        visualFocusZh: 'One person with six AI tools working in sync, warm home office glow',
+        visualSummaryZh: '画面重点是 One person with six AI tools working in sync, warm home office glow',
+      },
+      {
+        id: 'shot-04',
+        title: '竞品反常识',
+        type: '对比',
+        narration: '很多人觉得AI替代还早，但GPT-5.5这次直接把成绩单亮出来。不是要取代你，是已经开始了。',
+        durationSeconds: 10,
+        dataPoints: ['很多人觉得AI替代还早', '但GPT-5.5这次直接把成绩单亮出来', '不是要取代你，是已经开始了'],
+        comparisonSummaryZh: '对比关系：旧讲法 vs 当前方案',
+        comparisons: [{left: '旧讲法', right: '当前方案'}],
+      },
+      {
+        id: 'shot-05',
+        title: '代入场景',
+        type: '案例',
+        narration: '一个普通文案，用GPT-5.5之后每天多出三小时。一个小电商团队，三个人干了原来十个人的活。',
+        durationSeconds: 10,
+        dataPoints: ['一个普通文案', '用GPT-5.5之后每天多出三小时', '一个小电商团队'],
+      },
+      {
+        id: 'shot-06',
+        title: '互动收束',
+        narration: '评论区说说，你的工作有没有被它影响到？',
+        durationSeconds: 4,
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    config.scenes.slice(0, 4).map((scene) => scene.family),
+    ['hero', 'timeline', 'feature-rail', 'compare-board'],
+  );
+  assert.ok(['metrics', 'tag-matrix'].includes(config.scenes[4].family));
+  assert.equal(config.scenes[4].family === 'feature-rail', false);
+  assert.equal(new Set(config.scenes.slice(1, -1).map((scene) => scene.family)).size, 4);
+});
+
+test('adjacent middle scenes avoid repeating the same auto-inferred family', () => {
+  const config = buildUltimateProjectConfig({
+    projectId: 'repeat-guard',
+    title: 'Repeat Guard',
+    template: 'ultimate',
+    visualSystem: 'ultimate-1080p',
+    render: {
+      fps: 30,
+      width: 1920,
+      height: 1080,
+    },
+    shots: [
+      {
+        id: 'shot-01',
+        title: '开场',
+        narration: '开场。',
+        durationSeconds: 4,
+      },
+      {
+        id: 'shot-02',
+        title: '系统架构',
+        narration: '这套系统分成4个模块、2层结构、3个Agent和1个router，本质上是完整的 orchestration stack。',
+        durationSeconds: 8,
+        dataPoints: ['4个模块', '2层结构', '3个Agent', '1个router'],
+      },
+      {
+        id: 'shot-03',
+        title: '系统扩容',
+        narration: '扩容后还是4个模块、2层结构、3个Agent和1个router，但更关心4项指标、2段耗时、3个瓶颈。',
+        durationSeconds: 8,
+        dataPoints: ['4项指标', '2段耗时', '3个瓶颈', '4个模块'],
+      },
+      {
+        id: 'shot-04',
+        title: '结尾',
+        narration: '结尾。',
+        durationSeconds: 4,
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    config.scenes.map((scene) => scene.family),
+    ['hero', 'architecture-map', 'metrics', 'cta'],
+  );
+});
+
+test('global family planning maximizes middle-scene template diversity', () => {
+  const config = buildUltimateProjectConfig({
+    projectId: 'diversity-pass',
+    title: 'Diversity Pass',
+    template: 'ultimate',
+    visualSystem: 'ultimate-1080p',
+    render: {
+      fps: 30,
+      width: 1920,
+      height: 1080,
+    },
+    shots: [
+      {
+        id: 'shot-01',
+        title: '开场',
+        narration: '开场。',
+        durationSeconds: 4,
+      },
+      {
+        id: 'shot-02',
+        title: '发布时间线',
+        narration: '前脚发布，后脚落地，第三天开始扩散，第四天进入主叙事。',
+        durationSeconds: 8,
+        dataPoints: ['前脚发布', '后脚落地', '第三天开始扩散', '第四天进入主叙事'],
+      },
+      {
+        id: 'shot-03',
+        title: '能力拆解',
+        narration: '它能写代码、分析数据、生成报告，一个人顶一个团队。',
+        durationSeconds: 8,
+        dataPoints: ['写代码', '分析数据', '生成报告', '一个人顶一个团队'],
+      },
+      {
+        id: 'shot-04',
+        title: '反常识对比',
+        type: '对比',
+        narration: '很多人觉得替代还早，但现在已经开始了。',
+        durationSeconds: 8,
+        dataPoints: ['很多人觉得替代还早', '现在已经开始了', '旧讲法', '当前方案'],
+        comparisonSummaryZh: '旧讲法 vs 当前方案',
+        comparisons: [{left: '旧讲法', right: '当前方案'}],
+      },
+      {
+        id: 'shot-05',
+        title: '结果量化',
+        narration: '普通文案每天多出三小时，小团队三个人干十个人的活。',
+        durationSeconds: 8,
+        dataPoints: ['每天多出三小时', '三个人干十个人的活', '效率更高', '不那么累'],
+      },
+      {
+        id: 'shot-06',
+        title: '收尾',
+        narration: '收尾。',
+        durationSeconds: 4,
+      },
+    ],
+  });
+
+  const middleFamilies = config.scenes.slice(1, -1).map((scene) => scene.family);
+
+  assert.equal(new Set(middleFamilies).size, middleFamilies.length);
+  assert.deepEqual(
+    config.scenes.slice(0, 4).map((scene) => scene.family),
+    ['hero', 'timeline', 'feature-rail', 'compare-board'],
+  );
+  assert.ok(['metrics', 'tag-matrix'].includes(config.scenes[4].family));
+});

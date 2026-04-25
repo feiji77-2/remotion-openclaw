@@ -1,5 +1,10 @@
 # Ultimate 风格命中手册
 
+> 2026-04-25 更新：
+> 当前中段镜头已经不是“纯前序贪心抢占”了，而是“候选池 + 全局分配 + 中段尽量去重”。
+> 如果你要看最新版本的元素命中总表、页面分组、控制方式和设计说明，请优先看：
+> [`docs/ultimate-elements-atlas.zh-CN.md`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/ultimate-elements-atlas.zh-CN.md)
+
 这份文档不是讲“理想上应该怎么设计”，而是讲你现在这套 `Ultimate` 系统在代码里到底怎么分配风格、怎么被抢风格、怎么强制控制，以及怎么用白话写法让它稳定命中。
 
 适用范围：

@@ -36,7 +36,13 @@ export async function resolveWorkflowVoiceDefaults(
   } = {},
 ) {
   const nextOptions = {...options};
-  const defaultSpeaker = safeString(env.WORKFLOW_DEFAULT_XTTS_SPEAKER) || 'anchor';
+  const defaultVoiceEngine = safeString(env.WORKFLOW_DEFAULT_VOICE_ENGINE).toLowerCase();
+  const defaultVoiceSpeed = safeString(env.WORKFLOW_DEFAULT_VOICE_SPEED);
+  const voiceSpeedExplicit = Boolean(options?.voiceSpeedExplicit);
+  const defaultCosyVoice = safeString(env.COSYVOICE_DEFAULT_VOICE);
+  const defaultCosyLanguage = safeString(env.COSYVOICE_DEFAULT_LANGUAGE) || 'zh-cn';
+  const defaultCosyInstruction = safeString(env.COSYVOICE_DEFAULT_INSTRUCTION);
+  const defaultSpeaker = safeString(env.WORKFLOW_DEFAULT_XTTS_SPEAKER) || 'daman-business-001';
   const defaultLanguage = safeString(env.WORKFLOW_DEFAULT_XTTS_LANGUAGE) || 'zh-cn';
   const configuredReference = safeString(env.WORKFLOW_DEFAULT_XTTS_REFERENCE)
     || path.join('runtime', 'voices', 'xtts', `${defaultSpeaker}.wav`);
@@ -54,11 +60,40 @@ export async function resolveWorkflowVoiceDefaults(
   };
   const hasAnyExplicitVoiceOverride = Object.values(explicit).some(Boolean);
   const currentEngine = safeString(nextOptions.voiceEngine).toLowerCase();
+  const shouldAutoSelectCosyVoice = (
+    !hasAnyExplicitVoiceOverride
+    && defaultVoiceEngine === 'cosyvoice'
+    && Boolean(defaultCosyVoice)
+  );
   const shouldAutoSelectXtts = !hasAnyExplicitVoiceOverride && hasDefaultReference;
   const isOrWillBeXtts = currentEngine === 'xtts' || shouldAutoSelectXtts;
+  const isOrWillBeCosyVoice = currentEngine === 'cosyvoice' || shouldAutoSelectCosyVoice;
 
-  if (shouldAutoSelectXtts) {
+  if (shouldAutoSelectCosyVoice) {
+    nextOptions.voiceEngine = 'cosyvoice';
+  } else if (shouldAutoSelectXtts) {
     nextOptions.voiceEngine = 'xtts';
+  }
+
+  if (isOrWillBeCosyVoice && defaultCosyVoice) {
+    if (!voiceSpeedExplicit && defaultVoiceSpeed) {
+      nextOptions.voiceSpeed = defaultVoiceSpeed;
+    }
+    if (!explicit.speaker && !safeString(nextOptions.speaker)) {
+      nextOptions.speaker = defaultCosyVoice;
+    }
+
+    if (!explicit.language && !safeString(nextOptions.voiceLanguage)) {
+      nextOptions.voiceLanguage = defaultCosyLanguage;
+    }
+
+    if (!safeString(nextOptions.voiceInstruction) && defaultCosyInstruction) {
+      nextOptions.voiceInstruction = defaultCosyInstruction;
+    }
+  }
+
+  if (!voiceSpeedExplicit && defaultVoiceSpeed) {
+    nextOptions.voiceSpeed = defaultVoiceSpeed;
   }
 
   if (isOrWillBeXtts && hasDefaultReference) {
@@ -85,8 +120,16 @@ export async function resolveWorkflowVoiceDefaults(
           reference: defaultReference,
           referenceAbsolutePath: defaultReferenceAbsolute,
         }
+      : shouldAutoSelectCosyVoice
+        ? {
+            engine: 'cosyvoice',
+            speaker: defaultCosyVoice,
+            language: defaultCosyLanguage,
+            instruction: defaultCosyInstruction || '',
+          }
       : null,
     applied: {
+      autoSelectedCosyVoice: shouldAutoSelectCosyVoice,
       autoSelectedEngine: shouldAutoSelectXtts,
       filledSpeaker: isOrWillBeXtts && hasDefaultReference && !explicit.speaker && !safeString(options?.speaker),
       filledReference: isOrWillBeXtts && hasDefaultReference && !explicit.reference && !safeString(options?.reference),

@@ -19,6 +19,8 @@
     "pipeline:start": "./scripts/start-pipeline.sh",
     "pipeline:api": "node server/api/server.js",
     "pipeline:worker": "node server/workers/renderWorker.js",
+    "voice:qwen": "node scripts/voice/qwen-tts-voice.mjs",
+    "voice:cosyvoice": "node scripts/voice/cosyvoice-bailian-voice.mjs",
     "smoke:staging": "node scripts/run-staging-smoke.mjs",
     "test": "node --test server/tests/*.test.js",
     "typecheck": "tsc --noEmit",

@@ -161,7 +161,7 @@ npm run workflow:ultimate -- "Claude Code 和 Codex 区别"
 
 默认语音规则现在是：
 
-- 如果存在 `runtime/voices/xtts/anchor.wav`，最简命令会默认启用 `xtts + anchor + zh-cn`
+- 如果存在 `runtime/voices/xtts/daman-business-001.wav`，最简命令会默认启用 `xtts + daman-business-001 + zh-cn`
 - 如果这个默认真人样本不存在，才会继续走原来的默认语音引擎
 - 你一旦显式传了 `--voice-engine` / `--speaker` / `--reference` / `--voice-language`，就以你的参数为准
 
@@ -178,7 +178,7 @@ npm run workflow:ultimate -- "Remotion 自动视频" --no-voice --no-render
 npm run workflow:ultimate -- "OpenAI 最新 Agent 能力" --output out/openai-agent.mp4
 
 # 使用 XTTS 真人克隆语音
-npm run workflow:ultimate -- "AI 行业日报" --voice-engine xtts --reference runtime/voices/xtts/anchor.wav --speaker anchor --voice-language zh-cn
+npm run workflow:ultimate -- "AI 行业日报" --voice-engine xtts --reference runtime/voices/xtts/daman-business-001.wav --speaker daman-business-001 --voice-language zh-cn
 ```
 
 说明：
@@ -230,6 +230,16 @@ npm run workflow:ultimate -- "AI 行业日报" --voice-engine xtts --reference r
 直接看这份文档：
 
 - [`docs/local-xtts-voice-clone.zh-CN.md`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/local-xtts-voice-clone.zh-CN.md)
+
+如果你现在要处理的是：
+
+- 阿里云百炼 Qwen TTS 怎么接
+- 怎么创建 / 复用克隆音色
+- 怎么把 `qwen-tts` 接进原工作流
+
+直接看这份文档：
+
+- [`docs/qwen-tts-bailian.zh-CN.md`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/qwen-tts-bailian.zh-CN.md)
 
 ## 推荐实战顺序
 

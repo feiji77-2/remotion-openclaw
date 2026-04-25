@@ -19,6 +19,7 @@ const { execSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const {buildPreferredRemotionFlags} = require("./render-defaults.js");
 
 const SRC_ENTRY = "src/Root.tsx";
 const COMPOSITION = "Video1v4";   // ← 统一指向 Video1v4
@@ -26,6 +27,15 @@ const OUT_DIR = "out/cached";
 const CACHE_DIR = ".render-cache";
 const HASH_FILE = path.join(CACHE_DIR, "manifest.json");
 const LOG_FILE = path.join(CACHE_DIR, "render.log");
+const PREFERRED_RENDER_FLAGS = buildPreferredRemotionFlags();
+
+function shellEscape(value) {
+  return `"${String(value).replace(/(["\\$`])/g, "\\$1")}"`;
+}
+
+function renderFlagsToShell(flags) {
+  return flags.map((flag) => shellEscape(flag)).join(" ");
+}
 
 function ensureContentManifest() {
   log("🧱 同步内容合同生成产物...");
@@ -186,7 +196,7 @@ function renderShard(shard, range) {
 
   log(`▶  渲染 ${shard} (帧 ${range})`);
   run(
-    `npx remotion render "${SRC_ENTRY}" "${COMPOSITION}" "${out}" --frames="${range}" --concurrency=8 2>&1 | tail -3`,
+    `npx remotion render "${SRC_ENTRY}" "${COMPOSITION}" "${out}" ${renderFlagsToShell(PREFERRED_RENDER_FLAGS.flags)} --frames="${range}" --concurrency=8 2>&1 | tail -3`,
     { maxBuffer: 10 * 1024 * 1024 }
   );
 
