@@ -18,6 +18,7 @@ function readWorkflowJob(jobId) {
 }
 
 function writeWorkflowJob(job) {
+  ensureDir(WORKFLOW_JOBS_DIR);
   fs.writeFileSync(getWorkflowJobPath(job.jobId), JSON.stringify(job, null, 2));
   return job;
 }

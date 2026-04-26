@@ -6,11 +6,11 @@
 
 中文简介：
 
-> 面向中文短视频生产的开源工作流工作台与 Remotion 渲染管线，包含 Step 1-8 可视化编排、配音/图片/渲染任务链路，以及 `Video1v4` 生产组合。
+> 面向中文科技 / AI 讲解视频的开源工作流工作台与 Remotion 渲染管线，包含 Step 1-8 可视化编排、配音/图片/渲染任务链路，以及 `UltimateSceneTemplate` 生产主线。
 
 English description:
 
-> Open-source workflow studio and Remotion render pipeline for Chinese short-form video production, including a Step 1-8 visual workflow, async voice/image/render jobs, and the `Video1v4` production composition.
+> Open-source workflow studio and Remotion render pipeline for Chinese tech / AI explainer videos, including a Step 1-8 visual workflow, async voice/image/render jobs, and the `UltimateSceneTemplate` production mainline.
 
 ## 推荐 Topics
 
@@ -42,27 +42,27 @@ Website：
 
 ## Gitee 项目简介示例
 
-> 开源短视频工作流工作台与 Remotion 渲染管线，支持 Step 1-8 可视化编排、配音/图片/渲染任务链路，以及 `Video1v4` 生产组合。
+> 开源科技 / AI 讲解视频工作流工作台与 Remotion 渲染管线，支持 Step 1-8 可视化编排、配音/图片/渲染任务链路，以及 `UltimateSceneTemplate` 生产主线。
 
-## 首个 Release 标题建议
+## Release 标题建议
 
-- `v1.0.0 - Public Release of Video1v4 Pipeline`
-- `v1.0.0 - OpenClaw Remotion Video Pipeline Public Release`
+- `v3.0.0 - Ultimate Scene Pipeline`
+- `v3.0.0 - OpenClaw Ultimate Widescreen Release`
 
 ## 首个 Release 描述模板
 
 ```md
 ## Overview
 
-First public release of the OpenClaw Remotion Video Pipeline.
+Public release of the Ultimate scene pipeline for the OpenClaw Remotion video workflow.
 
 ## Included
 
 - Step 1-8 workflow player app
 - Workflow API and render worker
 - Voice / image / render job flow
-- `Video1v4` production composition
-- Public-release cleanup and archived legacy scripts
+- `UltimateSceneTemplate` production composition
+- Archived legacy material moved under `docs/archive/`
 
 ## Validation
 
@@ -86,8 +86,8 @@ First public release of the OpenClaw Remotion Video Pipeline.
   仓库首页封面图
 - `docs/assets/player-overview.png`
   Step 1-8 工作台截图
-- `docs/assets/video1v4-preview.gif`
-  `Video1v4` 动态预览
+- `docs/assets/ultimate-scene-preview.gif`
+  `UltimateSceneTemplate` 动态预览
 
 ## 建议仓库置顶信息
 

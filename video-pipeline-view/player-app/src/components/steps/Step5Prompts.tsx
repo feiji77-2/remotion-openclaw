@@ -218,7 +218,7 @@ export const Step5Prompts: React.FC<Step5PromptsProps> = ({
             onClick={onGenerate}
             disabled={loading}
           >
-            {loading ? '生成中...' : `重新生成 Step ${stepId}`}
+            {loading ? '生成中…' : `重新生成 Step ${stepId}`}
           </button>
         ) : null}
         <button
@@ -227,7 +227,7 @@ export const Step5Prompts: React.FC<Step5PromptsProps> = ({
           onClick={onGenerateImages}
           disabled={isImageGenerating || loading}
         >
-          {isImageGenerating ? '图片生成中...' : currentImageStatus === 'done' ? '重新生成图片' : '生成分镜图'}
+          {isImageGenerating ? '图片生成中…' : currentImageStatus === 'done' ? '重新生成图片' : '生成分镜图'}
         </button>
       </div>
 

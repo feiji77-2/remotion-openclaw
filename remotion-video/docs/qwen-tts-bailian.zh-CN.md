@@ -38,7 +38,7 @@ QWEN_TTS_DEFAULT_VOICE=Cherry
 
 ```bash
 npm run voice:qwen -- create \
-  --file runtime/voices/xtts/daman-business-001.wav \
+  --file runtime/voices/qwen/daman-business-001.wav \
   --name daman-qwen \
   --language zh-cn
 ```
@@ -47,7 +47,7 @@ npm run voice:qwen -- create \
 
 ```bash
 npm run voice:qwen -- ensure \
-  --file runtime/voices/xtts/daman-business-001.wav \
+  --file runtime/voices/qwen/daman-business-001.wav \
   --name daman-qwen \
   --language zh-cn
 ```
@@ -99,7 +99,7 @@ npm run workflow:ultimate -- "国产 AI 开源王炸到底强在哪" \
 ```bash
 npm run workflow:ultimate -- "GPT-5.5 发布后岗位会被替代吗" \
   --voice-engine qwen-tts \
-  --reference runtime/voices/xtts/daman-business-001.wav \
+  --reference runtime/voices/qwen/daman-business-001.wav \
   --speaker daman-qwen \
   --voice-language zh-cn
 ```

@@ -13,7 +13,7 @@
 - Step 7：Remotion 项目打包
 - Step 8：Ultimate 横版成片渲染
 
-旧的 `video-pipeline-storyboard` 固定 6 镜头链路已经从主运行链路移除。仓库里仍保留部分历史组合代码作为存量资产，但不再作为默认 Skill 真源、默认 build 出口或默认渲染入口。
+旧的 `video-pipeline-storyboard + Video1v4` 固定 6 镜头链路已经从活跃源码目录清除。历史升级资料仅保留在 `docs/archive/`，不再作为默认 Skill 真源、默认 build 出口或默认渲染入口。
 
 ## 亮点
 
@@ -50,12 +50,6 @@
 - Step 5 会为每个场景生成 `16:9 / 1920x1080` 的视觉提示词
 - `hero` 固定首屏，`cta` 固定尾屏
 - 中段 family 会尽量避免连续重复
-
-详细结构见：
-
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-- [remotion-video/docs/ultimate-20-template-audit.zh-CN.md](remotion-video/docs/ultimate-20-template-audit.zh-CN.md)
-- [remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md](remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md)
 
 ## 环境要求
 
@@ -120,7 +114,7 @@ npm run dev:player
 - `npm run test`
   执行后端测试
 - `npm run release:check`
-  执行公开发布前主校验
+  执行公开发布前主校验，并通过短合同 smoke 渲染验证 MP4 产物是否真实可用
 
 ## 工作流范围
 
@@ -158,12 +152,13 @@ Step 4 / 5 现在输出的是 Ultimate 场景真源：
 
 ## 文档
 
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-  当前主链路架构、Step 分工与 API 面
-- [remotion-video/docs/ultimate-20-template-audit.zh-CN.md](remotion-video/docs/ultimate-20-template-audit.zh-CN.md)
-  当前 20 模板主链路审计结论
-- [remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md](remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md)
-  20 模板总表与命中方式
+- 主链路与生成说明
+  - [ARCHITECTURE.md](ARCHITECTURE.md)
+    当前主链路架构、Step 分工与 API 面
+  - [remotion-video/docs/ultimate-20-template-audit.zh-CN.md](remotion-video/docs/ultimate-20-template-audit.zh-CN.md)
+    当前 20 模板主链路审计结论
+  - [remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md](remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md)
+    20 模板总表与命中方式
 - [remotion-video/docs/ultimate-style-hit-guide.zh-CN.md](remotion-video/docs/ultimate-style-hit-guide.zh-CN.md)
   风格命中规律、控制方式与白话说明
 - [CONTRIBUTING.md](CONTRIBUTING.md)

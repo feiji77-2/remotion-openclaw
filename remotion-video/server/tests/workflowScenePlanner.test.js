@@ -93,6 +93,20 @@ test('step 4 scene planner expands beyond six placeholder shots and assigns Ulti
   assert.equal(shots[shots.length - 1]?.sceneFamily, 'cta');
   assert.ok(shots.every((shot) => typeof shot.sceneFamily === 'string' && shot.sceneFamily.length > 0));
   assert.ok(shots.every((shot) => Array.isArray(shot.templateCandidates) && shot.templateCandidates.length > 0));
+  assert.ok(
+    shots.some((shot) => (
+      shot.scriptRole === 'body'
+      && typeof shot.scriptExcerpt === 'string'
+      && shot.scriptExcerpt.length > 0
+      && typeof shot.scriptSourceText === 'string'
+      && shot.scriptSourceText.length > 0
+    )),
+    'expected body scenes to keep script binding metadata',
+  );
+  assert.ok(
+    shots.some((shot) => typeof shot.storyboardCueZh === 'string' && shot.storyboardCueZh.length > 0),
+    'expected scene planner to emit storyboard cue text from narration',
+  );
 });
 
 test('step 5 scene prompts stay in 16:9 widescreen mode and retain sceneFamily', async () => {
@@ -116,6 +130,7 @@ test('step 5 scene prompts stay in 16:9 widescreen mode and retain sceneFamily',
 
   const prompts = step5.payload?.prompts?.byShotId || {};
   const promptEntries = Object.values(prompts);
+  const shotEntries = Object.fromEntries((step4.payload?.shots || []).map((shot) => [shot.id, shot]));
 
   assert.equal(step5.resolvedSkill?.skillId, 'video-pipeline-scene-prompts');
   assert.equal(promptEntries.length, step4.payload.shots.length);
@@ -123,4 +138,12 @@ test('step 5 scene prompts stay in 16:9 widescreen mode and retain sceneFamily',
   assert.ok(promptEntries.every((item) => item.canvasRatio === '16:9'));
   assert.ok(promptEntries.every((item) => Number(item.canvasWidth) === 1920 && Number(item.canvasHeight) === 1080));
   assert.ok(promptEntries.every((item) => String(item.prompt || item.promptZh || '').includes('16:9')));
+  assert.ok(promptEntries.every((item) => typeof item.text === 'string' && item.text.length > 0));
+  assert.ok(promptEntries.every((item) => typeof item.scriptExcerpt === 'string' && item.scriptExcerpt.length > 0));
+  assert.ok(promptEntries.every((item) => typeof item.storyboardCueZh === 'string' && item.storyboardCueZh.length > 0));
+  assert.ok(promptEntries.every((item) => String(item.promptZh || '').includes('口播原句')));
+  assert.ok(
+    Object.entries(prompts).every(([shotId, item]) => item.scriptExcerpt === shotEntries[shotId]?.scriptExcerpt),
+    'expected prompt entries to preserve shot-level script excerpts',
+  );
 });

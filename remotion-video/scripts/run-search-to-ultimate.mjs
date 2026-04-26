@@ -7,7 +7,6 @@ import {spawn, spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import dotenv from 'dotenv';
-import {ensureXttsServiceReady} from './lib/voice-service-bootstrap.mjs';
 import {resolveWorkflowVoiceDefaults} from './lib/workflow-voice-defaults.mjs';
 
 const require = createRequire(import.meta.url);
@@ -190,13 +189,12 @@ Options:
   --fps <number>
   --width <number>
   --height <number>
-  --voice-engine <name>     chattts | melo | openvoice | xtts | qwen-tts | cosyvoice
+  --voice-engine <name>     qwen-tts
   --voice-speed <number>    默认 1.0
-  --speaker <value>         speaker seed / voice code
-  --reference <path|url>    参考音频路径或 URL（XTTS / OpenVoice）
+  --speaker <value>         千问系统音色名或已克隆 voice id
+  --reference <path|url>    参考音频路径或 URL（千问克隆音色）
   --voice-language <code>   语言代码，例如 zh-cn / en / ja
-  --voice-model <name>      指定云端 TTS 模型，例如 qwen3-tts-vc-2026-01-22
-  --voice-instruction <text> 语音指令，例如“性格直率，情绪易激动且外露”
+  --voice-model <name>      指定千问 TTS 模型，例如 qwen3-tts-vc-2026-01-22
   --package-version <ver>   指定打包版本号，默认读取 remotion-video/package.json
   --output <path>           指定最终视频输出路径
   --resume                  复用已有 step/voice/images/render 产物继续执行
@@ -206,13 +204,10 @@ Options:
   --help                    显示帮助
 
 Examples:
-  node scripts/run-search-to-ultimate.mjs "今天的 AI 头条"   # 有 runtime/voices/xtts/daman-business-001.wav 时默认走 xtts
+  node scripts/run-search-to-ultimate.mjs "今天的 AI 头条"
   node scripts/run-search-to-ultimate.mjs "Claude Code 和 Codex 区别"
   node scripts/run-search-to-ultimate.mjs --topic "AI agent 工作流" --no-render
-  node scripts/run-search-to-ultimate.mjs "Remotion 自动视频" --voice-engine chattts --output out/agent.mp4
-  node scripts/run-search-to-ultimate.mjs "AI 行业日报" --voice-engine xtts --reference runtime/voices/xtts/daman-business-001.wav --speaker daman-business-001
   node scripts/run-search-to-ultimate.mjs "阿里云百炼语音" --voice-engine qwen-tts --reference /path/to/ref.wav --speaker my-qwen-clone
-  node scripts/run-search-to-ultimate.mjs "情绪化口播" --voice-engine cosyvoice --speaker cosyvoice-v3.5-plus-bailian-xxxx --voice-speed 1.1 --voice-instruction "性格直率，情绪易激动且外露"
 `);
 };
 
@@ -226,7 +221,7 @@ const parseArgs = (argv) => {
     fps: DEFAULT_FPS,
     width: DEFAULT_WIDTH,
     height: DEFAULT_HEIGHT,
-    voiceEngine: 'chattts',
+    voiceEngine: 'qwen-tts',
     voiceSpeed: '1.0',
     voiceLanguage: '',
     voiceModel: '',
@@ -273,7 +268,7 @@ const parseArgs = (argv) => {
         index += 1;
         break;
       case '--voice-engine':
-        options.voiceEngine = safeString(argv[index + 1]) || 'chattts';
+        options.voiceEngine = safeString(argv[index + 1]) || 'qwen-tts';
         options.voiceEngineExplicit = true;
         index += 1;
         break;
@@ -1773,18 +1768,16 @@ async function main() {
     process.exit(1);
   }
 
-  if (voiceDefaults.applied.autoSelectedEngine && voiceDefaults.profile) {
-    process.stdout.write(
-      `[voice-default] auto-select xtts speaker=${voiceDefaults.profile.speaker} reference=${voiceDefaults.profile.reference}\n`,
-    );
-  } else if (
-    safeString(options.voiceEngine).toLowerCase() === 'xtts'
-    && voiceDefaults.profile
-    && (voiceDefaults.applied.filledSpeaker || voiceDefaults.applied.filledReference || voiceDefaults.applied.filledLanguage)
-  ) {
-    process.stdout.write(
-      `[voice-default] xtts defaults speaker=${safeString(options.speaker)} reference=${safeString(options.reference)} language=${safeString(options.voiceLanguage)}\n`,
-    );
+  if (voiceDefaults.profile) {
+    const logParts = [
+      `[voice-default] engine=${safeString(options.voiceEngine).toLowerCase() || 'qwen-tts'}`,
+      `speaker=${safeString(options.speaker)}`,
+      `language=${safeString(options.voiceLanguage)}`,
+    ];
+    if (safeString(options.voiceModel)) {
+      logParts.push(`model=${safeString(options.voiceModel)}`);
+    }
+    process.stdout.write(`${logParts.join(' ')}\n`);
   }
 
   const projectId = buildProjectId(topic, options.projectId);
@@ -2015,22 +2008,6 @@ async function main() {
         reusedVoiceCount = voicePlan.reusableQueue.length;
         process.stdout.write(`[voice] reused=${reusedVoiceCount}\n`);
       } else {
-        if (safeString(voicePlan.voiceSettings?.engine).toLowerCase() === 'xtts') {
-          await measureAsync(stageTimings, 'voiceBootstrap', async () => {
-            const xttsBootstrap = await ensureXttsServiceReady({
-              update: (message) => {
-                process.stdout.write(`[voice] ${message}\n`);
-              },
-            });
-
-            if (xttsBootstrap.started) {
-              process.stdout.write(
-                `[voice] XTTS auto-started${xttsBootstrap.pid ? ` (pid=${xttsBootstrap.pid})` : ''}\n`,
-              );
-            }
-          });
-        }
-
         const voiceJobId = `voice_${Date.now()}`;
         const voiceResult = await processVoiceJob(
           {

@@ -1,4 +1,9 @@
 const fs = require('fs');
+const {
+  analyzeTechnicalDetails,
+  detectTechnicalTopic,
+  scoreTechnicalDetails,
+} = require('./technicalTopic');
 
 const PLAYBOOK_CACHE = new Map();
 
@@ -161,7 +166,131 @@ function compactClause(value, maxLength = 58) {
   if (firstClause.length <= maxLength) {
     return firstClause;
   }
-  return `${firstClause.slice(0, maxLength - 1).trim()}…`;
+  return firstClause
+    .slice(0, maxLength)
+    .replace(/[，；:：、\-\s]+$/g, '')
+    .trim();
+}
+
+function isSafetyHeavyFact(value) {
+  return /安全体系|安全评估|红队|防护/.test(safeString(value));
+}
+
+function normalizeComparableToken(value) {
+  return safeString(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function normalizeModelLabel(value) {
+  const safe = safeString(value);
+  if (!safe) {
+    return '';
+  }
+
+  const gptMatch = safe.match(/\bgpt\s*[- ]?\s*(\d+(?:\.\d+)?)\b/i);
+  if (gptMatch?.[1]) {
+    return `GPT-${gptMatch[1]}`;
+  }
+
+  const claudeMatch = safe.match(/\bclaude(?:\s+([a-z0-9.+-]+))?\b/i);
+  if (claudeMatch) {
+    return claudeMatch[1]
+      ? `Claude ${claudeMatch[1]}`
+      : 'Claude';
+  }
+
+  const geminiMatch = safe.match(/\bgemini(?:\s+([a-z0-9.+-]+))?\b/i);
+  if (geminiMatch) {
+    return geminiMatch[1]
+      ? `Gemini ${geminiMatch[1]}`
+      : 'Gemini';
+  }
+
+  const deepSeekMatch = safe.match(/\bdeepseek(?:\s+([a-z0-9.+-]+))?\b/i);
+  if (deepSeekMatch) {
+    return deepSeekMatch[1]
+      ? `DeepSeek ${deepSeekMatch[1]}`
+      : 'DeepSeek';
+  }
+
+  const kimiMatch = safe.match(/\bkimi\s*k?\s*(\d+(?:\.\d+)?)\b/i);
+  if (kimiMatch?.[1]) {
+    return `Kimi ${kimiMatch[1]}`;
+  }
+
+  return safe;
+}
+
+function isGenericFocusInstruction(value) {
+  const safe = safeString(value);
+  if (!safe) {
+    return false;
+  }
+
+  return /(围绕标题主判断|讲发布本身|能力变化|差异和影响|短句|结论先行|像真人拆重点|空话|背景铺垫|泛泛而谈|3\s*到\s*4\s*段推进)/.test(safe);
+}
+
+function splitTextSentences(text) {
+  return (safeString(text).match(/[^。！？]+[。！？]?/g) || [])
+    .map((item) => safeString(item))
+    .filter(Boolean);
+}
+
+function dedupeSentences(text) {
+  const seen = new Set();
+  const output = [];
+
+  for (const sentence of splitTextSentences(text)) {
+    const key = normalizeComparableToken(sentence);
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(sentence);
+  }
+
+  return output.join('');
+}
+
+function sanitizeFactText(value) {
+  const cleaned = safeString(value)
+    .replace(/点击了解详情!?/gi, '')
+    .replace(/阅读原文|查看全文|来源[:：].*$/gi, '')
+    .replace(/围绕[“"][^”"]+[”"]已经存在可整理的公开线索，?/g, '')
+    .replace(/适合先回答“?这是什么、为什么被关注”?/g, '')
+    .replace(/当前更值得展开的是这个主题的核心问题、实际影响和用户最在意的结果，而不是只复述名词定义。?/g, '')
+    .replace(/这个主题适合做短视频拆解，因为可以把零散线索压缩成事实、判断和执行路径三层信息。?/g, '')
+    .replace(/\.\.\.+/g, '')
+    .replace(/……+/g, '')
+    .replace(/…+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleaned) {
+    return '';
+  }
+
+  const firstSentence = cleaned.split(/[。！？]/)[0]?.trim() || '';
+  if (firstSentence && firstSentence.length <= 96) {
+    return firstSentence;
+  }
+
+  const firstClause = cleaned.split(/[；;，,]/)[0]?.trim() || '';
+  if (firstClause && firstClause.length <= 96) {
+    return firstClause;
+  }
+
+  return cleaned.slice(0, 96).replace(/[，；:：、\-\s]+$/g, '').trim();
+}
+
+function isLowSignalFact(value) {
+  const safe = safeString(value);
+  if (!safe) {
+    return true;
+  }
+
+  return /已经存在可整理的公开线索|适合先回答|当前更值得展开|内容价值|点击了解详情|知识库|适合做短视频拆解|零散线索|事实、判断和执行路径|讲清楚/.test(safe);
 }
 
 function joinSentences(sentences) {
@@ -178,6 +307,25 @@ function splitInstructionTerms(text) {
       .map((item) => item.trim())
       .filter((item) => item.length >= 2),
   );
+}
+
+function extractKeywords(text, max = 6) {
+  const safe = safeString(text).toLowerCase();
+  const matches = safe.match(/[\p{Script=Han}]{2,}|[\p{L}\p{N}]{3,}/gu) || [];
+  const expanded = new Set();
+
+  for (const token of matches) {
+    expanded.add(token);
+    if (/^[\p{Script=Han}]+$/u.test(token) && token.length > 6) {
+      expanded.add(token.slice(0, 4));
+      expanded.add(token.slice(-4));
+      for (let index = 0; index < Math.min(3, token.length - 1); index += 1) {
+        expanded.add(token.slice(index, index + 2));
+      }
+    }
+  }
+
+  return uniqueStrings([...expanded].filter((item) => item.length >= 2)).slice(0, max);
 }
 
 function extractDurationSeconds(text) {
@@ -613,17 +761,18 @@ function buildContextCorpus(context) {
 function getTopicEntity(context) {
   const corpus = buildContextCorpus(context);
 
-  return matchFirst(corpus, [
+  const entity = matchFirst(corpus, [
     /\bKimi\s*K\d+(?:\.\d+)?\b/i,
     /\bDeepSeek(?:\s*[A-Za-z0-9.+-]+)?\b/i,
     /\bClaude(?:\s*[A-Za-z0-9.+-]+)?\b/i,
     /\bGemini(?:\s*[A-Za-z0-9.+-]+)?\b/i,
     /\bGPT(?:[- ]?\d+(?:\.\d+)?)?\b/i,
   ]);
+  return normalizeModelLabel(entity);
 }
 
 function getCompetitorLabel(context) {
-  const entity = safeString(getTopicEntity(context)).toLowerCase();
+  const entity = normalizeComparableToken(getTopicEntity(context));
   const corpus = buildContextCorpus(context);
   const candidates = [
     /\bGPT(?:[- ]?\d+(?:\.\d+)?)?\b/i,
@@ -634,12 +783,21 @@ function getCompetitorLabel(context) {
 
   for (const pattern of candidates) {
     const match = matchFirst(corpus, [pattern]);
-    if (match && safeString(match).toLowerCase() !== entity) {
-      return match;
+    if (match && normalizeComparableToken(match) !== entity) {
+      return normalizeModelLabel(match);
     }
   }
 
   return '';
+}
+
+function usesDomesticModelFraming(context) {
+  const entity = getTopicEntity(context);
+  const topic = safeString(context?.topic?.query || context?.topic?.inputTitleKeywords || context?.topic?.inputTopic);
+  if (/^(gpt|claude|gemini)\b/i.test(entity)) {
+    return false;
+  }
+  return /(kimi|deepseek|qwen|glm|豆包|文心|混元|通义|月之暗面|moonshot|国产|国内)/i.test(`${entity} ${topic}`);
 }
 
 function cleanTopicLabel(value) {
@@ -680,12 +838,79 @@ function pickFactByKeywords(facts, keywords, fallbackIndex = 0, fallback = '') {
     .map((item) => safeString(item).toLowerCase())
     .filter(Boolean);
   const pool = Array.isArray(facts) ? facts : [];
+  const allowsSafety = normalizedKeywords.some((keyword) => /安全|红队|防护/.test(keyword));
 
-  for (const item of pool) {
-    const haystack = `${safeString(item?.fact)} ${safeString(item?.evidenceAnchor)} ${safeString(item?.sourceTitle)}`.toLowerCase();
-    if (normalizedKeywords.some((keyword) => haystack.includes(keyword))) {
-      return compactClause(item?.fact, 64);
-    }
+  const scoredFacts = pool
+    .map((item, index) => {
+      const fact = sanitizeFactText(item?.fact);
+      if (!fact) {
+        return null;
+      }
+      const haystack = `${fact} ${safeString(item?.evidenceAnchor)} ${safeString(item?.sourceTitle)}`.toLowerCase();
+      const matches = normalizedKeywords.filter((keyword) => haystack.includes(keyword));
+      return {
+        index,
+        fact,
+        matches: matches.length,
+        score: (
+          matches.length * 5
+          + (/\d/.test(fact) ? 1 : 0)
+          + (/(agent|工作流|代码|发布|升级|benchmark|效率)/i.test(haystack) ? 2 : 0)
+          - (/(安全|红队|防护)/.test(haystack) && !normalizedKeywords.some((keyword) => /安全|红队|防护/.test(keyword)) ? 3 : 0)
+          - (isLowSignalFact(haystack) ? 4 : 0)
+        ),
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+
+  const preferred = scoredFacts.find((item) => item.score > 0 && (allowsSafety || !isSafetyHeavyFact(item.fact)));
+  if (preferred) {
+    return compactClause(preferred.fact, 64);
+  }
+
+  if (scoredFacts[0]?.score > 0 && allowsSafety) {
+    return compactClause(scoredFacts[0].fact, 64);
+  }
+
+  return pickFact(pool, fallbackIndex, fallback);
+}
+
+function pickFactByCategories(facts, categories, fallbackIndex = 0, fallback = '') {
+  const normalizedCategories = new Set((Array.isArray(categories) ? categories : []).map((item) => safeString(item)));
+  const pool = Array.isArray(facts) ? facts : [];
+
+  const scoredFacts = pool
+    .map((item, index) => {
+      const fact = sanitizeFactText(item?.fact);
+      if (!fact) {
+        return null;
+      }
+
+      const detail = analyzeTechnicalDetails({
+        fact,
+        evidenceAnchor: item?.evidenceAnchor,
+        sourceTitle: item?.sourceTitle,
+      });
+      const matchCount = detail.categories.filter((itemCategory) => normalizedCategories.has(itemCategory)).length;
+
+      return {
+        index,
+        fact,
+        matchCount,
+        score: scoreTechnicalDetails({
+          fact,
+          evidenceAnchor: item?.evidenceAnchor,
+          sourceTitle: item?.sourceTitle,
+        }) + matchCount * 6,
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+
+  const preferred = scoredFacts.find((item) => item.matchCount > 0 && item.score > 0);
+  if (preferred) {
+    return compactClause(preferred.fact, 68);
   }
 
   return pickFact(pool, fallbackIndex, fallback);
@@ -695,16 +920,22 @@ function getFacts(context) {
   const analysis = getAnalysisSource(context);
   const researchFacts = Array.isArray(analysis?.researchFacts) ? analysis.researchFacts : [];
   const topicResearch = Array.isArray(context?.pipeline?.topicResearch?.results) ? context.pipeline.topicResearch.results : [];
+  const topicState = detectTechnicalTopic({
+    topic: context?.topic?.query,
+    selectedTitle: getSelectedTitle(context),
+    researchFacts,
+    searchResults: topicResearch,
+  });
 
   const normalizedResearch = researchFacts.map((item, index) => ({
     label: safeString(item?.label || `事实 ${index + 1}`),
-    fact: safeString(item?.fact),
+    fact: sanitizeFactText(item?.fact),
     evidenceAnchor: safeString(item?.evidenceAnchor || item?.sourceTitle),
     sourceTitle: safeString(item?.sourceTitle),
   }));
   const normalizedSearch = topicResearch.map((item, index) => ({
     label: safeString(item?.title || `搜索结果 ${index + 1}`),
-    fact: compactClause(item?.snippet || item?.title, 56),
+    fact: sanitizeFactText(item?.snippet || item?.title),
     evidenceAnchor: safeString(item?.publishedAt ? `${item.title || ''} · ${item.publishedAt}` : item?.title),
     sourceTitle: safeString(item?.title),
   }));
@@ -719,7 +950,32 @@ function getFacts(context) {
   }
 
   if (merged.length > 0) {
-    return merged.slice(0, 6);
+    const ranked = topicState.requiresTechnicalDetail
+      ? [...merged].sort((left, right) => (
+          scoreTechnicalDetails({
+            fact: right.fact,
+            evidenceAnchor: right.evidenceAnchor,
+            sourceTitle: right.sourceTitle,
+          }) - scoreTechnicalDetails({
+            fact: left.fact,
+            evidenceAnchor: left.evidenceAnchor,
+            sourceTitle: left.sourceTitle,
+          })
+        ))
+      : merged;
+    const preferred = ranked.filter((item) => !isLowSignalFact(`${item.fact} ${item.evidenceAnchor}`));
+    const nonSafetyPreferred = preferred.filter((item) => !isSafetyHeavyFact(item.fact));
+    const ordered = preferred.length >= Math.min(3, merged.length)
+      ? [
+          ...nonSafetyPreferred,
+          ...preferred.filter((item) => !nonSafetyPreferred.includes(item)),
+        ]
+      : [
+          ...nonSafetyPreferred,
+          ...preferred.filter((item) => !nonSafetyPreferred.includes(item)),
+          ...ranked.filter((item) => !preferred.includes(item)),
+        ];
+    return ordered.slice(0, 6);
   }
 
   const layers = Array.isArray(analysis?.layers) ? analysis.layers : [];
@@ -729,6 +985,34 @@ function getFacts(context) {
     evidenceAnchor: safeString(item?.evidence || item?.label),
     sourceTitle: safeString(item?.label),
   }));
+}
+
+function buildTechnicalDetailContract(context, facts) {
+  const topicState = detectTechnicalTopic({
+    topic: context?.topic?.query,
+    selectedTitle: getSelectedTitle(context),
+    researchFacts: facts,
+    searchResults: context?.pipeline?.topicResearch?.results,
+  });
+
+  if (!topicState.requiresTechnicalDetail) {
+    return null;
+  }
+
+  return {
+    topicKind: topicState.isReleaseTopic ? 'ai-model-release' : 'ai-technical-topic',
+    minTechnicalBodyBlocks: 2,
+    requireReleaseDetail: topicState.isReleaseTopic,
+    requiredAngles: topicState.isReleaseTopic
+      ? ['版本或发布时间', '能力或机制变化', 'benchmark/API/价格/限制中的至少一项']
+      : ['能力或机制变化', 'benchmark/API/价格/限制中的至少一项'],
+    bannedGenericClaims: [
+      '只说更强了',
+      '只说改工作流',
+      '只说压力变大',
+      '只说定位变化',
+    ],
+  };
 }
 
 function pickProfile(level) {
@@ -798,9 +1082,11 @@ function buildFocusLine(context) {
   const analysis = getAnalysisSource(context);
   const requirements = getRequirements(context);
   const skill = getCurrentStepSkill(context);
+  const selectedTitle = getSelectedTitle(context);
   const facts = getFacts(context);
   const combinedFacts = facts.map((item) => safeString(item?.fact)).join(' ');
   const competitor = getCompetitorLabel(context);
+  const selectedTitleText = safeString(selectedTitle?.title);
 
   if (/[开源]/.test(combinedFacts) && /代码|编码/.test(combinedFacts)) {
     return '开源路线和代码能力';
@@ -808,16 +1094,21 @@ function buildFocusLine(context) {
   if (/(Agent|子 Agent|集群)/i.test(combinedFacts) && /代码|编码/.test(combinedFacts)) {
     return '代码能力和 Agent 集群';
   }
+  if (/(Agent|工作流)/i.test(selectedTitleText)) {
+    return /代码|开发|编程/.test(selectedTitleText)
+      ? 'Agent 能力和开发工作流'
+      : 'Agent 能力和工作流';
+  }
   if (competitor && /持平|优于|对标/.test(combinedFacts)) {
     return `${safeString(competitor)} 正面对比`;
   }
 
   return compactClause(
-    requirements.focus
-    || skill.emphasis
-    || skill.goal
+    (!isGenericFocusInstruction(skill.emphasis) ? skill.emphasis : '')
+    || (!isGenericFocusInstruction(requirements.focus) ? requirements.focus : '')
     || analysis?.corePromise
     || analysis?.thesis
+    || skill.goal
     || context?.topic?.query
     || '当前主题',
     42,
@@ -859,7 +1150,9 @@ function pickBodySections(playbook, sectionCount) {
 }
 
 function pickFact(facts, index, fallback) {
-  return compactClause(facts[index]?.fact || fallback, 52);
+  const fact = sanitizeFactText(facts[index]?.fact);
+  const resolved = fact || sanitizeFactText(fallback) || safeString(fallback);
+  return compactClause(resolved, 52);
 }
 
 function pickEvidence(facts, index, fallback) {
@@ -880,6 +1173,23 @@ function pickCtaPattern(playbook, index) {
   return patterns[index % patterns.length];
 }
 
+function buildStep3BlockDataPoints(items, fallbackText = '', max = 4) {
+  const explicit = uniqueStrings(
+    (Array.isArray(items) ? items : [])
+      .map((item) => compactClause(item, 30))
+      .filter(Boolean),
+  );
+  if (explicit.length > 0) {
+    return explicit.slice(0, max);
+  }
+
+  const fallbackSentences = (safeString(fallbackText).match(/[^。！？；\n]+/g) || [])
+    .map((item) => compactClause(item, 30))
+    .filter((item) => item.length >= 4);
+
+  return uniqueStrings(fallbackSentences).slice(0, max);
+}
+
 function sanitizeText(text, controls, playbook, topicLabel) {
   let safe = safeString(text);
   for (const term of controls.avoidTerms || []) {
@@ -896,11 +1206,78 @@ function sanitizeText(text, controls, playbook, topicLabel) {
   for (const closer of playbook.antiAi?.bannedClosers || []) {
     safe = safe.replaceAll(closer, '');
   }
-  return safe
+  safe = safe
     .replace(/\s+/g, ' ')
     .replace(/，，+/g, '，')
     .replace(/。。+/g, '。')
+    .replace(/…+/g, '')
     .trim();
+  return dedupeSentences(safe);
+}
+
+function normalizeSentenceKey(value, topicLabel = '') {
+  const stripped = safeString(value)
+    .replace(/^(另外|而且|再补一句|更硬的点在后面|再往执行里落|说白了|更关键的是|先把话说透|真到使用场景里|比如做内容的人|再比如做开发和执行的人)[，,:：]*/u, '')
+    .trim();
+  const substantive = stripped.includes('：')
+    ? stripped.split(/[：:]/).slice(-1)[0].trim() || stripped
+    : stripped;
+  const normalized = normalizeComparableToken(
+    isSafetyHeavyFact(substantive)
+      ? substantive.replace(/^(另外|而且)/, '')
+      : substantive,
+  );
+  const topicToken = normalizeComparableToken(topicLabel);
+  if (!topicToken) {
+    return normalized;
+  }
+  return normalized.replaceAll(topicToken, '');
+}
+
+function buildNonRepeatingFallback(item, topicLabel, maxLength = 56) {
+  const sceneIntent = safeString(item?.sceneIntent || item?.label);
+  const evidenceAnchor = safeString(item?.evidenceAnchor);
+  const dataPoint = Array.isArray(item?.dataPoints)
+    ? safeString(item.dataPoints[0])
+    : '';
+
+  return compactClause(
+    dataPoint
+    || (sceneIntent && evidenceAnchor ? `${sceneIntent}这一块直接落到${evidenceAnchor}` : '')
+    || (sceneIntent ? `${sceneIntent}这一块重点是把结果讲明白` : '')
+    || `这块直接回到${topicLabel || '主线'}的结果层`,
+    maxLength,
+  );
+}
+
+function dedupeCopyPayload(copy, topicLabel) {
+  const seen = new Set();
+  const dedupeText = (text, fallback = '') => {
+    const kept = [];
+    for (const sentence of splitTextSentences(text)) {
+      const key = normalizeSentenceKey(sentence, topicLabel);
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      kept.push(sentence);
+    }
+
+    const joined = kept.join('');
+    return safeString(joined) || compactClause(fallback, 56);
+  };
+
+  const nextCopy = {
+    ...copy,
+    hook: dedupeText(copy.hook, copy.hook),
+    body: (Array.isArray(copy.body) ? copy.body : []).map((item) => ({
+      ...item,
+      text: dedupeText(item?.text, buildNonRepeatingFallback(item, topicLabel)),
+    })),
+    cta: dedupeText(copy.cta, copy.cta),
+  };
+
+  return nextCopy;
 }
 
 function buildToneText(context, controls, playbook) {
@@ -917,17 +1294,15 @@ function buildToneText(context, controls, playbook) {
 
 function buildMainClaim(context) {
   const analysis = getAnalysisSource(context);
-  const selectedTitle = getSelectedTitle(context);
   const topicLabel = getTopicLabel(context);
   const competitor = getCompetitorLabel(context);
 
   return compactClause(
     analysis?.thesis
     || analysis?.corePromise
-    || selectedTitle?.rationale
     || (competitor
       ? `${topicLabel} 这次最值得讲的，是它开始正面给 ${competitor} 压力`
-      : `${topicLabel} 真正该先讲的是为什么值得看`),
+      : `${topicLabel} 真正该先讲的，是它怎么开始改真实工作流`),
     46,
   );
 }
@@ -950,14 +1325,14 @@ function buildBrief(context, playbook) {
   const audienceLine = summarizeAudience(context);
   const ctaPattern = pickCtaPattern(playbook, controls.variant);
 
-  const outline = bodySections.map((section, index) => ({
-    label: safeString(section.title || `正文块 ${index + 1}`),
-    beat: safeString(
+  const outline = bodySections.map((section, index) => {
+    const label = safeString(section.title || `正文块 ${index + 1}`);
+    const beat = safeString(
       index === 0
         ? `${formula.label}起手，先把「${safeString(context?.topic?.query || selectedTitle?.title || '当前主题')}」最值得听的判断抛出来，再带出背景和数据线索。`
         : `用${safeString(section.formula || formula.label)}把「${section.title}」这块讲透，别空讲，必须落到具体事实和结果。`,
-    ),
-    goal: safeString(
+    );
+    const goal = safeString(
       index === 0
         ? `前 3 秒先抓住 ${audienceLine}，不铺垫。`
         : section.title.includes('产品细节')
@@ -967,9 +1342,25 @@ function buildBrief(context, playbook) {
             : section.title.includes('案例') || section.title.includes('场景')
               ? '给至少 2 个可代入的具体场景。'
               : '让这一块的信息比上一块更具体、更有画面感。',
-    ),
-    evidenceAnchor: pickEvidence(facts, index, selectedTitle?.evidenceAnchor || mainClaim),
-  }));
+    );
+    const evidenceAnchor = pickEvidence(facts, index, selectedTitle?.evidenceAnchor || mainClaim);
+    return {
+      label,
+      beat,
+      goal,
+      evidenceAnchor,
+      sceneIntent: compactClause(section.title || goal, 30),
+      mustInclude: buildStep3BlockDataPoints([
+        pickFact(facts, index, mainClaim),
+        evidenceAnchor,
+        ...(Array.isArray(section.rules) ? section.rules.slice(0, 2) : []),
+      ], `${goal} ${beat}`, 3),
+      transitionToNext: index < bodySections.length - 1
+        ? `下一块转到 ${safeString(bodySections[index + 1]?.title || `正文块 ${index + 2}`)}`
+        : '最后收束到 CTA',
+      keywords: extractKeywords(`${label} ${evidenceAnchor} ${pickFact(facts, index, mainClaim)}`, 6),
+    };
+  });
 
   return {
     brief: {
@@ -986,21 +1377,21 @@ function buildHookText(context, playbook, controls, mainClaim, focusLine) {
   const topicLabel = getTopicLabel(context);
   const formula = pickFormula(playbook, controls.variant);
   const templates = [
-    `别把「${topicLabel}」当普通介绍，真正该先讲的是：${mainClaim}。`,
-    `很多人讲「${topicLabel}」都先讲慢了，真正该先抓的是${focusLine || mainClaim}。`,
-    `「${topicLabel}」到底怎么讲才不空？先把${focusLine || mainClaim}这一下讲透。`,
-    `我先给你个判断：${mainClaim}，你再决定这条值不值得继续看。`,
+    `别再只看热度了，真正该先看的，是${focusLine || mainClaim}。`,
+    `「${topicLabel}」这事，核心就一句：${mainClaim}。`,
+    `${focusLine || mainClaim}，不是热度，是${topicLabel}真正值得看的。`,
+    `很多人讲「${topicLabel}」讲慢了——真正该先讲的，是${mainClaim}。`,
   ];
 
   let hook = templates[controls.variant % templates.length];
   if (/情绪/.test(formula.label)) {
-    hook = `很多人卡在「${topicLabel}」上，不是不会看，是没先抓住${focusLine || mainClaim}。`;
+    hook = `很多人卡在「${topicLabel}」上，不是不会看，是没抓住${focusLine || mainClaim}。`;
   }
   if (/痛点/.test(formula.label)) {
-    hook = `「${topicLabel}」别再空讲了，先把${focusLine || mainClaim}讲清。`;
+    hook = `「${topicLabel}」这事，核心就一句：${mainClaim}。`;
   }
   if (/互动/.test(formula.label)) {
-    hook = `先记一句：${mainClaim}。你听完再看，这条是不是比普通讲法更值钱。`;
+    hook = `先记这句：${mainClaim}。`;
   }
 
   hook = sanitizeText(hook, controls, playbook, topicLabel);
@@ -1009,63 +1400,87 @@ function buildHookText(context, playbook, controls, mainClaim, focusLine) {
 
 function buildBackgroundBlock(context, controls, playbook, mainClaim, facts) {
   const topicLabel = getTopicLabel(context);
-  const releaseFact = pickFactByKeywords(
+  const releaseFact = pickFactByCategories(
     facts,
-    ['发布', '开源', '升级', '旗舰'],
+    ['release'],
     0,
-    `${topicLabel} 这次不是喊口号，是正式发布并开源`,
+    `${topicLabel} 这次先要把版本和发布时间讲清，不是空喊升级`,
   );
-  const benchmarkFact = pickFactByKeywords(
+  const capabilityFact = pickFactByCategories(
     facts,
-    ['持平', '优于', 'gpt', 'benchmark', 'bench', '考试'],
-    2,
-    `${topicLabel} 已经被拿去和顶级模型正面对比`,
+    ['capability', 'product'],
+    1,
+    `${topicLabel} 这次不是普通聊天增强，而是把真实执行链路往前推了一步`,
   );
+  const distinctCapabilityFact = (
+    /安全体系也在同步升级/.test(capabilityFact)
+    || normalizeComparableToken(capabilityFact) === normalizeComparableToken(releaseFact)
+  )
+    ? `${topicLabel} 这次不是普通聊天增强，而是把真实执行链路往前推了一步`
+    : capabilityFact;
 
   return joinSentences([
-    `${controls.profile.openingPhrases[controls.variant % controls.profile.openingPhrases.length]}，${releaseFact}。`,
-    `更硬的点在后面，${benchmarkFact}。`,
-    `所以这条内容别先铺背景，直接把判断压到前面：${mainClaim}。`,
+    `${releaseFact}。`,
+    `${distinctCapabilityFact}。`,
   ]);
 }
 
 function buildCapabilityBlock(context, controls, playbook, focusLine, facts) {
   const topicLabel = getTopicLabel(context);
-  const capabilityFact = pickFactByKeywords(
+  const capabilityFact = pickFactByCategories(
     facts,
-    ['13', '4000', '300', 'agent', '代码', '编码'],
+    ['capability', 'product'],
     1,
-    `${topicLabel} 这次把长程编码、代码修改和多 Agent 协作一起拉上来了`,
+    `${topicLabel} 这次把能力升级落到了工作流、工具调用和执行稳定性上`,
   );
-  const productFact = pickFactByKeywords(
+  const benchmarkOrOpsFact = pickFactByCategories(
     facts,
-    ['技能', '实测', '场景', '效率', '开发者', '视觉理解'],
+    ['benchmark', 'pricing', 'product', 'comparison'],
     3,
-    `开发者真正在乎的，是它能不能把复杂任务拆完还能接得住`,
+    `真正值得讲的，不是“更聪明”，而是 benchmark、API 能力或限制有没有一起变`,
   );
+  const distinctBenchmarkFact = normalizeComparableToken(benchmarkOrOpsFact) === normalizeComparableToken(capabilityFact)
+    ? `真正值得讲的，不是“更聪明”，而是 benchmark、API 能力或限制有没有一起变`
+    : benchmarkOrOpsFact;
+  const distinctCapabilityFact = /安全体系也在同步升级/.test(capabilityFact)
+    ? `${topicLabel} 这次把能力升级落到了工作流、工具调用和执行稳定性上`
+    : capabilityFact;
 
   return joinSentences([
-    `具体能力别讲空话，得直接落到“它能帮你做什么”。`,
-    `先看最硬的一层，${capabilityFact}。`,
-    `再往执行里落，${productFact}。`,
-    `所以它值钱的地方不是参数好看，而是围着${focusLine || topicLabel}这条主线，真能帮你少试错、少返工。`,
-  ]);
+      `${distinctCapabilityFact}。`,
+      `${distinctBenchmarkFact}。`,
+    ]);
 }
 
 function buildComparisonBlock(context, controls, playbook, mainClaim, focusLine, facts) {
   const topicLabel = getTopicLabel(context);
-  const competitor = getCompetitorLabel(context) || '同类闭源模型';
-  const benchmarkFact = pickFactByKeywords(
+  const competitor = getCompetitorLabel(context);
+  const domesticModelFrame = usesDomesticModelFraming(context);
+  const benchmarkFact = pickFactByCategories(
     facts,
-    ['持平', '优于', 'gpt', 'claude', 'gemini', 'benchmark', 'bench'],
+    ['benchmark', 'comparison', 'pricing', 'product'],
     2,
-    `${topicLabel} 已经能和顶级闭源模型摆到一张表上比`,
+    competitor
+      ? `${topicLabel} 已经能和顶级闭源模型摆到一张表上比`
+      : `${topicLabel} 现在更该和上一代“只会聊天”的理解方式拉开差距`,
   );
 
+  if (!competitor) {
+    return joinSentences([
+      `${benchmarkFact}。`,
+      `${focusLine || topicLabel}才是真正拉开差距的地方。`,
+      `${mainClaim}这条判断，要拿结果去比，不是拿背景去堆。`,
+    ]);
+  }
+
   return joinSentences([
-    `很多人一说国产模型就默认比 ${competitor} 弱，这个判断现在该改了。`,
+    domesticModelFrame
+      ? `很多人一说国产模型就默认比 ${competitor} 弱，这个判断现在该改了。`
+      : `很多人一说 ${topicLabel} 这种新版本，第一反应还是先看热度，不先看它能不能真的压到 ${competitor}，这个习惯现在该改了。`,
     `${benchmarkFact}。`,
-    `说白了，真正能拉开差异的，不是喊一句“国产也很强”，而是把${mainClaim}这条判断拿事实顶住。`,
+    domesticModelFrame
+      ? `说白了，真正能拉开差异的，不是喊一句“国产也很强”，而是把${mainClaim}这条判断拿 benchmark、工具链或价格限制去顶住。`
+      : `说白了，真正能拉开差异的，不是先把热度喊满，而是把${mainClaim}这条判断拿 benchmark、工具链或价格限制去顶住。`,
     `别人还在讲概念的时候，这里已经能把${focusLine || topicLabel}放到结果层去比了。`,
   ]);
 }
@@ -1073,33 +1488,30 @@ function buildComparisonBlock(context, controls, playbook, mainClaim, focusLine,
 function buildScenarioBlock(context, controls, playbook, focusLine, mainClaim, facts) {
   const topicLabel = getTopicLabel(context);
   const audienceLine = summarizeAudience(context);
-  const scenarioFact = pickFactByKeywords(
+  const scenarioFact = pickFactByCategories(
     facts,
-    ['开发者', '场景', '技能', 'agent', '协作者', '实测'],
+    ['product', 'capability', 'pricing'],
     3,
-    `${mainClaim} 这条判断放到真实开发和协作场景里更有感觉`,
+    `${mainClaim} 这条判断放到真实开发和协作场景里才有意义`,
   );
 
   return joinSentences([
-    `真到使用场景里，${audienceLine}最先要的不是背景，而是${focusLine || mainClaim}。`,
-    `比如做内容的人，要在几十秒里讲清「${topicLabel}」，就会先拿这条判断做开场，再补事实和案例。`,
-    `再比如做开发和执行的人，更在乎结果，所以他最先想知道的，是这件事到底能不能少走弯路、快一点看到差异。`,
-    `而且${scenarioFact}。`,
-  ]);
-}
+    `${scenarioFact}。`,
+    `${focusLine || mainClaim}才是关键。`,
+  ]);}
 
 function buildMergedBlock(context, controls, playbook, mainClaim, focusLine, facts) {
   const comparisonLine = buildComparisonBlock(context, controls, playbook, mainClaim, focusLine, facts);
   const scenarioLine = buildScenarioBlock(context, controls, playbook, focusLine, mainClaim, facts);
   return joinSentences([
     comparisonLine,
-    scenarioLine,
   ]);
 }
 
-function buildBodyBlocks(context, playbook, controls, mainClaim, focusLine, facts) {
+function buildBodyBlocks(context, playbook, controls, mainClaim, focusLine, facts, outlineItems = []) {
   const sections = pickBodySections(playbook, controls.sectionCount);
   return sections.map((section, index) => {
+    const outlineItem = outlineItems[index] || {};
     const title = safeString(section.title || `正文块 ${index + 1}`);
     let text = '';
 
@@ -1115,15 +1527,34 @@ function buildBodyBlocks(context, playbook, controls, mainClaim, focusLine, fact
       text = buildScenarioBlock(context, controls, playbook, focusLine, mainClaim, facts);
     } else {
       text = joinSentences([
-        `${controls.profile.bridgePhrases[index % controls.profile.bridgePhrases.length]}，先把这一块讲具体。`,
         `${pickFact(facts, index, focusLine || mainClaim)}。`,
-        `别空讲，直接让观众知道它和自己有什么关系。`,
+        `${pickFact(facts, index, focusLine || mainClaim)}。`,
+        `${focusLine || mainClaim}才是关键。`,
       ]);
     }
 
     return {
-      label: title,
+      label: safeString(outlineItem.label || title),
       text: sanitizeText(text, controls, playbook, getTopicLabel(context)),
+      sceneIntent: compactClause(outlineItem.sceneIntent || title, 30),
+      evidenceAnchor: safeString(outlineItem.evidenceAnchor || pickEvidence(facts, index, mainClaim)),
+      keywords: extractKeywords([
+        safeString(outlineItem.sceneIntent || title),
+        safeString(outlineItem.evidenceAnchor || pickEvidence(facts, index, mainClaim)),
+        pickFact(facts, index, mainClaim),
+      ].join(' '), 6),
+      dataPoints: buildStep3BlockDataPoints(
+        [
+          ...(Array.isArray(outlineItem.mustInclude) ? outlineItem.mustInclude : []),
+          pickFact(facts, index, mainClaim),
+        ],
+        text,
+        4,
+      ),
+      transitionToNext: safeString(
+        outlineItem.transitionToNext
+        || (index < sections.length - 1 ? `下一块转到 ${safeString(sections[index + 1]?.title || `正文块 ${index + 2}`)}` : '最后收束到 CTA'),
+      ),
     };
   });
 }
@@ -1152,10 +1583,11 @@ function buildCopy(context, briefStagePayload, playbook) {
   const mainClaim = buildMainClaim(context);
   const topicLabel = getTopicLabel(context);
   const competitor = getCompetitorLabel(context);
+  const outlineItems = Array.isArray(briefStagePayload?.outline) ? briefStagePayload.outline : [];
 
   const copy = {
     hook: buildHookText(context, playbook, controls, mainClaim, focusLine),
-    body: buildBodyBlocks(context, playbook, controls, mainClaim, focusLine, facts),
+    body: buildBodyBlocks(context, playbook, controls, mainClaim, focusLine, facts, outlineItems),
     cta: sanitizeText(buildCtaText(context, playbook, controls, mainClaim), controls, playbook, topicLabel),
   };
 
@@ -1164,15 +1596,17 @@ function buildCopy(context, briefStagePayload, playbook) {
   let currentLength = measureCopyLength(copy);
 
   const expansionPool = uniqueStrings([
-    pickFactByKeywords(facts, ['13', '4000', '300', 'agent', '代码'], 1, `${topicLabel} 这次把关键能力全摆上桌了。`),
-    pickFactByKeywords(facts, ['持平', '优于', 'gpt', 'claude', 'gemini', 'benchmark'], 2, `${topicLabel} 现在已经能和顶级模型正面对比。`),
-    pickFactByKeywords(facts, ['开源', '发布', '旗舰'], 0, `${topicLabel} 这次不是试水，是正式把能力放出来。`),
+    pickFactByCategories(facts, ['capability', 'product'], 1, `${topicLabel} 这次把关键能力摆上桌，不是只讲感觉。`),
+    pickFactByCategories(facts, ['benchmark', 'comparison', 'pricing'], 2, `${topicLabel} 现在已经能和顶级模型正面对比。`),
+    pickFactByCategories(facts, ['release'], 0, `${topicLabel} 这次不是试水，是正式把能力放出来。`),
     competitor ? `${topicLabel} 之所以会被拿去和 ${competitor} 一起聊，不是情绪拉满，是能力已经进到同一档比较里了。` : '',
     `${mainClaim}。`,
     `说到底，${buildComparisonLine(topicLabel, focusLine)}。`,
-    `放到真实执行里，重点不是“听起来强”，而是${focusLine || mainClaim}到底能不能落到结果。`,
+    `放到真实执行里，重点不是“听起来强”，而是${focusLine || mainClaim}到底能不能落到 benchmark、API 或结果。`,
     `你真拿去讲的时候，会发现把事实、差异和场景压成一条线，比堆背景有用得多。`,
-  ]).map((item) => sanitizeText(item, controls, playbook, topicLabel));
+  ])
+    .map((item) => sanitizeText(item, controls, playbook, topicLabel))
+    .filter((item) => item && !isLowSignalFact(item));
 
   if (currentLength < minTargetLength) {
     let poolIndex = 0;
@@ -1204,13 +1638,23 @@ function buildCopy(context, briefStagePayload, playbook) {
   currentLength = measureCopyLength(copy);
   if (currentLength < minTargetLength && copy.body.length > 0) {
     let refillIndex = 0;
+    const domesticModelFrame = usesDomesticModelFraming(context);
     const refillFragments = uniqueStrings([
-      pickFactByKeywords(facts, ['开源', '发布', '旗舰'], 0, `${topicLabel} 这次不是小修小补。`),
-      pickFactByKeywords(facts, ['13', '4000', '300', 'agent', '代码'], 1, `${topicLabel} 这次最硬的还是代码和 Agent 这一层。`),
-      pickFactByKeywords(facts, ['持平', '优于', 'gpt', 'benchmark', 'bench'], 2, `${topicLabel} 现在已经不是只能在国产模型里横向比了。`),
+      pickFactByCategories(facts, ['release'], 0, `${topicLabel} 这次不是小修小补。`),
+      pickFactByCategories(facts, ['capability', 'product'], 1, `${topicLabel} 这次最硬的还是代码、工具调用和 Agent 这一层。`),
+      pickFactByCategories(
+        facts,
+        ['benchmark', 'comparison', 'pricing'],
+        2,
+        domesticModelFrame
+          ? `${topicLabel} 现在已经不是只能在国产模型里横向比了。`
+          : `${topicLabel} 现在已经不能只拿发布热度衡量了，得直接看 benchmark、工具链和价格限制。`,
+      ),
       competitor ? `${topicLabel} 开始被放进和 ${competitor} 的同场比较里，这才是压力真正出现的地方。` : '',
       `${mainClaim}。`,
-    ]).map((item) => sanitizeText(item, controls, playbook, topicLabel));
+    ])
+      .map((item) => sanitizeText(item, controls, playbook, topicLabel))
+      .filter((item) => item && !isLowSignalFact(item));
 
     while (currentLength < minTargetLength && refillIndex < refillFragments.length * 3) {
       const blockIndex = refillIndex % copy.body.length;
@@ -1218,6 +1662,48 @@ function buildCopy(context, briefStagePayload, playbook) {
       currentLength = measureCopyLength(copy);
       refillIndex += 1;
     }
+  }
+
+  currentLength = measureCopyLength(copy);
+  if (currentLength > maxTargetLength) {
+    const hookBudget = Math.max(playbook.hook.maxChars, Math.round(controls.targetWordCount * 0.18));
+    const ctaBudget = Math.max(26, Math.round(controls.targetWordCount * 0.16));
+    const bodyBudget = Math.max(120, controls.targetWordCount - hookBudget - ctaBudget);
+    const perBodyBudget = Math.max(34, Math.round(bodyBudget / Math.max(1, copy.body.length)));
+
+    copy.hook = compressTextToBudget(copy.hook, hookBudget);
+    copy.body = copy.body.map((item) => ({
+      ...item,
+      text: compressTextToBudget(dedupeSentences(item.text), perBodyBudget),
+    }));
+    copy.cta = compressTextToBudget(copy.cta, ctaBudget);
+  }
+
+  copy.hook = sanitizeText(copy.hook, controls, playbook, topicLabel);
+  copy.body = copy.body.map((item) => ({
+    ...item,
+    text: sanitizeText(item.text, controls, playbook, topicLabel),
+  }));
+  copy.cta = sanitizeText(copy.cta, controls, playbook, topicLabel);
+
+  const dedupedCopy = dedupeCopyPayload(copy, topicLabel);
+  copy.hook = dedupedCopy.hook;
+  copy.body = dedupedCopy.body;
+  copy.cta = dedupedCopy.cta;
+
+  currentLength = measureCopyLength(copy);
+  if (currentLength > maxTargetLength) {
+    const hookBudget = Math.max(playbook.hook.maxChars, Math.round(controls.targetWordCount * 0.16));
+    const ctaBudget = Math.max(24, Math.round(controls.targetWordCount * 0.14));
+    const bodyBudget = Math.max(110, controls.targetWordCount - hookBudget - ctaBudget);
+    const perBodyBudget = Math.max(32, Math.round(bodyBudget / Math.max(1, copy.body.length)));
+
+    copy.hook = compressTextToBudget(copy.hook, hookBudget);
+    copy.body = copy.body.map((item) => ({
+      ...item,
+      text: compressTextToBudget(item.text, perBodyBudget),
+    }));
+    copy.cta = compressTextToBudget(copy.cta, ctaBudget);
   }
 
   return {copy};
@@ -1229,10 +1715,19 @@ function buildRuntimePayload(context, playbook, briefStagePayload) {
   const selectedTitle = getSelectedTitle(context);
   const facts = getFacts(context);
   const bodySections = pickBodySections(playbook, controls.sectionCount);
+  const technicalDetailContract = buildTechnicalDetailContract(context, facts);
 
   return {
     topic: context?.topic || {},
     selectedTitle,
+    titleBackbone: {
+      title: safeString(selectedTitle?.title),
+      angle: safeString(selectedTitle?.angle),
+      rationale: safeString(selectedTitle?.rationale),
+      evidenceAnchor: safeString(selectedTitle?.evidenceAnchor),
+      hookStyle: safeString(selectedTitle?.hookStyle),
+      titleKeywords: extractKeywords(selectedTitle?.title, 8),
+    },
     analysis: {
       thesis: safeString(analysis?.thesis),
       audience: safeString(analysis?.audience),
@@ -1242,6 +1737,7 @@ function buildRuntimePayload(context, playbook, briefStagePayload) {
     researchFacts: facts,
     requirements: getRequirements(context),
     stepSkillOverride: getCurrentStepSkill(context),
+    technicalDetailContract,
     resolvedTargets: {
       targetDurationSeconds: controls.targetDurationSeconds,
       targetWordCount: controls.targetWordCount,
@@ -1262,12 +1758,17 @@ function buildRuntimePayload(context, playbook, briefStagePayload) {
       ctaPatterns: playbook.ctaPatterns,
       antiAi: playbook.antiAi,
     },
+    outputContract: {
+      outlineFields: ['label', 'beat', 'goal', 'evidenceAnchor', 'sceneIntent', 'mustInclude', 'transitionToNext', 'keywords'],
+      bodyFields: ['label', 'text', 'sceneIntent', 'evidenceAnchor', 'keywords', 'dataPoints', 'transitionToNext'],
+    },
     brief: briefStagePayload || null,
   };
 }
 
 function buildBriefPrompt(context, skillSpec) {
   const playbook = getStep3SkillPlaybook(skillSpec);
+  const runtimePayload = buildRuntimePayload(context, playbook);
   const schema = {
     brief: {
       hookAngle: 'string',
@@ -1281,6 +1782,10 @@ function buildBriefPrompt(context, skillSpec) {
         beat: 'string',
         goal: 'string',
         evidenceAnchor: 'string',
+        sceneIntent: 'string',
+        mustInclude: ['string'],
+        transitionToNext: 'string',
+        keywords: ['string'],
       },
     ],
   };
@@ -1289,12 +1794,16 @@ function buildBriefPrompt(context, skillSpec) {
     '你必须把下面这份 video-pipeline-content SKILL.md 当作 Step 3 的唯一真源。',
     '现在先做第一阶段：输出 brief 和 outline，不直接写最终正文。',
     'outline 必须显式覆盖 skill 里的正文块、三要素、CTA 意图和去 AI 味规则。',
+    '每个 outline 块都必须给 sceneIntent / evidenceAnchor / mustInclude / transitionToNext / keywords，后续 Step 4 会直接消费这些字段。',
+    runtimePayload.technicalDetailContract
+      ? '这是 AI/模型技术选题，outline 不能只写“更强了/改工作流了”。必须明确分配发布细节、能力机制、benchmark/API/价格/限制这些硬信息到对应正文块。'
+      : '',
     '',
     '【SKILL Prompt 真源】',
     playbook.promptTemplate || playbook.rawSkill,
     '',
     '【运行时输入】',
-    JSON.stringify(buildRuntimePayload(context, playbook), null, 2),
+    JSON.stringify(runtimePayload, null, 2),
     '',
     '只返回这个 JSON 结构：',
     JSON.stringify(schema, null, 2),
@@ -1303,6 +1812,7 @@ function buildBriefPrompt(context, skillSpec) {
 
 function buildCopyPrompt(context, briefStagePayload, skillSpec) {
   const playbook = getStep3SkillPlaybook(skillSpec);
+  const runtimePayload = buildRuntimePayload(context, playbook, briefStagePayload);
   const schema = {
     copy: {
       hook: 'string',
@@ -1310,6 +1820,11 @@ function buildCopyPrompt(context, briefStagePayload, skillSpec) {
         {
           label: 'string',
           text: 'string',
+          sceneIntent: 'string',
+          evidenceAnchor: 'string',
+          keywords: ['string'],
+          dataPoints: ['string'],
+          transitionToNext: 'string',
         },
       ],
       cta: 'string',
@@ -1320,12 +1835,16 @@ function buildCopyPrompt(context, briefStagePayload, skillSpec) {
     '你必须继续严格执行同一份 video-pipeline-content SKILL.md，不允许退回通用模板写法。',
     '现在做第二阶段：根据 brief 输出最终文案。',
     '必须满足：Hook 抓人、Body 覆盖产品细节/使用案例/竞品对比、CTA 用强引导、人话表达、少 AI 味。',
+    '正文每块必须和标题主线对齐，并保留 sceneIntent / evidenceAnchor / keywords / dataPoints / transitionToNext。',
+    runtimePayload.technicalDetailContract
+      ? '这是 AI/模型技术选题，正文至少 2 段要带具体技术更新：版本/发布日期、能力机制、benchmark、API/工具链、价格/限制、兼容性中的至少几项；禁止只写抽象判断。'
+      : '',
     '',
     '【SKILL Prompt 真源】',
     playbook.promptTemplate || playbook.rawSkill,
     '',
     '【运行时输入】',
-    JSON.stringify(buildRuntimePayload(context, playbook, briefStagePayload), null, 2),
+    JSON.stringify(runtimePayload, null, 2),
     '',
     '只返回这个 JSON 结构：',
     JSON.stringify(schema, null, 2),
@@ -1361,8 +1880,16 @@ function validateStep3SkillAlignment(context, payload, skillSpec) {
   ].join('\n');
   const totalChars = joinedText.replace(/\s+/g, '').length;
   const minExpectedChars = Math.max(playbook.targetChars.min, Math.round(controls.targetWordCount * 0.82));
-  const maxExpectedChars = Math.max(minExpectedChars + 30, Math.round(controls.targetWordCount * 1.18));
+  const maxExpectedChars = Math.max(minExpectedChars + 40, Math.round(controls.targetWordCount * 1.32));
   const reasons = [];
+  const structuredBlockCount = body.filter((item) => (
+    safeString(item?.sceneIntent)
+    && safeString(item?.evidenceAnchor)
+    && Array.isArray(item?.keywords)
+    && item.keywords.length > 0
+    && Array.isArray(item?.dataPoints)
+    && item.dataPoints.length > 0
+  )).length;
 
   if (body.length !== expectedSections.length) {
     reasons.push(`正文块数量应为 ${expectedSections.length}，当前只有 ${body.length}`);
@@ -1376,11 +1903,14 @@ function validateStep3SkillAlignment(context, payload, skillSpec) {
   if (!/(可以帮你|能帮你|功能|细节|效率|结果)/.test(joinedText)) {
     reasons.push('缺少产品细节或能力描述');
   }
-  if (!/(同类|竞品|对比|差异|别人|传统讲法)/.test(joinedText)) {
+  if (!/(同类|竞品|对比|差异|差别|旧模型|之前的模型|以前|传统讲法|端到端)/.test(joinedText)) {
     reasons.push('缺少竞品对比或差异化表达');
   }
   if (!/(比如|场景|案例|什么人|做内容|做执行|真实用法)/.test(joinedText)) {
     reasons.push('缺少具体使用场景或案例');
+  }
+  if (structuredBlockCount < Math.max(1, body.length - 1)) {
+    reasons.push('正文结构化字段不足，缺少 sceneIntent / evidenceAnchor / keywords / dataPoints');
   }
   if (!/(评论|留言|关注|转发|下期|扣1)/.test(safeString(copy.cta))) {
     reasons.push('CTA 不够强，不符合 skill 强引导规则');

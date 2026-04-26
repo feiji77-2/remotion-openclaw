@@ -89,6 +89,79 @@ function normalizeSearchText(value) {
     .trim();
 }
 
+function compactSearchToken(value) {
+  return stripHtml(String(value || ''))
+    .toLowerCase()
+    .replace(/[“”"'‘’]+/g, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, '')
+    .trim();
+}
+
+function inferModelSearchHint(query) {
+  const safe = String(query || '').trim();
+  if (!safe) {
+    return null;
+  }
+
+  const mappings = [
+    {
+      pattern: /\bgpt\s*[- ]?(\d+(?:\.\d+)+)\b/i,
+      vendor: 'OpenAI',
+      buildLabel: (version) => `GPT-${version}`,
+    },
+    {
+      pattern: /\bclaude(?:\s+([a-z0-9.+-]+(?:\s+\d+(?:\.\d+)*)?))?\b/i,
+      vendor: 'Anthropic',
+      buildLabel: (variant) => (variant ? `Claude ${variant}` : 'Claude'),
+    },
+    {
+      pattern: /\bgemini(?:\s+([a-z0-9.+-]+(?:\s+\d+(?:\.\d+)*)?))?\b/i,
+      vendor: 'Google',
+      buildLabel: (variant) => (variant ? `Gemini ${variant}` : 'Gemini'),
+    },
+    {
+      pattern: /\bdeepseek(?:\s+([a-z0-9.+-]+))?\b/i,
+      vendor: 'DeepSeek',
+      buildLabel: (variant) => (variant ? `DeepSeek ${variant}` : 'DeepSeek'),
+    },
+    {
+      pattern: /\bkimi\s*k?\s*[- ]?(\d+(?:\.\d+)+)\b/i,
+      vendor: 'Moonshot',
+      buildLabel: (version) => `Kimi ${version}`,
+    },
+    {
+      pattern: /\bqwen(?:\s+([a-z0-9.+-]+))?\b/i,
+      vendor: 'Alibaba',
+      buildLabel: (variant) => (variant ? `Qwen ${variant}` : 'Qwen'),
+    },
+    {
+      pattern: /\bllama(?:\s+([a-z0-9.+-]+))?\b/i,
+      vendor: 'Meta',
+      buildLabel: (variant) => (variant ? `Llama ${variant}` : 'Llama'),
+    },
+  ];
+
+  for (const mapping of mappings) {
+    const match = safe.match(mapping.pattern);
+    if (!match) {
+      continue;
+    }
+
+    const variant = String(match[1] || '').trim().replace(/\s+/g, ' ');
+    const modelLabel = mapping.buildLabel(variant).trim();
+    if (!modelLabel) {
+      continue;
+    }
+
+    return {
+      vendor: mapping.vendor,
+      modelLabel,
+    };
+  }
+
+  return null;
+}
+
 function buildAnchorTokens(query) {
   const rawTokens = String(query || '').match(/[A-Za-z0-9][A-Za-z0-9.+-]*/g) || [];
   const stopwords = new Set(['ai']);
@@ -117,6 +190,20 @@ function buildSearchQueries(query) {
   const normalizedQuery = String(query || '').trim();
   const queries = new Set();
   const anchorTokens = buildAnchorTokens(normalizedQuery);
+  const modelHint = inferModelSearchHint(normalizedQuery);
+  const isAiTechnicalQuery = /(openai|chatgpt|gpt|claude|anthropic|gemini|deepseek|kimi|moonshot|llama|qwen|模型|大模型|ai|llm)/i.test(normalizedQuery);
+  const isReleaseQuery = /(发布|上线|更新|升级|release|launch|preview|beta|版本)/i.test(normalizedQuery);
+
+  if (modelHint?.vendor && modelHint?.modelLabel) {
+    queries.add(`${modelHint.vendor} ${modelHint.modelLabel}`);
+    queries.add(`${modelHint.vendor} ${modelHint.modelLabel} 官方`);
+    queries.add(`${modelHint.vendor} ${modelHint.modelLabel} release notes`);
+  }
+
+  if (modelHint?.modelLabel) {
+    queries.add(modelHint.modelLabel);
+    queries.add(`${modelHint.modelLabel} 官方`);
+  }
 
   if (normalizedQuery) {
     queries.add(normalizedQuery);
@@ -131,24 +218,50 @@ function buildSearchQueries(query) {
     queries.add(anchorTokens.slice(0, 3).join(' '));
   }
 
-  return [...queries].filter(Boolean).slice(0, 4);
+  if (isAiTechnicalQuery) {
+    queries.add(`${normalizedQuery} 官方`);
+    queries.add(`${normalizedQuery} benchmark`);
+    queries.add(`${normalizedQuery} API`);
+  }
+
+  if (isAiTechnicalQuery && isReleaseQuery) {
+    queries.add(`${normalizedQuery} release notes`);
+    queries.add(`${normalizedQuery} 开发者`);
+    if (modelHint?.vendor && modelHint?.modelLabel) {
+      queries.add(`${modelHint.vendor} ${modelHint.modelLabel} benchmark`);
+      queries.add(`${modelHint.vendor} ${modelHint.modelLabel} API`);
+      queries.add(`${modelHint.vendor} ${modelHint.modelLabel} 开发者`);
+    }
+  }
+
+  return [...queries].filter(Boolean).slice(0, 10);
 }
 
 function scoreSearchResult(item, terms, anchorTokens = []) {
   const haystack = normalizeSearchText(`${item?.title || ''} ${item?.snippet || ''}`);
+  const compactHaystack = compactSearchToken(haystack);
   let score = 0;
   let matches = 0;
   let anchorMatches = 0;
 
   for (const term of terms) {
-    if (term.value && haystack.includes(term.value.toLowerCase())) {
+    const normalizedTerm = String(term.value || '').toLowerCase();
+    const compactTerm = compactSearchToken(term.value);
+    if (
+      (normalizedTerm && haystack.includes(normalizedTerm))
+      || (compactTerm && compactHaystack.includes(compactTerm))
+    ) {
       score += term.weight;
       matches += 1;
     }
   }
 
   for (const token of anchorTokens) {
-    if (token && haystack.includes(token)) {
+    const compactToken = compactSearchToken(token);
+    if (
+      (token && haystack.includes(token))
+      || (compactToken && compactHaystack.includes(compactToken))
+    ) {
       anchorMatches += 1;
     }
   }
@@ -410,6 +523,14 @@ function buildStep123Context(stepId, input) {
 }
 
 module.exports = {
+  __private: {
+    buildAnchorTokens,
+    buildSearchQueries,
+    buildSearchTerms,
+    compactSearchToken,
+    inferModelSearchHint,
+    scoreSearchResult,
+  },
   buildStep123Context,
   clone,
   getInputTopic,

@@ -1,4 +1,5 @@
 const {WorkflowGenerationError} = require('./errors');
+const {analyzeTechnicalDetails, detectTechnicalTopic} = require('./technicalTopic');
 
 function normalizeText(value) {
   return String(value || '')
@@ -92,6 +93,137 @@ function ensureArray(value, label, minLength, code) {
   return safe;
 }
 
+function ensureStringArray(value, fallback = [], max = 8) {
+  const normalized = [...new Set(
+    (Array.isArray(value) ? value : fallback)
+      .map((item) => String(item || '').trim())
+      .filter(Boolean),
+  )];
+  return normalized.slice(0, max);
+}
+
+function buildTechnicalTopicState(context, extra = {}) {
+  return detectTechnicalTopic({
+    topic: context?.topic?.query,
+    inputTopic: context?.topic?.inputTopic || context?.pipeline?.inputTopic,
+    inputTitleKeywords: context?.topic?.inputTitleKeywords || context?.pipeline?.inputTitleKeywords,
+    selectedTitle: context?.pipeline?.selectedTitle,
+    researchFacts: extra.researchFacts,
+    searchResults: context?.pipeline?.topicResearch?.results,
+    body: extra.body,
+  });
+}
+
+function validateStep1TechnicalResearch(facts, context) {
+  const topicState = buildTechnicalTopicState(context, {researchFacts: facts});
+  if (!topicState.requiresTechnicalDetail) {
+    return;
+  }
+
+  const analyses = facts.map((item) => analyzeTechnicalDetails({
+    fact: item.fact,
+    evidenceAnchor: item.evidenceAnchor,
+    sourceTitle: item.sourceTitle,
+  }));
+  const concreteFacts = analyses.filter((item) => item.hasConcreteDetail);
+  const releaseFacts = analyses.filter((item) => item.hasReleaseDetail);
+  const hardFacts = analyses.filter((item) => item.hasHardUpdateCategory);
+  const operationalFacts = analyses.filter((item) => (
+    item.categories.includes('benchmark')
+    || item.categories.includes('product')
+    || item.categories.includes('pricing')
+    || item.categories.includes('safety')
+    || item.categories.includes('comparison')
+  ));
+
+  if (concreteFacts.length < 2) {
+    fail('AI/模型技术选题的搜索事实太空，至少 2 条要带版本、日期、机制、benchmark、API/工具链或价格限制等硬信息', 'STEP1_RESEARCH_TECH_DETAIL_WEAK', {
+      concreteFacts: concreteFacts.length,
+      totalFacts: facts.length,
+    });
+  }
+
+  if (topicState.isReleaseTopic && releaseFacts.length < 1) {
+    fail('AI/模型发布选题缺少版本号或发布时间这类发布细节', 'STEP1_RESEARCH_RELEASE_DETAIL_MISSING', {
+      releaseFacts: releaseFacts.length,
+      totalFacts: facts.length,
+    });
+  }
+
+  if (hardFacts.length < 2) {
+    fail('AI/模型技术选题至少要有 2 条事实讲清具体能力、机制、benchmark、API/工具链或限制，不要只讲“更强了”', 'STEP1_RESEARCH_HARD_UPDATE_MISSING', {
+      hardFacts: hardFacts.length,
+      totalFacts: facts.length,
+    });
+  }
+
+  if (operationalFacts.length < 1) {
+    fail('AI/模型技术选题至少要补 1 条可执行层更新，例如 benchmark、API/工具链、价格/限制、兼容性或安全机制', 'STEP1_RESEARCH_OPERATIONAL_DETAIL_MISSING', {
+      operationalFacts: operationalFacts.length,
+      totalFacts: facts.length,
+    });
+  }
+}
+
+function validateStep3TechnicalCopy(copy, body, context) {
+  const topicState = buildTechnicalTopicState(context, {body});
+  if (!topicState.requiresTechnicalDetail) {
+    return;
+  }
+
+  const hookAnalysis = analyzeTechnicalDetails(copy.hook);
+  const ctaAnalysis = analyzeTechnicalDetails(copy.cta);
+  const blockAnalyses = body.map((item) => analyzeTechnicalDetails({
+    text: item.text,
+    sceneIntent: item.sceneIntent,
+    evidenceAnchor: item.evidenceAnchor,
+    dataPoints: item.dataPoints,
+    keywords: item.keywords,
+  }));
+  const technicalBlocks = blockAnalyses.filter((item) => item.hasConcreteDetail);
+  const hardDetailBlocks = blockAnalyses.filter((item) => item.hasHardUpdateCategory);
+  const releaseCovered = hookAnalysis.hasReleaseDetail || blockAnalyses.some((item) => item.hasReleaseDetail);
+  const operationalCovered = blockAnalyses.some((item) => (
+    item.categories.includes('benchmark')
+    || item.categories.includes('product')
+    || item.categories.includes('pricing')
+    || item.categories.includes('safety')
+  ));
+  const technicalComparisonCovered = blockAnalyses.some((item) => item.hasComparison && item.hasHardUpdateCategory)
+    || blockAnalyses.some((item) => item.categories.includes('benchmark'));
+  const totalTechnicalSignals = [
+    hookAnalysis,
+    ...blockAnalyses,
+    ctaAnalysis,
+  ].filter((item) => item.hasConcreteDetail || item.hasHardUpdateCategory);
+
+  if (technicalBlocks.length < 2) {
+    fail('AI/模型技术选题文案太空，至少 2 段正文要带版本、机制、benchmark、API/工具链或价格限制等硬信息', 'STEP3_COPY_TECH_DETAIL_WEAK', {
+      technicalBlocks: technicalBlocks.length,
+      bodyBlocks: body.length,
+    });
+  }
+
+  if (topicState.isReleaseTopic && !releaseCovered) {
+    fail('AI/模型发布选题文案缺少版本号或发布时间这类发布细节', 'STEP3_COPY_RELEASE_DETAIL_MISSING');
+  }
+
+  if (hardDetailBlocks.length < 2 || totalTechnicalSignals.length < 3) {
+    fail('AI/模型技术选题文案缺少真正的技术更新点，至少要讲清 2 处能力/机制/benchmark/API/限制变化', 'STEP3_COPY_HARD_UPDATE_MISSING', {
+      hardDetailBlocks: hardDetailBlocks.length,
+      technicalSignals: totalTechnicalSignals.length,
+    });
+  }
+
+  if (!operationalCovered) {
+    fail('AI/模型技术选题文案没有落到 benchmark、API/工具链、价格/限制、兼容性或安全机制这类实打实更新点', 'STEP3_COPY_OPERATIONAL_DETAIL_MISSING');
+  }
+
+  if (!technicalComparisonCovered) {
+    fail('AI/模型技术选题文案缺少拿得出手的技术对比，不能只说“压力变大了”', 'STEP3_COPY_TECH_COMPARISON_WEAK');
+  }
+}
+
 function validateStep1Research(candidate, context) {
   const facts = ensureArray(candidate?.researchFacts, '搜索事实', 2, 'STEP1_RESEARCH_INVALID')
     .slice(0, 5)
@@ -101,6 +233,8 @@ function validateStep1Research(candidate, context) {
       evidenceAnchor: ensureString(item?.evidenceAnchor, '证据锚点', 'STEP1_RESEARCH_INVALID'),
       sourceTitle: String(item?.sourceTitle || '').trim(),
     }));
+
+  validateStep1TechnicalResearch(facts, context);
 
   return {
     researchFacts: facts,
@@ -218,6 +352,10 @@ function validateStep3Brief(candidate, context) {
       beat: ensureString(item?.beat, '大纲节拍', 'STEP3_BRIEF_INVALID'),
       goal: ensureString(item?.goal, '大纲目标', 'STEP3_BRIEF_INVALID'),
       evidenceAnchor: ensureString(item?.evidenceAnchor, '大纲证据锚点', 'STEP3_BRIEF_INVALID'),
+      sceneIntent: ensureString(item?.sceneIntent || item?.label || item?.goal, '大纲场景意图', 'STEP3_BRIEF_INVALID'),
+      transitionToNext: String(item?.transitionToNext || '').trim(),
+      mustInclude: ensureStringArray(item?.mustInclude, [item?.goal]).slice(0, 4),
+      keywords: ensureStringArray(item?.keywords, tokenize(`${item?.label || ''} ${item?.goal || ''} ${item?.beat || ''}`), 6),
     }));
 
   return {
@@ -238,6 +376,11 @@ function validateStep3Copy(candidate, context) {
     .map((item, index) => ({
       label: ensureString(item?.label || `段落 ${index + 1}`, '段落标签', 'STEP3_COPY_INVALID'),
       text: ensureString(item?.text, '段落文案', 'STEP3_COPY_INVALID'),
+      sceneIntent: ensureString(item?.sceneIntent || item?.label, '段落场景意图', 'STEP3_COPY_INVALID'),
+      evidenceAnchor: ensureString(item?.evidenceAnchor || item?.label, '段落证据锚点', 'STEP3_COPY_INVALID'),
+      transitionToNext: String(item?.transitionToNext || '').trim(),
+      keywords: ensureStringArray(item?.keywords, tokenize(`${item?.label || ''} ${item?.text || ''}`), 6),
+      dataPoints: ensureStringArray(item?.dataPoints, tokenize(item?.text), 5),
     }));
 
   const result = {
@@ -262,6 +405,10 @@ function validateStep3Copy(candidate, context) {
     fail('生成文案没有承接当前标题与主题，请重新生成', 'STEP3_COPY_MISALIGNED');
   }
 
+  if (result.copy.body.filter((item) => item.keywords.length > 0 && item.dataPoints.length > 0).length < Math.max(1, result.copy.body.length - 1)) {
+    fail('生成文案缺少结构化关键词或信息点，无法稳定服务后续场景编排', 'STEP3_COPY_STRUCTURE_WEAK');
+  }
+
   if (context.generation.mode === 'regenerate' && context.generation.previousPayload) {
     const previousText = [
       context.generation.previousPayload.hook,
@@ -277,6 +424,8 @@ function validateStep3Copy(candidate, context) {
       });
     }
   }
+
+  validateStep3TechnicalCopy(result.copy, result.copy.body, context);
 
   return result;
 }

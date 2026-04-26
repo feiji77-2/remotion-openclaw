@@ -52,7 +52,7 @@ Options:
   --help                显示帮助
 
 Examples:
-  node scripts/voice/qwen-tts-voice.mjs create --file runtime/voices/xtts/daman-business-001.wav --name daman-qwen
+  node scripts/voice/qwen-tts-voice.mjs create --file /path/to/reference.wav --name daman-qwen
   node scripts/voice/qwen-tts-voice.mjs ensure --file /path/ref.wav --name my-qwen-clone
   node scripts/voice/qwen-tts-voice.mjs list
   node scripts/voice/qwen-tts-voice.mjs synthesize --voice daman-qwen --text "这是一条阿里云百炼语音测试" --out out/qwen-tts-preview.wav

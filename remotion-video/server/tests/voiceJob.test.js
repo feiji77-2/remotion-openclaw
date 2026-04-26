@@ -8,18 +8,13 @@ const {
   resolveTtsLanguageForText,
 } = require('../voice/voiceJob');
 
-test('getVoiceCapabilities exposes xtts local cloning engine', () => {
+test('getVoiceCapabilities exposes qwen-tts as the only active engine', () => {
   const capabilities = getVoiceCapabilities();
 
-  assert.ok(capabilities.engines.xtts);
-  assert.equal(capabilities.engines.xtts.name, 'XTTS-v2');
-  assert.equal(capabilities.engines.xtts.supportsCloning, true);
-  assert.equal(capabilities.engines.xtts.requiresReference, true);
-  assert.match(capabilities.engines.xtts.healthUrl, /18083/);
-  assert.ok(capabilities.engines['qwen-tts']);
+  assert.deepEqual(Object.keys(capabilities.engines), ['qwen-tts']);
+  assert.equal(capabilities.engines['qwen-tts'].name, 'Qwen TTS (DashScope)');
   assert.equal(capabilities.engines['qwen-tts'].supportsCloning, true);
-  assert.ok(capabilities.engines.cosyvoice);
-  assert.equal(capabilities.engines.cosyvoice.supportsInstruction, true);
+  assert.equal(capabilities.defaultEngine, 'qwen-tts');
 });
 
 test('normalizeSpeechTextForTts improves mixed zh-cn tech narration pronunciation', () => {
@@ -44,11 +39,10 @@ test('normalizeSpeechTextForTts improves English model/version pronunciation', (
   assert.match(normalized, /K 2 point 6/);
 });
 
-test('resolveTtsLanguageForText switches English-dominant xtts text to en', () => {
+test('resolveTtsLanguageForText switches English-dominant text to en', () => {
   const language = resolveTtsLanguageForText(
     'OpenAI released GPT-5.5 with stronger coding, agent workflows, and enterprise tool use.',
     {language: 'zh-cn'},
-    'xtts',
   );
 
   assert.equal(language, 'en');
@@ -58,17 +52,15 @@ test('resolveTtsLanguageForText keeps mixed Chinese tech narration on zh-cn', ()
   const language = resolveTtsLanguageForText(
     '今天我们聊 GPT-5.5 发布后，AI 编程岗位到底会不会被替代。',
     {language: 'zh-cn'},
-    'xtts',
   );
 
   assert.equal(language, 'zh-cn');
 });
 
-test('resolveTtsLanguageForText respects explicit xtts language override', () => {
+test('resolveTtsLanguageForText respects explicit language override', () => {
   const language = resolveTtsLanguageForText(
     'OpenAI released GPT-5.5 with stronger coding, agent workflows, and enterprise tool use.',
     {language: 'zh-cn', languageExplicit: true},
-    'xtts',
   );
 
   assert.equal(language, 'zh-cn');

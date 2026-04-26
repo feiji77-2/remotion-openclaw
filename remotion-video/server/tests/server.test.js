@@ -35,8 +35,12 @@ async function startTestServer() {
 }
 
 function resetJobsDir() {
-  fs.rmSync(JOBS_DIR, {recursive: true, force: true});
   fs.mkdirSync(JOBS_DIR, {recursive: true});
+  for (const entry of fs.readdirSync(JOBS_DIR, {withFileTypes: true})) {
+    if (entry.isFile() && entry.name.endsWith('.json')) {
+      fs.rmSync(path.join(JOBS_DIR, entry.name), {force: true});
+    }
+  }
 }
 
 async function requestJson(baseUrl, pathname, {method = 'GET', body, auth = true} = {}) {
@@ -68,7 +72,7 @@ test('health remains public while API routes require auth', {concurrency: false}
     const health = await fetch(`${baseUrl}/health`);
     assert.equal(health.status, 200);
     const healthJson = await health.json();
-    assert.ok(healthJson?.capabilities?.voice?.engines?.xtts);
+    assert.ok(healthJson?.capabilities?.voice?.engines?.['qwen-tts']);
 
     const {response} = await requestJson(baseUrl, '/api/jobs', {auth: false});
     assert.equal(response.status, 401);
@@ -138,7 +142,7 @@ test('render submission stores jobs in runtime directory and read requests are r
   }
 });
 
-test('admin routes require admin key and sanitize project asset requests', {concurrency: false}, async () => {
+test('admin routes require admin key and reject unsafe project asset slugs', {concurrency: false}, async () => {
   resetJobsDir();
   const server = await startTestServer();
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -148,8 +152,7 @@ test('admin routes require admin key and sanitize project asset requests', {conc
     assert.equal(jobsWithoutAdmin.response.status, 403);
 
     const assetsWithAdmin = await requestAdminJson(baseUrl, '/api/projects/%2E%2E%2F%2E%2E%2Fetc/assets');
-    assert.equal(assetsWithAdmin.response.status, 200);
-    assert.deepEqual(assetsWithAdmin.json, {assets: []});
+    assert.equal(assetsWithAdmin.response.status, 400);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

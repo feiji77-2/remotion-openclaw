@@ -21,6 +21,20 @@ const hasCliFlag = (args, flag) => {
   });
 };
 
+const stripCliFlag = (args, flag) => {
+  const output = [];
+
+  for (let index = 0; index < args.length; index += 1) {
+    const current = args[index];
+    if (current === flag) {
+      continue;
+    }
+    output.push(current);
+  }
+
+  return output;
+};
+
 const loadJson = async (filePath) => {
   const content = await fs.readFile(filePath, 'utf8');
   return JSON.parse(content);
@@ -114,6 +128,11 @@ async function main() {
 
   const propsPath = path.resolve(process.cwd(), inputArg);
   const props = await loadJson(propsPath);
+  const inlinePropsMode = (
+    String(process.env.RENDER_PROJECT_INLINE_PROPS || '').trim() === '1'
+    || hasCliFlag(passthroughArgs, '--inline-props')
+  );
+  const cleanedPassthroughArgs = stripCliFlag(passthroughArgs, '--inline-props');
   const projectId = String(props.projectId || 'project-render').trim() || 'project-render';
   const packageVersion = typeof props.packageVersion === 'string' ? props.packageVersion.trim() : '';
   const versionSuffix = sanitizeVersionForFileName(packageVersion);
@@ -127,7 +146,7 @@ async function main() {
   const outputPath = outputArg
     ? path.resolve(process.cwd(), outputArg)
     : path.resolve(process.cwd(), 'out', `${projectId}${versionSuffix ? `-v${versionSuffix}` : ''}.mp4`);
-  const hasCustomPort = hasCliFlag(passthroughArgs, '--port');
+  const hasCustomPort = hasCliFlag(cleanedPassthroughArgs, '--port');
   const renderPort = hasCustomPort
     ? null
     : String(process.env.REMOTION_RENDER_PORT || '3010').trim() || '3010';
@@ -148,7 +167,21 @@ async function main() {
     process.exit(1);
   }
 
-  const inlineProps = await stageRenderPropsFile(PROJECT_ROOT, projectId, renderProps, compositionId);
+  const inlineProps = inlinePropsMode
+    ? {
+        propsJson: renderProps,
+        propsFile: null,
+        durationInFrames: compositionId === 'UltimateSceneTemplate'
+          ? Math.max(1, getUltimateDurationInFrames(renderProps?.config))
+          : Math.max(1, Number(renderProps?.durationInFrames) || 1),
+        renderFps: Number(renderProps?.renderFps) || 30,
+        renderWidth: Number(renderProps?.renderWidth) || (compositionId === 'UltimateSceneTemplate' ? 1920 : 1080),
+        renderHeight: Number(renderProps?.renderHeight) || (compositionId === 'UltimateSceneTemplate' ? 1080 : 1920),
+        template: renderProps?.template,
+        packageVersion: typeof renderProps?.packageVersion === 'string' ? renderProps.packageVersion : null,
+        projectId,
+      }
+    : await stageRenderPropsFile(PROJECT_ROOT, projectId, renderProps, compositionId);
 
   const launch = resolveRemotionLaunch(PROJECT_ROOT);
   const remotionArgs = [
@@ -157,9 +190,13 @@ async function main() {
     compositionId,
     outputPath,
     '--props',
-    JSON.stringify(inlineProps),
+    JSON.stringify(
+      inlinePropsMode
+        ? inlineProps.propsJson
+        : inlineProps,
+    ),
   ];
-  const preferredRender = buildPreferredRemotionFlags({existingArgs: passthroughArgs});
+  const preferredRender = buildPreferredRemotionFlags({existingArgs: cleanedPassthroughArgs});
 
   remotionArgs.push(...preferredRender.flags);
 
@@ -167,7 +204,7 @@ async function main() {
     remotionArgs.push('--port', renderPort);
   }
 
-  remotionArgs.push(...passthroughArgs);
+  remotionArgs.push(...cleanedPassthroughArgs);
 
     process.stdout.write(
       [
@@ -175,7 +212,9 @@ async function main() {
       packageVersion ? `[render-project] package-version=${packageVersion}` : '',
       `[render-project] composition=${compositionId}`,
       `[render-project] output=${outputPath}`,
-      `[render-project] props-file=${inlineProps.propsFile}`,
+      inlinePropsMode
+        ? '[render-project] props-mode=inline'
+        : `[render-project] props-file=${inlineProps.propsFile}`,
       `[render-project] cli=${launch.displayCommand}`,
       `[render-project] browser=${preferredRender.browserExecutable ?? 'auto-download'}`,
       renderPort ? `[render-project] port=${renderPort}` : '',

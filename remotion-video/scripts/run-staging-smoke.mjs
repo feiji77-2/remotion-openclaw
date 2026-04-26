@@ -270,7 +270,7 @@ async function main() {
         projectId,
         shots,
         voiceSettings: {
-          engine: 'chattts',
+          engine: 'qwen-tts',
         },
       },
     });
@@ -297,7 +297,7 @@ async function main() {
         script,
         template: 'caption',
         quality: 'high',
-        voice: 'chattts',
+        voice: 'qwen-tts',
         shots,
         subtitleText: script,
         durationInFrames: 150,

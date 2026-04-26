@@ -1,4 +1,5 @@
 const {buildStep123Context, getInputTopic, searchTopicResearch} = require('./context');
+const {validateAndEnrichFacts} = require('./technicalTopic');
 const {WorkflowGenerationError, toWorkflowGenerationError} = require('./errors');
 const {
   DEFAULT_MODEL,
@@ -243,17 +244,36 @@ function deriveTopicEntity(topicQuery, facts) {
   return compactClause(topicQuery, 18) || '当前主题';
 }
 
+function normalizeComparableToken(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
 function deriveCompetitorLabel(topicQuery, facts) {
   const combined = [
     String(topicQuery || '').trim(),
     ...(Array.isArray(facts) ? facts.map((item) => `${item?.sourceTitle || ''} ${item?.fact || ''}`.trim()) : []),
   ].join(' ');
+  const entity = normalizeComparableToken(deriveTopicEntity(topicQuery, facts));
+  const candidates = [
+    /\bGPT(?:[- ]?\d+(?:\.\d+)?)?\b/gi,
+    /\bClaude(?:\s+Opus)?(?:\s+\d+(?:\.\d+)?)?\b/gi,
+    /\bGemini(?:\s+\d+(?:\.\d+)?)?\b/gi,
+    /\bDeepSeek(?:\s*[A-Za-z0-9.+-]+)?\b/gi,
+  ];
 
-  const match = combined.match(/\bGPT(?:-\d+(?:\.\d+)?)?\b/i)
-    || combined.match(/\bClaude(?:\s+Opus)?(?:\s+\d+(?:\.\d+)?)?\b/i)
-    || combined.match(/\bGemini(?:\s+\d+(?:\.\d+)?)?\b/i);
+  for (const pattern of candidates) {
+    const matches = combined.match(pattern) || [];
+    for (const match of matches) {
+      const normalized = normalizeComparableToken(match);
+      if (normalized && normalized !== entity) {
+        return match.replace(/\s+/g, ' ').trim();
+      }
+    }
+  }
 
-  return match?.[0]?.replace(/\s+/g, ' ').trim() || '';
+  return '';
 }
 
 function deriveFocusPhrase(topicQuery, facts) {
@@ -284,6 +304,15 @@ function deriveFocusPhrase(topicQuery, facts) {
   return picked.slice(0, 2).join('和');
 }
 
+function usesDomesticModelFraming(topicQuery, facts) {
+  const entity = deriveTopicEntity(topicQuery, facts);
+  const topic = String(topicQuery || '').trim();
+  if (/^(gpt|claude|gemini)\b/i.test(entity)) {
+    return false;
+  }
+  return /(kimi|deepseek|qwen|glm|豆包|文心|混元|通义|月之暗面|moonshot|国产|国内)/i.test(`${entity} ${topic}`);
+}
+
 function deriveStep1AnalysisFromResearch(context, researchStagePayload) {
   const topicQuery = String(
     context?.topic?.query
@@ -301,8 +330,11 @@ function deriveStep1AnalysisFromResearch(context, researchStagePayload) {
   const entity = deriveTopicEntity(topicQuery, facts);
   const competitor = deriveCompetitorLabel(topicQuery, facts);
   const focus = deriveFocusPhrase(topicQuery, facts);
+  const domesticModelFrame = usesDomesticModelFraming(topicQuery, facts);
   const thesis = competitor
-    ? `${entity} 这次真正值得讲的，不是“又一个国产模型”，而是它在${focus}上开始正面给 ${competitor} 压力。`
+    ? domesticModelFrame
+      ? `${entity} 这次真正值得讲的，不是“又一个国产模型”，而是它在${focus}上开始正面给 ${competitor} 压力。`
+      : `${entity} 这次真正值得讲的，不是“又一次版本更新”，而是它在${focus}上开始正面给 ${competitor} 压力。`
     : `${entity} 这次真正值得讲的，不是热闹本身，而是它把${focus}推进到了更能落地的阶段。`;
 
   return {
@@ -1088,11 +1120,24 @@ async function generateStep123Workflow(input) {
 
   try {
     if (stepId === 1) {
+      const baseResearch = deriveStep1ResearchFromSearch(context);
+      const enrichedResearch = await validateAndEnrichFacts(
+        baseResearch.researchFacts,
+        context,
+        hasWorkflowLLM() ? generateStructuredJson : null
+      );
+
+      if (enrichedResearch.enriched) {
+        console.warn(`[Step1] ${enrichedResearch.warning}`);
+        baseResearch.researchFacts = enrichedResearch.facts;
+        baseResearch._llmEnriched = enrichedResearch.warning;
+      }
+
       const researchStage = {
         stepId,
         stageKey: 'research',
         model: 'search-derived',
-        payload: validateStep1Research(deriveStep1ResearchFromSearch(context), context),
+        payload: validateStep1Research(baseResearch, context),
       };
       const analysisStage = {
         stepId,

@@ -104,10 +104,26 @@ const SKILL_DEFINITIONS = [
     stepId: 3,
     stepLabel: 'Step 3 · 内容生成',
     name: 'video-pipeline-content',
-    sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-content', 'SKILL.md'),
+    sourcePath: path.join(WORKFLOW_SKILLS_DIR, 'video-pipeline-content.SKILL.md'),
     displaySummary: '根据标题、分析和生成要求，产出口语化 Hook / Body / CTA。',
     inputs: ['inputTopic', 'selectedTitle', 'analysis.thesis', 'analysis.audience', 'analysis.searchPhase'],
-    outputs: ['copy.brief', 'copy.hook', 'copy.body[]', 'copy.cta', 'copy.totalChars', 'copy.readingTime', 'copy.keywords'],
+    outputs: [
+      'copy.brief',
+      'copy.outline[]',
+      'copy.hook',
+      'copy.body[]',
+      'copy.body[].sceneIntent',
+      'copy.body[].evidenceAnchor',
+      'copy.body[].keywords',
+      'copy.body[].dataPoints',
+      'copy.cta',
+      'copy.totalChars',
+      'copy.readingTime',
+      'copy.keywords',
+      'copy.titleAlignment',
+      'copy.storySpine',
+      'copy.coverage',
+    ],
     defaults: {
       goal: '生成适合中文短视频口播的拟人化文案。',
       style: '结论先行、口语化、少 AI 味。',
@@ -128,13 +144,15 @@ const SKILL_DEFINITIONS = [
       'hook / body / cta 不可为空。',
       '需要 totalChars / readingTime / keywords。',
       '正文段落数量与目标时长基本匹配。',
+      '正文块应尽量带 sceneIntent / evidenceAnchor / keywords / dataPoints，方便 Step 4 消费。',
     ],
     uiHints: [
       '适合拆为文案策略、大纲节拍、最终文案三块。',
+      '可展示标题对齐、证据覆盖、场景意图和时长估算。',
       '展示字数和预估口播时长。',
     ],
     evalRules: [
-      '信息密度、口语化、节奏、CTA 力度、合规性。',
+      '信息密度、口语化、节奏、标题对齐、证据覆盖、CTA 力度、合规性。',
     ],
   },
   {
@@ -218,15 +236,15 @@ const SKILL_DEFINITIONS = [
     inputs: ['shots[]', 'copy', 'targetDuration'],
     outputs: ['voice.engine', 'voice.language', 'voice.speed', 'voice.pitch', 'voice.script[]', 'voice.totalDuration', 'voice.totalChars'],
     defaults: {
-      engine: 'chattts',
+      engine: 'qwen-tts',
       language: 'zh-CN',
       speed: '1.0',
       pitch: 0,
       goal: '生成可直接提交 TTS 的逐场景脚本。',
-      style: '口语化、节奏稳定、适合 ChatTTS。',
+      style: '口语化、节奏稳定、适合千问 TTS。',
       emphasis: '场景时长匹配、总时长统计、脚本清晰。',
       avoid: '书面腔、场景间时长失衡。',
-      notes: 'ChatTTS 为默认引擎，Melo / OpenVoice 为回退。',
+      notes: '当前统一使用阿里千问 TTS 链路。',
     },
     constraints: [
       '脚本数量要和场景数量对齐。',
@@ -235,7 +253,7 @@ const SKILL_DEFINITIONS = [
     qualityRules: [
       'voice.script 不能为空。',
       'totalDuration / totalChars 需要可计算。',
-      '默认引擎为 ChatTTS。',
+      '默认引擎为 Qwen TTS。',
     ],
     uiHints: [
       '展示引擎、总时长、总字数和逐场景脚本。',
@@ -832,6 +850,195 @@ function detectCtaStyle(text) {
   return '收束型';
 }
 
+function normalizeKeywordList(items, max = 6) {
+  return uniqueBy(
+    (Array.isArray(items) ? items : [])
+      .map((item) => safeString(item).toLowerCase())
+      .filter(Boolean),
+    (item) => item,
+  ).slice(0, max);
+}
+
+function normalizeDataPointList(items, fallbackText = '', max = 4) {
+  const explicit = uniqueBy(
+    (Array.isArray(items) ? items : [])
+      .map((item) => compactText(item, 42))
+      .filter(Boolean),
+    (item) => item,
+  );
+  if (explicit.length > 0) {
+    return explicit.slice(0, max);
+  }
+  return extractDataPointsFromText(fallbackText).slice(0, max);
+}
+
+function buildStep3TitleKeywords(selectedTitleText) {
+  const safeTitle = safeString(selectedTitleText);
+  const baseKeywords = tokenizeKeywords(safeTitle);
+  const fillerPatterns = [
+    /这次真上强度了/,
+    /值不值得重点盯/,
+    /很多人只盯/,
+    /很多人还把/,
+    /如果只看/,
+    /真正该先看的是/,
+    /最该讲的不是热度/,
+    /到底先看什么/,
+  ];
+  const prioritizedKeywords = [];
+  const pushKeyword = (value) => {
+    const normalized = safeString(value).toLowerCase();
+    if (!normalized || prioritizedKeywords.includes(normalized)) {
+      return;
+    }
+    prioritizedKeywords.push(normalized);
+  };
+  const modelMatch = safeTitle.match(/\b(?:gpt|claude|gemini|kimi|deepseek|qwen|llama)[- ]?[a-z0-9.]+\b/i);
+  if (modelMatch?.[0]) {
+    pushKeyword(modelMatch[0]);
+  }
+  const keywordPatterns = [
+    [/发布|上线|更新|升级/i, '发布'],
+    [/工作流|workflow/i, '工作流'],
+    [/代码能力|编码|code/i, '代码能力'],
+    [/agent|智能体/i, 'agent'],
+    [/回答什么|问答|聊天/i, '问答'],
+    [/干完|执行|交付结果|完成任务/i, '执行'],
+    [/任务/i, '任务'],
+    [/benchmark|评测|测试/i, 'benchmark'],
+    [/api|工具调用|tool/i, 'api'],
+    [/推理|reason/i, '推理'],
+    [/多模态|语音|视觉|image|video/i, '多模态'],
+    [/安全|safety/i, '安全'],
+    [/价格|定价|token|成本/i, '定价'],
+  ];
+  for (const [pattern, label] of keywordPatterns) {
+    if (pattern.test(safeTitle)) {
+      pushKeyword(label);
+    }
+  }
+  const clauseFragments = safeTitle
+    .split(/[，,。！？；:：]/)
+    .flatMap((item) => {
+      const clause = safeString(item).toLowerCase();
+      if (!clause) {
+        return [];
+      }
+      if (fillerPatterns.some((pattern) => pattern.test(clause)) || clause.includes('…')) {
+        return [];
+      }
+      const semanticMatches = keywordPatterns
+        .filter(([pattern]) => pattern.test(clause))
+        .map(([, label]) => label.toLowerCase());
+      if (semanticMatches.length > 0) {
+        return semanticMatches;
+      }
+      if (/^[\p{Script=Han}]+$/u.test(clause) && clause.length <= 6) {
+        return [clause];
+      }
+      return [clause];
+    });
+  const filteredBaseKeywords = baseKeywords.filter((keyword) => {
+    if (fillerPatterns.some((pattern) => pattern.test(keyword))) {
+      return false;
+    }
+    if (/^[\p{Script=Han}]+$/u.test(keyword) && keyword.length > 8) {
+      return false;
+    }
+    if (/^\d+(?:\.\d+)?[\p{Script=Han}]+$/u.test(keyword)) {
+      return false;
+    }
+    return true;
+  });
+
+  return normalizeKeywordList([
+    ...prioritizedKeywords,
+    ...clauseFragments,
+    ...filteredBaseKeywords,
+  ], 10);
+}
+
+function getStep3TitleAlignment(selectedTitle, copy) {
+  const selectedTitleText = safeString(selectedTitle?.title);
+  const titleKeywords = buildStep3TitleKeywords(selectedTitleText);
+  const rawCopyText = [
+    safeString(copy?.hook),
+    ...(Array.isArray(copy?.body) ? copy.body.map((item) => safeString(item?.text)) : []),
+    safeString(copy?.cta),
+  ].join(' ');
+  const normalizedCopyText = rawCopyText.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+  const matchedKeywords = titleKeywords.filter((keyword) => {
+    const normalizedKeyword = safeString(keyword).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    return normalizedKeyword && normalizedCopyText.includes(normalizedKeyword);
+  });
+  const missingKeywords = titleKeywords.filter((keyword) => !matchedKeywords.includes(keyword));
+  const score = titleKeywords.length > 0
+    ? clamp(round((matchedKeywords.length / titleKeywords.length) * 100), 0, 100)
+    : 72;
+
+  return {
+    selectedTitle: compactText(selectedTitleText || '当前主标题', 36),
+    titleKeywords,
+    matchedKeywords,
+    missingKeywords,
+    score,
+  };
+}
+
+function buildStep3StorySpine(copy, analysis) {
+  const body = Array.isArray(copy?.body) ? copy.body : [];
+  const sceneIntents = uniqueBy(
+    body.map((item) => safeString(item?.sceneIntent || item?.label)).filter(Boolean),
+    (item) => item,
+  ).slice(0, 6);
+  const mainClaim = compactText(
+    body[0]?.sceneIntent
+    || analysis?.corePromise
+    || analysis?.thesis
+    || copy?.hook,
+    60,
+  );
+
+  return {
+    openingPromise: compactText(copy?.hook, 60),
+    mainClaim,
+    audience: compactText(analysis?.analysisBrief?.audienceFocus || analysis?.audience, 42),
+    sceneIntents,
+    closingMove: compactText(copy?.ctaMeta?.intent || copy?.cta, 40),
+  };
+}
+
+function buildStep3Coverage(copy, input) {
+  const body = Array.isArray(copy?.body) ? copy.body : [];
+  const evidenceAnchors = uniqueBy(
+    body
+      .map((item) => safeString(item?.evidenceAnchor))
+      .filter(Boolean),
+    (item) => item,
+  ).slice(0, 8);
+  const briefPacing = safeString(copy?.brief?.pacing);
+  const pacingMatch = briefPacing.match(/(\d+(?:\.\d+)?)\s*秒/);
+  const requestedLength = safeString(input?.pipelineState?.copy?.requirements?.length);
+  const requestedMatch = requestedLength.match(/(\d+(?:\.\d+)?)\s*秒/);
+  const targetDurationSeconds = toNumber(input?.pipelineState?.currentStepSkill?.targetDurationSeconds, 0)
+    || toNumber(pacingMatch?.[1], 0)
+    || toNumber(requestedMatch?.[1], 0)
+    || toNumber(copy?.readingTime, 0)
+    || 0;
+  const estimatedSceneCount = clamp(Math.round((targetDurationSeconds || 60) / 8), 3, 12);
+
+  return {
+    bodyBlockCount: body.length,
+    evidenceAnchors,
+    keywordCount: Array.isArray(copy?.keywords) ? copy.keywords.length : 0,
+    matchedKeywordCount: Array.isArray(copy?.titleAlignment?.matchedKeywords)
+      ? copy.titleAlignment.matchedKeywords.length
+      : 0,
+    targetDurationSeconds,
+    estimatedSceneCount,
+  };
+}
+
 function normalizeStep3Payload(payload, input) {
   const nextPayload = clone(payload || {});
   const copy = nextPayload.copy && typeof nextPayload.copy === 'object'
@@ -845,6 +1052,38 @@ function normalizeStep3Payload(payload, input) {
     ...tokenizeKeywords(copy.hook),
     ...researchFacts.flatMap((item) => tokenizeKeywords(item?.fact)),
   ].slice(0, 8);
+  copy.body = (Array.isArray(copy.body) ? copy.body : []).map((item, index) => {
+    const text = safeString(item?.text);
+    return {
+      ...item,
+      id: safeString(item?.id) || `copy-${index + 1}`,
+      label: safeString(item?.label) || `段落 ${index + 1}`,
+      text,
+      sceneIntent: compactText(item?.sceneIntent || item?.label || text, 36),
+      evidenceAnchor: compactText(item?.evidenceAnchor || researchFacts[index]?.evidenceAnchor || researchFacts[index]?.sourceTitle || '', 42),
+      transitionToNext: compactText(item?.transitionToNext, 34),
+      keywords: normalizeKeywordList(
+        Array.isArray(item?.keywords) ? item.keywords : tokenizeKeywords(`${item?.label || ''} ${text}`),
+        6,
+      ),
+      dataPoints: normalizeDataPointList(item?.dataPoints, text, 4),
+    };
+  });
+  copy.outline = (Array.isArray(copy.outline) ? copy.outline : []).map((item, index) => ({
+    ...item,
+    id: safeString(item?.id) || `copy-outline-${index + 1}`,
+    label: safeString(item?.label) || `节拍 ${index + 1}`,
+    beat: safeString(item?.beat),
+    goal: safeString(item?.goal),
+    evidenceAnchor: compactText(item?.evidenceAnchor || researchFacts[index]?.evidenceAnchor || '', 42),
+    sceneIntent: compactText(item?.sceneIntent || item?.label || item?.goal || item?.beat, 36),
+    transitionToNext: compactText(item?.transitionToNext, 34),
+    mustInclude: normalizeDataPointList(item?.mustInclude, `${item?.goal || ''} ${item?.beat || ''}`, 3),
+    keywords: normalizeKeywordList(
+      Array.isArray(item?.keywords) ? item.keywords : tokenizeKeywords(`${item?.label || ''} ${item?.goal || ''} ${item?.beat || ''}`),
+      5,
+    ),
+  }));
   const totalChars = [
     safeString(copy.hook),
     ...(Array.isArray(copy.body) ? copy.body.map((item) => safeString(item?.text)) : []),
@@ -863,7 +1102,13 @@ function normalizeStep3Payload(payload, input) {
   };
   copy.totalChars = totalChars;
   copy.readingTime = Math.max(15, round(totalChars / 3.4));
-  copy.keywords = keywords;
+  copy.keywords = normalizeKeywordList([
+    ...keywords,
+    ...copy.body.flatMap((item) => Array.isArray(item?.keywords) ? item.keywords : []),
+  ], 10);
+  copy.titleAlignment = getStep3TitleAlignment(selectedTitle, copy);
+  copy.storySpine = buildStep3StorySpine(copy, analysis);
+  copy.coverage = buildStep3Coverage(copy, input);
   nextPayload.copy = copy;
   return nextPayload;
 }
@@ -925,7 +1170,14 @@ function splitSceneBlock(block, sceneCharBudget = 48) {
   const rawNarration = safeString(block?.narration);
 
   if (clauses.length <= 1 || rawNarration.length <= sceneCharBudget) {
-    return [{...block, narration: rawNarration}];
+    return [{
+      ...block,
+      narration: rawNarration,
+      scriptSourceText: safeString(block?.scriptSourceText || rawNarration),
+      scriptExcerpt: safeString(block?.scriptExcerpt || rawNarration),
+      scriptSplitIndex: 0,
+      scriptSplitCount: 1,
+    }];
   }
 
   const output = [];
@@ -953,7 +1205,22 @@ function splitSceneBlock(block, sceneCharBudget = 48) {
     ...block,
     title: index === 0 ? block.title : `${block.title} · ${index + 1}`,
     narration: text,
+    scriptSourceText: safeString(block?.scriptSourceText || rawNarration),
+    scriptExcerpt: text,
+    scriptSplitIndex: index,
+    scriptSplitCount: output.length,
   }));
+}
+
+function buildShotStoryboardCue(segment, narration) {
+  const cueParts = uniqueBy([
+    safeString(segment?.sceneIntent),
+    safeString(segment?.scriptBlockLabel),
+    safeString(segment?.evidenceAnchor),
+    compactText(splitNarrationClauses(narration)[0] || narration, 28),
+    ...(Array.isArray(segment?.dataPoints) ? segment.dataPoints.slice(0, 2) : []).map((item) => compactText(item, 22)),
+  ].filter(Boolean), (item) => item).slice(0, 3);
+  return cueParts.join(' ｜ ');
 }
 
 function mergeStep4Segments(segments, maxCount) {
@@ -1161,36 +1428,60 @@ function buildStep4Slots(payload, input) {
         role: 'hook',
         level: '开场 Hook',
         type: '开场',
+        scriptRole: 'hook',
+        scriptBlockId: 'hook',
+        scriptBlockLabel: 'Hook',
         title: shouldUseSceneOverride(payloadShots[0]?.title, copy?.hookMeta?.title)
           ? payloadShots[0]?.title
           : (copy?.hookMeta?.title || '开场钩子'),
         narration: shouldUseSceneOverride(payloadShots[0]?.narration, copy?.hook)
           ? payloadShots[0]?.narration
           : (copy?.hook || '先抛出一个足够抓人的判断。'),
+        scriptSourceText: safeString(copy?.hook),
+        scriptExcerpt: safeString(copy?.hook),
+        sceneIntent: '开场钩子',
+        evidenceAnchor: safeString(copy?.hookMeta?.title || title?.evidenceAnchor || title?.title),
       },
       ...body
         .map((item, index) => ({
           role: 'body',
           level: `中段场景 ${index + 1}`,
-          type: buildStep4SceneType('body', item?.text),
+          type: buildStep4SceneType('body', `${item?.sceneIntent || ''} ${item?.label || ''} ${item?.text || ''}`),
+          scriptRole: 'body',
+          scriptBlockId: safeString(item?.id || `copy-body-${index + 1}`),
+          scriptBlockLabel: safeString(item?.label || item?.sceneIntent || `正文块 ${index + 1}`),
           title: shouldUseSceneOverride(payloadShots[index + 1]?.title, item?.label)
             ? payloadShots[index + 1]?.title
-            : (item?.label || `核心信息 ${index + 1}`),
+            : (item?.sceneIntent || item?.label || `核心信息 ${index + 1}`),
           narration: shouldUseSceneOverride(payloadShots[index + 1]?.narration, item?.text)
             ? payloadShots[index + 1]?.narration
             : (item?.text || ''),
+          scriptSourceText: safeString(item?.text),
+          scriptExcerpt: safeString(item?.text),
+          evidenceAnchor: safeString(item?.evidenceAnchor),
+          sceneIntent: safeString(item?.sceneIntent),
+          transitionToNext: safeString(item?.transitionToNext),
+          dataPoints: Array.isArray(item?.dataPoints) ? item.dataPoints : [],
+          keywords: Array.isArray(item?.keywords) ? item.keywords : [],
         }))
         .filter((item) => safeString(item.narration)),
       {
         role: 'cta',
         level: '收尾互动',
         type: '结尾CTA',
+        scriptRole: 'cta',
+        scriptBlockId: 'cta',
+        scriptBlockLabel: 'CTA',
         title: shouldUseSceneOverride(payloadShots[payloadShots.length - 1]?.title, copy?.ctaMeta?.intent)
           ? payloadShots[payloadShots.length - 1]?.title
           : '收尾互动',
         narration: shouldUseSceneOverride(payloadShots[payloadShots.length - 1]?.narration, copy?.cta)
           ? payloadShots[payloadShots.length - 1]?.narration
           : (copy?.cta || '最后收口并推动互动。'),
+        scriptSourceText: safeString(copy?.cta),
+        scriptExcerpt: safeString(copy?.cta),
+        sceneIntent: '收尾互动',
+        evidenceAnchor: safeString(copy?.ctaMeta?.intent || title?.title),
       },
     ].filter((item) => safeString(item?.narration));
 
@@ -1202,22 +1493,43 @@ function buildStep4Slots(payload, input) {
         role: 'body',
         level: `证据补充 ${index + 1}`,
         type: '证据',
+        scriptRole: 'supporting-fact',
+        scriptBlockId: `fact-${index + 1}`,
+        scriptBlockLabel: compactText(item?.label || `证据 ${index + 1}`, 24),
         title: compactText(item?.evidenceAnchor || item?.sourceTitle || `证据 ${index + 1}`, 24),
         narration: item?.fact,
+        scriptSourceText: safeString(item?.fact),
+        scriptExcerpt: safeString(item?.fact),
+        evidenceAnchor: safeString(item?.evidenceAnchor || item?.sourceTitle),
+        sceneIntent: '证据补充',
       })),
       ...process.map((item, index) => ({
         role: 'body',
         level: `流程补充 ${index + 1}`,
         type: '流程',
+        scriptRole: 'supporting-process',
+        scriptBlockId: `process-${index + 1}`,
+        scriptBlockLabel: compactText(item?.label || `步骤 ${index + 1}`, 24),
         title: compactText(item?.label || `步骤 ${index + 1}`, 24),
         narration: item?.detail,
+        scriptSourceText: safeString(item?.detail),
+        scriptExcerpt: safeString(item?.detail),
+        evidenceAnchor: safeString(item?.label),
+        sceneIntent: '流程补充',
       })),
       ...layers.map((item, index) => ({
         role: 'body',
         level: `判断层 ${index + 1}`,
         type: '信息传递',
+        scriptRole: 'supporting-layer',
+        scriptBlockId: `layer-${index + 1}`,
+        scriptBlockLabel: compactText(item?.label || `角度 ${index + 1}`, 24),
         title: compactText(item?.label || `角度 ${index + 1}`, 24),
         narration: item?.insight,
+        scriptSourceText: safeString(item?.insight),
+        scriptExcerpt: safeString(item?.insight),
+        evidenceAnchor: safeString(item?.evidence),
+        sceneIntent: '判断补充',
       })),
     ].filter((item) => safeString(item?.narration) && !existingTexts.has(safeString(item.narration)));
 
@@ -1270,16 +1582,30 @@ function buildStep4Slots(payload, input) {
         : safeString(source?.level || segment.level || `中段场景 ${index}`);
     const dataPoints = Array.isArray(source?.dataPoints) && source.dataPoints.length > 0
       ? source.dataPoints
-      : extractDataPointsFromText(narration);
+      : normalizeDataPointList(source?.mustInclude, `${source?.sceneIntent || ''} ${narration}`, 4);
     const keywords = Array.isArray(source?.keywords) && source.keywords.length > 0
       ? source.keywords
-      : tokenizeKeywords(`${segment.title} ${narration}`).slice(0, 6);
+      : normalizeKeywordList(tokenizeKeywords(`${source?.sceneIntent || ''} ${segment.title} ${narration}`), 6);
     const focus = safeString(source?.visual?.focus || segment?.visual?.focus) || getSceneFocusForFamily(family);
     const comparisons = Array.isArray(source?.comparisons) && source.comparisons.length > 0
       ? source.comparisons
       : sceneType === '对比'
         ? [{left: '旧方案', right: '当前方案'}]
         : [];
+    const scriptSourceText = safeString(source?.scriptSourceText || segment?.scriptSourceText || narration);
+    const scriptExcerpt = compactText(safeString(source?.scriptExcerpt || segment?.scriptExcerpt || narration), 92);
+    const scriptBlockLabel = safeString(source?.scriptBlockLabel || segment?.scriptBlockLabel || source?.title || segment?.title || level);
+    const sceneIntent = safeString(source?.sceneIntent || segment?.sceneIntent || scriptBlockLabel);
+    const evidenceAnchor = safeString(source?.evidenceAnchor || segment?.evidenceAnchor);
+    const storyboardCueZh = safeString(source?.storyboardCueZh || segment?.storyboardCueZh)
+      || buildShotStoryboardCue({
+        ...segment,
+        ...source,
+        sceneIntent,
+        scriptBlockLabel,
+        evidenceAnchor,
+        dataPoints,
+      }, scriptExcerpt);
 
     return {
       ...source,
@@ -1294,12 +1620,27 @@ function buildStep4Slots(payload, input) {
       templateCandidates,
       visual: {
         ...(source?.visual && typeof source.visual === 'object' ? source.visual : {}),
-        description: safeString(source?.visual?.description) || `16:9 横版场景，围绕「${topicTitle}」用 ${family} 模板呈现 ${compactText(narration, 48)}`,
+        description: safeString(source?.visual?.description)
+          || `16:9 横版场景，围绕口播重点「${compactText(scriptExcerpt, 30)}」用 ${family} 模板呈现 ${compactText(sceneIntent || narration, 48)}`,
         focus,
       },
       dataPoints,
       comparisons,
       keywords,
+      sceneIntent,
+      evidenceAnchor,
+      scriptRole: safeString(source?.scriptRole || segment?.scriptRole || segment?.role),
+      scriptBlockId: safeString(source?.scriptBlockId || segment?.scriptBlockId || source?.id),
+      scriptBlockLabel,
+      scriptSourceText,
+      scriptExcerpt,
+      scriptSplitIndex: Number.isFinite(Number(source?.scriptSplitIndex ?? segment?.scriptSplitIndex))
+        ? Number(source?.scriptSplitIndex ?? segment?.scriptSplitIndex)
+        : 0,
+      scriptSplitCount: Number.isFinite(Number(source?.scriptSplitCount ?? segment?.scriptSplitCount))
+        ? Number(source?.scriptSplitCount ?? segment?.scriptSplitCount)
+        : 1,
+      storyboardCueZh,
     };
   });
 }
@@ -1384,13 +1725,27 @@ function buildStep5DisplayFields(shot, current) {
   const focus = safeString(current?.visualFocusZh || current?.visualFocus || visual.focus || shot?.visual?.focus)
     || getSceneFocusForFamily(family)
     || (shot?.type === '对比' ? '左右信息对照 + 核心判断' : '主体清晰 + 信息层次明确');
+  const scriptSourceText = safeString(current?.scriptSourceText || shot?.scriptSourceText || shot?.narration);
+  const scriptExcerpt = compactText(
+    safeString(current?.scriptExcerpt || shot?.scriptExcerpt || shot?.narration || shotTitle),
+    52,
+  );
+  const scriptAnchor = compactText(splitNarrationClauses(scriptExcerpt)[0] || scriptExcerpt, 30);
+  const sceneIntent = safeString(current?.sceneIntent || shot?.sceneIntent || shot?.title);
+  const storyboardCueZh = safeString(current?.storyboardCueZh || shot?.storyboardCueZh)
+    || buildShotStoryboardCue({
+      sceneIntent,
+      scriptBlockLabel: current?.scriptBlockLabel || shot?.scriptBlockLabel,
+      evidenceAnchor: current?.evidenceAnchor || shot?.evidenceAnchor,
+      dataPoints: current?.dataPoints || shot?.dataPoints,
+    }, scriptExcerpt);
   const description = normalizeUltimateCanvasText(safeString(current?.visualSummaryZh || current?.promptZh || visual.description || shot?.visual?.description))
-    || `围绕「${shotTitle}」在 16:9 横版画面里呈现 ${compactText(shot?.narration || '当前内容重点', 34)}`;
+    || `围绕口播原句“${scriptAnchor}”在 16:9 横版画面里呈现 ${compactText(sceneIntent || shot?.narration || '当前内容重点', 34)}`;
   const dataHighlightsZh = normalizePromptDataHighlightsZh(current?.dataPoints || shot?.dataPoints, shot);
   const comparisonSummaryZh = safeString(current?.comparisonSummaryZh)
     || summarizePromptComparisonsZh(current?.comparisons || shot?.comparisons, shot);
   const promptZh = ensureUltimateCanvasPrompt(safeString(current?.promptZh))
-    || `16:9 横版画面，1920x1080，采用 ${family} 模板风格，${description}，重点突出 ${focus}，保留标题留白，保证主体和信息一眼能看懂。`;
+    || `16:9 横版画面，1920x1080，采用 ${family} 模板风格，必须服务口播原句“${scriptAnchor}”，${description}，重点突出 ${focus}，画面元素围绕 ${storyboardCueZh || sceneIntent}，保留标题留白，保证主体和信息一眼能看懂。`;
   const negativePromptZh = safeString(current?.negativePromptZh)
     || [
       '避免主体模糊',
@@ -1400,7 +1755,13 @@ function buildStep5DisplayFields(shot, current) {
       shot?.type === '对比' ? '避免左右信息失衡' : '避免焦点分散',
     ].join('、');
   const visualSummaryZh = normalizeUltimateCanvasText(safeString(current?.visualSummaryZh))
-    || [description, focus ? `画面重点是 ${focus}` : '', comparisonSummaryZh].filter(Boolean).join('，');
+    || [
+      `这一屏围绕口播原句“${scriptAnchor}”展开`,
+      description,
+      storyboardCueZh ? `分镜抓手：${storyboardCueZh}` : '',
+      focus ? `画面重点是 ${focus}` : '',
+      comparisonSummaryZh,
+    ].filter(Boolean).join('，');
 
   return {
     shotTitle,
@@ -1410,6 +1771,13 @@ function buildStep5DisplayFields(shot, current) {
     negativePromptZh,
     dataHighlightsZh,
     comparisonSummaryZh,
+    text: safeString(current?.text || shot?.narration),
+    sceneIntent,
+    evidenceAnchor: safeString(current?.evidenceAnchor || shot?.evidenceAnchor),
+    storyboardCueZh,
+    scriptSourceText,
+    scriptExcerpt,
+    scriptBlockLabel: safeString(current?.scriptBlockLabel || shot?.scriptBlockLabel),
   };
 }
 
@@ -1434,9 +1802,9 @@ function normalizeStep5Payload(payload, input) {
       : Array.isArray(shot?.templateCandidates) && shot.templateCandidates.length > 0
         ? uniqueBy(shot.templateCandidates.filter((item) => ULTIMATE_SCENE_FAMILIES.has(item)), (item) => item).slice(0, 6)
         : buildStep4TemplateCandidates(family, 1);
-    const promptText = ensureUltimateCanvasPrompt(safeString(current.imagePrompt || current.prompt))
-      || `16:9 横版，1920x1080，${compactText(shot.visual?.description, 56)}，${compactText(shot.narration, 40)}，重点突出 ${shot.visual?.focus || getSceneFocusForFamily(family)}`;
     const display = buildStep5DisplayFields(shot, current);
+    const promptText = ensureUltimateCanvasPrompt(safeString(current.imagePrompt || current.prompt))
+      || `16:9 横版，1920x1080，storyboard frame for spoken line "${compactText(display.scriptExcerpt || shot.narration, 42)}"，scene intent: ${compactText(display.sceneIntent || shot.title, 32)}，visual cue: ${compactText(display.storyboardCueZh || display.visualSummaryZh, 46)}，focus on ${display.visualFocusZh || shot.visual?.focus || getSceneFocusForFamily(family)}，no generic title-only illustration`;
     acc[shot.id] = {
       ...current,
       ...display,
@@ -1449,6 +1817,8 @@ function normalizeStep5Payload(payload, input) {
       canvasWidth: 1920,
       canvasHeight: 1080,
       visual: current.visual || shot.visual,
+      scriptRole: safeString(current?.scriptRole || shot?.scriptRole),
+      scriptBlockId: safeString(current?.scriptBlockId || shot?.scriptBlockId),
       dataPoints: Array.isArray(current.dataPoints) ? current.dataPoints : shot.dataPoints,
       comparisons: Array.isArray(current.comparisons) ? current.comparisons : shot.comparisons,
       keywords: Array.isArray(current.keywords) ? current.keywords : shot.keywords,
@@ -1482,7 +1852,7 @@ function normalizeStep6Payload(payload, input) {
       duration,
     };
   });
-  voice.engine = safeString(voice.engine) || 'chattts';
+  voice.engine = safeString(voice.engine) || 'qwen-tts';
   voice.language = safeString(voice.language) || 'zh-CN';
   voice.speed = safeString(voice.speed) || '1.0';
   voice.pitch = toNumber(voice.pitch, 0);
@@ -1705,10 +2075,23 @@ function evaluateStep3(payload) {
   const issues = [];
   const suggestions = [];
   const totalChars = round(copy.totalChars || 0);
+  const titleAlignmentScore = round(copy?.titleAlignment?.score || 0);
+  const evidenceAnchors = Array.isArray(copy?.coverage?.evidenceAnchors) ? copy.coverage.evidenceAnchors : [];
+  const structuredBodyCount = body.filter((item) => (
+    safeString(item?.sceneIntent)
+    && (safeString(item?.evidenceAnchor) || (Array.isArray(item?.dataPoints) && item.dataPoints.length > 0))
+    && Array.isArray(item?.keywords)
+    && item.keywords.length > 0
+  )).length;
 
   if (!safeString(copy.hook)) issues.push('缺少 Hook');
   if (body.length === 0) issues.push('缺少正文段落');
   if (!safeString(copy.cta)) issues.push('缺少 CTA');
+  if (titleAlignmentScore < 60) issues.push('文案对当前标题承接不足，主判断可能跑偏');
+  if (evidenceAnchors.length === 0) issues.push('正文缺少明确证据锚点，后续场景编排会变虚');
+  if (structuredBodyCount < Math.max(1, body.length - 1)) {
+    suggestions.push('建议给每段正文补 sceneIntent / evidenceAnchor / keywords / dataPoints，方便 Step 4 稳定拆场景');
+  }
   if (forbiddenWords.copy.length > 0 || forbiddenWords.cta.length > 0) {
     issues.push('命中了 eval 禁词，建议重写更自然的人话表达');
   }
@@ -1722,6 +2105,8 @@ function evaluateStep3(payload) {
       spoken: safeString(copy?.brief?.tone) ? 84 : 72,
       pacing: safeString(copy?.brief?.pacing) ? 88 : 68,
       cta: safeString(copy.cta) ? 90 : 40,
+      alignment: titleAlignmentScore || 56,
+      evidence: evidenceAnchors.length >= Math.max(2, Math.min(4, body.length)) ? 88 : evidenceAnchors.length > 0 ? 72 : 54,
       compliance: forbiddenWords.copy.length === 0 && forbiddenWords.cta.length === 0 ? 90 : 56,
     },
     issues,
@@ -1809,7 +2194,7 @@ function evaluateStep6(payload, input) {
     {
       timing: round(voice.totalDuration || 0) > 0 ? 88 : 62,
       spoken: script.every((item) => safeString(item?.text).length > 0) ? 86 : 64,
-      engine: safeString(voice.engine) === 'chattts' ? 92 : 82,
+      engine: safeString(voice.engine) === 'qwen-tts' ? 92 : 82,
       completeness: safeString(voice.language) && safeString(voice.speed) ? 88 : 68,
     },
     issues,

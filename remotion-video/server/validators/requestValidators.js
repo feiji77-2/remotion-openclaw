@@ -2,8 +2,9 @@ const path = require('path');
 const {assertWebhookAllowed, getSecurityConfig, normalizeString} = require('../security/apiSecurity');
 
 const MAX_SCRIPT_LENGTH = 8_000;
-const MAX_PROJECT_ID_LENGTH = 64;
+const MAX_PROJECT_ID_LENGTH = 32;
 const MAX_SHOTS = 24;
+const STRICT_PROJECT_ID_PATTERN = /^[a-z0-9](?:[a-z0-9_-]{0,30}[a-z0-9])?$/;
 
 function badRequest(message) {
   const error = new Error(message);
@@ -11,14 +12,52 @@ function badRequest(message) {
   return error;
 }
 
-function sanitizeProjectId(value, fallback = 'default') {
-  const safe = normalizeString(value)
+function slugifyProjectId(value) {
+  return normalizeString(value)
     .toLowerCase()
     .replace(/[^a-z0-9-_]+/g, '-')
     .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, MAX_PROJECT_ID_LENGTH);
+    .replace(/^[-_]+|[-_]+$/g, '');
+}
+
+function sanitizeProjectId(value, fallback = 'default') {
+  const safe = slugifyProjectId(value).slice(0, MAX_PROJECT_ID_LENGTH);
   return safe || fallback;
+}
+
+function assertStrictProjectId(projectId, fieldName = 'projectId') {
+  if (!STRICT_PROJECT_ID_PATTERN.test(projectId)) {
+    throw badRequest(
+      `${fieldName} must match /^[a-z0-9](?:[a-z0-9_-]{0,30}[a-z0-9])?$/`,
+    );
+  }
+  return projectId;
+}
+
+function normalizeProjectId(value, {fallback = 'default'} = {}) {
+  const raw = normalizeString(value);
+  if (!raw) {
+    return fallback;
+  }
+
+  if (raw.includes('..') || /[/\\]/.test(raw)) {
+    throw badRequest('projectId must not contain path separators or traversal segments');
+  }
+
+  const safe = slugifyProjectId(raw);
+  if (!safe) {
+    throw badRequest('projectId must contain at least one lowercase letter or digit after normalization');
+  }
+  if (safe.length > MAX_PROJECT_ID_LENGTH) {
+    throw badRequest(`projectId must be <= ${MAX_PROJECT_ID_LENGTH} characters after normalization`);
+  }
+
+  return assertStrictProjectId(safe);
+}
+
+function normalizeProjectSlugParam(value) {
+  const raw = normalizeString(value).toLowerCase();
+  return assertStrictProjectId(raw, 'project');
 }
 
 function normalizePositiveInt(value, {min = 1, max = Number.MAX_SAFE_INTEGER} = {}) {
@@ -158,7 +197,7 @@ function normalizeRenderOptions(options) {
 async function normalizeRenderRequest(body, securityConfig = getSecurityConfig()) {
   const script = normalizeString(body.script);
   const rawProjectId = normalizeString(body.projectId);
-  const projectId = sanitizeProjectId(rawProjectId);
+  const projectId = normalizeProjectId(rawProjectId);
   if (!script && !rawProjectId) {
     throw badRequest('script or projectId required');
   }
@@ -169,7 +208,7 @@ async function normalizeRenderRequest(body, securityConfig = getSecurityConfig()
   return {
     script: script || null,
     template: normalizeString(body.template) || 'caption',
-    voice: normalizeString(body.voice) || 'chattts',
+    voice: normalizeString(body.voice) || 'qwen-tts',
     webhook: await assertWebhookAllowed(body.webhook, securityConfig),
     projectId,
     quality: normalizeString(body.quality) || 'high',
@@ -205,7 +244,7 @@ function normalizeVoiceRequest(body) {
   }
 
   return {
-    projectId: sanitizeProjectId(body.projectId),
+    projectId: normalizeProjectId(body.projectId),
     shots,
     voiceSettings: normalizeVoiceSettings(body.voiceSettings),
     submittedAt: new Date().toISOString(),
@@ -234,7 +273,7 @@ function normalizeImageRequest(body) {
     throw badRequest('prompts is required');
   }
   return {
-    projectId: sanitizeProjectId(body.projectId),
+    projectId: normalizeProjectId(body.projectId),
     prompts,
     shots: normalizeShots(body.shots) || [],
   };
@@ -242,6 +281,8 @@ function normalizeImageRequest(body) {
 
 module.exports = {
   badRequest,
+  normalizeProjectId,
+  normalizeProjectSlugParam,
   sanitizeProjectId,
   normalizePublicAssetPath,
   normalizeRenderRequest,

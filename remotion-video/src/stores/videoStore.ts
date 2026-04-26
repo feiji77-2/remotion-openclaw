@@ -40,7 +40,7 @@ const initialState = {
   projectId: '',
   template: 'caption' as TemplateType,
   script: '',
-  voice: 'chattts' as VoiceType,
+  voice: 'qwen-tts' as VoiceType,
   renderStatus: 'pending' as RenderStatus,
   progress: 0,
   progressMsg: '',
@@ -75,11 +75,16 @@ export const useVideoProjectStore = create<VideoProjectState>()(
     {
       name: 'video-project-storage',
       storage: createJSONStorage(() => localStorage),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...(persistedState as Partial<VideoProjectState>),
+        voice: 'qwen-tts' as VoiceType,
+      }),
       partialize: (state) => ({
         projectId: state.projectId,
         template: state.template,
         script: state.script,
-        voice: state.voice,
+        voice: 'qwen-tts' as VoiceType,
       }),
     }
   )

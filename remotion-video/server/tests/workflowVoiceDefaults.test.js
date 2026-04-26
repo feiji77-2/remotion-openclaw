@@ -12,103 +12,76 @@ async function loadWorkflowVoiceDefaultsModule() {
   return await import(modulePath);
 }
 
-test('resolveWorkflowVoiceDefaults auto-selects xtts when daman-business-001 voice exists and no CLI overrides are provided', async () => {
+test('resolveWorkflowVoiceDefaults defaults to qwen-tts and fills speaker/language', async () => {
   const {resolveWorkflowVoiceDefaults} = await loadWorkflowVoiceDefaultsModule();
 
   const result = await resolveWorkflowVoiceDefaults(
     {
-      voiceEngine: 'chattts',
+      voiceEngine: '',
       voiceLanguage: '',
-      reference: '',
+      speaker: '',
     },
     {
       cwd: '/tmp/remotion-video',
-      fileExistsImpl: async (filePath) => filePath.endsWith('/runtime/voices/xtts/daman-business-001.wav'),
+      fileExistsImpl: async () => false,
       env: {},
     },
   );
 
-  assert.equal(result.options.voiceEngine, 'xtts');
-  assert.equal(result.options.speaker, 'daman-business-001');
-  assert.equal(result.options.reference, 'runtime/voices/xtts/daman-business-001.wav');
+  assert.equal(result.options.voiceEngine, 'qwen-tts');
+  assert.equal(result.options.speaker, 'Cherry');
   assert.equal(result.options.voiceLanguage, 'zh-cn');
-  assert.equal(result.applied.autoSelectedEngine, true);
+  assert.equal(result.profile.engine, 'qwen-tts');
 });
 
-test('resolveWorkflowVoiceDefaults fills missing xtts defaults when engine is explicit', async () => {
+test('resolveWorkflowVoiceDefaults coerces legacy engines to qwen-tts', async () => {
   const {resolveWorkflowVoiceDefaults} = await loadWorkflowVoiceDefaultsModule();
 
   const result = await resolveWorkflowVoiceDefaults(
     {
-      voiceEngine: 'xtts',
+      voiceEngine: 'legacy-local-tts',
       voiceEngineExplicit: true,
       voiceLanguage: '',
-      reference: '',
+      speaker: '',
     },
     {
       cwd: '/tmp/remotion-video',
-      fileExistsImpl: async () => true,
+      fileExistsImpl: async () => false,
       env: {},
     },
   );
 
-  assert.equal(result.options.voiceEngine, 'xtts');
-  assert.equal(result.options.speaker, 'daman-business-001');
-  assert.equal(result.options.reference, 'runtime/voices/xtts/daman-business-001.wav');
+  assert.equal(result.options.voiceEngine, 'qwen-tts');
+  assert.equal(result.options.speaker, 'Cherry');
   assert.equal(result.options.voiceLanguage, 'zh-cn');
-  assert.equal(result.applied.autoSelectedEngine, false);
 });
 
-test('resolveWorkflowVoiceDefaults does not override explicit non-xtts engine', async () => {
+test('resolveWorkflowVoiceDefaults applies qwen env defaults', async () => {
   const {resolveWorkflowVoiceDefaults} = await loadWorkflowVoiceDefaultsModule();
 
   const result = await resolveWorkflowVoiceDefaults(
     {
-      voiceEngine: 'chattts',
-      voiceEngineExplicit: true,
+      voiceEngine: '',
       voiceLanguage: '',
-      reference: '',
-    },
-    {
-      cwd: '/tmp/remotion-video',
-      fileExistsImpl: async () => true,
-      env: {},
-    },
-  );
-
-  assert.equal(result.options.voiceEngine, 'chattts');
-  assert.equal(result.options.speaker, undefined);
-  assert.equal(result.options.reference, '');
-  assert.equal(result.options.voiceLanguage, '');
-});
-
-test('resolveWorkflowVoiceDefaults can auto-select cosyvoice when env requests it', async () => {
-  const {resolveWorkflowVoiceDefaults} = await loadWorkflowVoiceDefaultsModule();
-
-  const result = await resolveWorkflowVoiceDefaults(
-    {
-      voiceEngine: 'chattts',
-      voiceLanguage: '',
-      reference: '',
-      voiceInstruction: '',
+      speaker: '',
+      voiceModel: '',
     },
     {
       cwd: '/tmp/remotion-video',
       fileExistsImpl: async () => false,
       env: {
-        WORKFLOW_DEFAULT_VOICE_ENGINE: 'cosyvoice',
+        WORKFLOW_DEFAULT_VOICE_ENGINE: 'qwen-tts',
         WORKFLOW_DEFAULT_VOICE_SPEED: '1.1',
-        COSYVOICE_DEFAULT_VOICE: 'cosyvoice-v3.5-plus-bailian-demo',
-        COSYVOICE_DEFAULT_LANGUAGE: 'zh-cn',
-        COSYVOICE_DEFAULT_INSTRUCTION: '性格直率，情绪易激动且外露',
+        WORKFLOW_DEFAULT_QWEN_LANGUAGE: 'en',
+        QWEN_TTS_DEFAULT_VOICE: 'daman-qwen',
+        QWEN_TTS_SYSTEM_MODEL: 'qwen3-tts-flash',
       },
     },
   );
 
-  assert.equal(result.options.voiceEngine, 'cosyvoice');
+  assert.equal(result.options.voiceEngine, 'qwen-tts');
   assert.equal(result.options.voiceSpeed, '1.1');
-  assert.equal(result.options.speaker, 'cosyvoice-v3.5-plus-bailian-demo');
-  assert.equal(result.options.voiceLanguage, 'zh-cn');
-  assert.equal(result.options.voiceInstruction, '性格直率，情绪易激动且外露');
-  assert.equal(result.applied.autoSelectedCosyVoice, true);
+  assert.equal(result.options.speaker, 'daman-qwen');
+  assert.equal(result.options.voiceLanguage, 'en');
+  assert.equal(result.options.voiceModel, 'qwen3-tts-flash');
 });

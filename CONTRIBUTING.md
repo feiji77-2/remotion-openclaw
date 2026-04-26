@@ -44,7 +44,7 @@ npm run dev:worker
 ## Step 链路约束
 
 - Step 1-3：优先遵守 Skill 真源与结构化生成约束
-- Step 4-5：保持 6 镜头结构与中文视觉链路兼容
+- Step 4-5：保持 `scene planner + scene prompts + Ultimate 20 family` 一致，不要把旧 6 镜头心智接回主链路
 - Step 6：默认 `ChatTTS`，回退 `Melo / OpenVoice`
 - Step 7：只做 Remotion 项目构建摘要
 - Step 8：只做最终渲染参数、预览和导出
@@ -54,6 +54,7 @@ npm run dev:worker
 至少执行：
 
 - `npm run release:check`
+- 它现在会包含一次短合同 smoke 视频渲染与 MP4 合同校验，不再只是代码层绿灯
 
 涉及后端工作流、渲染或配音时，额外确认：
 

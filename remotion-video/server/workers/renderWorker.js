@@ -1,7 +1,7 @@
 /**
  * OpenClaw Video Render Worker（真实渲染版）
  *
- * Stage 1: 配音合成（ChatTTS / MeloTTS）
+ * Stage 1: 配音合成（Qwen TTS）
  * Stage 2: 字幕生成（Deepgram/Whisper → SRT）
  * Stage 3: Remotion 真实渲染 ← 接入真实命令
  * Stage 4: Webhook 回调
@@ -12,6 +12,12 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const { processVoiceJob } = require('../voice/voiceJob');
+const {
+  resolveQwenSynthesisModel,
+  resolveQwenTtsDefaultVoice,
+  synthesizeQwenTtsToFile,
+} = require('../voice/qwenTtsClient');
+const {createLogger} = require('../utils/logger');
 const {
   PROJECT_ROOT,
   PUBLIC_DIR,
@@ -29,15 +35,111 @@ const OUTPUT_DIR = OUTPUT_ASSETS_DIR;
 const VOICE_DIR = VOICE_ASSETS_DIR;
 const SUBTITLE_DIR = SUBTITLE_ASSETS_DIR;
 const RENDER_TIMEOUT_MS = Number(process.env.WORKER_DURATION_LIMIT || '1200000');
+const WORKER_SHUTDOWN_TIMEOUT_MS = Number(process.env.WORKER_SHUTDOWN_TIMEOUT_MS || '30000');
 const DEFAULT_SMOKE_DURATION_FRAMES = 180;
-const CHAT_TTS_HTTP_HEALTH_URL = process.env.CHATTTS_HTTP_HEALTH_URL || 'http://127.0.0.1:18084/health';
-const CHAT_TTS_HTTP_SYNTH_URL = process.env.CHATTTS_HTTP_SYNTH_URL || 'http://127.0.0.1:18084/synthesize';
 const SECURITY_CONFIG = getSecurityConfig();
+const logger = createLogger({scope: 'render-worker'});
+const activeChildProcesses = new Set();
+let shutdownHandlersInstalled = false;
 
 // 确保目录存在
 [OUTPUT_DIR, VOICE_DIR, SUBTITLE_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
+
+function trackChildProcess(proc, meta = {}) {
+  const entry = {proc, meta};
+  activeChildProcesses.add(entry);
+
+  const cleanup = () => {
+    activeChildProcesses.delete(entry);
+  };
+
+  proc.once('close', cleanup);
+  proc.once('exit', cleanup);
+  proc.once('error', cleanup);
+
+  return proc;
+}
+
+function terminateTrackedChildProcesses(signal = 'SIGTERM') {
+  for (const entry of [...activeChildProcesses]) {
+    const proc = entry?.proc;
+    if (!proc || proc.killed) {
+      continue;
+    }
+
+    try {
+      proc.kill(signal);
+      logger.warn('child-process-terminated', {
+        signal,
+        pid: proc.pid,
+        ...entry.meta,
+      });
+    } catch (error) {
+      logger.warn('child-process-terminate-failed', {
+        signal,
+        pid: proc.pid,
+        ...entry.meta,
+        error,
+      });
+    }
+  }
+}
+
+function installWorkerSignalHandlers({mode, stop}) {
+  if (shutdownHandlersInstalled) {
+    return;
+  }
+
+  shutdownHandlersInstalled = true;
+  let isShuttingDown = false;
+
+  const handleSignal = async (signal) => {
+    if (isShuttingDown) {
+      return;
+    }
+    isShuttingDown = true;
+
+    logger.info('worker-shutdown', {
+      signal,
+      mode,
+      timeoutMs: WORKER_SHUTDOWN_TIMEOUT_MS,
+      activeChildProcessCount: activeChildProcesses.size,
+    });
+
+    try {
+      const result = await stop();
+      if (result?.timedOut) {
+        logger.warn('worker-shutdown-timeout', {
+          signal,
+          mode,
+          activeJobId: result.activeJobId || null,
+        });
+        terminateTrackedChildProcesses('SIGTERM');
+      }
+    } catch (error) {
+      logger.error('worker-shutdown-failed', {
+        signal,
+        mode,
+        error,
+      });
+      terminateTrackedChildProcesses('SIGTERM');
+      process.exitCode = 1;
+    } finally {
+      setTimeout(() => {
+        process.exit(process.exitCode || 0);
+      }, 0);
+    }
+  };
+
+  process.once('SIGTERM', () => {
+    void handleSignal('SIGTERM');
+  });
+  process.once('SIGINT', () => {
+    void handleSignal('SIGINT');
+  });
+}
 
 function resolveRemotionLaunch(cwd) {
   const bundledCli = path.join(cwd, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
@@ -69,7 +171,7 @@ function resolveRemotionLaunch(cwd) {
 // ─── Stage 1: 配音合成 ─────────────────────────────────
 async function stageVoiceSynthesis(job, update) {
   update(5, '🎤 合成语音...');
-  const { voice = 'chattts', projectId = 'default' } = job.data;
+  const { projectId = 'default' } = job.data;
   const designRenderData = getDesignRenderData(job.data.designJson);
   const script =
     typeof job.data.script === 'string' && job.data.script.trim()
@@ -83,7 +185,7 @@ async function stageVoiceSynthesis(job, update) {
   const scriptFile = path.join(projectVoiceDir, `script_${job.id}.json`);
 
   // 写入脚本
-  fs.writeFileSync(scriptFile, JSON.stringify({ script, voice, generatedAt: new Date().toISOString() }, null, 2));
+  fs.writeFileSync(scriptFile, JSON.stringify({ script, voice: 'qwen-tts', generatedAt: new Date().toISOString() }, null, 2));
 
   const preparedAudioSegments = materializeAudioSegments(
     Array.isArray(job.data.audioSegments) && job.data.audioSegments.length > 0
@@ -100,53 +202,36 @@ async function stageVoiceSynthesis(job, update) {
   const fallbackVoice = path.join(VOICE_DIR, 'full-narration.wav');
   if (fs.existsSync(fallbackVoice) && !fs.existsSync(voiceFile)) {
     fs.copyFileSync(fallbackVoice, voiceFile);
-    console.log(`[Worker] Voice copied from fallback: ${voiceFile}`);
+    logger.info('voice-fallback-copied', {jobId: job.id, projectId, voiceFile});
   } else if (fs.existsSync(voiceFile)) {
-    console.log(`[Worker] Voice exists: ${voiceFile}`);
+    logger.info('voice-reused', {jobId: job.id, projectId, voiceFile});
   } else {
-    if (voice === 'chattts') {
-      try {
-        const healthRes = await fetch(CHAT_TTS_HTTP_HEALTH_URL);
-        if (!healthRes.ok) {
-          throw new Error(`ChatTTS health HTTP ${healthRes.status}`);
-        }
-        const synthRes = await fetch(CHAT_TTS_HTTP_SYNTH_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: script,
-            speed: 1.0,
-            speaker_seed: 42,
-          }),
-        });
-        if (!synthRes.ok) {
-          const detail = await synthRes.text().catch(() => '');
-          throw new Error(`ChatTTS synth HTTP ${synthRes.status} ${detail}`);
-        }
-        const buffer = Buffer.from(await synthRes.arrayBuffer());
-        fs.writeFileSync(voiceFile, buffer);
-        console.log(`[Worker] Voice synthesized by ChatTTS: ${voiceFile}`);
-      } catch (e) {
-        console.warn(`[Worker] ChatTTS synthesis failed, falling back to Melo/fallback: ${e.message}`);
-      }
-    }
-
-    // 调用 MeloTTS 合成
-    if (!fs.existsSync(voiceFile)) {
-      const scriptPath = path.join(PROJECT_ROOT, 'scripts/synthesize-melo-voice.mjs');
-      if (fs.existsSync(scriptPath)) {
-        try {
-          await execFilePromise(process.execPath, [scriptPath, script, voiceFile], {
-            cwd: PROJECT_ROOT,
-            timeout: 60000,
-          });
-          console.log(`[Worker] Voice synthesized by MeloTTS: ${voiceFile}`);
-        } catch (e) {
-          console.warn(`[Worker] MeloTTS synthesis failed, using fallback: ${e.message}`);
-          if (fs.existsSync(fallbackVoice)) {
-            fs.copyFileSync(fallbackVoice, voiceFile);
-          }
-        }
+    try {
+      await synthesizeQwenTtsToFile({
+        text: script,
+        voice: resolveQwenTtsDefaultVoice(process.env),
+        language: 'zh-cn',
+        outputPath: voiceFile,
+        model: resolveQwenSynthesisModel({env: process.env}),
+        speed: 1.0,
+        env: process.env,
+      });
+      logger.info('voice-synthesized', {
+        jobId: job.id,
+        projectId,
+        engine: 'qwen-tts',
+        voiceFile,
+      });
+    } catch (e) {
+      logger.warn('voice-synthesis-fallback', {
+        jobId: job.id,
+        projectId,
+        engine: 'qwen-tts',
+        fallback: 'static-fallback',
+        error: e,
+      });
+      if (fs.existsSync(fallbackVoice)) {
+        fs.copyFileSync(fallbackVoice, voiceFile);
       }
     }
   }
@@ -200,7 +285,12 @@ async function stageSubtitleGeneration(job, voiceFile, update) {
       update(35, '✅ 字幕生成完成');
       return { subtitleFile };
     } catch (e) {
-      console.warn('[Worker] Deepgram failed:', e.message);
+      logger.warn('subtitle-provider-failed', {
+        jobId: job.id,
+        projectId,
+        provider: 'deepgram',
+        error: e,
+      });
     }
   }
 
@@ -336,7 +426,15 @@ async function stageRemotionRender(job, files, update) {
     args.push('--frames', `${resolvedFrameRange[0]}-${resolvedFrameRange[1]}`);
   }
 
-  console.log(`[Worker] Remotion command: ${launch.displayCommand} ${args.join(' ')}`);
+  logger.info('remotion-render-started', {
+    jobId: job.id,
+    projectId,
+    template,
+    compositionId,
+    outputFile,
+    command: launch.displayCommand,
+    frameRange: resolvedFrameRange ?? null,
+  });
   update(45, '🎬 Remotion 渲染中（请稍候）...');
 
   let stdout = '';
@@ -353,11 +451,28 @@ async function stageRemotionRender(job, files, update) {
           REMOTION_PUBLIC_DIR: path.join(remotionDir, 'public'),
         },
       });
+      trackChildProcess(proc, {
+        kind: 'remotion-render',
+        jobId: job.id,
+        projectId,
+      });
+
+      const renderTimeout = setTimeout(() => {
+        proc.kill('SIGTERM');
+        reject(new Error(`Remotion render timeout (${RENDER_TIMEOUT_MS}ms)`));
+      }, RENDER_TIMEOUT_MS);
+      if (typeof renderTimeout.unref === 'function') {
+        renderTimeout.unref();
+      }
 
       proc.stdout.on('data', (d) => {
         const line = d.toString().trim();
         stdout += line + '\n';
-        console.log(`[Remotion] ${line}`);
+        logger.debug('remotion-stdout', {
+          jobId: job.id,
+          projectId,
+          line,
+        });
 
         // 解析进度
         const pctMatch = line.match(/(\d+)%/);
@@ -376,25 +491,33 @@ async function stageRemotionRender(job, files, update) {
         const line = d.toString().trim();
         if (line) {
           stderr += line + '\n';
-          console.warn(`[Remotion:warn] ${line}`);
+          logger.warn('remotion-stderr', {
+            jobId: job.id,
+            projectId,
+            line,
+          });
         }
       });
 
       proc.on('close', (code) => {
-        console.log(`[Worker] Remotion exit code: ${code}`);
+        clearTimeout(renderTimeout);
+        logger.info('remotion-render-exited', {
+          jobId: job.id,
+          projectId,
+          exitCode: code ?? 1,
+        });
         resolve(code ?? 1);
       });
 
       proc.on('error', (err) => {
-        console.error(`[Worker] Remotion spawn error: ${err.message}`);
+        clearTimeout(renderTimeout);
+        logger.error('remotion-spawn-error', {
+          jobId: job.id,
+          projectId,
+          error: err,
+        });
         reject(err);
       });
-
-      // 渲染超时
-      setTimeout(() => {
-        proc.kill('SIGTERM');
-        reject(new Error(`Remotion render timeout (${RENDER_TIMEOUT_MS}ms)`));
-      }, RENDER_TIMEOUT_MS);
     });
 
     if (exitCode !== 0) {
@@ -419,7 +542,12 @@ async function stageRemotionRender(job, files, update) {
     };
 
   } catch (err) {
-    console.error(`[Worker] Render error: ${err.message}`);
+    logger.error('remotion-render-failed', {
+      jobId: job.id,
+      projectId,
+      template,
+      error: err,
+    });
     throw err;
   }
 }
@@ -435,7 +563,11 @@ async function stageWebhook(job, result, update) {
 
   try {
     if (typeof globalThis.fetch !== 'function') {
-      console.warn('[Worker] Webhook skipped: fetch is not available in this Node runtime');
+      logger.warn('webhook-skipped', {
+        jobId: job.id,
+        projectId: job.data?.projectId,
+        reason: 'fetch-unavailable',
+      });
       update(100, '✅ 全部完成');
       return;
     }
@@ -450,9 +582,18 @@ async function stageWebhook(job, result, update) {
         completedAt: new Date().toISOString(),
       }),
     });
-    console.log(`[Worker] Webhook sent to ${webhook}`);
+    logger.info('webhook-sent', {
+      jobId: job.id,
+      projectId: job.data?.projectId,
+      webhook,
+    });
   } catch (e) {
-    console.warn('[Worker] Webhook failed:', e.message);
+    logger.warn('webhook-failed', {
+      jobId: job.id,
+      projectId: job.data?.projectId,
+      webhook,
+      error: e,
+    });
   }
 
   update(100, '✅ 全部完成');
@@ -1059,11 +1200,12 @@ function formatSrtTimestamp(ms) {
 
 // ─── 主处理函数 ─────────────────────────────────────────
 async function processRenderJob(job, update) {
-  console.log(`\n${'='.repeat(50)}`);
-  console.log(`[Worker] 🆕 Job: ${job.id}`);
-  console.log(`[Worker] Template: ${job.data.template || 'caption'}`);
-  console.log(`[Worker] Project: ${job.data.projectId || 'default'}`);
-  console.log(`${'='.repeat(50)}\n`);
+  logger.info('job-started', {
+    jobId: job.id,
+    jobType: job.name || job.type || 'render',
+    template: job.data.template || 'caption',
+    projectId: job.data.projectId || 'default',
+  });
 
   try {
     // Stage 1
@@ -1084,7 +1226,12 @@ async function processRenderJob(job, update) {
       renderMeta: stage3.renderMeta ?? null,
     }, update);
 
-    console.log(`\n[Worker] ✅ Job ${job.id} done: ${stage3.outputFile}\n`);
+    logger.info('job-completed', {
+      jobId: job.id,
+      jobType: job.name || job.type || 'render',
+      projectId: job.data.projectId || 'default',
+      outputFile: stage3.outputFile,
+    });
     return {
       outputFile: stage3.outputFile,
       voiceFile: stage1.voiceFile,
@@ -1094,7 +1241,12 @@ async function processRenderJob(job, update) {
     };
 
   } catch (err) {
-    console.error(`\n[Worker] ❌ Job ${job.id} failed: ${err.message}\n`);
+    logger.error('job-failed', {
+      jobId: job.id,
+      jobType: job.name || job.type || 'render',
+      projectId: job.data.projectId || 'default',
+      error: err,
+    });
     throw err;
   }
 }
@@ -1104,9 +1256,9 @@ function startFileBasedWorker() {
   assertQueueModeAllowed('file', SECURITY_CONFIG);
   const { startSimpleWorker } = require('../queue/fileQueue');
 
-  console.log('[Worker] 🚀 File-based render worker started');
+  logger.info('worker-started', {mode: 'file'});
 
-  startSimpleWorker({
+  const workerController = startSimpleWorker({
     async render(job, updateProgress) {
       return await processRenderJob(job, updateProgress);
     },
@@ -1114,6 +1266,16 @@ function startFileBasedWorker() {
       return await processVoiceJob(job, updateProgress);
     },
   });
+
+  installWorkerSignalHandlers({
+    mode: 'file',
+    stop: async () => workerController.stop({
+      graceful: true,
+      timeoutMs: WORKER_SHUTDOWN_TIMEOUT_MS,
+    }),
+  });
+
+  return workerController;
 }
 
 // ─── BullMQ Worker（Redis版）────────────────────────────
@@ -1126,7 +1288,7 @@ function startRedisWorker() {
     enableReadyCheck: false,
   });
 
-  connection.on('error', err => console.error('[Worker] Redis error:', err.message));
+  connection.on('error', err => logger.error('redis-error', {error: err}));
 
   const worker = new Worker('video-render', async (job) => {
     const update = (pct, msg) => job.updateProgress({ pct, msg });
@@ -1140,30 +1302,52 @@ function startRedisWorker() {
   });
 
   worker.on('completed', ({ id, returnvalue }) => {
-    console.log(`[Worker] ✅ Job ${id} completed`);
+    logger.info('queue-worker-job-completed', {
+      jobId: id,
+      outputFile: returnvalue?.outputFile,
+    });
   });
 
   worker.on('failed', ({ id, failedReason }) => {
-    console.error(`[Worker] ❌ Job ${id} failed: ${failedReason}`);
+    logger.error('queue-worker-job-failed', {
+      jobId: id,
+      failedReason,
+    });
   });
 
   worker.on('error', err => {
-    console.error('[Worker] Error:', err.message);
+    logger.error('worker-error', {error: err});
   });
 
-  console.log('[Worker] 🎬 Redis render worker started, waiting for jobs...');
-
-  process.on('SIGTERM', async () => {
-    await worker.close();
-    await connection.quit();
-    process.exit(0);
+  logger.info('worker-started', {
+    mode: 'redis',
+    concurrency: parseInt(process.env.WORKER_CONCURRENCY || '2'),
   });
+
+  installWorkerSignalHandlers({
+    mode: 'redis',
+    stop: async () => {
+      await worker.close();
+      await connection.quit();
+      return {
+        timedOut: false,
+        activeJobId: null,
+      };
+    },
+  });
+
+  return worker;
 }
 
 // ─── 工具函数 ───────────────────────────────────────────
 function execFilePromise(command, args, { cwd, timeout = 60000 } = {}) {
   return new Promise((resolve, reject) => {
     const proc = spawn(command, args, {cwd, shell: false});
+    trackChildProcess(proc, {
+      kind: 'exec-file',
+      command,
+      cwd: cwd || process.cwd(),
+    });
     let stdout = '', stderr = '';
 
     proc.stdout.on('data', d => { stdout += d.toString(); });

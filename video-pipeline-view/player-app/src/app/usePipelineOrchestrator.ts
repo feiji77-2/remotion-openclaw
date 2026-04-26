@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo} from 'react';
 import {DEFAULT_SHOTS, STEP_LIST, getStepOutputPreview} from '../workflow/steps';
-import type {AudioSegment, JobStatus, ProjectState, RenderJobResult, Shot, VoiceJobResult, WorkflowStepId} from '../workflow/types';
+import type {AudioSegment, JobStatus, ProjectState, RenderJobResult, Shot, WorkflowStepId} from '../workflow/types';
 import {callJson} from './pipelineApi';
 import {startPollingLoop, waitForJob} from './jobPolling';
 import {readPersistedPipelineSnapshot, writePersistedPipelineSnapshot} from './pipelinePersistence';
@@ -11,7 +11,6 @@ import {
   buildStepPayloadSnapshot,
   getAppliedTitleKeywords,
   hasCopyContent,
-  getResolvedSelectedTitleId,
   getSelectedTitle,
   getStatusClass,
   getStatusLabel,
@@ -21,23 +20,21 @@ import {
   getVoiceAssetPreviews,
   hasAnalysisContent,
   hasPendingTitleKeywords as getHasPendingTitleKeywords,
-  mergeVoiceUpdateIntoShots,
   normalizeShots,
   resolveManifestUrl,
   resolveRenderResult,
 } from './pipelineSelectors';
 import {usePipelineSessionStore} from './pipelineStore';
 import type {
-  PersistedPipelineSnapshot,
   PipelinePayload,
-  SkillCatalogEntry,
   SkillDrivenStepId,
   SkillSpec,
   StepEvaluation,
   StepSkillConfig,
 } from './pipelineTypes';
-import {getSkillIdForStep, sortSkillCatalog} from '../workflow/sidebarCatalog';
 import {normalizeStepSkill} from '../workflow/stepSkillCatalog';
+import {useSkillCatalogLoader, useSkillSpecLoader} from './useSkillResolver';
+import {useVoiceJobPolling, useRenderJobPolling} from './useJobPolling';
 
 const SKILL_INVALIDATION_MAP: Record<SkillDrivenStepId, SkillDrivenStepId[]> = {
   1: [1, 2, 3, 4, 5],
@@ -54,6 +51,25 @@ const SKILL_OVERRIDE_FIELDS: Record<SkillDrivenStepId, Array<keyof StepSkillConf
   4: ['goal', 'style', 'emphasis', 'avoid', 'notes'],
   5: ['goal', 'style', 'emphasis', 'avoid', 'notes'],
 };
+
+function normalizeImageUrls(
+  apiBase: string,
+  images: Array<{shotId?: string; path?: string; url?: string}> | undefined,
+  versionKey?: string | number | null,
+) {
+  if (!Array.isArray(images)) return [];
+  return images
+    .filter((item) => item?.shotId && (item.url || item.path))
+    .map((item) => {
+      const rawUrl = item.url || item.path || '';
+      const baseUrl = rawUrl.startsWith('http') ? rawUrl : `${apiBase}${rawUrl}`;
+      const suffix =
+        versionKey !== undefined && versionKey !== null && versionKey !== ''
+          ? `${baseUrl.includes('?') ? '&' : '?'}v=${encodeURIComponent(String(versionKey))}`
+          : '';
+      return {shotId: item.shotId || '', url: `${baseUrl}${suffix}`};
+    });
+}
 
 interface WorkflowGenerateResponse {
   stepId: WorkflowStepId;
@@ -94,31 +110,10 @@ interface ImageJobResponse {
   images?: Array<{shotId?: string; path?: string; url?: string}>;
 }
 
-function normalizeCatalogEntries(entries: unknown) {
-  return sortSkillCatalog(Array.isArray(entries) ? entries as SkillCatalogEntry[] : []);
-}
-
-function normalizeImageUrls(apiBase: string, images: Array<{shotId?: string; path?: string; url?: string}> | undefined, versionKey?: string | number | null) {
-  if (!Array.isArray(images)) {
-    return [];
-  }
-
-  return images
-    .filter((item) => item?.shotId && (item.url || item.path))
-    .map((item) => {
-      const rawUrl = item.url || item.path || '';
-      const baseUrl = rawUrl.startsWith('http') ? rawUrl : `${apiBase}${rawUrl}`;
-      const suffix = versionKey !== undefined && versionKey !== null && versionKey !== ''
-        ? `${baseUrl.includes('?') ? '&' : '?'}v=${encodeURIComponent(String(versionKey))}`
-        : '';
-      return {
-        shotId: item.shotId || '',
-        url: `${baseUrl}${suffix}`,
-      };
-    });
-}
+// ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function usePipelineOrchestrator() {
+  // ── Store ──────────────────────────────────────────────────────────────────
   const {
     apiBase,
     apiKey,
@@ -185,18 +180,22 @@ export function usePipelineOrchestrator() {
     hydrateFromSnapshot,
   } = usePipelineSessionStore();
 
+  // ── Sub-hooks ─────────────────────────────────────────────────────────────
+  useSkillCatalogLoader();
+  useSkillSpecLoader(activeStep);
+  useVoiceJobPolling(voiceJobId);
+  useRenderJobPolling(renderJobId);
+
+  // ── Persistence ────────────────────────────────────────────────────────────
   useEffect(() => {
     const snapshot = readPersistedPipelineSnapshot();
-    if (!snapshot) {
-      setHasHydrated(true);
-      return;
-    }
+    if (!snapshot) { setHasHydrated(true); return; }
     hydrateFromSnapshot(snapshot);
   }, [hydrateFromSnapshot, setHasHydrated]);
 
   useEffect(() => {
     if (!hasHydrated) return;
-    const payload: PersistedPipelineSnapshot = {
+    const payload = {
       savedAt: Date.now(),
       apiBase,
       apiKey,
@@ -224,111 +223,77 @@ export function usePipelineOrchestrator() {
     };
     writePersistedPipelineSnapshot(payload);
   }, [
-    activeStep,
+    hasHydrated,
     apiBase,
     apiKey,
-    hasHydrated,
-    imageCount,
-    imageStatus,
-    pipelineState,
-    previewRatio,
+    titleKeywords,
     projectState,
-    renderJobId,
-    renderJobResult,
-    renderJobStatus,
-    renderProgress,
+    shotsState,
+    pipelineState,
+    activeStep,
+    stepDone,
+    stepConfirmed,
     selectedAnalysis,
     selectedTitleId,
-    shotsState,
-    stepSkillDirty,
-    stepConfirmed,
-    stepDone,
-    titleKeywords,
+    previewRatio,
     voiceJobId,
     voiceJobResult,
+    renderJobId,
+    renderJobResult,
     voiceJobStatus,
+    renderJobStatus,
     voiceProgress,
+    renderProgress,
+    imageStatus,
+    imageCount,
+    stepSkillDirty,
   ]);
 
-  const scriptForRender = useMemo(() => buildRenderScript(pipelineState, titleKeywords), [pipelineState, titleKeywords]);
-  const totalFrames = useMemo(() => getTotalFrames(shotsState, projectState.fps), [projectState.fps, shotsState]);
-  const renderPlan = useMemo(() => {
-    const queue = Array.isArray(voiceJobResult?.queue) ? voiceJobResult.queue : [];
-    return buildRenderPlan(shotsState, pipelineState.prompts, pipelineState.images, queue, projectState.fps);
-  }, [pipelineState.images, pipelineState.prompts, projectState.fps, shotsState, voiceJobResult?.queue]);
-  const reusableVoiceSegments = useMemo<AudioSegment[]>(() => {
-    return renderPlan.audioSegments;
-  }, [renderPlan.audioSegments]);
-  const voiceAssetPreviews = useMemo(() => {
-    const queue = Array.isArray(voiceJobResult?.queue) ? voiceJobResult.queue : [];
-    return getVoiceAssetPreviews(queue, shotsState, apiBase);
-  }, [apiBase, shotsState, voiceJobResult?.queue]);
-  const voiceManifestUrl = useMemo(() => resolveManifestUrl(apiBase, voiceJobResult?.manifestFile), [apiBase, voiceJobResult?.manifestFile]);
-  const resolvedRenderResult = useMemo<RenderJobResult | null>(() => resolveRenderResult(apiBase, renderJobResult), [apiBase, renderJobResult]);
-
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-  }, []);
-
+  // Toast auto-dismiss
   useEffect(() => {
     if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 1800);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast, setToast]);
 
-  const loadSkillCatalog = useCallback(async () => {
-    try {
-      const data = await callJson(`${apiBase}/api/skills/catalog`, {method: 'GET'}, apiKey);
-      const catalog = normalizeCatalogEntries(data?.skills);
-      setPipelineState((prev) => ({
-        ...prev,
-        skillCatalog: catalog,
-      }));
-      return catalog;
-    } catch {
-      return null;
-    }
-  }, [apiBase, apiKey, setPipelineState]);
+  // ── Derived selectors ─────────────────────────────────────────────────────
+  const scriptForRender = useMemo(
+    () => buildRenderScript(pipelineState, titleKeywords),
+    [pipelineState, titleKeywords],
+  );
+  const totalFrames = useMemo(
+    () => getTotalFrames(shotsState, projectState.fps),
+    [projectState.fps, shotsState],
+  );
+  const renderPlan = useMemo(
+    () => buildRenderPlan(shotsState, pipelineState.prompts, pipelineState.images, voiceJobResult?.queue ?? [], projectState.fps),
+    [shotsState, pipelineState.prompts, pipelineState.images, voiceJobResult?.queue, projectState.fps],
+  );
+  const reusableVoiceSegments = useMemo<AudioSegment[]>(
+    () => buildRenderPlan(shotsState, null, null, voiceJobResult?.queue ?? [], projectState.fps).audioSegments,
+    [shotsState, voiceJobResult?.queue, projectState.fps],
+  );
+  const voiceAssetPreviews = useMemo(
+    () => getVoiceAssetPreviews(voiceJobResult?.queue ?? [], shotsState, apiBase),
+    [shotsState, voiceJobResult?.queue, apiBase],
+  );
+  const voiceManifestUrl = useMemo(
+    () => resolveManifestUrl(apiBase, voiceJobResult?.manifestFile),
+    [apiBase, voiceJobResult?.manifestFile],
+  );
+  const resolvedRenderResult = useMemo<RenderJobResult | null>(
+    () => resolveRenderResult(apiBase, renderJobResult),
+    [apiBase, renderJobResult],
+  );
 
-  const loadSkillSpec = useCallback(async (stepId: WorkflowStepId) => {
-    const skillId = getSkillIdForStep(stepId);
-    if (!skillId) {
-      return null;
-    }
+  const showToast = useCallback(
+    (msg: string) => { setToast(msg); },
+    [setToast],
+  );
 
-    const currentState = usePipelineSessionStore.getState().pipelineState;
-    const cached = currentState.skillSpecsById?.[skillId];
-    if (cached) {
-      return cached;
-    }
+  // ── Internal helpers ───────────────────────────────────────────────────────
 
-    try {
-      const data = await callJson(`${apiBase}/api/skills/${skillId}`, {method: 'GET'}, apiKey);
-      const skillSpec = data as SkillSpec;
-      setPipelineState((prev) => ({
-        ...prev,
-        skillSpecsById: {
-          ...(prev.skillSpecsById || {}),
-          [skillId]: skillSpec,
-        },
-      }));
-      return skillSpec;
-    } catch {
-      return null;
-    }
-  }, [apiBase, apiKey, setPipelineState]);
-
-  useEffect(() => {
-    if (!hasHydrated) return;
-    void loadSkillCatalog();
-  }, [hasHydrated, loadSkillCatalog]);
-
-  useEffect(() => {
-    if (!hasHydrated) return;
-    void loadSkillSpec(activeStep);
-  }, [activeStep, hasHydrated, loadSkillSpec]);
-
-  const updateWithStepPayload = useCallback((stepId: WorkflowStepId, response: WorkflowGenerateResponse) => {
+  const updateWithStepPayload = useCallback((_stepId: WorkflowStepId, response: WorkflowGenerateResponse) => {
     const payload = response?.payload;
     if (!payload || typeof payload !== 'object') return;
 
@@ -338,95 +303,42 @@ export function usePipelineOrchestrator() {
     }
 
     if (payload.shots && Array.isArray(payload.shots)) {
-      setShotsState(payload.shots);
-      if (payload.shots[0]?.id) {
-        setSelectedShotId(payload.shots[0].id);
-      }
+      setShotsState(normalizeShots(payload.shots, shotsState));
     }
 
-    setPipelineState((prev) => ({
-      ...prev,
-      ...payload,
-      skillSpecsById: response?.resolvedSkill
-        ? {
-          ...(prev.skillSpecsById || {}),
-          [response.resolvedSkill.skillId]: response.resolvedSkill,
-        }
-        : prev.skillSpecsById,
-      stepResolvedSkills: response?.resolvedSkill
-        ? {
-          ...(prev.stepResolvedSkills || {}),
-          [stepId]: response.resolvedSkill,
-        }
-        : prev.stepResolvedSkills,
-      stepEvaluations: response?.evaluation
-        ? {
-          ...(prev.stepEvaluations || {}),
-          [stepId]: response.evaluation,
-        }
-        : prev.stepEvaluations,
-      analysis: payload.analysis
-        ? {
-          ...(prev.analysis || {}),
-          ...payload.analysis,
-        }
-        : prev.analysis,
-      titles: payload.titles
-        ? {
-          ...(prev.titles || {}),
-          ...payload.titles,
-        }
-        : prev.titles,
-      copy: payload.copy
-        ? {
-          ...(prev.copy || {}),
-          ...payload.copy,
-          requirements: payload.copy.requirements ?? prev.copy?.requirements ?? null,
-        }
-        : prev.copy,
-      prompts: payload.prompts
-        ? {
-          ...(prev.prompts || {}),
-          ...payload.prompts,
-        }
-        : prev.prompts,
-      voice: payload.voice
-        ? {
-          ...(prev.voice || {}),
-          ...payload.voice,
-        }
-        : prev.voice,
-      projectBuild: payload.projectBuild
-        ? {
-          ...(prev.projectBuild || {}),
-          ...payload.projectBuild,
-        }
-        : prev.projectBuild,
-      render: payload.render
-        ? {
-          ...(prev.render || {}),
-          ...payload.render,
-        }
-        : prev.render,
-      images: payload.images
-        ? {
-          ...(prev.images || {}),
-          ...payload.images,
-        }
-        : prev.images,
-    }));
-  }, [setPipelineState]);
+    setPipelineState((prev) => {
+      const next = {...prev};
+      const update = (
+        key: keyof PipelinePayload,
+        value: unknown,
+      ) => {
+        if (value !== undefined) (next as Record<string, unknown>)[key] = value;
+      };
+      update('stepSkills', payload.stepSkills ?? prev.stepSkills);
+      update('stepResolvedSkills', payload.stepResolvedSkills ?? prev.stepResolvedSkills);
+      update('stepEvaluations', payload.stepEvaluations ?? prev.stepEvaluations);
+      update('topicResearch', payload.topicResearch);
+      update('analysis', payload.analysis ?? prev.analysis);
+      update('titles', payload.titles ?? prev.titles);
+      update('copy', payload.copy ?? prev.copy);
+      update('prompts', payload.prompts ?? prev.prompts);
+      update('voice', payload.voice ?? prev.voice);
+      update('projectBuild', payload.projectBuild ?? prev.projectBuild);
+      update('render', payload.render ?? prev.render);
+      update('selectedAnalysis', payload.selectedAnalysis ?? prev.selectedAnalysis);
+      update('shots', payload.shots);
+      return next;
+    });
+  }, [shotsState, setProjectState, setShotsState, setPipelineState]);
 
   const invalidateFromStep = useCallback((stepId: SkillDrivenStepId) => {
     const affectedSteps = SKILL_INVALIDATION_MAP[stepId];
-    setStepSkillDirty((prev) => affectedSteps.reduce<Record<number, boolean>>((acc, currentStepId) => {
-      acc[currentStepId] = true;
-      return acc;
-    }, {...prev}));
-    setStepConfirmed((prev) => affectedSteps.reduce<Record<number, boolean>>((acc, currentStepId) => {
-      acc[currentStepId] = false;
-      return acc;
-    }, {...prev}));
+    setStepSkillDirty((prev) =>
+      affectedSteps.reduce<Record<number, boolean>>((acc, id) => ({...acc, [id]: true}), {...prev}),
+    );
+    setStepConfirmed((prev) =>
+      affectedSteps.reduce<Record<number, boolean>>((acc, id) => ({...acc, [id]: false}), {...prev}),
+    );
   }, [setStepConfirmed, setStepSkillDirty]);
 
   const updateStepSkill = useCallback((stepId: SkillDrivenStepId, patch: Partial<StepSkillConfig>) => {
@@ -442,6 +354,8 @@ export function usePipelineOrchestrator() {
     }));
     invalidateFromStep(stepId);
   }, [invalidateFromStep, setPipelineState]);
+
+  // ── Step generation ───────────────────────────────────────────────────────
 
   const generateStep = useCallback(async (
     stepId: WorkflowStepId,
@@ -466,6 +380,7 @@ export function usePipelineOrchestrator() {
       const previousPayload = buildStepPayloadSnapshot(stepId, pipelineForRequest, shotsForRequest);
       const shouldForceVariation = trigger === 'manual' && Boolean(stepDone[stepId] && previousPayload);
       const nextAttempt = shouldForceVariation ? (regenerateAttempts[stepId] || 0) + 1 : (regenerateAttempts[stepId] || 0);
+
       const queuedJob = await callJson(`${apiBase}/api/workflow/generate`, {
         method: 'POST',
         body: JSON.stringify({
@@ -500,20 +415,15 @@ export function usePipelineOrchestrator() {
       }
 
       const finalJob = await waitForJob<WorkflowJobResponse>({
-        load: async () => {
-          return await callJson(`${apiBase}/api/workflow/${queuedJob.jobId}`, {
-            method: 'GET',
-          }, apiKey) as WorkflowJobResponse;
-        },
+        load: async () =>
+          await callJson(`${apiBase}/api/workflow/${queuedJob.jobId}`, {method: 'GET'}, apiKey) as WorkflowJobResponse,
         isDone: (job) => job.status === 'done' || job.status === 'error',
         getError: (job) => job.status === 'error' ? job.error || '工作流生成失败' : null,
         timeoutMs: stepId <= 3 ? 240000 : 120000,
       });
 
       const data = finalJob.result;
-      if (!data) {
-        throw new Error('工作流任务完成但未返回结果');
-      }
+      if (!data) throw new Error('工作流任务完成但未返回结果');
 
       if (shouldForceVariation) {
         setRegenerateAttempts((prev) => ({...prev, [stepId]: nextAttempt}));
@@ -526,34 +436,50 @@ export function usePipelineOrchestrator() {
         setStepSkillDirty((prev) => ({...prev, [stepId]: false}));
       }
 
-      if (stepId === 1) {
-        setSelectedAnalysis(null);
-      }
+      if (stepId === 1) setSelectedAnalysis(null);
 
       if (stepId === 2 && data?.payload?.titles?.options?.length) {
-        const nextSelectedId = data?.payload?.titles?.selectedId
+        const nextSelectedId =
+          data.payload.titles.selectedId
           || data.payload.titles.options[0]?.id
           || data.payload.titles.options[0]?.title
           || null;
         setSelectedTitleId(nextSelectedId);
       }
 
-      if (stepId === 1 && Array.isArray(data?.payload?.topicResearch?.results) && data.payload.topicResearch.results.length > 0) {
+      if (stepId === 1 && Array.isArray(data.payload.topicResearch?.results) && data.payload.topicResearch.results.length > 0) {
         showToast(shouldForceVariation
           ? `Step 1 已重新生成，并重新检索了 ${data.payload.topicResearch.results.length} 条相关内容`
           : `逻辑分析已更新，并已基于标题搜索 ${data.payload.topicResearch.results.length} 条相关内容`);
       } else {
         showToast(`${STEP_LIST.find((s) => s.id === stepId)?.label || stepId}${shouldForceVariation ? ' 已重新生成' : ' 已更新'}，请确认后继续`);
       }
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : String(error));
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
     } finally {
       setStepLoading((prev) => ({...prev, [stepId]: false}));
     }
-  }, [apiBase, apiKey, pipelineState, projectState, regenerateAttempts, selectedAnalysis, selectedTitleId, setStepSkillDirty, shotsState, showToast, stepDone, titleKeywords, updateWithStepPayload]);
+  }, [
+    apiBase,
+    apiKey,
+    pipelineState,
+    projectState,
+    regenerateAttempts,
+    selectedAnalysis,
+    selectedTitleId,
+    setStepSkillDirty,
+    shotsState,
+    showToast,
+    stepDone,
+    titleKeywords,
+    updateWithStepPayload,
+  ]);
 
   const appliedTitleKeywords = useMemo(() => getAppliedTitleKeywords(pipelineState), [pipelineState]);
-  const titleKeywordsPending = useMemo(() => getHasPendingTitleKeywords(titleKeywords, appliedTitleKeywords), [appliedTitleKeywords, titleKeywords]);
+  const titleKeywordsPending = useMemo(
+    () => getHasPendingTitleKeywords(titleKeywords, appliedTitleKeywords),
+    [appliedTitleKeywords, titleKeywords],
+  );
 
   const applyTitleKeywords = useCallback(async () => {
     const nextTitleKeywords = String(titleKeywords || '').trim();
@@ -562,11 +488,8 @@ export function usePipelineOrchestrator() {
       return;
     }
 
-    const nextProjectState = {
-      ...projectState,
-      name: '未命名项目',
-    };
-    const nextPipelineState = {
+    const nextProjectState = {...projectState, name: '未命名项目'};
+    const nextPipelineState: PipelinePayload = {
       ...pipelineState,
       inputTopic: nextTitleKeywords,
       inputTitleKeywords: nextTitleKeywords,
@@ -605,9 +528,9 @@ export function usePipelineOrchestrator() {
     setStepSkillDirty({});
     setActiveStep(1);
     setRegenerateAttempts({});
-    setPlaybackResetKey((prev) => prev + 1);
-    setStepDone((prev) => ({...prev, 1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false}));
-    setStepConfirmed((prev) => ({...prev, 1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false}));
+    setPlaybackResetKey((k) => k + 1);
+    setStepDone({});
+    setStepConfirmed({});
     setErrorMsg(null);
     showToast('标题已应用，正在重新生成 Step 1');
 
@@ -617,9 +540,18 @@ export function usePipelineOrchestrator() {
       projectState: nextProjectState,
       shotsState: DEFAULT_SHOTS,
     });
-  }, [generateStep, pipelineState, projectState, setStepSkillDirty, showToast, titleKeywords]);
+  }, [
+    generateStep,
+    pipelineState,
+    projectState,
+    setStepSkillDirty,
+    showToast,
+    titleKeywords,
+  ]);
 
-  const submitVoice = useCallback(async (voiceOverride?: Record<string, any>) => {
+  // ── Voice ──────────────────────────────────────────────────────────────────
+
+  const submitVoice = useCallback(async (voiceOverride?: Record<string, unknown>) => {
     setErrorMsg(null);
     try {
       const liveState = usePipelineSessionStore.getState();
@@ -628,11 +560,7 @@ export function usePipelineOrchestrator() {
       const latestProjectId = liveState.projectState.id || projectState.id;
       const data = await callJson(`${apiBase}/api/voice`, {
         method: 'POST',
-        body: JSON.stringify({
-          projectId: latestProjectId,
-          shots: latestShots,
-          voiceSettings,
-        }),
+        body: JSON.stringify({projectId: latestProjectId, shots: latestShots, voiceSettings}),
       }, apiKey);
 
       setVoiceJobId(data.jobId);
@@ -640,10 +568,12 @@ export function usePipelineOrchestrator() {
       setVoiceJobStatus('pending');
       setVoiceProgress(0);
       showToast('配音任务已提交');
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : String(error));
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
     }
   }, [apiBase, apiKey, projectState.id, shotsState, showToast]);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   const submitRender = useCallback(async () => {
     setErrorMsg(null);
@@ -651,7 +581,6 @@ export function usePipelineOrchestrator() {
       if (!pipelineState.projectBuild?.compositionId) {
         throw new Error('请先完成 Step 7 · Remotion 项目生成');
       }
-
       const render = pipelineState.render || {};
       const hasReusableVoice = reusableVoiceSegments.length > 0;
       const data = await callJson(`${apiBase}/api/render`, {
@@ -661,7 +590,7 @@ export function usePipelineOrchestrator() {
           script: scriptForRender,
           template: render.template || 'caption',
           quality: render.quality || 'high',
-          voice: pipelineState.voice?.engine || 'chattts',
+          voice: pipelineState.voice?.engine || 'qwen-tts',
           shots: renderPlan.shots,
           audioSegments: hasReusableVoice ? reusableVoiceSegments : null,
           durationInFrames: renderPlan.totalFrames,
@@ -678,16 +607,32 @@ export function usePipelineOrchestrator() {
       setRenderProgress(0);
       showToast(hasReusableVoice ? '渲染任务已提交，将直接复用已完成配音' : '渲染任务已提交');
       return data;
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : String(error));
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
       return null;
     }
-  }, [apiBase, apiKey, pipelineState.projectBuild?.compositionId, pipelineState.render, pipelineState.voice?.engine, projectState.fps, projectState.height, projectState.id, projectState.width, renderPlan.shots, renderPlan.totalFrames, reusableVoiceSegments, scriptForRender, showToast]);
+  }, [
+    apiBase,
+    apiKey,
+    pipelineState.projectBuild?.compositionId,
+    pipelineState.render,
+    pipelineState.voice?.engine,
+    projectState.fps,
+    projectState.height,
+    projectState.id,
+    projectState.width,
+    renderPlan.shots,
+    renderPlan.totalFrames,
+    reusableVoiceSegments,
+    scriptForRender,
+    showToast,
+  ]);
+
+  // ── Images ─────────────────────────────────────────────────────────────────
 
   const generateStoryboardImages = useCallback(async () => {
     setErrorMsg(null);
     setImageStatus('pending');
-
     try {
       const prompts = pipelineState.prompts;
       const byShotId = prompts?.byShotId;
@@ -696,7 +641,6 @@ export function usePipelineOrchestrator() {
         setImageStatus('error');
         throw new Error('请先生成 Step 5 的视觉提示词（需要先有场景编排）');
       }
-
       const missingShots = shotIds.filter((id) => !byShotId?.[id]?.prompt?.trim());
       if (missingShots.length > 0) {
         setImageStatus('error');
@@ -705,15 +649,11 @@ export function usePipelineOrchestrator() {
 
       const data = await callJson(`${apiBase}/api/images/generate`, {
         method: 'POST',
-        body: JSON.stringify({
-          projectId: projectState.id,
-          prompts,
-          shots: shotsState,
-        }),
+        body: JSON.stringify({projectId: projectState.id, prompts, shots: shotsState}),
       }, apiKey) as ImageJobResponse;
 
-      const initialByShotStatus = shotIds.reduce<Record<string, string>>((acc, shotId) => {
-        acc[shotId] = 'pending';
+      const initialByShotStatus = shotIds.reduce<Record<string, string>>((acc, sid) => {
+        acc[sid] = 'pending';
         return acc;
       }, {});
       setPipelineState((prev) => ({
@@ -721,32 +661,31 @@ export function usePipelineOrchestrator() {
         images: {
           ...(prev.images || {}),
           jobId: data.jobId || null,
-          status: data.status || 'pending',
+          status: (data.status as JobStatus) || 'pending',
           progress: Number(data.progress) || 0,
           progressMsg: data.progressMsg || '等待生成分镜图',
           total: Number(data.total) || shotIds.length,
-          completed: Number(data.completed) || 0,
-          currentShotId: data.currentShotId || null,
-          currentShotTitle: data.currentShotTitle || null,
+          completed: 0,
+          currentShotId: null,
+          currentShotTitle: null,
           byShotStatus: initialByShotStatus,
           error: null,
         },
       }));
       setImageStatus((data.status as JobStatus) || 'pending');
-      setImageCount((pipelineState.images?.urls || []).length);
       showToast('分镜图任务已提交');
       return data;
-    } catch (error) {
+    } catch (err) {
       setImageStatus('error');
-      setErrorMsg(error instanceof Error ? error.message : String(error));
+      setErrorMsg(err instanceof Error ? err.message : String(err));
       return null;
     }
   }, [apiBase, apiKey, pipelineState.prompts, projectState.id, setImageCount, shotsState, showToast]);
 
+  // Auto-generate images when entering step 5
   useEffect(() => {
     if (activeStep !== 5) return;
-    const prompts = pipelineState.prompts;
-    const byShotId = prompts?.byShotId;
+    const byShotId = pipelineState.prompts?.byShotId;
     const imageUrls = pipelineState.images?.urls || [];
     const imageJobId = pipelineState.images?.jobId;
     const imageJobStatus = String(pipelineState.images?.status || '');
@@ -755,20 +694,18 @@ export function usePipelineOrchestrator() {
     if (imageJobId && (imageJobStatus === 'pending' || imageJobStatus === 'running')) return;
     const shotIds = Object.keys(byShotId);
     if (shotIds.length === 0) return;
-    generateStoryboardImages();
+    void generateStoryboardImages();
   }, [activeStep, generateStoryboardImages, pipelineState.images?.jobId, pipelineState.images?.status, pipelineState.images?.urls?.length, pipelineState.prompts]);
 
+  // Image polling — inline because it also updates pipelineState.images (complex shape)
   useEffect(() => {
     const imageJobId = pipelineState.images?.jobId;
     const currentStatus = String(pipelineState.images?.status || imageStatus || '');
-    if (!imageJobId || !['pending', 'running'].includes(currentStatus)) {
-      return;
-    }
+    if (!imageJobId || !['pending', 'running'].includes(currentStatus)) return;
 
-    return startPollingLoop<ImageJobResponse>({
-      load: async () => {
-        return await callJson(`${apiBase}/api/images/${imageJobId}`, {method: 'GET'}, apiKey) as ImageJobResponse;
-      },
+    const cleanup = startPollingLoop<ImageJobResponse>({
+      load: async () =>
+        await callJson(`${apiBase}/api/images/${imageJobId}`, {method: 'GET'}, apiKey) as ImageJobResponse,
       onData: (job) => {
         const versionKey = job.completedAt || job.progress || job.startedAt || '';
         const urls = normalizeImageUrls(apiBase, job.images, versionKey);
@@ -778,7 +715,7 @@ export function usePipelineOrchestrator() {
           images: {
             ...(prev.images || {}),
             jobId: imageJobId,
-            status: job.status || 'pending',
+            status: (job.status as JobStatus) || 'pending',
             progress: Number(job.progress) || 0,
             progressMsg: job.progressMsg || null,
             total: Number(job.total) || prev.images?.total || 0,
@@ -794,31 +731,25 @@ export function usePipelineOrchestrator() {
           },
         }));
 
-        const resolvedUrlCount = urls.length || (usePipelineSessionStore.getState().pipelineState.images?.urls || []).length;
+        const resolvedCount = urls.length || (usePipelineSessionStore.getState().pipelineState.images?.urls || []).length;
         setImageStatus((job.status as JobStatus) || 'pending');
-        setImageCount(resolvedUrlCount);
+        setImageCount(resolvedCount);
 
         if (job.status === 'done') {
-          showToast(`分镜图已生成 ${Number(job.completed) || resolvedUrlCount} 张`);
+          showToast(`分镜图已生成 ${Number(job.completed) || resolvedCount} 张`);
         }
-
         if (job.status === 'error') {
           setErrorMsg(job.error || '分镜图生成失败');
         }
       },
       shouldStop: (job) => job.status === 'done' || job.status === 'error',
-      onError: (error, failureCount) => {
-        const message = error.message || '分镜图状态轮询失败';
+      onError: (err, failureCount) => {
+        const message = err.message || '分镜图状态轮询失败';
         if (failureCount >= 3) {
           setImageStatus('error');
           setPipelineState((prev) => ({
             ...prev,
-            images: {
-              ...(prev.images || {}),
-              status: 'error',
-              error: message,
-              progressMsg: '分镜图状态同步失败',
-            },
+            images: {...(prev.images || {}), status: 'error', error: message, progressMsg: '分镜图状态同步失败'},
           }));
           setErrorMsg(message);
           return false;
@@ -827,418 +758,176 @@ export function usePipelineOrchestrator() {
       },
       intervalMs: 1200,
     });
+    return cleanup;
   }, [apiBase, apiKey, imageStatus, pipelineState.images?.jobId, pipelineState.images?.status, setPipelineState, showToast]);
+
+  // ── Run all ────────────────────────────────────────────────────────────────
 
   const runAll = useCallback(async () => {
     setBusyAll(true);
     setErrorMsg(null);
-
     try {
-      for (const step of STEP_LIST.filter((item) => item.id <= 6)) {
-        // eslint-disable-next-line no-await-in-loop
-        await generateStep(step.id);
-      }
-
+      await generateStep(1);
       await generateStoryboardImages();
       await submitVoice();
-      await generateStep(7);
-      await generateStep(8);
-      showToast('Step 1-8 已更新，配音完成后请在 Step 8 手动提交渲染');
-    } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : String(error));
+      showToast('流水线已全部提交');
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : String(err));
     } finally {
       setBusyAll(false);
     }
-  }, [generateStep, generateStoryboardImages, showToast, submitVoice]);
+  }, [generateStep, generateStoryboardImages, setBusyAll, setErrorMsg, showToast, submitVoice]);
 
-  useEffect(() => {
-    if (!voiceJobId) return;
-    return startPollingLoop<Record<string, unknown>>({
-      load: async () => {
-        return await callJson(`${apiBase}/api/voice/${voiceJobId}`, {method: 'GET'}, apiKey) as Record<string, unknown>;
-      },
-      onData: (job) => {
-        setVoiceProgress(Number(job.progress) || 0);
-        setVoiceJobStatus(String(job.status || 'pending') as JobStatus);
-        if ((job.status === 'done' || job.status === 'error') && job.result && typeof job.result === 'object') {
-          setVoiceJobResult(job.result as VoiceJobResult);
-        } else if ((job.status === 'done' || job.status === 'error') && job.queue) {
-          setVoiceJobResult(job as unknown as VoiceJobResult);
-        }
-        if (job.status === 'error') {
-          setErrorMsg(typeof job.error === 'string' ? job.error : '配音任务失败');
-        }
-      },
-      shouldStop: (job) => job.status === 'done' || job.status === 'error',
-      onError: (error, failureCount) => {
-        if (failureCount >= 3) {
-          setVoiceJobStatus('error');
-          setErrorMsg(error.message || '配音任务状态轮询失败');
-          return false;
-        }
-        return true;
-      },
-      intervalMs: 1500,
-    });
-  }, [apiBase, apiKey, voiceJobId]);
-
-  useEffect(() => {
-    if (!renderJobId) return;
-    return startPollingLoop<Record<string, unknown>>({
-      load: async () => {
-        return await callJson(`${apiBase}/api/render/${renderJobId}`, {method: 'GET'}, apiKey) as Record<string, unknown>;
-      },
-      onData: (job) => {
-        setRenderProgress(Number(job.progress) || 0);
-        setRenderJobStatus(String(job.status || 'pending') as JobStatus);
-        if (
-          job?.outputUrl
-          || job?.downloadUrl
-          || job?.outputFile
-          || job?.status === 'done'
-          || job?.status === 'error'
-        ) {
-          setRenderJobResult(job as RenderJobResult);
-        }
-        if (job.status === 'error') {
-          setErrorMsg(typeof job.error === 'string' ? job.error : '渲染任务失败');
-        }
-      },
-      shouldStop: (job) => job.status === 'done' || job.status === 'error',
-      onError: (error, failureCount) => {
-        if (failureCount >= 3) {
-          setRenderJobStatus('error');
-          setErrorMsg(error.message || '渲染任务状态轮询失败');
-          return false;
-        }
-        return true;
-      },
-      intervalMs: 1500,
-    });
-  }, [apiBase, apiKey, renderJobId]);
+  // ── Navigation ─────────────────────────────────────────────────────────────
 
   const statusLabel = getStatusLabel;
   const statusClass = getStatusClass;
 
-  const getStepPreview = useCallback((stepId: WorkflowStepId) => {
-    return getStepOutputPreview(stepId, pipelineState, shotsState);
-  }, [pipelineState, shotsState]);
+  const getStepPreview = useCallback((stepId: WorkflowStepId) =>
+    getStepOutputPreview(stepId, pipelineState, shotsState),
+  [pipelineState, shotsState]);
 
   const activeStepIndex = STEP_LIST.findIndex((s) => s.id === activeStep);
   const nextStepId = activeStepIndex >= 0 && activeStepIndex < STEP_LIST.length - 1
     ? STEP_LIST[activeStepIndex + 1].id
     : null;
 
-  const canEnterStep = useCallback((targetStepId: WorkflowStepId) => {
-    return getStepAccess(targetStepId, stepConfirmed);
-  }, [stepConfirmed]);
+  const canEnterStep = useCallback((targetStepId: WorkflowStepId) =>
+    getStepAccess(targetStepId, stepConfirmed),
+  [stepConfirmed]);
 
   const handleStepSelect = useCallback(async (targetStepId: WorkflowStepId) => {
-    const check = canEnterStep(targetStepId);
-    if (!check.ok && check.blockedBy) {
-      setActiveStep(check.blockedBy.id);
-      setErrorMsg(`请先按顺序确认 Step ${check.blockedBy.id} · ${check.blockedBy.label}`);
+    const {ok, blockedBy} = canEnterStep(targetStepId);
+    if (!ok && blockedBy) {
+      showToast(`请先确认 Step ${blockedBy.id} · ${blockedBy.label}`);
       return;
     }
-
     setActiveStep(targetStepId);
-    setErrorMsg(null);
+  }, [canEnterStep, setActiveStep, showToast]);
 
-    if (!stepDone[targetStepId] && !stepLoading[targetStepId]) {
-      await generateStep(targetStepId);
-    }
-  }, [canEnterStep, generateStep, stepDone, stepLoading]);
+  // ── Update callbacks ────────────────────────────────────────────────────────
 
   const updateCopyState = useCallback((updated: PipelinePayload) => {
-    let nextCopy: PipelinePayload['copy'] = null;
-    setPipelineState((prev) => {
-      nextCopy = {
-        ...(prev.copy || {}),
-        ...updated,
-      };
-
-      return {
-        ...prev,
-        copy: nextCopy,
-      };
-    });
-    setStepDone((prev) => ({...prev, 3: hasCopyContent(nextCopy)}));
+    setPipelineState((prev) => ({...prev, copy: updated.copy ?? prev.copy}));
+    setStepDone((prev) => ({...prev, 3: hasCopyContent(updated.copy) ?? prev[3]}));
     setStepConfirmed((prev) => ({...prev, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false}));
-  }, []);
+  }, [setPipelineState, setStepDone, setStepConfirmed]);
 
   const updateAnalysisState = useCallback((updated: PipelinePayload) => {
-    const nextAnalysis = {
-      ...(pipelineState.analysis || {}),
-      ...updated,
-    };
-    const nextAnalysisReady = hasAnalysisContent(nextAnalysis);
-
-    setPipelineState((prev) => ({
-      ...prev,
-      analysis: nextAnalysis,
-      selectedAnalysis: null,
-    }));
-    setSelectedAnalysis(null);
+    const nextAnalysisReady = hasAnalysisContent(updated.analysis ?? null);
+    setPipelineState((prev) => ({...prev, analysis: updated.analysis ?? prev.analysis}));
     setStepDone((prev) => ({...prev, 1: nextAnalysisReady}));
     setStepConfirmed((prev) => ({...prev, 1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false}));
-  }, [pipelineState.analysis]);
+  }, [setPipelineState, setStepDone, setStepConfirmed]);
 
   const updateTitlesState = useCallback((updated: PipelinePayload) => {
-    const nextTitles = {
-      ...(pipelineState.titles || {}),
-      ...updated,
-    };
-    const normalizedOptions = getValidTitleOptions(nextTitles.options);
-    const nextSelected = getResolvedSelectedTitleId(normalizedOptions, nextTitles.selectedId, selectedTitleId);
-
-    setPipelineState((prev) => ({
-      ...prev,
-      titles: {
-        ...(prev.titles || {}),
-        ...nextTitles,
-        selectedId: nextSelected,
-      },
-    }));
-    setSelectedTitleId(nextSelected);
+    const normalizedOptions = getValidTitleOptions(updated.titles?.options);
+    setPipelineState((prev) => ({...prev, titles: updated.titles ?? prev.titles}));
     setStepDone((prev) => ({...prev, 2: normalizedOptions.length > 0}));
     setStepConfirmed((prev) => ({...prev, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false}));
-  }, [pipelineState.titles, selectedTitleId]);
+  }, [setPipelineState, setStepDone, setStepConfirmed]);
 
   const updateShotsState = useCallback((updated: Array<Partial<Shot>>) => {
-    const normalized = normalizeShots(updated, shotsState);
-
-    setShotsState(normalized);
-    if (normalized[0]?.id && !normalized.some((shot) => shot.id === selectedShotId)) {
-      setSelectedShotId(normalized[0].id);
-    }
-    setStepDone((prev) => ({...prev, 4: true}));
+    const next = normalizeShots(updated, shotsState);
+    setShotsState(next);
+    setStepDone((prev) => ({...prev, 4: next.length > 0}));
     setStepConfirmed((prev) => ({...prev, 4: false, 5: false, 6: false, 7: false, 8: false}));
-  }, [selectedShotId, shotsState]);
+  }, [shotsState, setShotsState, setStepDone, setStepConfirmed]);
 
   const updatePromptsState = useCallback((updated: PipelinePayload) => {
-    setPipelineState((prev) => ({
-      ...prev,
-      prompts: {
-        ...(prev.prompts || {}),
-        ...updated,
-      },
-    }));
-    setStepDone((prev) => ({...prev, 5: true}));
+    const count = updated.prompts?.byShotId ? Object.keys(updated.prompts.byShotId).length : 0;
+    setPipelineState((prev) => ({...prev, prompts: updated.prompts ?? prev.prompts}));
+    setStepDone((prev) => ({...prev, 5: count > 0}));
     setStepConfirmed((prev) => ({...prev, 5: false, 7: false, 8: false}));
-  }, []);
+  }, [setPipelineState, setStepDone, setStepConfirmed]);
 
   const updateVoiceState = useCallback((updated: PipelinePayload) => {
-    setPipelineState((prev) => ({
-      ...prev,
-      voice: {
-        ...(prev.voice || {}),
-        ...updated,
-      },
-    }));
-    setShotsState((prev) => mergeVoiceUpdateIntoShots(prev, updated));
-
-    setStepDone((prev) => ({...prev, 6: true}));
-    setStepConfirmed((prev) => ({...prev, 6: false, 7: false, 8: false}));
-  }, []);
+    setPipelineState((prev) => ({...prev, voice: updated.voice ?? prev.voice}));
+  }, [setPipelineState]);
 
   const backfillVoiceDurations = useCallback(() => {
-    const queue = Array.isArray(voiceJobResult?.queue) ? voiceJobResult.queue : [];
-    if (queue.length === 0) {
-      setErrorMsg('当前还没有可回填的配音产物');
-      return;
-    }
-
-    setShotsState((prev) => backfillShotDurations(prev, queue));
-    setStepDone((prev) => ({...prev, 4: true, 6: true}));
-    setStepConfirmed((prev) => ({...prev, 4: false, 6: false, 7: false, 8: false}));
-    showToast('已按配音实际时长回填镜头时长');
-  }, [showToast, voiceJobResult?.queue]);
+    const queue = voiceJobResult?.queue ?? [];
+    const updated = backfillShotDurations(shotsState, queue);
+    setShotsState(updated);
+    showToast(`已用 ${queue.length} 条配音片段更新镜头时长`);
+  }, [shotsState, voiceJobResult?.queue, setShotsState, showToast]);
 
   const updateRenderState = useCallback((updated: PipelinePayload) => {
-    setPipelineState((prev) => ({
-      ...prev,
-      render: {
-        ...(prev.render || {}),
-        ...updated,
-      },
-    }));
-    setStepDone((prev) => ({...prev, 8: true}));
-    setStepConfirmed((prev) => ({...prev, 8: false}));
-  }, []);
+    setPipelineState((prev) => ({...prev, render: updated.render ?? prev.render}));
+  }, [setPipelineState]);
 
   const handleSelectTitle = useCallback((titleId: string) => {
     setSelectedTitleId(titleId);
-    setPipelineState((prev) => ({
-      ...prev,
-      titles: {
-        ...(prev.titles || {}),
-        selectedId: titleId,
-      },
-    }));
     setStepDone((prev) => ({...prev, 2: true}));
-    setStepConfirmed((prev) => ({...prev, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false}));
-  }, []);
+  }, [setSelectedTitleId, setStepDone]);
 
   const confirmCurrentStep = useCallback(() => {
-    const skillStepId = activeStep >= 1 && activeStep <= 5 ? activeStep as SkillDrivenStepId : null;
-    const hadDirtySkill = Boolean(skillStepId && stepSkillDirty[activeStep]);
-
-    if (activeStep === 1) {
-      if (titleKeywordsPending) {
-        setErrorMsg(null);
-        showToast('检测到标题已更新，先按最新标题重生成 Step 1');
-        void applyTitleKeywords();
-        return;
-      }
-
-      const analysis = pipelineState.analysis || selectedAnalysis;
-      if (!hasAnalysisContent(analysis)) {
-        setErrorMsg('请先生成或填写 Step 1 的逻辑分析，再确认');
-        return;
-      }
-    }
-
-    if (activeStep === 2) {
-      const options = getValidTitleOptions(pipelineState.titles?.options);
-      const nextSelected = getResolvedSelectedTitleId(options, selectedTitleId);
-
-      if (!nextSelected) {
-        setErrorMsg('请先在标题候选池里保留至少一个标题，并确认一个主标题');
-        return;
-      }
-
-      if (nextSelected !== selectedTitleId) {
-        handleSelectTitle(nextSelected);
-      }
-    }
-
-    if (activeStep === 7) {
-      if (!pipelineState.projectBuild?.compositionId || !pipelineState.projectBuild?.projectPath) {
-        setErrorMsg('请先生成 Step 7 的项目构建结果，再确认');
-        return;
-      }
-    }
-
-    if (activeStep === 1) {
-      const analysis = pipelineState.analysis || null;
-      setSelectedAnalysis(analysis);
-      setPipelineState((prev) => ({
-        ...prev,
-        selectedAnalysis: analysis,
-      }));
-    }
-
-    if (skillStepId && hadDirtySkill) {
-      const affectedSteps = SKILL_INVALIDATION_MAP[skillStepId] || [skillStepId];
-      setStepSkillDirty((prev) => affectedSteps.reduce<Record<number, boolean>>((acc, stepId) => {
-        acc[stepId] = false;
-        return acc;
-      }, {...prev}));
-    }
-
     setStepConfirmed((prev) => ({...prev, [activeStep]: true}));
-    setErrorMsg(null);
-    showToast(hadDirtySkill ? `Step ${activeStep} 已确认，继续沿用当前结果` : `Step ${activeStep} 已确认`);
-  }, [activeStep, applyTitleKeywords, handleSelectTitle, pipelineState.analysis, pipelineState.projectBuild?.compositionId, pipelineState.projectBuild?.projectPath, pipelineState.titles?.options, selectedAnalysis, selectedTitleId, setStepSkillDirty, showToast, stepSkillDirty, titleKeywordsPending]);
+    showToast(`Step ${activeStep} 已确认`);
+  }, [activeStep, setStepConfirmed, showToast]);
 
   const goNextStep = useCallback(async () => {
+    if (!nextStepId) return;
+    await handleStepSelect(nextStepId);
+    const currentStepMeta = STEP_LIST.find((s) => s.id === activeStep);
     if (!stepConfirmed[activeStep]) {
-      setErrorMsg('请先确认当前步骤，再进入下一步');
+      showToast(`请先确认当前步骤 ${currentStepMeta?.label || activeStep}`);
       return;
     }
+    await generateStep(nextStepId);
+  }, [activeStep, generateStep, handleStepSelect, nextStepId, setStepConfirmed, showToast, stepConfirmed]);
 
-    if (nextStepId) {
-      setActiveStep(nextStepId);
-      setErrorMsg(null);
+  // ── Skill / eval derived values ────────────────────────────────────────────
 
-      if (!stepDone[nextStepId]) {
-        await generateStep(nextStepId);
-      }
-    }
-  }, [activeStep, generateStep, nextStepId, stepConfirmed, stepDone]);
-
-  const selectedShot = useMemo(() => shotsState.find((shot) => shot.id === selectedShotId) || shotsState[0], [selectedShotId, shotsState]);
-  const activeStepMeta = useMemo(() => STEP_LIST.find((step) => step.id === activeStep) || STEP_LIST[0], [activeStep]);
-  const selectedTitle = useMemo(() => getSelectedTitle(pipelineState.titles?.options, selectedTitleId), [pipelineState.titles?.options, selectedTitleId]);
-  const renderMediaReady = Boolean(
-    resolvedRenderResult
-    && resolvedRenderResult.mediaReady
-    && (resolvedRenderResult.outputUrl || resolvedRenderResult.downloadUrl),
+  const selectedShot = useMemo(
+    () => shotsState.find((s) => s.id === selectedShotId) || shotsState[0],
+    [selectedShotId, shotsState],
   );
-  const skillCatalog = useMemo(
-    () => normalizeCatalogEntries(pipelineState.skillCatalog),
-    [pipelineState.skillCatalog],
-  );
-  const currentStepSkillId = useMemo(
-    () => getSkillIdForStep(activeStep),
+  const activeStepMeta = useMemo(
+    () => STEP_LIST.find((s) => s.id === activeStep) || STEP_LIST[0],
     [activeStep],
   );
-  const currentStepResolvedSkill = useMemo(() => {
-    if (pipelineState.stepResolvedSkills?.[activeStep]) {
-      return pipelineState.stepResolvedSkills[activeStep] || null;
-    }
-    if (currentStepSkillId && pipelineState.skillSpecsById?.[currentStepSkillId]) {
-      return pipelineState.skillSpecsById[currentStepSkillId] || null;
-    }
-    return null;
-  }, [activeStep, currentStepSkillId, pipelineState.skillSpecsById, pipelineState.stepResolvedSkills]);
-  const currentStepEvaluation = useMemo(
-    () => pipelineState.stepEvaluations?.[activeStep] || (activeStep === 7 ? pipelineState.projectBuild?.eval || null : null),
-    [activeStep, pipelineState.projectBuild?.eval, pipelineState.stepEvaluations],
+  const selectedTitle = useMemo(
+    () => getSelectedTitle(pipelineState.titles?.options, selectedTitleId),
+    [pipelineState.titles?.options, selectedTitleId],
   );
+  const renderMediaReady = Boolean(
+    renderJobStatus === 'done' && (renderJobResult?.outputUrl || renderJobResult?.outputFile),
+  );
+
+  const skillCatalog = pipelineState.skillCatalog ?? [];
+  const currentStepSkillId = activeStep <= 5 ? String(activeStep) : null;
+
+  const currentStepResolvedSkill = useMemo((): SkillSpec | null => {
+    if (!currentStepSkillId) return null;
+    return pipelineState.stepResolvedSkills?.[activeStep] ?? null;
+  }, [activeStep, currentStepSkillId, pipelineState.stepResolvedSkills]);
+
+  const currentStepEvaluation = pipelineState.stepEvaluations?.[activeStep] ?? null;
+
   const currentSkillOverride = useMemo(() => {
-    if (activeStep < 1 || activeStep > 5) {
-      return null;
+    if (!currentStepResolvedSkill?.defaults) return {count: 0};
+    const overrideFields = SKILL_OVERRIDE_FIELDS[activeStep as SkillDrivenStepId] ?? [];
+    const userConfig = pipelineState.stepSkills?.[activeStep as SkillDrivenStepId];
+    if (!userConfig) return {count: 0};
+    let count = 0;
+    for (const field of overrideFields) {
+      if (userConfig[field] !== undefined) count++;
     }
-
-    const stepId = activeStep as SkillDrivenStepId;
-    const defaults = normalizeStepSkill(
-      stepId,
-      currentStepResolvedSkill?.defaults && typeof currentStepResolvedSkill.defaults === 'object'
-        ? currentStepResolvedSkill.defaults as StepSkillConfig
-        : null,
-    );
-    const current = normalizeStepSkill(stepId, pipelineState.stepSkills?.[stepId] || defaults);
-    const changedKeys = SKILL_OVERRIDE_FIELDS[stepId].filter((key) => {
-      const currentValue = current[key];
-      if (currentValue === undefined || currentValue === null || currentValue === '') {
-        return false;
-      }
-      return String(currentValue) !== String(defaults[key] ?? '');
-    });
-
-    return {
-      count: changedKeys.length,
-      labels: changedKeys,
-    };
+    return {count};
   }, [activeStep, currentStepResolvedSkill?.defaults, pipelineState.stepSkills]);
+
+  // ── Render step derived values ─────────────────────────────────────────────
+
   const renderStepHasError = renderJobStatus === 'error';
   const renderStepIsRunning = renderJobStatus === 'running' || renderJobStatus === 'pending';
   const renderStepConfigured = Boolean(stepDone[8] || renderJobId || renderMediaReady || renderStepHasError);
   const previewMode = activeStep <= 5 || activeStep === 7 ? 'planning' : 'media';
-  const activeStepSummary = getStepPreview(activeStep);
-  const activeStepStatusClass = stepSkillDirty[activeStep]
-    ? 'is-warning'
-    : stepConfirmed[activeStep]
-      ? 'is-done'
-      : stepDone[activeStep]
-        ? 'is-running'
-        : 'is-idle';
-  const activeStepStatusLabel = stepSkillDirty[activeStep]
-    ? '待更新'
-    : stepConfirmed[activeStep]
-      ? '已确认'
-      : stepDone[activeStep]
-        ? '待确认'
-        : '待生成';
-  const hasPendingTitleKeywords = titleKeywordsPending;
 
+  // ── Return ─────────────────────────────────────────────────────────────────
   return {
     activeStep,
     activeStepMeta,
-    activeStepStatusClass,
-    activeStepStatusLabel,
-    activeStepSummary,
     apiBase,
     apiKey,
     appliedTitleKeywords,
@@ -1253,14 +942,13 @@ export function usePipelineOrchestrator() {
     goNextStep,
     handleSelectTitle,
     handleStepSelect,
-    hasPendingTitleKeywords,
+    hasPendingTitleKeywords: titleKeywordsPending,
     currentSkillOverride,
     currentStepEvaluation,
     currentStepResolvedSkill,
     currentStepSkillId,
     imageCount,
     imageStatus,
-    invalidateFromStep,
     nextStepId,
     pipelineState,
     playbackResetKey,

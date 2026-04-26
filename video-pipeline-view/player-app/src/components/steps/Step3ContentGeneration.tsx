@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {usePersistentStepEditor} from './usePersistentStepEditor';
 import type {StepSkillConfig} from '../../app/pipelineTypes';
 
@@ -22,12 +22,23 @@ interface OutlineItem {
   beat?: string;
   goal?: string;
   evidenceAnchor?: string;
+  sceneIntent?: string;
+  transitionToNext?: string;
+  mustInclude?: string[];
+  keywords?: string[];
+  [key: string]: any;
 }
 
 interface ContentBlock {
   id?: string;
   label?: string;
   text?: string;
+  sceneIntent?: string;
+  evidenceAnchor?: string;
+  transitionToNext?: string;
+  keywords?: string[];
+  dataPoints?: string[];
+  [key: string]: any;
 }
 
 interface CopyData {
@@ -37,6 +48,7 @@ interface CopyData {
   hook?: string;
   body?: ContentBlock[];
   cta?: string;
+  [key: string]: any;
 }
 
 interface Step3ContentGenerationProps {
@@ -115,8 +127,16 @@ function createBody(index: number): ContentBlock {
   };
 }
 
+function countCharacters(copy: {hook?: string; body?: ContentBlock[]; cta?: string}): number {
+  const hookLen = String(copy.hook || '').replace(/\s/g, '').length;
+  const bodyLen = (copy.body || []).reduce((sum, b) => sum + String(b.text || '').replace(/\s/g, '').length, 0);
+  const ctaLen = String(copy.cta || '').replace(/\s/g, '').length;
+  return hookLen + bodyLen + ctaLen;
+}
+
 function buildDraft(data: CopyData | null): Draft {
   return {
+    ...(data || {}),
     requirements: {
       ...DEFAULT_REQUIREMENTS,
       ...(data?.requirements || {}),
@@ -127,6 +147,7 @@ function buildDraft(data: CopyData | null): Draft {
     },
     outline: Array.isArray(data?.outline) && data.outline.length > 0
       ? data.outline.map((item, index) => ({
+        ...(item || {}),
         id: item.id || `copy-outline-${index + 1}`,
         label: item.label || `节拍 ${index + 1}`,
         beat: item.beat || '',
@@ -137,6 +158,7 @@ function buildDraft(data: CopyData | null): Draft {
     hook: String(data?.hook || '').trim(),
     body: Array.isArray(data?.body) && data.body.length > 0
       ? data.body.map((item, index) => ({
+        ...(item || {}),
         id: item.id || `copy-${index + 1}`,
         label: item.label || `段落 ${index + 1}`,
         text: item.text || '',
@@ -159,6 +181,7 @@ function sanitizeRequirements(requirements: CopyRequirements | null | undefined)
 
 function sanitizeDraft(data: Draft): CopyData {
   return {
+    ...data,
     requirements: sanitizeRequirements(data.requirements),
     brief: {
       hookAngle: String(data.brief.hookAngle || '').trim(),
@@ -168,6 +191,7 @@ function sanitizeDraft(data: Draft): CopyData {
     },
     outline: (Array.isArray(data.outline) ? data.outline : [])
       .map((item, index) => ({
+        ...(item || {}),
         id: item.id || `copy-outline-${index + 1}`,
         label: String(item.label || `节拍 ${index + 1}`).trim(),
         beat: String(item.beat || '').trim(),
@@ -178,6 +202,7 @@ function sanitizeDraft(data: Draft): CopyData {
     hook: String(data.hook || '').trim(),
     body: (Array.isArray(data.body) ? data.body : [])
       .map((item, index) => ({
+        ...(item || {}),
         id: item.id || `copy-${index + 1}`,
         label: String(item.label || `段落 ${index + 1}`).trim(),
         text: String(item.text || '').trim(),
@@ -204,6 +229,34 @@ function getAntiAiLabel(level?: string | null) {
   return '';
 }
 
+function CopyProgressBar({current, target, label}: {current: number; target: number; label: string}) {
+  const percentage = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+  const isInRange = current >= target * 0.8 && current <= target * 1.2;
+  const isUnder = current < target * 0.8;
+  const statusClass = isInRange ? 'is-good' : isUnder ? 'is-low' : 'is-high';
+
+  return (
+    <div className="wf-copy-progress">
+      <div className="wf-copy-progress-label">
+        <span>{label}</span>
+        <span className="wf-copy-progress-count">
+          <strong className={statusClass}>{current}</strong> / {target} 字
+        </span>
+      </div>
+      <div className="wf-copy-progress-bar">
+        <div
+          className={`wf-copy-progress-fill ${statusClass}`}
+          style={{width: `${percentage}%`}}
+          role="progressbar"
+          aria-valuenow={percentage}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        />
+      </div>
+    </div>
+  );
+}
+
 export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
   data,
   stepSkill,
@@ -216,6 +269,10 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
 }) => {
   const normalized = useMemo(() => buildDraft(data), [data]);
   const hasContent = useMemo(() => hasMeaningfulCopy(data), [data]);
+  const charCount = useMemo(() => countCharacters(normalized), [normalized]);
+  const targetWordCount = stepSkill?.targetWordCount || (stepSkill?.targetDurationSeconds ? Math.round(stepSkill.targetDurationSeconds * 3.5) : 450);
+  const [activeTab, setActiveTab] = useState<'brief' | 'outline' | 'copy'>('copy');
+
   const stepSkillPills = useMemo(() => {
     const pills: string[] = [];
     if (stepSkill?.targetDurationSeconds && stepSkill?.targetWordCount) {
@@ -234,6 +291,7 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
     }
     return pills;
   }, [stepSkill?.antiAiLevel, stepSkill?.spokenPersona, stepSkill?.targetDurationSeconds, stepSkill?.targetWordCount]);
+
   const {
     editing,
     setEditing,
@@ -244,18 +302,18 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
 
   const current = editing && draft ? draft : normalized;
 
-  const openEditor = () => {
+  const openEditor = useCallback(() => {
     setDraft(buildDraft(data));
     setEditing(true);
-  };
+  }, [data, setDraft, setEditing]);
 
-  const saveEditor = () => {
+  const saveEditor = useCallback(() => {
     if (!draft) return;
     onUpdate(sanitizeDraft(draft));
     clearEditor();
-  };
+  }, [draft, onUpdate, clearEditor]);
 
-  const updateBrief = (field: keyof CopyBrief, value: string) => {
+  const updateBrief = useCallback((field: keyof CopyBrief, value: string) => {
     setDraft((prev) => ({
       ...(prev || buildDraft(data)),
       brief: {
@@ -264,9 +322,9 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
         [field]: value,
       },
     }));
-  };
+  }, [data, setDraft]);
 
-  const updateRequirements = (field: keyof CopyRequirements, value: string) => {
+  const updateRequirements = useCallback((field: keyof CopyRequirements, value: string) => {
     if (editing) {
       setDraft((prev) => ({
         ...(prev || buildDraft(data)),
@@ -285,9 +343,9 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
         [field]: value,
       }),
     });
-  };
+  }, [editing, data, setDraft, onUpdate, current.requirements]);
 
-  const updateOutline = (index: number, field: keyof OutlineItem, value: string) => {
+  const updateOutline = useCallback((index: number, field: keyof OutlineItem, value: string) => {
     setDraft((prev) => {
       const base = buildDraft(prev || data);
       const nextOutline = (base.outline || []).map((item, itemIndex) => (
@@ -295,9 +353,9 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
       ));
       return {...base, outline: nextOutline};
     });
-  };
+  }, [data, setDraft]);
 
-  const addOutline = () => {
+  const addOutline = useCallback(() => {
     setDraft((prev) => {
       const base = buildDraft(prev || data);
       return {
@@ -305,9 +363,9 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
         outline: [...(base.outline || []), createOutline((base.outline || []).length)],
       };
     });
-  };
+  }, [data, setDraft]);
 
-  const removeOutline = (index: number) => {
+  const removeOutline = useCallback((index: number) => {
     setDraft((prev) => {
       const base = buildDraft(prev || data);
       return {
@@ -315,9 +373,9 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
         outline: (base.outline || []).filter((_, itemIndex) => itemIndex !== index),
       };
     });
-  };
+  }, [data, setDraft]);
 
-  const updateBody = (index: number, field: keyof ContentBlock, value: string) => {
+  const updateBody = useCallback((index: number, field: keyof ContentBlock, value: string) => {
     setDraft((prev) => {
       const base = buildDraft(prev || data);
       const nextBody = (base.body || []).map((item, itemIndex) => (
@@ -325,9 +383,9 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
       ));
       return {...base, body: nextBody};
     });
-  };
+  }, [data, setDraft]);
 
-  const addBody = () => {
+  const addBody = useCallback(() => {
     setDraft((prev) => {
       const base = buildDraft(prev || data);
       return {
@@ -335,9 +393,9 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
         body: [...(base.body || []), createBody((base.body || []).length)],
       };
     });
-  };
+  }, [data, setDraft]);
 
-  const removeBody = (index: number) => {
+  const removeBody = useCallback((index: number) => {
     setDraft((prev) => {
       const base = buildDraft(prev || data);
       return {
@@ -345,33 +403,7 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
         body: (base.body || []).filter((_, itemIndex) => itemIndex !== index),
       };
     });
-  };
-
-  const requirementsSection = (
-    <section className="wf-struct-section wf-requirements-section">
-      <div className="wf-struct-head">
-        <div>
-          <span className="wf-stage-kicker">生成要求</span>
-          <h5>具体控制这次文案怎么写</h5>
-        </div>
-        <span className="wf-stat-pill is-accent">生成前生效</span>
-      </div>
-      <div className="wf-requirements-grid">
-        {REQUIREMENT_FIELDS.map(({field, label, placeholder}) => (
-          <label key={field} className="wf-requirement-card">
-            <strong>{label}</strong>
-            <textarea
-              className="wf-edit-textarea"
-              rows={3}
-              value={current.requirements[field] || ''}
-              onChange={(event) => updateRequirements(field, event.target.value)}
-              placeholder={placeholder}
-            />
-          </label>
-        ))}
-      </div>
-    </section>
-  );
+  }, [data, setDraft]);
 
   if (!hasContent && !editing) {
     if (workbenchMode) {
@@ -386,7 +418,7 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
 
     return (
       <div className="wf-step3-root">
-        <div className="wf-stage-hero">
+        <div className="wf-stage-hero wf-stage-hero-upgraded">
           <div className="wf-stage-hero-copy">
             <span className="wf-stage-kicker">Step 3</span>
             <h4>先生成文案 brief，再出最终成稿</h4>
@@ -399,14 +431,37 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
               onClick={onGenerate}
               disabled={loading}
             >
-              {loading ? '生成中...' : '生成文案 brief 与成稿'}
+              {loading ? '生成中…' : '生成文案 brief 与成稿'}
             </button>
             <button type="button" className="wf-btn wf-btn-edit" onClick={openEditor}>
               手动录入文案结构
             </button>
           </div>
         </div>
-        {requirementsSection}
+        <section className="wf-struct-section wf-requirements-section">
+          <div className="wf-struct-head">
+            <div>
+              <span className="wf-stage-kicker">生成要求</span>
+              <h5>具体控制这次文案怎么写</h5>
+            </div>
+            <span className="wf-stat-pill is-accent">生成前生效</span>
+          </div>
+          <div className="wf-requirements-grid">
+            {REQUIREMENT_FIELDS.map(({field, label, placeholder}) => (
+              <label key={field} className="wf-requirement-card" htmlFor={`req-${field}`}>
+                <strong>{label}</strong>
+                <textarea
+                  id={`req-${field}`}
+                  className="wf-edit-textarea"
+                  rows={3}
+                  value={current.requirements[field] || ''}
+                  onChange={(event) => updateRequirements(field, event.target.value)}
+                  placeholder={placeholder}
+                />
+              </label>
+            ))}
+          </div>
+        </section>
       </div>
     );
   }
@@ -438,7 +493,7 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
         </div>
       ) : (
         <>
-          <div className="wf-stage-hero">
+          <div className="wf-stage-hero wf-stage-hero-upgraded">
             <div className="wf-stage-hero-copy">
               <span className="wf-stage-kicker">文案主链</span>
               <h4>{current.hook || '待生成 Hook'}</h4>
@@ -467,12 +522,12 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
                 onClick={onGenerate}
                 disabled={loading}
               >
-                {loading ? '生成中...' : '重新生成'}
+                {loading ? '生成中…' : '重新生成'}
               </button>
             </div>
           </div>
 
-          {requirementsSection}
+          <CopyProgressBar current={charCount} target={targetWordCount} label="文案进度" />
         </>
       )}
 
@@ -492,9 +547,12 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
               ['ctaIntent', 'CTA 意图'],
             ] as Array<[keyof CopyBrief, string]>).map(([field, label]) => (
               <div key={field} className="wf-brief-card">
-                <span>{label}</span>
+                <label htmlFor={`brief-${field}`}>
+                  <span>{label}</span>
+                </label>
                 {editing ? (
                   <textarea
+                    id={`brief-${field}`}
                     className="wf-edit-textarea"
                     rows={3}
                     value={current.brief[field] || ''}
@@ -509,97 +567,213 @@ export const Step3ContentGeneration: React.FC<Step3ContentGenerationProps> = ({
         </section>
       ) : null}
 
-      {!workbenchMode || editing ? (
-        <section className="wf-struct-section">
-          <div className="wf-struct-head">
-            <div>
-              <span className="wf-stage-kicker">大纲节拍</span>
-              <h5>先定每一拍要完成什么</h5>
+      <section className="wf-struct-section">
+        <div className="wf-tab-header" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'brief'}
+            className={`wf-tab-btn ${activeTab === 'brief' ? 'active' : ''}`}
+            onClick={() => setActiveTab('brief')}
+          >
+            策略 Brief
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'outline'}
+            className={`wf-tab-btn ${activeTab === 'outline' ? 'active' : ''}`}
+            onClick={() => setActiveTab('outline')}
+          >
+            大纲节拍 ({(current.outline || []).length})
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'copy'}
+            className={`wf-tab-btn ${activeTab === 'copy' ? 'active' : ''}`}
+            onClick={() => setActiveTab('copy')}
+          >
+            最终文案
+          </button>
+        </div>
+
+        {activeTab === 'brief' && (!workbenchMode || editing) ? (
+          <div className="wf-tab-content" role="tabpanel">
+            <div className="wf-brief-grid">
+              {([
+                ['hookAngle', 'Hook 角度'],
+                ['tone', '语气'],
+                ['pacing', '节奏'],
+                ['ctaIntent', 'CTA 意图'],
+              ] as Array<[keyof CopyBrief, string]>).map(([field, label]) => (
+                <div key={field} className="wf-brief-card">
+                  <label htmlFor={`tab-brief-${field}`}>
+                    <span>{label}</span>
+                  </label>
+                  {editing ? (
+                    <textarea
+                      id={`tab-brief-${field}`}
+                      className="wf-edit-textarea"
+                      rows={3}
+                      value={current.brief[field] || ''}
+                      onChange={(event) => updateBrief(field, event.target.value)}
+                    />
+                  ) : (
+                    <p>{current.brief[field] || '待补充'}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === 'outline' && (!workbenchMode || editing) ? (
+          <div className="wf-tab-content" role="tabpanel">
+            <div className="wf-detail-list">
+              {(current.outline || []).map((item, index) => (
+                <div key={item.id || index} className="wf-detail-card">
+                  <div className="wf-detail-card-top">
+                    <strong>{item.label || `节拍 ${index + 1}`}</strong>
+                    {editing ? (
+                      <button type="button" className="wf-btn-remove-block" onClick={() => removeOutline(index)} aria-label={`删除节拍 ${index + 1}`}>删除</button>
+                    ) : null}
+                  </div>
+                  {editing ? (
+                    <div className="wf-form-stack">
+                      <label htmlFor={`outline-label-${index}`} className="sr-only">节拍标签</label>
+                      <input
+                        id={`outline-label-${index}`}
+                        className="wf-edit-label-input"
+                        value={item.label || ''}
+                        onChange={(event) => updateOutline(index, 'label', event.target.value)}
+                        placeholder="节拍标签"
+                      />
+                      <label htmlFor={`outline-beat-${index}`} className="sr-only">节拍内容</label>
+                      <textarea
+                        id={`outline-beat-${index}`}
+                        className="wf-edit-textarea"
+                        rows={2}
+                        value={item.beat || ''}
+                        onChange={(event) => updateOutline(index, 'beat', event.target.value)}
+                        placeholder="这一拍讲什么"
+                      />
+                      <label htmlFor={`outline-goal-${index}`} className="sr-only">节拍目标</label>
+                      <textarea
+                        id={`outline-goal-${index}`}
+                        className="wf-edit-textarea"
+                        rows={2}
+                        value={item.goal || ''}
+                        onChange={(event) => updateOutline(index, 'goal', event.target.value)}
+                        placeholder="这一拍的目标"
+                      />
+                      <label htmlFor={`outline-evidence-${index}`} className="sr-only">证据锚点</label>
+                      <input
+                        id={`outline-evidence-${index}`}
+                        className="wf-edit-label-input"
+                        value={item.evidenceAnchor || ''}
+                        onChange={(event) => updateOutline(index, 'evidenceAnchor', event.target.value)}
+                        placeholder="证据锚点"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <p>{item.beat || '待补充节拍说明'}</p>
+                      <div className="wf-fact-meta">
+                        <span>{item.goal || '待补充节拍目标'}</span>
+                        <small>{item.evidenceAnchor || '待补充证据锚点'}</small>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
             </div>
             {editing ? (
               <button type="button" className="wf-btn wf-btn-add-block" onClick={addOutline}>+ 添加节拍</button>
             ) : null}
           </div>
-          <div className="wf-detail-list">
-            {(current.outline || []).map((item, index) => (
-              <div key={item.id || index} className="wf-detail-card">
-                <div className="wf-detail-card-top">
-                  <strong>{item.label || `节拍 ${index + 1}`}</strong>
-                  {editing ? (
-                    <button type="button" className="wf-btn-remove-block" onClick={() => removeOutline(index)}>删除</button>
-                  ) : null}
-                </div>
-                {editing ? (
-                  <div className="wf-form-stack">
-                    <input className="wf-edit-label-input" value={item.label || ''} onChange={(event) => updateOutline(index, 'label', event.target.value)} placeholder="节拍标签" />
-                    <textarea className="wf-edit-textarea" rows={2} value={item.beat || ''} onChange={(event) => updateOutline(index, 'beat', event.target.value)} placeholder="这一拍讲什么" />
-                    <textarea className="wf-edit-textarea" rows={2} value={item.goal || ''} onChange={(event) => updateOutline(index, 'goal', event.target.value)} placeholder="这一拍的目标" />
-                    <input className="wf-edit-label-input" value={item.evidenceAnchor || ''} onChange={(event) => updateOutline(index, 'evidenceAnchor', event.target.value)} placeholder="证据锚点" />
-                  </div>
-                ) : (
-                  <>
-                    <p>{item.beat || '待补充节拍说明'}</p>
-                    <div className="wf-fact-meta">
-                      <span>{item.goal || '待补充节拍目标'}</span>
-                      <small>{item.evidenceAnchor || '待补充证据锚点'}</small>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
+        ) : null}
 
-      <section className="wf-struct-section">
-        <div className="wf-struct-head">
-          <div>
-            <span className="wf-stage-kicker">最终文案</span>
-            <h5>{workbenchMode ? '直接看可继续推进的成稿' : '确认后直接进入 Step 4 分镜'}</h5>
-          </div>
-          {editing ? (
-            <button type="button" className="wf-btn wf-btn-add-block" onClick={addBody}>+ 添加正文段落</button>
-          ) : null}
-        </div>
-
-        <div className="wf-copy-hero-block">
-          <span className="wf-stage-kicker">Hook</span>
-          {editing ? (
-            <textarea className="wf-edit-textarea" rows={4} value={current.hook} onChange={(event) => setDraft((prev) => ({...(prev || buildDraft(data)), hook: event.target.value}))} placeholder="输入开场 Hook..." />
-          ) : (
-            <p>{current.hook || '待生成 Hook'}</p>
-          )}
-        </div>
-
-        <div className="wf-detail-list">
-          {(current.body || []).map((item, index) => (
-            <div key={item.id || index} className="wf-detail-card">
-              <div className="wf-detail-card-top">
-                <strong>{item.label || `段落 ${index + 1}`}</strong>
-                {editing ? (
-                  <button type="button" className="wf-btn-remove-block" onClick={() => removeBody(index)}>删除</button>
-                ) : null}
-              </div>
+        {activeTab === 'copy' ? (
+          <div className="wf-tab-content" role="tabpanel">
+            <div className="wf-copy-hero-block">
+              <span className="wf-stage-kicker">Hook</span>
               {editing ? (
-                <div className="wf-form-stack">
-                  <input className="wf-edit-label-input" value={item.label || ''} onChange={(event) => updateBody(index, 'label', event.target.value)} placeholder="段落标签" />
-                  <textarea className="wf-edit-textarea" rows={4} value={item.text || ''} onChange={(event) => updateBody(index, 'text', event.target.value)} placeholder="输入正文段落..." />
-                </div>
+                <label htmlFor="hook-input" className="sr-only">开场 Hook</label>
+              ) : null}
+              {editing ? (
+                <textarea
+                  id="hook-input"
+                  className="wf-edit-textarea"
+                  rows={4}
+                  value={current.hook}
+                  onChange={(event) => setDraft((prev) => ({...(prev || buildDraft(data)), hook: event.target.value}))}
+                  placeholder="输入开场 Hook..."
+                />
               ) : (
-                <p>{item.text || '待补充正文内容'}</p>
+                <p className="wf-copy-hook-text">{current.hook || '待生成 Hook'}</p>
               )}
             </div>
-          ))}
-        </div>
 
-        <div className="wf-copy-hero-block wf-copy-cta-block">
-          <span className="wf-stage-kicker">CTA</span>
-          {editing ? (
-            <textarea className="wf-edit-textarea" rows={3} value={current.cta} onChange={(event) => setDraft((prev) => ({...(prev || buildDraft(data)), cta: event.target.value}))} placeholder="输入 CTA..." />
-          ) : (
-            <p>{current.cta || '待生成 CTA'}</p>
-          )}
-        </div>
+            <div className="wf-detail-list">
+              {(current.body || []).map((item, index) => (
+                <div key={item.id || index} className="wf-detail-card">
+                  <div className="wf-detail-card-top">
+                    <strong>{item.label || `段落 ${index + 1}`}</strong>
+                    {editing ? (
+                      <button type="button" className="wf-btn-remove-block" onClick={() => removeBody(index)} aria-label={`删除段落 ${index + 1}`}>删除</button>
+                    ) : null}
+                  </div>
+                  {editing ? (
+                    <div className="wf-form-stack">
+                      <label htmlFor={`body-label-${index}`} className="sr-only">段落标签</label>
+                      <input
+                        id={`body-label-${index}`}
+                        className="wf-edit-label-input"
+                        value={item.label || ''}
+                        onChange={(event) => updateBody(index, 'label', event.target.value)}
+                        placeholder="段落标签"
+                      />
+                      <label htmlFor={`body-text-${index}`} className="sr-only">正文内容</label>
+                      <textarea
+                        id={`body-text-${index}`}
+                        className="wf-edit-textarea"
+                        rows={4}
+                        value={item.text || ''}
+                        onChange={(event) => updateBody(index, 'text', event.target.value)}
+                        placeholder="输入正文段落..."
+                      />
+                    </div>
+                  ) : (
+                    <p className="wf-copy-body-text">{item.text || '待补充正文内容'}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            {editing ? (
+              <button type="button" className="wf-btn wf-btn-add-block" onClick={addBody}>+ 添加正文段落</button>
+            ) : null}
+
+            <div className="wf-copy-hero-block wf-copy-cta-block">
+              <span className="wf-stage-kicker">CTA</span>
+              {editing ? (
+                <label htmlFor="cta-input" className="sr-only">行动号召</label>
+              ) : null}
+              {editing ? (
+                <textarea
+                  id="cta-input"
+                  className="wf-edit-textarea"
+                  rows={3}
+                  value={current.cta}
+                  onChange={(event) => setDraft((prev) => ({...(prev || buildDraft(data)), cta: event.target.value}))}
+                  placeholder="输入 CTA..."
+                />
+              ) : (
+                <p className="wf-copy-cta-text">{current.cta || '待生成 CTA'}</p>
+              )}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {!workbenchMode ? (

@@ -25,8 +25,9 @@ const {
   normalizeVoiceRequest,
   normalizeWorkflowRequest,
   normalizeImageRequest,
-  sanitizeProjectId,
+  normalizeProjectSlugParam,
 } = require('../validators/requestValidators');
+const {createLogger} = require('../utils/logger');
 const {
   createWorkflowJob,
   readWorkflowJob,
@@ -62,6 +63,7 @@ const PORT = process.env.PORT || 3001;
 const QUEUE_MODE = (process.env.PIPELINE_QUEUE_MODE || 'file').toLowerCase();
 const USE_REDIS = QUEUE_MODE === 'redis';
 const SECURITY_CONFIG = getSecurityConfig();
+const logger = createLogger({scope: 'api', queueMode: QUEUE_MODE});
 const requireAdminAuth = createAdminAuthMiddleware(SECURITY_CONFIG);
 const adminReadRateLimitMiddleware = createAdminReadRateLimitMiddleware(SECURITY_CONFIG);
 const adminWriteRateLimitMiddleware = createAdminWriteRateLimitMiddleware(SECURITY_CONFIG);
@@ -102,6 +104,15 @@ function mapQueueState(state) {
     paused: 'paused',
   };
   return map[state] || state;
+}
+
+function logRouteError(route, error, data = {}) {
+  logger.error('route-failed', {
+    route,
+    status: error?.status || 500,
+    error,
+    ...data,
+  });
 }
 
 function isInsideDir(targetPath, dirPath) {
@@ -346,7 +357,13 @@ app.post('/api/render', async (req, res) => {
       jobId = addFileJob('render', jobPayload);
     }
 
-    console.log(`[API] Job queued: ${jobId}`);
+    logger.info('job-queued', {
+      route: 'POST /api/render',
+      jobId,
+      jobType: 'render',
+      projectId: jobPayload.projectId,
+      template: jobPayload.template,
+    });
     res.json({
       jobId,
       status: 'pending',
@@ -357,7 +374,7 @@ app.post('/api/render', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('[API] POST /api/render error:', err);
+    logRouteError('POST /api/render', err);
     res.status(err.status || 500).json({ error: err.message });
   }
 });
@@ -376,7 +393,7 @@ app.get('/api/render/:jobId', async (req, res) => {
 
     res.status(404).json({ error: '任务不存在', jobId });
   } catch (err) {
-    console.error('[API] GET /api/render/:jobId error:', err);
+    logRouteError('GET /api/render/:jobId', err, {jobId: req.params.jobId});
     res.status(500).json({ error: err.message });
   }
 });
@@ -409,7 +426,7 @@ app.get('/api/render/:jobId/download', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(downloadName)}"`);
     return res.sendFile(localOutputFile, { dotfiles: 'allow' });
   } catch (err) {
-    console.error('[API] GET /api/render/:jobId/download error:', err);
+    logRouteError('GET /api/render/:jobId/download', err, {jobId: req.params.jobId});
     return res.status(500).json({ error: err.message });
   }
 });
@@ -432,7 +449,11 @@ app.delete('/api/render/:jobId', requireAdminAuth, adminWriteRateLimitMiddleware
           return res.status(400).json({ error: '任务已完成，无法取消' });
         }
         await job.remove();
-        console.log(`[API] Job cancelled: ${jobId}`);
+        logger.info('job-cancelled', {
+          route: 'DELETE /api/render/:jobId',
+          jobId,
+          queueMode: 'redis',
+        });
         return res.json({ jobId, status: 'cancelled' });
       }
       return res.status(404).json({ error: '任务不存在' });
@@ -441,8 +462,14 @@ app.delete('/api/render/:jobId', requireAdminAuth, adminWriteRateLimitMiddleware
     if (!removeFileJob(jobId)) {
       return res.status(404).json({ error: '任务不存在' });
     }
+    logger.info('job-cancelled', {
+      route: 'DELETE /api/render/:jobId',
+      jobId,
+      queueMode: 'file',
+    });
     res.json({ jobId, status: 'cancelled' });
   } catch (err) {
+    logRouteError('DELETE /api/render/:jobId', err, {jobId: req.params.jobId});
     res.status(500).json({ error: err.message });
   }
 });
@@ -492,6 +519,7 @@ app.get('/api/render', requireAdminAuth, adminReadRateLimitMiddleware, async (re
       jobs: jobs.slice(normalizedOffset, normalizedOffset + normalizedLimit),
     });
   } catch (err) {
+    logRouteError('GET /api/render', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -516,6 +544,7 @@ app.post('/api/render/:jobId/retry', requireAdminAuth, adminWriteRateLimitMiddle
     }
     res.json({ jobId, status: 'retry_scheduled' });
   } catch (err) {
+    logRouteError('POST /api/render/:jobId/retry', err, {jobId: req.params.jobId});
     res.status(500).json({ error: err.message });
   }
 });
@@ -529,7 +558,7 @@ app.get('/api/skills/catalog', (req, res) => {
       generatedAt: new Date().toISOString(),
     });
   } catch (err) {
-    console.error('[API] GET /api/skills/catalog error:', err);
+    logRouteError('GET /api/skills/catalog', err);
     res.status(500).json({
       code: 'SKILL_CATALOG_FAILED',
       error: err.message,
@@ -551,7 +580,7 @@ app.get('/api/skills/:skillId', (req, res) => {
 
     return res.json(skill);
   } catch (err) {
-    console.error('[API] GET /api/skills/:skillId error:', err);
+    logRouteError('GET /api/skills/:skillId', err, {skillId: req.params.skillId});
     return res.status(500).json({
       code: 'SKILL_DETAIL_FAILED',
       error: err.message,
@@ -565,6 +594,11 @@ app.post('/api/workflow/generate', async (req, res) => {
     const workflowInput = normalizeWorkflowRequest(req.body);
     const job = createWorkflowJob(workflowInput);
     void runWorkflowJob(job.jobId, workflowInput, generateWorkflowStep);
+    logger.info('workflow-job-queued', {
+      route: 'POST /api/workflow/generate',
+      jobId: job.jobId,
+      stepId: workflowInput.stepId,
+    });
 
     res.status(202).json({
       jobId: job.jobId,
@@ -576,7 +610,7 @@ app.post('/api/workflow/generate', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('[API] POST /api/workflow/generate error:', err);
+    logRouteError('POST /api/workflow/generate', err);
     res.status(err.status || 500).json({
       code: err.code || 'WORKFLOW_GENERATION_FAILED',
       error: err.message,
@@ -593,7 +627,7 @@ app.get('/api/workflow/:jobId', (req, res) => {
     }
     return res.json(job);
   } catch (err) {
-    console.error('[API] GET /api/workflow/:jobId error:', err);
+    logRouteError('GET /api/workflow/:jobId', err, {jobId: req.params.jobId});
     return res.status(500).json({error: err.message});
   }
 });
@@ -605,7 +639,12 @@ app.post('/api/voice', async (req, res) => {
     const jobPayload = normalizeVoiceRequest(req.body);
 
     const jobId = await enqueueJob('voice', jobPayload);
-    console.log(`[API] Voice job queued: ${jobId}`);
+    logger.info('job-queued', {
+      route: 'POST /api/voice',
+      jobId,
+      jobType: 'voice',
+      projectId: jobPayload.projectId,
+    });
     res.json({
       jobId,
       status: 'pending',
@@ -615,7 +654,7 @@ app.post('/api/voice', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('[API] POST /api/voice error:', err);
+    logRouteError('POST /api/voice', err);
     res.status(err.status || 500).json({ error: err.message });
   }
 });
@@ -628,7 +667,7 @@ app.get('/api/voice/:jobId', async (req, res) => {
     }
     res.json(response);
   } catch (err) {
-    console.error('[API] GET /api/voice/:jobId error:', err);
+    logRouteError('GET /api/voice/:jobId', err, {jobId: req.params.jobId});
     res.status(500).json({ error: err.message });
   }
 });
@@ -652,7 +691,7 @@ app.post('/api/voice/:jobId/retry', requireAdminAuth, adminWriteRateLimitMiddlew
     }
     res.json({ jobId, status: 'retry_scheduled' });
   } catch (err) {
-    console.error('[API] POST /api/voice/:jobId/retry error:', err);
+    logRouteError('POST /api/voice/:jobId/retry', err, {jobId: req.params.jobId});
     res.status(500).json({ error: err.message });
   }
 });
@@ -690,6 +729,7 @@ function readImageJob(jobId) {
 }
 
 function writeImageJob(job) {
+  fs.mkdirSync(IMAGE_JOBS_DIR, {recursive: true});
   fs.writeFileSync(getImageJobPath(job.jobId), JSON.stringify(job, null, 2));
   return job;
 }
@@ -1038,7 +1078,12 @@ async function runImageGenerationJob(jobId) {
       return;
     }
 
-    console.warn('[API] image script failed, fallback to inline SVG:', stderr.substring(0, 200));
+    logger.warn('image-script-fallback', {
+      jobId,
+      reason: 'process-exit',
+      exitCode: code,
+      stderrSnippet: stderr.substring(0, 200),
+    });
     try {
       settled = true;
       await runInlineImageGeneration(jobId);
@@ -1064,7 +1109,11 @@ async function runImageGenerationJob(jobId) {
       // ignore
     }
 
-    console.warn('[API] image script spawn error, fallback to inline SVG:', error.message);
+    logger.warn('image-script-fallback', {
+      jobId,
+      reason: 'spawn-error',
+      error,
+    });
     try {
       await runInlineImageGeneration(jobId);
     } catch (fallbackError) {
@@ -1083,6 +1132,13 @@ app.post('/api/images/generate', async (req, res) => {
     const {projectId, prompts, shots} = normalizeImageRequest(req.body);
     const job = createImageJob({ projectId, prompts, shots });
     void runImageGenerationJob(job.jobId);
+    logger.info('job-queued', {
+      route: 'POST /api/images/generate',
+      jobId: job.jobId,
+      jobType: 'images',
+      projectId,
+      shotCount: Array.isArray(shots) ? shots.length : 0,
+    });
 
     res.json({
       jobId: job.jobId,
@@ -1096,7 +1152,7 @@ app.post('/api/images/generate', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('[API] POST /api/images/generate error:', err);
+    logRouteError('POST /api/images/generate', err);
     res.status(err.status || 500).json({ error: err.message });
   }
 });
@@ -1110,7 +1166,7 @@ app.get('/api/images/:jobId', async (req, res) => {
 
     return res.json(job);
   } catch (err) {
-    console.error('[API] GET /api/images/:jobId error:', err);
+    logRouteError('GET /api/images/:jobId', err, {jobId: req.params.jobId});
     return res.status(500).json({ error: err.message });
   }
 });
@@ -1162,7 +1218,7 @@ app.get('/api/jobs', requireAdminAuth, adminReadRateLimitMiddleware, async (req,
       jobs,
     });
   } catch (err) {
-    console.error('[API] GET /api/jobs error:', err);
+    logRouteError('GET /api/jobs', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1188,7 +1244,13 @@ app.get('/api/projects', requireAdminAuth, adminReadRateLimitMiddleware, (req, r
  * 列出项目资产
  */
 app.get('/api/projects/:project/assets', requireAdminAuth, adminReadRateLimitMiddleware, (req, res) => {
-  const project = sanitizeProjectId(req.params.project);
+  let project;
+  try {
+    project = normalizeProjectSlugParam(req.params.project);
+  } catch (error) {
+    logRouteError('GET /api/projects/:project/assets', error, {project: req.params.project});
+    return res.status(error.status || 400).json({error: error.message});
+  }
   const assetDir = path.join(ASSETS_DIR, project);
   if (!fs.existsSync(assetDir)) return res.json({ assets: [] });
 
@@ -1264,10 +1326,12 @@ app.get('/', (req, res) => {
 // ─── Start ────────────────────────────────────────────────
 function startServer(port = PORT) {
   return app.listen(port, () => {
-    console.log(`\n🎬 OpenClaw Video Pipeline API`);
-    console.log(`   http://localhost:${port}`);
-    console.log(`   Queue mode: ${QUEUE_MODE}`);
-    console.log(`   Health: http://localhost:${port}/health\n`);
+    logger.info('server-started', {
+      port,
+      queueMode: QUEUE_MODE,
+      baseUrl: `http://localhost:${port}`,
+      healthUrl: `http://localhost:${port}/health`,
+    });
   });
 }
 
@@ -1283,5 +1347,13 @@ module.exports = {
     writeRateLimitMiddleware.reset?.();
     adminReadRateLimitMiddleware.reset?.();
     adminWriteRateLimitMiddleware.reset?.();
+  },
+  __testUtils: {
+    createImageJob,
+    readImageJob,
+    runInlineImageGeneration,
+    getImageJobPath,
+    IMAGE_JOBS_DIR,
+    ASSETS_DIR,
   },
 };

@@ -7,6 +7,8 @@
 
 let _queue;
 let _connection;
+const {createLogger} = require('../utils/logger');
+const logger = createLogger({scope: 'render-queue'});
 
 function getConnection() {
   if (!_connection) {
@@ -17,11 +19,11 @@ function getConnection() {
     });
 
     _connection.on('error', err => {
-      console.error('[Queue] Redis connection error:', err.message);
+      logger.error('redis-connection-error', {error: err});
     });
 
     _connection.on('connect', () => {
-      console.log('[Queue] Connected to Redis');
+      logger.info('redis-connected');
     });
   }
   return _connection;
@@ -40,7 +42,7 @@ function getQueue() {
     });
 
     _queue.on('error', err => {
-      console.error('[Queue] Queue error:', err.message);
+      logger.error('queue-error', {error: err});
     });
   }
   return _queue;
@@ -73,17 +75,17 @@ function setupQueueEvents(handler) {
   const queue = getQueue();
 
   queue.on('active', ({ jobId }) => {
-    console.log(`[Queue] ▶ Job ${jobId} started`);
+    logger.info('job-started', {jobId});
     handler?.('active', jobId);
   });
 
   queue.on('completed', ({ jobId, returnvalue }) => {
-    console.log(`[Queue] ✅ Job ${jobId} completed`);
+    logger.info('job-completed', {jobId});
     handler?.('completed', jobId, returnvalue);
   });
 
   queue.on('failed', ({ jobId, failedReason }) => {
-    console.error(`[Queue] ❌ Job ${jobId} failed: ${failedReason}`);
+    logger.error('job-failed', {jobId, failedReason});
     handler?.('failed', jobId, failedReason);
   });
 
@@ -92,11 +94,11 @@ function setupQueueEvents(handler) {
   });
 
   queue.on('delayed', ({ jobId }) => {
-    console.log(`[Queue] ⏸ Job ${jobId} delayed`);
+    logger.info('job-delayed', {jobId});
   });
 
   queue.on('waiting', ({ jobId }) => {
-    console.log(`[Queue] ⏳ Job ${jobId} waiting`);
+    logger.info('job-waiting', {jobId});
   });
 }
 

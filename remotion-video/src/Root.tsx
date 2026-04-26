@@ -22,6 +22,13 @@ export type RenderShotProps = {
   imageUrl?: string | null;
   posterMode?: boolean;
   promptZh?: string;
+  sceneIntent?: string;
+  evidenceAnchor?: string;
+  storyboardCueZh?: string;
+  scriptBlockId?: string;
+  scriptBlockLabel?: string;
+  scriptSourceText?: string;
+  scriptExcerpt?: string;
   visualSummaryZh?: string;
   visualFocusZh?: string;
   comparisonSummaryZh?: string;
@@ -131,13 +138,25 @@ export type UltimateSceneCompositionProps = {
   renderHeight?: number;
 };
 
-const DEFAULT_PROPS: VideoProps = {
+type OpenClawCompositionProps = VideoProps & {
+  propsFile?: string | null;
+};
+
+const DEFAULT_PROPS: OpenClawCompositionProps = {
+  propsFile: null,
   template: 'caption',
   subtitleStyle: 'caption',
   theme: 'tech-dark',
   typewriter: true,
   projectId: 'default',
   quality: 'high',
+};
+
+const DEFAULT_ULTIMATE_PROPS: UltimateSceneCompositionProps = {
+  propsFile: null,
+  config: ULTIMATE_SCENE_DEMO,
+  voiceFile: null,
+  audioSegments: null,
 };
 
 const resolvePositiveInt = (value: number | undefined, fallback: number) => {
@@ -152,13 +171,13 @@ export const RemotionRoot: React.FC = () => {
       {/* OpenClaw 通用模板 */}
       <Composition
         id="OpenClawVideo"
-        component={FileBackedOpenClawVideo as React.FC<Record<string, unknown>>}
+        component={FileBackedOpenClawVideo}
         durationInFrames={ROOT_DURATION_IN_FRAMES}
         fps={FPS}
         width={VIDEO_WIDTH}
         height={VIDEO_HEIGHT}
-        calculateMetadata={({props: metadataProps}: {props: VideoProps}) => {
-          const resolvedProps: VideoProps = {
+        calculateMetadata={({props: metadataProps}: {props: OpenClawCompositionProps}) => {
+          const resolvedProps: OpenClawCompositionProps = {
             ...DEFAULT_PROPS,
             ...(metadataProps ?? {}),
           };
@@ -170,8 +189,7 @@ export const RemotionRoot: React.FC = () => {
             height: resolvePositiveInt(resolvedProps.renderHeight, VIDEO_HEIGHT),
           };
         }}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        defaultProps={DEFAULT_PROPS as any}
+        defaultProps={DEFAULT_PROPS}
       />
       <Composition
         id="UltimateElementsLibrary"
@@ -183,7 +201,7 @@ export const RemotionRoot: React.FC = () => {
       />
       <Composition
         id="UltimateSceneTemplate"
-        component={FileBackedUltimateSceneTemplate as React.FC<Record<string, unknown>>}
+        component={FileBackedUltimateSceneTemplate}
         durationInFrames={getUltimateProjectDuration(ULTIMATE_SCENE_DEMO)}
         fps={30}
         width={1920}
@@ -201,8 +219,7 @@ export const RemotionRoot: React.FC = () => {
             height: resolvePositiveInt(props?.renderHeight, 1080),
           };
         }}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        defaultProps={{config: ULTIMATE_SCENE_DEMO} as any}
+        defaultProps={DEFAULT_ULTIMATE_PROPS}
       />
     </>
   );

@@ -124,7 +124,7 @@ interface VideoProjectStore {
   projectId: string;
   template: 'caption' | 'split' | 'fullscreen';
   script: string;
-  voice: 'melo' | 'azure';
+  voice: 'qwen-tts';
   progress: number;
   subtitles: SubtitleTrack | null;
   

@@ -17,6 +17,8 @@ export interface StepSkillConfig {
   targetWordCount?: number | null;
   antiAiLevel?: Step3AntiAiLevel | string;
   spokenPersona?: string;
+  // Extra fields collected at runtime — typed loosely but not [key:string]:any
+  extra?: Record<string, string>;
 }
 
 export type PipelineStepSkills = Partial<Record<SkillDrivenStepId, StepSkillConfig>>;
@@ -38,7 +40,7 @@ export interface SkillSpec extends SkillCatalogEntry {
   version?: string;
   inputs?: string[];
   outputs?: string[];
-  defaults?: Record<string, any> | null;
+  defaults?: StepSkillConfig | null;
   constraints?: string[];
   qualityRules?: string[];
   uiHints?: string[];
@@ -57,18 +59,7 @@ export interface StepEvaluation {
   evaluatedAt?: string;
 }
 
-export interface ProjectBuildState {
-  projectPath?: string;
-  compositionId?: string;
-  stylePreset?: string;
-  buildStatus?: 'ready' | 'missing' | 'error' | 'draft' | string;
-  files?: string[];
-  summary?: string;
-  notes?: string;
-  renderCommand?: string;
-  eval?: StepEvaluation | null;
-  [key: string]: any;
-}
+// ─── Sub-state strict types ───────────────────────────────────────────────
 
 export interface PipelineResearchFact {
   id?: string;
@@ -106,7 +97,6 @@ export interface PipelineAnalysisState {
   researchFacts?: PipelineResearchFact[];
   layers?: PipelineAnalysisLayer[];
   process?: PipelineAnalysisProcessItem[];
-  [key: string]: any;
 }
 
 export interface PipelineTitleStrategy {
@@ -126,7 +116,6 @@ export interface PipelineTitleOption {
   rationale?: string;
   evidenceAnchor?: string;
   hookStyle?: string;
-  [key: string]: any;
 }
 
 export interface PipelineTitlesState {
@@ -135,7 +124,6 @@ export interface PipelineTitlesState {
   options?: PipelineTitleOption[];
   selectedId?: string | null;
   selectedReason?: string;
-  [key: string]: any;
 }
 
 export interface PipelineCopyBrief {
@@ -158,13 +146,46 @@ export interface PipelineCopyOutlineItem {
   beat?: string;
   goal?: string;
   evidenceAnchor?: string;
+  sceneIntent?: string;
+  mustInclude?: string[];
+  transitionToNext?: string;
+  keywords?: string[];
 }
 
 export interface PipelineCopyBlock {
   id?: string;
   text?: string;
   label?: string;
-  [key: string]: any;
+  sceneIntent?: string;
+  evidenceAnchor?: string;
+  transitionToNext?: string;
+  keywords?: string[];
+  dataPoints?: string[];
+}
+
+export interface PipelineCopyTitleAlignment {
+  selectedTitle?: string;
+  titleKeywords?: string[];
+  matchedKeywords?: string[];
+  missingKeywords?: string[];
+  score?: number;
+}
+
+export interface PipelineCopyStorySpine {
+  openingPromise?: string;
+  mainClaim?: string;
+  audience?: string;
+  sceneIntents?: string[];
+  closingMove?: string;
+}
+
+export interface PipelineCopyCoverage {
+  bodyBlockCount?: number;
+  evidenceAnchors?: string[];
+  keywordCount?: number;
+  matchedKeywordCount?: number;
+  targetDurationSeconds?: number;
+  estimatedSceneCount?: number;
 }
 
 export interface PipelineCopyState {
@@ -174,13 +195,22 @@ export interface PipelineCopyState {
   hook?: string;
   body?: PipelineCopyBlock[];
   cta?: string;
-  [key: string]: any;
+  titleAlignment?: PipelineCopyTitleAlignment | null;
+  storySpine?: PipelineCopyStorySpine | null;
+  coverage?: PipelineCopyCoverage | null;
 }
 
 export interface PipelinePromptEntry {
   prompt?: string;
   promptZh?: string;
   shotTitle?: string;
+  sceneIntent?: string;
+  evidenceAnchor?: string;
+  storyboardCueZh?: string;
+  scriptBlockId?: string;
+  scriptBlockLabel?: string;
+  scriptSourceText?: string;
+  scriptExcerpt?: string;
   visualSummaryZh?: string;
   visualFocusZh?: string;
   text?: string;
@@ -197,25 +227,21 @@ export interface PipelinePromptEntry {
   visual?: {
     description?: string;
     focus?: string;
-    [key: string]: any;
   };
   imageUrl?: string;
   status?: 'pending' | 'generating' | 'done' | 'error';
   duration?: number;
   durationSeconds?: number;
-  [key: string]: any;
 }
 
 export interface PipelinePromptsState {
   byShotId?: Record<string, PipelinePromptEntry>;
-  [key: string]: any;
 }
 
 export interface PipelineVoiceScriptEntry {
   shotId?: string;
   text?: string;
   duration?: number;
-  [key: string]: any;
 }
 
 export interface PipelineVoiceState {
@@ -223,7 +249,6 @@ export interface PipelineVoiceState {
   preset?: string;
   byShotId?: Record<string, PipelinePromptEntry>;
   script?: PipelineVoiceScriptEntry[];
-  [key: string]: any;
 }
 
 export interface PipelineImagesState {
@@ -241,13 +266,25 @@ export interface PipelineImagesState {
   startedAt?: string | null;
   completedAt?: string | null;
   error?: string | null;
-  [key: string]: any;
 }
 
 export interface PipelineTopicResearch {
-  results?: any[];
-  [key: string]: any;
+  results?: unknown[];
 }
+
+export interface ProjectBuildState {
+  projectPath?: string;
+  compositionId?: string;
+  stylePreset?: string;
+  buildStatus?: 'ready' | 'missing' | 'error' | 'draft' | string;
+  files?: string[];
+  summary?: string;
+  notes?: string;
+  renderCommand?: string;
+  eval?: StepEvaluation | null;
+}
+
+// ─── Pipeline Payload ───────────────────────────────────────────────────────
 
 export interface PipelinePayload {
   inputTopic?: string;
@@ -265,13 +302,14 @@ export interface PipelinePayload {
   prompts?: PipelinePromptsState | null;
   voice?: PipelineVoiceState | null;
   projectBuild?: ProjectBuildState | null;
-  render?: Record<string, any> | null;
+  render?: Record<string, unknown> | null;
   images?: PipelineImagesState | null;
   selectedAnalysis?: PipelineAnalysisState | null;
   selectedTitleId?: string | null;
   shots?: Shot[];
-  [key: string]: any;
 }
+
+// ─── Session / Persistence ─────────────────────────────────────────────────
 
 export interface VoiceAssetPreview extends VoiceQueueItem {
   title: string;
@@ -288,7 +326,7 @@ export interface PipelineSessionSnapshot {
   activeStep: WorkflowStepId;
   stepDone: Record<number, boolean>;
   stepConfirmed: Record<number, boolean>;
-  selectedAnalysis: any;
+  selectedAnalysis: PipelineAnalysisState | null;
   selectedTitleId: string | null;
   previewRatio: PreviewRatio;
   voiceJobId: string | null;
@@ -306,4 +344,5 @@ export interface PipelineSessionSnapshot {
 
 export interface PersistedPipelineSnapshot extends PipelineSessionSnapshot {
   savedAt: number;
+  schemaVersion?: number;
 }

@@ -19,6 +19,14 @@
   box-sizing: border-box;
 }
 
+:focus {
+  outline-color: var(--blue);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 html,
 body,
 #root {
@@ -43,7 +51,7 @@ select,
 .wf-prompt-card,
 .wf-shot,
 .wf-copy-block {
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .workflow-app {
@@ -928,6 +936,34 @@ select,
   color: var(--muted);
 }
 
+.mac-preview-keyboard-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  font-size: 11px;
+  color: var(--muted);
+  align-items: center;
+}
+
+.mac-preview-keyboard-hints kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 4px;
+  border: 1px solid #c6c6c8;
+  background: #f5f5f7;
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--text);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+}
+
 .mac-step-shell {
   min-height: 0;
   display: grid;
@@ -1317,8 +1353,8 @@ textarea.wf-edit-textarea {
 input.wf-edit-label-input:focus,
 textarea.wf-edit-textarea:focus {
   border-color: var(--blue);
-  outline: none;
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.16);
+  outline: none;
 }
 
 .mac-textarea {
@@ -1794,6 +1830,15 @@ input[type='range']::-webkit-slider-thumb {
   cursor: pointer;
 }
 
+.mac-timeline-ruler:focus {
+  outline: none;
+}
+
+.mac-timeline-ruler:focus-visible {
+  background: rgba(0, 122, 255, 0.05);
+  box-shadow: inset 0 -2px 0 var(--blue);
+}
+
 .mac-tick {
   position: absolute;
   top: 0;
@@ -1927,6 +1972,12 @@ input[type='range']::-webkit-slider-thumb {
 .mac-sequence-block.active {
   border-color: var(--blue);
   box-shadow: 0 0 0 2px var(--blue-soft);
+}
+
+.mac-sequence-block:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  z-index: 1;
 }
 
 .mac-playhead {
@@ -2839,6 +2890,129 @@ input[type='range']::-webkit-slider-thumb {
   background: linear-gradient(180deg, #fff9f3, #fff);
 }
 
+.wf-copy-hook-text,
+.wf-copy-body-text,
+.wf-copy-cta-text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.wf-tab-header {
+  display: flex;
+  gap: 4px;
+  padding: 0 0 12px 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+
+.wf-tab-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wf-tab-btn:hover {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.wf-tab-btn.active {
+  color: var(--blue);
+  background: rgba(0, 122, 255, 0.08);
+  border-color: rgba(0, 122, 255, 0.2);
+}
+
+.wf-tab-btn:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.wf-tab-content {
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wf-copy-progress {
+  margin: 0 0 16px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fafafa, #ffffff);
+}
+
+.wf-copy-progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.wf-copy-progress-count {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.wf-copy-progress-count strong {
+  font-weight: 600;
+}
+
+.wf-copy-progress-count strong.is-low {
+  color: #d97706;
+}
+
+.wf-copy-progress-count strong.is-good {
+  color: #059669;
+}
+
+.wf-copy-progress-count strong.is-high {
+  color: #dc2626;
+}
+
+.wf-copy-progress-bar {
+  height: 6px;
+  background: #e5e5ea;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.wf-copy-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.wf-copy-progress-fill.is-low {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.wf-copy-progress-fill.is-good {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.wf-copy-progress-fill.is-high {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
 .wf-confirm-row {
   display: flex;
   align-items: center;
@@ -3283,5 +3457,33 @@ input[type='range']::-webkit-slider-thumb {
   .wf-strategy-grid,
   .wf-title-grid-upgraded {
     grid-template-columns: 1fr;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .mac-status-pill.is-animated::after,
+  .mac-progress > span.is-animated,
+  .mac-step-badge.is-generating::after {
+    animation: none !important;
   }
 }

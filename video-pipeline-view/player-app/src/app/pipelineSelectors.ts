@@ -282,9 +282,10 @@ export function normalizeShots(updated: Array<Partial<Shot>>, currentShots: Shot
 }
 
 export function mergeVoiceUpdateIntoShots(shotsState: Shot[], updated: PipelinePayload) {
-  const byShotId = updated?.byShotId && typeof updated.byShotId === 'object' ? updated.byShotId : {};
-  const scriptMap = Array.isArray(updated?.script)
-    ? Object.fromEntries(updated.script.map((item: any) => [item.shotId, item]))
+  const voice = updated?.voice;
+  const byShotId = voice?.byShotId && typeof voice.byShotId === 'object' ? voice.byShotId : {};
+  const scriptMap = Array.isArray(voice?.script)
+    ? Object.fromEntries(voice.script.map((item) => [item.shotId ?? '', item]))
     : {};
 
   if (Object.keys(byShotId).length === 0 && Object.keys(scriptMap).length === 0) {

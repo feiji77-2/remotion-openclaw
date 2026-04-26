@@ -104,37 +104,17 @@ export const VideoEditor: React.FC = () => {
 
           {/* 语音选择 */}
           <div className="glass rounded-xl p-6">
-            <h2 className="text-lg font-medium mb-4">配音类型</h2>
-            <div className="grid grid-cols-3 gap-3">
+            <h2 className="text-lg font-medium mb-4">配音引擎</h2>
+            <div className="grid grid-cols-1 gap-3">
               <button
-                onClick={() => setVoice('chattts')}
+                onClick={() => setVoice('qwen-tts')}
                 className={`px-4 py-3 rounded-lg transition-all ${
-                  voice === 'chattts'
+                  voice === 'qwen-tts'
                     ? 'bg-primary text-white'
                     : 'bg-background-card text-text-secondary hover:bg-white/5'
                 }`}
               >
-                ChatTTS
-              </button>
-              <button
-                onClick={() => setVoice('melo')}
-                className={`px-4 py-3 rounded-lg transition-all ${
-                  voice === 'melo'
-                    ? 'bg-primary text-white'
-                    : 'bg-background-card text-text-secondary hover:bg-white/5'
-                }`}
-              >
-                MeloTTS
-              </button>
-              <button
-                onClick={() => setVoice('azure')}
-                className={`px-4 py-3 rounded-lg transition-all ${
-                  voice === 'azure'
-                    ? 'bg-primary text-white'
-                    : 'bg-background-card text-text-secondary hover:bg-white/5'
-                }`}
-              >
-                Azure TTS
+                阿里千问 TTS
               </button>
             </div>
           </div>

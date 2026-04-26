@@ -1,7 +1,7 @@
 export type WorkflowStepId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type JobStatus = 'pending' | 'running' | 'done' | 'error' | 'idle';
 export type PreviewRatio = 'landscape' | 'portrait';
-export type VoiceEngine = 'chattts' | 'openvoice' | 'melo' | 'azure' | 'elevenlabs';
+export type VoiceEngine = 'qwen-tts';
 
 export interface Shot {
   id: string;

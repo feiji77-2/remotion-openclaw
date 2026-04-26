@@ -20,6 +20,14 @@ function normalizeCopyRequirements(requirements) {
   return Object.values(normalized).some(Boolean) ? normalized : null;
 }
 
+function normalizeStringArray(items, max = 8) {
+  return [...new Set(
+    (Array.isArray(items) ? items : [])
+      .map((item) => String(item || '').trim())
+      .filter(Boolean),
+  )].slice(0, max);
+}
+
 function normalizeStep1Payload(stage1, stage2, input) {
   const current = clone(input.pipelineState?.analysis || {});
   const currentLayers = Array.isArray(current.layers) ? current.layers : [];
@@ -121,16 +129,27 @@ function normalizeStep3Payload(stage1, stage2, input) {
         ctaIntent: String(stage1.brief.ctaIntent || current.brief?.ctaIntent || '').trim(),
       },
       outline: stage1.outline.map((item, index) => ({
+        ...(currentOutline[index] && typeof currentOutline[index] === 'object' ? currentOutline[index] : {}),
         id: currentOutline[index]?.id || `copy-outline-${index + 1}`,
         label: String(item.label || currentOutline[index]?.label || `节拍 ${index + 1}`).trim(),
         beat: String(item.beat || currentOutline[index]?.beat || '').trim(),
         goal: String(item.goal || currentOutline[index]?.goal || '').trim(),
         evidenceAnchor: String(item.evidenceAnchor || currentOutline[index]?.evidenceAnchor || '').trim(),
+        sceneIntent: String(item.sceneIntent || currentOutline[index]?.sceneIntent || item.label || item.goal || '').trim(),
+        transitionToNext: String(item.transitionToNext || currentOutline[index]?.transitionToNext || '').trim(),
+        mustInclude: normalizeStringArray(item.mustInclude || currentOutline[index]?.mustInclude, 4),
+        keywords: normalizeStringArray(item.keywords || currentOutline[index]?.keywords, 6),
       })),
       body: stage2.copy.body.map((item, index) => ({
+        ...(currentBody[index] && typeof currentBody[index] === 'object' ? currentBody[index] : {}),
         id: currentBody[index]?.id || `copy-${index + 1}`,
         label: String(item.label || currentBody[index]?.label || `段落 ${index + 1}`).trim(),
         text: String(item.text || currentBody[index]?.text || '').trim(),
+        sceneIntent: String(item.sceneIntent || currentBody[index]?.sceneIntent || item.label || '').trim(),
+        evidenceAnchor: String(item.evidenceAnchor || currentBody[index]?.evidenceAnchor || '').trim(),
+        transitionToNext: String(item.transitionToNext || currentBody[index]?.transitionToNext || '').trim(),
+        keywords: normalizeStringArray(item.keywords || currentBody[index]?.keywords, 6),
+        dataPoints: normalizeStringArray(item.dataPoints || currentBody[index]?.dataPoints, 5),
       })),
       cta: String(stage2.copy.cta || current.cta || '').trim(),
     },

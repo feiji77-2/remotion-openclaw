@@ -1,16 +1,14 @@
-import React, {useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {usePipelineOrchestrator} from './app/usePipelineOrchestrator';
 import {usePreviewPlayback} from './app/usePreviewPlayback';
-import {StepWorkspace} from './components/steps/StepWorkspace';
+import {computeStepBadgeClass, computeStepBadgeLabel, useBuildStatus, useStepStatus} from './app/useStepStatus';
 import {STEP_LIST} from './workflow/steps';
+import {StepWorkspace} from './components/steps/StepWorkspace';
 
 const App: React.FC = () => {
   const {
     activeStep,
     activeStepMeta,
-    activeStepStatusClass,
-    activeStepStatusLabel,
-    activeStepSummary,
     apiBase,
     apiKey,
     appliedTitleKeywords,
@@ -59,8 +57,6 @@ const App: React.FC = () => {
     skillCatalog,
     shotsState,
     showToast,
-    statusClass,
-    statusLabel,
     stepConfirmed,
     stepDone,
     stepSkillDirty,
@@ -85,39 +81,175 @@ const App: React.FC = () => {
     voiceProgress,
     voiceResult,
   } = usePipelineOrchestrator();
+
   const [collapsedTracks, setCollapsedTracks] = useState({v1: false, g1: false, a1: false});
-  const {
-    currentFrame,
-    formatTimecode,
-    hoverFrame,
-    isPlaying,
-    onTimelineHoverMove,
-    onTimelinePointer,
-    setCurrentFrame,
-    setHoverFrame,
-    setIsPlaying,
-    timelineMarks,
-    timelineTrackRef,
-  } = usePreviewPlayback({
+  const appRef = useRef<HTMLDivElement>(null);
+
+  const {currentFrame, formatTimecode, hoverFrame, isPlaying, onTimelineHoverMove,
+    onTimelinePointer, setCurrentFrame, setHoverFrame, setIsPlaying, timelineMarks,
+    timelineTrackRef} = usePreviewPlayback({
     fps: projectState.fps,
     totalFrames,
     resetKey: playbackResetKey,
   });
-  const projectBuildStatusClass = useMemo(() => {
-    if (pipelineState.projectBuild?.buildStatus === 'ready') return 'is-done';
-    if (pipelineState.projectBuild?.buildStatus === 'missing' || pipelineState.projectBuild?.buildStatus === 'error') return 'is-error';
-    return 'is-idle';
-  }, [pipelineState.projectBuild?.buildStatus]);
-  const projectBuildStatusLabel = useMemo(() => {
-    if (pipelineState.projectBuild?.buildStatus === 'ready') return '就绪';
-    if (pipelineState.projectBuild?.buildStatus === 'missing') return '缺失';
-    if (pipelineState.projectBuild?.buildStatus === 'error') return '错误';
-    return '待生成';
-  }, [pipelineState.projectBuild?.buildStatus]);
+
+  const buildStatus = useBuildStatus(pipelineState.projectBuild);
+
+  const activeStepStatus = useStepStatus({
+    stepConfirmed,
+    stepDone,
+    stepSkillDirty,
+    stepId: activeStep,
+  });
+
+  const pipelineStatus = useMemo(() => {
+    if (imageStatus === 'error' || voiceJobStatus === 'error' || renderJobStatus === 'error') {
+      return {className: 'is-error', label: '错误'};
+    }
+    if (imageStatus === 'running' || voiceJobStatus === 'running' || renderJobStatus === 'running' ||
+        imageStatus === 'pending' || voiceJobStatus === 'pending' || renderJobStatus === 'pending') {
+      return {className: 'is-running', label: '运行中'};
+    }
+    if (imageStatus === 'done' && voiceJobStatus === 'done' && renderJobStatus === 'done') {
+      return {className: 'is-done', label: '完成'};
+    }
+    return {className: 'is-idle', label: '空闲'};
+  }, [imageStatus, voiceJobStatus, renderJobStatus]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (previewMode !== 'media') return;
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowLeft':
+        e.preventDefault();
+        setCurrentFrame((f) => Math.max(0, f - (e.shiftKey ? 10 : 1)));
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        setCurrentFrame((f) => Math.min(totalFrames - 1, f + (e.shiftKey ? 10 : 1)));
+        break;
+      case ' ':
+        e.preventDefault();
+        setIsPlaying((v) => !v);
+        break;
+      case 'Home':
+        e.preventDefault();
+        setCurrentFrame(0);
+        break;
+      case 'End':
+        e.preventDefault();
+        setCurrentFrame(totalFrames - 1);
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setIsPlaying(false);
+        break;
+    }
+  }, [previewMode, totalFrames, setCurrentFrame, setIsPlaying]);
+
+  useEffect(() => {
+    const app = appRef.current;
+    if (app) {
+      app.addEventListener('keydown', handleKeyDown as EventListener);
+      return () => app.removeEventListener('keydown', handleKeyDown as EventListener);
+    }
+  }, [handleKeyDown]);
+
+  // ── Step list rendering ───────────────────────────────────────────────────
+
+  const stepList = useMemo(() => {
+    return STEP_LIST.map((step) => {
+      const stepIndex = STEP_LIST.findIndex((s) => s.id === step.id);
+      const blockedBy = stepIndex > 0
+        ? STEP_LIST.slice(0, stepIndex).find((prev) => !stepConfirmed[prev.id]) ?? null
+        : null;
+      const isLoading = Boolean(stepLoading[step.id]);
+      const isConfirmed = Boolean(stepConfirmed[step.id]);
+      const isGenerated = Boolean(stepDone[step.id]);
+      const isSkillDirty = Boolean(stepSkillDirty[step.id]);
+      const isRenderStep = step.id === 8;
+
+      const badgeLabel = computeStepBadgeLabel({
+        stepId: step.id,
+        isRenderStep,
+        isLoading,
+        isConfirmed,
+        isGenerated,
+        isSkillDirty,
+        blockedBy,
+        renderStepHasError,
+        renderStepIsRunning,
+        renderMediaReady,
+        renderStepConfigured,
+      });
+
+      const badgeClass = computeStepBadgeClass({
+        stepId: step.id,
+        isRenderStep,
+        isLoading,
+        isConfirmed,
+        isGenerated,
+        isSkillDirty,
+        blockedBy,
+        renderStepHasError,
+        renderStepIsRunning,
+        renderMediaReady,
+        renderStepConfigured,
+      });
+
+      return {
+        step,
+        blockedBy,
+        isLoading,
+        isConfirmed,
+        isGenerated,
+        isSkillDirty,
+        isRenderStep,
+        badgeLabel,
+        badgeClass,
+      };
+    });
+  }, [stepConfirmed, stepDone, stepLoading, stepSkillDirty, renderStepHasError,
+      renderStepIsRunning, renderMediaReady, renderStepConfigured]);
+
+  // ── Timeline shot blocks ──────────────────────────────────────────────────
+
+  const shotBlocks = useMemo(() => {
+    let leftFrame = 0;
+    return shotsState.map((shot, idx) => {
+      const widthFrame = Math.round(shot.durationSeconds * projectState.fps);
+      const left = (leftFrame / totalFrames) * 100;
+      const width = (widthFrame / totalFrames) * 100;
+      leftFrame += widthFrame;
+      return {shot, left, width, idx};
+    });
+  }, [shotsState, projectState.fps, totalFrames]);
+
+  const graphicBlocks = useMemo(() => {
+    let leftFrame = 0;
+    return shotsState.slice(0, Math.max(1, Math.ceil(shotsState.length / 2))).map((shot, idx) => {
+      const widthFrame = Math.round(shot.durationSeconds * projectState.fps * 0.75);
+      const left = (leftFrame / totalFrames) * 100;
+      const width = (widthFrame / totalFrames) * 100;
+      leftFrame += widthFrame;
+      return {shot, left, width, idx};
+    });
+  }, [shotsState, projectState.fps, totalFrames]);
+
+  const audioBlockWidth = useMemo(() => {
+    return Math.max((Math.round(totalFrames * 0.92) / totalFrames) * 100, 8);
+  }, [totalFrames]);
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="workflow-app">
+    <div className="workflow-app" ref={appRef} tabIndex={-1}>
       <div className="mac-window">
+        {/* ── Title bar ── */}
         <header className="mac-titlebar">
           <div className="mac-window-controls" aria-hidden>
             <span className="mac-dot mac-dot-red" />
@@ -132,125 +264,72 @@ const App: React.FC = () => {
             </div>
 
             <div className="mac-toolbar-actions">
-              <input
-                value={apiBase}
-                onChange={(e) => setApiBase(e.target.value)}
-                className="mac-input mac-api"
-                placeholder="API Base"
-              />
-              <input
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="mac-input mac-api"
-                placeholder="API Key"
-              />
-              <button className="mac-btn" type="button" onClick={() => showToast('导出设置面板（示意）')}>导出设置</button>
-              <button className={`mac-btn mac-btn-primary ${busyAll ? 'is-loading' : ''}`} onClick={runAll} disabled={busyAll} type="button">
+              <label htmlFor="api-base-input" className="sr-only">API Base</label>
+              <input id="api-base-input" value={apiBase} onChange={(e) => setApiBase(e.target.value)}
+                className="mac-input mac-api" placeholder="API Base" />
+              <label htmlFor="api-key-input" className="sr-only">API Key</label>
+              <input id="api-key-input" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
+                className="mac-input mac-api" placeholder="API Key" type="password" />
+              <button className="mac-btn" type="button" onClick={() => showToast('导出设置面板（示意）')}>
+                导出设置
+              </button>
+              <button
+                className={`mac-btn mac-btn-primary ${busyAll ? 'is-loading' : ''}`}
+                onClick={runAll}
+                disabled={busyAll}
+                type="button"
+              >
                 {busyAll ? '执行中' : '一键执行'}
               </button>
             </div>
           </div>
         </header>
 
+        {/* ── Main 3-column layout ── */}
         <div className="mac-layout">
+
+          {/* ── Left: Step list ── */}
           <aside className="mac-panel mac-left">
             <section className="mac-group">
               <div className="mac-group-title">流程步骤</div>
               <div className="mac-step-list">
-                {STEP_LIST.map((step) => {
-                  const stepIndex = STEP_LIST.findIndex((s) => s.id === step.id);
-                  const blockedBy = stepIndex > 0
-                    ? STEP_LIST.slice(0, stepIndex).find((prevStep) => !stepConfirmed[prevStep.id])
-                    : null;
-                  const isLoading = Boolean(stepLoading[step.id]);
-                  const isConfirmed = Boolean(stepConfirmed[step.id]);
-                  const isGenerated = Boolean(stepDone[step.id]);
-                  const isSkillDirty = Boolean(stepSkillDirty[step.id]);
-                  const isRenderStep = step.id === 8;
-                  const badgeLabel = isRenderStep
-                    ? isLoading
-                      ? '生成中'
-                      : renderStepHasError
-                        ? '失败'
-                        : renderStepIsRunning
-                          ? '渲染中'
-                          : renderMediaReady
-                            ? '结果可用'
-                            : renderStepConfigured
-                              ? '待渲染'
-                              : blockedBy
-                                ? '锁定'
-                                : '待生成'
-                    : isSkillDirty
-                      ? '待更新'
-                    : isLoading
-                      ? '生成中'
-                      : isConfirmed
-                        ? '已确认'
-                        : isGenerated
-                          ? '待确认'
-                          : blockedBy
-                            ? '锁定'
-                            : '待生成';
-
-                  return (
-                    <button
-                      key={step.id}
-                      className={`mac-step ${activeStep === step.id ? 'active' : ''} ${(isConfirmed || (isRenderStep && renderMediaReady)) ? 'is-confirmed' : ''} ${blockedBy && !isGenerated ? 'is-blocked' : ''} ${isSkillDirty ? 'is-stale' : ''}`}
-                      onClick={() => {
-                        void handleStepSelect(step.id);
-                      }}
-                      disabled={isLoading}
-                      type="button"
-                      title={blockedBy ? `请先确认 Step ${blockedBy.id} · ${blockedBy.label}` : undefined}
-                    >
-                      <div className="mac-step-line">
-                        <span>Step {step.id} · {step.label}</span>
-                        <span className={`mac-step-badge ${isRenderStep
-                          ? renderStepHasError
-                            ? 'is-error'
-                            : renderStepIsRunning
-                            ? 'is-generating'
-                            : renderMediaReady
-                              ? 'is-confirmed'
-                              : renderStepConfigured
-                                ? 'done'
-                                : blockedBy
-                                  ? 'is-blocked'
-                                  : ''
-                          : isSkillDirty
-                            ? 'is-warning'
-                          : isLoading
-                            ? 'is-generating'
-                            : isConfirmed
-                              ? 'is-confirmed'
-                              : isGenerated
-                                ? 'done'
-                                : blockedBy
-                                  ? 'is-blocked'
-                                  : ''}`}>
-                          {badgeLabel}
-                        </span>
-                      </div>
-                      <small>{step.hint}</small>
-                      <div className="mac-step-output-preview">{getStepPreview(step.id)}</div>
-                    </button>
-                  );
-                })}
+                {stepList.map(({step, blockedBy, isConfirmed, badgeLabel, badgeClass}) => (
+                  <button
+                    key={step.id}
+                    className={`mac-step ${activeStep === step.id ? 'active' : ''} ${
+                      (isConfirmed || (step.id === 8 && renderMediaReady)) ? 'is-confirmed' : ''
+                    } ${blockedBy && !stepDone[step.id] ? 'is-blocked' : ''} ${
+                      stepSkillDirty[step.id] ? 'is-stale' : ''
+                    }`}
+                    onClick={() => { void handleStepSelect(step.id); }}
+                    disabled={Boolean(stepLoading[step.id])}
+                    type="button"
+                    title={blockedBy ? `请先确认 Step ${blockedBy.id} · ${blockedBy.label}` : undefined}
+                  >
+                    <div className="mac-step-line">
+                      <span>Step {step.id} · {step.label}</span>
+                      <span className={`mac-step-badge ${badgeClass}`}>{badgeLabel}</span>
+                    </div>
+                    <small>{step.hint}</small>
+                    <div className="mac-step-output-preview">{getStepPreview(step.id)}</div>
+                  </button>
+                ))}
               </div>
             </section>
-
           </aside>
 
+          {/* ── Center: Preview + Step editor ── */}
           <main className="mac-center">
             <section className={`mac-preview-shell ${previewMode === 'planning' ? 'is-planning' : 'is-media'}`}>
               <div className={`mac-preview-window ${previewMode === 'planning' ? 'is-planning' : 'is-media'}`}>
+
+                {/* Planning strip (steps 1-5, 7) */}
                 {previewMode === 'planning' ? (
                   <div className="mac-step-context-strip">
-                    <p className="mac-step-context-copy">{activeStepSummary}</p>
+                    <p className="mac-step-context-copy">{getStepPreview(activeStep)}</p>
                     <div className="mac-step-context-actions">
-                      <span className={`mac-status-pill ${activeStepStatusClass}`}>
-                        {activeStepStatusLabel}
+                      <span className={`mac-status-pill ${activeStepStatus.className}`}>
+                        {activeStepStatus.label}
                       </span>
                       {nextStepId ? (
                         <button className="mac-btn mac-btn-primary" type="button" onClick={goNextStep}>
@@ -261,11 +340,15 @@ const App: React.FC = () => {
                   </div>
                 ) : (
                   <>
+                    {/* Media header */}
                     <div className="mac-preview-head">
                       <div className="mac-group-title">预览</div>
-                      <div className="mac-timecode">{formatTimecode(currentFrame)} / {formatTimecode(totalFrames)}</div>
+                      <div className="mac-timecode">
+                        {formatTimecode(currentFrame)} / {formatTimecode(totalFrames)}
+                      </div>
                     </div>
 
+                    {/* Viewport */}
                     <div className="mac-preview-viewport">
                       <a
                         className="mac-preview-plugin-link"
@@ -276,7 +359,8 @@ const App: React.FC = () => {
                         aria-label="打开浏览器 AI 插件商店"
                       >
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                          <path d="M12 3L4 7.5V16.5L12 21L20 16.5V7.5L12 3Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/>
+                          <path d="M12 3L4 7.5V16.5L12 21L20 16.5V7.5L12 3Z" stroke="currentColor"
+                            strokeWidth="1.7" strokeLinejoin="round"/>
                           <path d="M8.5 11.5H15.5M12 8V15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/>
                         </svg>
                       </a>
@@ -289,17 +373,22 @@ const App: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Stage meta */}
                     <div className="mac-preview-stage">
                       <div className="mac-preview-stage-meta">
                         <span>当前步骤：{activeStepMeta.label}</span>
                         <span>当前镜头：{selectedShot?.title || '未选择'}</span>
                         <span>主标题：{selectedTitle?.title || '待确认'}</span>
-                        <span>配音引擎：{pipelineState.voice?.engine || 'chattts'}</span>
+                        <span>配音引擎：{pipelineState.voice?.engine || 'qwen-tts'}</span>
+                      </div>
+                      <div className="mac-preview-keyboard-hints" aria-hidden="true">
+                        <kbd>←</kbd><kbd>→</kbd> 帧 | <kbd>Space</kbd> 播放 | <kbd>Home</kbd><kbd>End</kbd> 首尾
                       </div>
                     </div>
                   </>
                 )}
 
+                {/* Step workspace */}
                 <div className={`mac-step-shell ${previewMode === 'planning' ? 'is-planning' : ''}`}>
                   <StepWorkspace
                     step={activeStepMeta}
@@ -328,12 +417,8 @@ const App: React.FC = () => {
                     stepEvaluation={currentStepEvaluation}
                     imageStatus={imageStatus}
                     imageCount={imageCount}
-                    onGenerateStep={() => {
-                      void generateStep(activeStep, {trigger: 'manual'});
-                    }}
-                    onApplyTitleKeywords={() => {
-                      void applyTitleKeywords();
-                    }}
+                    onGenerateStep={() => { void generateStep(activeStep, {trigger: 'manual'}); }}
+                    onApplyTitleKeywords={() => { void applyTitleKeywords(); }}
                     onConfirmStep={confirmCurrentStep}
                     onUpdateStepSkill={updateStepSkill}
                     onSelectTitle={handleSelectTitle}
@@ -346,19 +431,28 @@ const App: React.FC = () => {
                     onUpdateRender={updateRenderState}
                     onGenerateImages={generateStoryboardImages}
                     onSubmitVoice={submitVoice}
-                    onSubmitRender={() => {
-                      void submitRender();
-                    }}
+                    onSubmitRender={() => { void submitRender(); }}
                   />
                 </div>
 
+                {/* Media controls (steps 6, 8) */}
                 {previewMode === 'media' ? (
                   <div className="mac-preview-controls">
-                    <button className="mac-btn" type="button" onClick={() => setCurrentFrame((f) => Math.max(0, f - 1))}>⏮</button>
-                    <button className="mac-btn" type="button" onClick={() => setIsPlaying((v) => !v)}>{isPlaying ? '⏸ 暂停' : '▶ 播放'}</button>
-                    <button className="mac-btn" type="button" onClick={() => setCurrentFrame((f) => Math.min(totalFrames - 1, f + 1))}>⏭</button>
+                    <button className="mac-btn" type="button"
+                      onClick={() => setCurrentFrame((f) => Math.max(0, f - 1))}
+                      aria-label="后退一帧">⏮</button>
+                    <button className="mac-btn" type="button"
+                      onClick={() => setIsPlaying((v) => !v)}
+                      aria-label={isPlaying ? '暂停播放' : '开始播放'}>
+                      {isPlaying ? '⏸ 暂停' : '▶ 播放'}
+                    </button>
+                    <button className="mac-btn" type="button"
+                      onClick={() => setCurrentFrame((f) => Math.min(totalFrames - 1, f + 1))}
+                      aria-label="前进一帧">⏭</button>
                     {activeStep !== 8 ? (
-                      <span className={`mac-status-pill ${stepConfirmed[activeStep] ? 'is-done' : stepDone[activeStep] ? 'is-running' : 'is-idle'}`}>
+                      <span className={`mac-status-pill ${
+                        stepConfirmed[activeStep] ? 'is-done' : stepDone[activeStep] ? 'is-running' : 'is-idle'
+                      }`}>
                         {stepConfirmed[activeStep] ? '当前已确认' : stepDone[activeStep] ? '待确认' : '待生成'}
                       </span>
                     ) : null}
@@ -368,8 +462,10 @@ const App: React.FC = () => {
                       </button>
                     ) : null}
                     <div className="mac-segmented">
-                      <button className={previewRatio === 'landscape' ? 'active' : ''} onClick={() => setPreviewRatio('landscape')} type="button">横屏 16:9</button>
-                      <button className={previewRatio === 'portrait' ? 'active' : ''} onClick={() => setPreviewRatio('portrait')} type="button">竖屏 9:16</button>
+                      <button className={previewRatio === 'landscape' ? 'active' : ''}
+                        onClick={() => setPreviewRatio('landscape')} type="button">横屏 16:9</button>
+                      <button className={previewRatio === 'portrait' ? 'active' : ''}
+                        onClick={() => setPreviewRatio('portrait')} type="button">竖屏 9:16</button>
                     </div>
                   </div>
                 ) : null}
@@ -377,6 +473,7 @@ const App: React.FC = () => {
             </section>
           </main>
 
+          {/* ── Right: Skill library + current step + job status ── */}
           <aside className="mac-panel mac-right">
             <section className="mac-group mac-war-room-panel">
               <div className="mac-war-room-head">
@@ -387,7 +484,9 @@ const App: React.FC = () => {
                 {skillCatalog.map((skill) => (
                   <div
                     key={skill.skillId}
-                    className={`mac-skill-card ${currentStepSkillId === skill.skillId ? 'is-current' : ''} ${skill.status !== 'ready' ? 'is-error' : ''}`}
+                    className={`mac-skill-card ${
+                      currentStepSkillId === skill.skillId ? 'is-current' : ''
+                    } ${skill.status !== 'ready' ? 'is-error' : ''}`}
                   >
                     <div className="mac-skill-card-head">
                       <span className="mac-skill-card-title">{skill.name || skill.skillId}</span>
@@ -409,7 +508,9 @@ const App: React.FC = () => {
               </div>
               {currentStepResolvedSkill ? (
                 <>
-                  <p className="mac-war-room-copy">{currentStepResolvedSkill.displaySummary || currentStepResolvedSkill.description}</p>
+                  <p className="mac-war-room-copy">
+                    {currentStepResolvedSkill.displaySummary || currentStepResolvedSkill.description}
+                  </p>
                   <div className="mac-war-room-meta-grid">
                     <div className="mac-war-room-meta">
                       <span>核心目标</span>
@@ -458,15 +559,14 @@ const App: React.FC = () => {
                     <div className="mac-war-room-eval-head">
                       <span className="mac-war-room-section-title">Eval 提示</span>
                       <span className={`mac-status-pill ${
-                        currentStepEvaluation?.status === 'PASS'
-                          ? 'is-done'
-                          : currentStepEvaluation?.status === 'PASS_WARN'
-                            ? 'is-warning'
-                            : currentStepEvaluation?.status
-                              ? 'is-error'
-                              : 'is-idle'
+                        currentStepEvaluation?.status === 'PASS' ? 'is-done'
+                          : currentStepEvaluation?.status === 'PASS_WARN' ? 'is-warning'
+                          : currentStepEvaluation?.status ? 'is-error'
+                          : 'is-idle'
                       }`}>
-                        {currentStepEvaluation?.score ? `${currentStepEvaluation.status} · ${currentStepEvaluation.score}` : '待评估'}
+                        {currentStepEvaluation?.score
+                          ? `${currentStepEvaluation.status} · ${currentStepEvaluation.score}`
+                          : '待评估'}
                       </span>
                     </div>
                     {currentStepEvaluation?.issues?.length ? (
@@ -495,36 +595,75 @@ const App: React.FC = () => {
             <section className="mac-group mac-war-room-status">
               <div className="mac-group-title">任务状态</div>
               <div className="mac-job-card">
-                <div>分镜图：<span className={`mac-status-pill ${statusClass(imageStatus)} ${(imageStatus === 'running' || imageStatus === 'pending') ? 'is-animated' : ''}`}>{statusLabel(imageStatus)}</span></div>
+                <div>
+                  分镜图：<span className={`mac-status-pill ${pipelineStatus.className}`}>
+                    {pipelineStatus.label}
+                  </span>
+                </div>
                 <div>产出：{imageCount} 张</div>
               </div>
               <div className="mac-job-card">
-                <div>配音：<span className={`mac-status-pill ${statusClass(voiceJobStatus)} ${(voiceJobStatus === 'running' || voiceJobStatus === 'pending') ? 'is-animated' : ''}`}>{statusLabel(voiceJobStatus)}</span></div>
-                <div className="mac-progress"><span className={(voiceJobStatus === 'running' || voiceJobStatus === 'pending') ? 'is-animated' : ''} style={{width: `${voiceProgress}%`}} /></div>
+                <div>
+                  配音：<span className={`mac-status-pill ${
+                    voiceJobStatus === 'running' || voiceJobStatus === 'pending' ? 'is-animated' : ''
+                  } ${voiceJobStatus === 'done' ? 'is-done' : voiceJobStatus === 'error' ? 'is-error' : 'is-idle'}`}>
+                    {voiceJobStatus === 'running' || voiceJobStatus === 'pending' ? '运行中'
+                      : voiceJobStatus === 'done' ? '完成' : voiceJobStatus === 'error' ? '错误' : '空闲'}
+                  </span>
+                </div>
+                <div className="mac-progress">
+                  <span className={voiceJobStatus === 'running' || voiceJobStatus === 'pending' ? 'is-animated' : ''}
+                    style={{width: `${voiceProgress}%`}} />
+                </div>
                 <small>{voiceResult?.engineName || voiceResult?.engine || voiceJobId || '-'}</small>
               </div>
               <div className="mac-job-card">
-                <div>Step 7：<span className={`mac-status-pill ${projectBuildStatusClass}`}>{projectBuildStatusLabel}</span></div>
+                <div>
+                  Step 7：<span className={`mac-status-pill ${buildStatus.className}`}>
+                    {buildStatus.label}
+                  </span>
+                </div>
                 <div>产物：{pipelineState.projectBuild?.compositionId || 'OpenClawVideo'}</div>
                 <small>{pipelineState.projectBuild?.stylePreset || pipelineState.projectBuild?.projectPath || '-'}</small>
               </div>
               <div className="mac-job-card">
-                <div>渲染：<span className={`mac-status-pill ${statusClass(renderJobStatus)} ${(renderJobStatus === 'running' || renderJobStatus === 'pending') ? 'is-animated' : ''}`}>{statusLabel(renderJobStatus)}</span></div>
-                <div className="mac-progress"><span className={(renderJobStatus === 'running' || renderJobStatus === 'pending') ? 'is-animated' : ''} style={{width: `${renderProgress}%`}} /></div>
+                <div>
+                  渲染：<span className={`mac-status-pill ${
+                    renderJobStatus === 'running' || renderJobStatus === 'pending' ? 'is-animated' : ''
+                  } ${renderJobStatus === 'done' ? 'is-done' : renderJobStatus === 'error' ? 'is-error' : 'is-idle'}`}>
+                    {renderJobStatus === 'running' || renderJobStatus === 'pending' ? '运行中'
+                      : renderJobStatus === 'done' ? '完成' : renderJobStatus === 'error' ? '错误' : '空闲'}
+                  </span>
+                </div>
+                <div className="mac-progress">
+                  <span className={renderJobStatus === 'running' || renderJobStatus === 'pending' ? 'is-animated' : ''}
+                    style={{width: `${renderProgress}%`}} />
+                </div>
                 <small>{renderResult?.outputFileName || renderResult?.outputSizeLabel || renderJobId || '-'}</small>
               </div>
             </section>
           </aside>
         </div>
 
-        <section className="mac-timeline-shell">
-          <div className="mac-timeline-ruler" ref={timelineTrackRef} onClick={onTimelinePointer} role="presentation">
+        {/* ── Timeline ── */}
+        <section className="mac-timeline-shell" aria-label="视频时间轴">
+          <div
+            className="mac-timeline-ruler"
+            ref={timelineTrackRef}
+            onClick={onTimelinePointer}
+            role="slider"
+            aria-label="播放头位置"
+            aria-valuemin={0}
+            aria-valuemax={totalFrames}
+            aria-valuenow={currentFrame}
+            aria-valuetext={`第 ${currentFrame} 帧，共 ${totalFrames} 帧`}
+            tabIndex={0}
+          >
             {timelineMarks.map((mark) => (
               <div key={mark.frame} className="mac-tick" style={{left: `${mark.left}%`}}>
                 <span>{mark.frame}</span>
               </div>
             ))}
-
             <div className="mac-playhead" style={{left: `${(currentFrame / totalFrames) * 100}%`}}>
               <span className="mac-playhead-label">F{currentFrame}</span>
             </div>
@@ -537,107 +676,68 @@ const App: React.FC = () => {
             onMouseLeave={() => setHoverFrame(null)}
             role="presentation"
           >
+            {/* V1 — video track */}
             <div className={`mac-track-row ${collapsedTracks.v1 ? 'collapsed' : ''}`}>
               <div className="mac-track-header">
-                <button
-                  type="button"
-                  className="mac-track-toggle"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCollapsedTracks((prev) => ({...prev, v1: !prev.v1}));
-                  }}
-                >
+                <button type="button" className="mac-track-toggle"
+                  onClick={(e) => { e.stopPropagation(); setCollapsedTracks((p) => ({...p, v1: !p.v1})); }}>
                   {collapsedTracks.v1 ? '▸' : '▾'}
                 </button>
-                <div>
-                  <strong>V1</strong>
-                  <small>视频轨</small>
-                </div>
+                <div><strong>V1</strong><small>视频轨</small></div>
               </div>
               <div className="mac-track-lane">
-                {shotsState.map((shot, idx) => {
-                  const leftFrame = shotsState.slice(0, idx).reduce((sum, s) => sum + Math.round(s.durationSeconds * projectState.fps), 0);
-                  const widthFrame = Math.round(shot.durationSeconds * projectState.fps);
-                  const left = (leftFrame / totalFrames) * 100;
-                  const width = (widthFrame / totalFrames) * 100;
-
-                  return (
-                    <button
-                      key={shot.id}
-                      className={`mac-sequence-block mac-seq-video ${selectedShotId === shot.id ? 'active' : ''}`}
-                      style={{left: `${left}%`, width: `${Math.max(width, 6)}%`}}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedShotId(shot.id);
-                      }}
-                      type="button"
-                    >
-                      {shot.title}
-                    </button>
-                  );
-                })}
+                {shotBlocks.map(({shot, left, width}) => (
+                  <button
+                    key={shot.id}
+                    className={`mac-sequence-block mac-seq-video ${
+                      selectedShotId === shot.id ? 'active' : ''
+                    }`}
+                    style={{left: `${left}%`, width: `${Math.max(width, 6)}%`}}
+                    onClick={(e) => { e.stopPropagation(); setSelectedShotId(shot.id); }}
+                    type="button"
+                  >
+                    {shot.title}
+                  </button>
+                ))}
               </div>
             </div>
 
+            {/* G1 — graphics track */}
             <div className={`mac-track-row ${collapsedTracks.g1 ? 'collapsed' : ''}`}>
               <div className="mac-track-header">
-                <button
-                  type="button"
-                  className="mac-track-toggle"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCollapsedTracks((prev) => ({...prev, g1: !prev.g1}));
-                  }}
-                >
+                <button type="button" className="mac-track-toggle"
+                  onClick={(e) => { e.stopPropagation(); setCollapsedTracks((p) => ({...p, g1: !p.g1})); }}>
                   {collapsedTracks.g1 ? '▸' : '▾'}
                 </button>
-                <div>
-                  <strong>G1</strong>
-                  <small>图形轨</small>
-                </div>
+                <div><strong>G1</strong><small>图形轨</small></div>
               </div>
               <div className="mac-track-lane">
-                {shotsState.slice(0, Math.max(1, Math.ceil(shotsState.length / 2))).map((shot, idx) => {
-                  const leftFrame = shotsState.slice(0, idx).reduce((sum, s) => sum + Math.round(s.durationSeconds * projectState.fps), 0);
-                  const widthFrame = Math.round(shot.durationSeconds * projectState.fps * 0.75);
-                  const left = (leftFrame / totalFrames) * 100;
-                  const width = (widthFrame / totalFrames) * 100;
-
-                  return (
-                    <button
-                      key={`g-${shot.id}`}
-                      className="mac-sequence-block mac-seq-graphic"
-                      style={{left: `${left}%`, width: `${Math.max(width, 6)}%`}}
-                      type="button"
-                    >
-                      字幕-{idx + 1}
-                    </button>
-                  );
-                })}
+                {graphicBlocks.map(({left, width, idx}) => (
+                  <button
+                    key={`g-${idx}`}
+                    className="mac-sequence-block mac-seq-graphic"
+                    style={{left: `${left}%`, width: `${Math.max(width, 6)}%`}}
+                    type="button"
+                  >
+                    字幕-{idx + 1}
+                  </button>
+                ))}
               </div>
             </div>
 
+            {/* A1 — audio track */}
             <div className={`mac-track-row ${collapsedTracks.a1 ? 'collapsed' : ''}`}>
               <div className="mac-track-header">
-                <button
-                  type="button"
-                  className="mac-track-toggle"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCollapsedTracks((prev) => ({...prev, a1: !prev.a1}));
-                  }}
-                >
+                <button type="button" className="mac-track-toggle"
+                  onClick={(e) => { e.stopPropagation(); setCollapsedTracks((p) => ({...p, a1: !p.a1})); }}>
                   {collapsedTracks.a1 ? '▸' : '▾'}
                 </button>
-                <div>
-                  <strong>A1</strong>
-                  <small>音频轨</small>
-                </div>
+                <div><strong>A1</strong><small>音频轨</small></div>
               </div>
               <div className="mac-track-lane">
                 <button
                   className="mac-sequence-block mac-seq-audio"
-                  style={{left: '0%', width: `${Math.max((Math.round(totalFrames * 0.92) / totalFrames) * 100, 8)}%`}}
+                  style={{left: '0%', width: `${audioBlockWidth}%`}}
                   type="button"
                 >
                   Voiceover Main Track

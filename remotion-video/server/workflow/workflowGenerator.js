@@ -446,6 +446,39 @@ function normalizeGenerationMeta(stepId, input) {
   };
 }
 
+function normalizeWorkflowShotContext(shot) {
+  return {
+    id: shot?.id,
+    title: shot?.title,
+    narration: shot?.narration,
+    durationSeconds: shot?.durationSeconds,
+    startFrame: shot?.startFrame,
+    level: shot?.level,
+    type: shot?.type,
+    family: shot?.family,
+    sceneFamily: shot?.sceneFamily,
+    sceneIntent: shot?.sceneIntent,
+    evidenceAnchor: shot?.evidenceAnchor,
+    transitionToNext: shot?.transitionToNext,
+    templateCandidates: Array.isArray(shot?.templateCandidates) ? shot.templateCandidates : [],
+    dataPoints: Array.isArray(shot?.dataPoints) ? shot.dataPoints : [],
+    keywords: Array.isArray(shot?.keywords) ? shot.keywords : [],
+    comparisons: Array.isArray(shot?.comparisons) ? shot.comparisons : [],
+    scriptRole: shot?.scriptRole,
+    scriptBlockId: shot?.scriptBlockId,
+    scriptBlockLabel: shot?.scriptBlockLabel,
+    scriptSourceText: shot?.scriptSourceText,
+    scriptExcerpt: shot?.scriptExcerpt,
+    storyboardCueZh: shot?.storyboardCueZh,
+    visual: shot?.visual && typeof shot.visual === 'object'
+      ? {
+          description: shot.visual.description,
+          focus: shot.visual.focus,
+        }
+      : null,
+  };
+}
+
 function buildWorkflowContext(stepId, input) {
   const shots = Array.isArray(input.shotsState) ? input.shotsState : [];
   const pipeline = input.pipelineState && typeof input.pipelineState === 'object'
@@ -482,13 +515,7 @@ function buildWorkflowContext(stepId, input) {
       width: project.width || 1920,
       height: project.height || 1080,
     },
-    shots: shots.map((shot) => ({
-      id: shot.id,
-      title: shot.title,
-      narration: shot.narration,
-      durationSeconds: shot.durationSeconds,
-      startFrame: shot.startFrame,
-    })),
+    shots: shots.map((shot) => normalizeWorkflowShotContext(shot)),
     pipeline: {
       analysis: pipeline.analysis || null,
       titles: pipeline.titles || null,
@@ -550,6 +577,12 @@ function buildStepSchemaPrompt(stepId, context) {
     context.generation?.previousOutputSummary
       ? `上一版摘要：${context.generation.previousOutputSummary}`
       : '',
+    stepId === 4
+      ? 'Step 4 必须以 copy.hook / copy.body / copy.cta 为分镜真源。每个中段场景都要能回指到具体口播段落或句子，不要只围绕标题造泛镜头。'
+      : '',
+    stepId === 5
+      ? 'Step 5 的每条视觉提示词必须服务对应 shot 的 narration / sceneIntent / dataPoints / scriptExcerpt。画面要解释这句口播，不要退回标题海报式插图。'
+      : '',
     buildStepSkillInstruction(stepId, context),
   ].join('\n');
 
@@ -606,6 +639,12 @@ function buildStepSchemaPrompt(stepId, context) {
           level: 'string',
           type: 'string',
           sceneFamily: 'string',
+          sceneIntent: 'string',
+          evidenceAnchor: 'string',
+          scriptBlockId: 'string',
+          scriptBlockLabel: 'string',
+          scriptExcerpt: 'string',
+          storyboardCueZh: 'string',
           templateCandidates: ['string'],
           dataPoints: ['string'],
           keywords: ['string'],
@@ -629,6 +668,13 @@ function buildStepSchemaPrompt(stepId, context) {
               visualFocusZh: 'string',
               visualSummaryZh: 'string',
               sceneFamily: 'string',
+              sceneIntent: 'string',
+              evidenceAnchor: 'string',
+              text: 'string',
+              scriptBlockId: 'string',
+              scriptBlockLabel: 'string',
+              scriptExcerpt: 'string',
+              storyboardCueZh: 'string',
               templateCandidates: ['string'],
               dataPoints: ['string'],
               keywords: ['string'],
@@ -819,11 +865,19 @@ function normalizePromptsPayload(candidate, input) {
       style: String(incoming.style || currentPrompt.style || '').trim(),
       mood: String(incoming.mood || currentPrompt.mood || '').trim(),
       visualFocus: String(incoming.visualFocus || currentPrompt.visualFocus || '').trim(),
+      text: String(incoming.text || currentPrompt.text || shot.narration || '').trim(),
       promptZh: String(incoming.promptZh || currentPrompt.promptZh || '').trim(),
       visualSummaryZh: String(incoming.visualSummaryZh || currentPrompt.visualSummaryZh || '').trim(),
       visualFocusZh: String(incoming.visualFocusZh || currentPrompt.visualFocusZh || '').trim(),
       negativePromptZh: String(incoming.negativePromptZh || currentPrompt.negativePromptZh || '').trim(),
       comparisonSummaryZh: String(incoming.comparisonSummaryZh || currentPrompt.comparisonSummaryZh || '').trim(),
+      sceneIntent: String(incoming.sceneIntent || currentPrompt.sceneIntent || shot.sceneIntent || '').trim(),
+      evidenceAnchor: String(incoming.evidenceAnchor || currentPrompt.evidenceAnchor || shot.evidenceAnchor || '').trim(),
+      scriptBlockId: String(incoming.scriptBlockId || currentPrompt.scriptBlockId || shot.scriptBlockId || '').trim(),
+      scriptBlockLabel: String(incoming.scriptBlockLabel || currentPrompt.scriptBlockLabel || shot.scriptBlockLabel || '').trim(),
+      scriptSourceText: String(incoming.scriptSourceText || currentPrompt.scriptSourceText || shot.scriptSourceText || shot.narration || '').trim(),
+      scriptExcerpt: String(incoming.scriptExcerpt || currentPrompt.scriptExcerpt || shot.scriptExcerpt || shot.narration || '').trim(),
+      storyboardCueZh: String(incoming.storyboardCueZh || currentPrompt.storyboardCueZh || shot.storyboardCueZh || shot.sceneIntent || '').trim(),
       family: String(incoming.family || incoming.sceneFamily || currentPrompt.family || currentPrompt.sceneFamily || shot.family || shot.sceneFamily || '').trim(),
       sceneFamily: String(incoming.sceneFamily || incoming.family || currentPrompt.sceneFamily || currentPrompt.family || shot.sceneFamily || shot.family || '').trim(),
       templateCandidates: Array.isArray(incoming.templateCandidates)
@@ -891,7 +945,7 @@ function normalizeVoicePayload(candidate, input) {
   return {
     voice: {
       preset: String(nextVoice.preset || currentVoice.preset || '').trim(),
-      engine: String(nextVoice.engine || currentVoice.engine || 'chattts').trim(),
+      engine: String(nextVoice.engine || currentVoice.engine || 'qwen-tts').trim(),
       language: String(nextVoice.language || currentVoice.language || 'zh-CN').trim(),
       speed: String(nextVoice.speed || currentVoice.speed || '1.0').trim(),
       pitch: toNumber(nextVoice.pitch ?? currentVoice.pitch ?? 0, 0),
@@ -1294,17 +1348,26 @@ function createFallbackWorkflowPayload(stepId, input) {
     const profile = buildStep5FallbackProfile(currentSkill, variant);
     const byShotId = {};
     shots.forEach((shot) => {
+      const scriptExcerpt = truncate(String(shot.scriptExcerpt || shot.narration || shot.title || '').trim(), 42);
+      const storyboardCue = truncate(String(shot.storyboardCueZh || shot.sceneIntent || shot.title || '').trim(), 36);
       byShotId[shot.id] = {
         prompt: [
-          `为场景“${shot.title}”生成 16:9 横版视觉，重点表现 ${truncate(shot.narration, 32)}，采用${profile.style}表达，突出 ${currentSkill.emphasis || profile.visualFocus}，主体清晰，信息层次明确。`,
-          `围绕“${shot.title}”设计 1920x1080 横版主画面，核心呈现 ${truncate(shot.narration, 32)}，整体走${profile.style}方向，保留标题留白与强视觉焦点。`,
-          `给“${shot.title}”生成高识别度的 16:9 视觉，画面围绕 ${truncate(shot.narration, 32)} 展开，用${profile.style}强化首屏理解和传播感。`,
-          `把“${shot.title}”做成适合科技讲解视频的 16:9 横版主画面，强调 ${truncate(shot.narration, 32)}，视觉风格采用${profile.style}，重点突出 ${currentSkill.emphasis || profile.visualFocus}。`,
+          `为场景“${shot.title}”生成 16:9 横版视觉，必须服务口播原句“${scriptExcerpt}”，围绕 ${storyboardCue} 组织画面，采用${profile.style}表达，突出 ${currentSkill.emphasis || profile.visualFocus}，主体清晰，信息层次明确。`,
+          `围绕“${shot.title}”设计 1920x1080 横版主画面，核心解释口播“${scriptExcerpt}”，用 ${storyboardCue} 做分镜抓手，整体走${profile.style}方向，保留标题留白与强视觉焦点。`,
+          `给“${shot.title}”生成高识别度的 16:9 视觉，画面必须围绕口播原句“${scriptExcerpt}”展开，用${profile.style}强化首屏理解和传播感，避免做成只对应标题的泛图。`,
+          `把“${shot.title}”做成适合科技讲解视频的 16:9 横版主画面，重点解释“${scriptExcerpt}”，视觉风格采用${profile.style}，分镜抓手围绕 ${storyboardCue}，重点突出 ${currentSkill.emphasis || profile.visualFocus}。`,
         ][variant],
         negativePrompt: [profile.negativePrompt, currentSkill.avoid].filter(Boolean).join(', '),
         style: profile.style,
         mood: currentSkill.style || profile.mood,
         visualFocus: currentSkill.emphasis || profile.visualFocus,
+        text: String(shot.narration || '').trim(),
+        sceneIntent: String(shot.sceneIntent || '').trim(),
+        evidenceAnchor: String(shot.evidenceAnchor || '').trim(),
+        scriptBlockId: String(shot.scriptBlockId || '').trim(),
+        scriptBlockLabel: String(shot.scriptBlockLabel || '').trim(),
+        scriptExcerpt: String(shot.scriptExcerpt || shot.narration || '').trim(),
+        storyboardCueZh: String(shot.storyboardCueZh || shot.sceneIntent || shot.title || '').trim(),
         canvasRatio: '16:9',
         canvasWidth: 1920,
         canvasHeight: 1080,

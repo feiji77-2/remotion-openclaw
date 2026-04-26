@@ -13,7 +13,7 @@ The active mainline is now:
 - Step 7: Remotion project packaging
 - Step 8: Ultimate widescreen rendering
 
-The old `video-pipeline-storyboard` fixed 6-shot path has been removed from the live workflow. Some legacy composition code still exists in the repository as historical assets, but it is no longer the default skill source, default build target, or default render entrypoint.
+The old `video-pipeline-storyboard + Video1v4` fixed 6-shot path has been removed from the active source tree. Historical migration material only remains under `docs/archive/`, and it is no longer a default skill source, build target, or render entrypoint.
 
 ## Highlights
 
@@ -50,12 +50,6 @@ The old `video-pipeline-storyboard` fixed 6-shot path has been removed from the 
 - Step 5 generates `16:9 / 1920x1080` visual prompts per scene
 - `hero` is fixed as the first scene, `cta` is fixed as the final scene
 - Middle-scene families are selected with a diversity bias
-
-See:
-
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-- [remotion-video/docs/ultimate-20-template-audit.zh-CN.md](remotion-video/docs/ultimate-20-template-audit.zh-CN.md)
-- [remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md](remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md)
 
 ## Requirements
 
@@ -120,7 +114,7 @@ npm run dev:player
 - `npm run test`
   Run backend tests
 - `npm run release:check`
-  Run the main public-release validation
+  Run the main public-release validation, including a short smoke MP4 render verification
 
 ## Workflow Scope
 
@@ -158,12 +152,13 @@ Step 4 / 5 now produces the Ultimate scene source of truth:
 
 ## Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-  Current architecture, Step ownership, and API surface
-- [remotion-video/docs/ultimate-20-template-audit.zh-CN.md](remotion-video/docs/ultimate-20-template-audit.zh-CN.md)
-  Audit summary for the active 20-template mainline
-- [remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md](remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md)
-  Full family table and hit rules
+- Mainline and generation references
+  - [ARCHITECTURE.md](ARCHITECTURE.md)
+    Current architecture, Step ownership, and API surface
+  - [remotion-video/docs/ultimate-20-template-audit.zh-CN.md](remotion-video/docs/ultimate-20-template-audit.zh-CN.md)
+    Audit summary for the active 20-template mainline
+  - [remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md](remotion-video/docs/ultimate-20-template-cheatsheet.zh-CN.md)
+    Full family table and hit rules
 - [remotion-video/docs/ultimate-style-hit-guide.zh-CN.md](remotion-video/docs/ultimate-style-hit-guide.zh-CN.md)
   Style hit rules and practical control notes
 - [CONTRIBUTING.md](CONTRIBUTING.md)

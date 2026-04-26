@@ -9,6 +9,10 @@ const {WorkflowGenerationError} = require('./errors');
 const execFileAsync = promisify(execFile);
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
+const DEFAULT_MINIMAX_MODEL = 'MiniMax-M2.7';
+const DEFAULT_MINIMAX_API_HOST = 'https://api.minimaxi.com';
+const DEFAULT_OPENAI_TIMEOUT_MS = 45000;
+const DEFAULT_MINIMAX_TIMEOUT_MS = 240000;
 const DEFAULT_OPENCLAW_TRANSPORT = 'gateway';
 const DEFAULT_OPENCLAW_TIMEOUT_MS = 240000;
 
@@ -27,6 +31,14 @@ function normalizeValue(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function normalizeBaseUrl(value, defaultHost = '') {
+  const normalized = normalizeValue(value || defaultHost).replace(/\/+$/, '');
+  if (!normalized) {
+    return '';
+  }
+  return /\/v\d+$/i.test(normalized) ? normalized : `${normalized}/v1`;
+}
+
 function clampOpenClawTransport(value) {
   return normalizeValue(value) === 'local' ? 'local' : DEFAULT_OPENCLAW_TRANSPORT;
 }
@@ -34,6 +46,11 @@ function clampOpenClawTransport(value) {
 function resolveOpenClawTimeoutMs() {
   const parsed = Number(process.env.OPENCLAW_WORKFLOW_TIMEOUT_MS);
   return Number.isFinite(parsed) && parsed >= 30000 ? parsed : DEFAULT_OPENCLAW_TIMEOUT_MS;
+}
+
+function resolveTimeoutMs(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 30000 ? parsed : fallback;
 }
 
 function resolveOpenClawConfigPath() {
@@ -65,9 +82,29 @@ function resolveOpenClawWorkflowModel(config) {
 }
 
 function resolveWorkflowLLMConfig() {
+  const explicitMiniMaxApiKey = normalizeValue(process.env.MINIMAX_API_KEY);
+  const explicitMiniMaxHost = normalizeBaseUrl(process.env.MINIMAX_API_HOST, DEFAULT_MINIMAX_API_HOST);
+  const explicitMiniMaxModel = normalizeValue(process.env.MINIMAX_WORKFLOW_MODEL || process.env.MINIMAX_MODEL);
   const explicitApiKey = normalizeValue(process.env.OPENAI_API_KEY);
   const explicitBaseURL = normalizeValue(process.env.OPENAI_BASE_URL);
   const explicitOpenAIModel = normalizeValue(process.env.OPENAI_WORKFLOW_MODEL || process.env.OPENAI_MODEL);
+
+  if (explicitMiniMaxApiKey) {
+    return {
+      available: true,
+      provider: 'minimax-openai-compatible',
+      transport: 'openai',
+      apiKey: explicitMiniMaxApiKey,
+      baseURL: explicitMiniMaxHost,
+      model: explicitMiniMaxModel || DEFAULT_MINIMAX_MODEL,
+      authSource: 'env:MINIMAX_API_KEY',
+      cliPath: null,
+      jsonMode: 'prompt-only',
+      extraBody: {reasoning_split: true},
+      requestTimeoutMs: resolveTimeoutMs(process.env.MINIMAX_WORKFLOW_TIMEOUT_MS, DEFAULT_MINIMAX_TIMEOUT_MS),
+      maxRetries: 0,
+    };
+  }
 
   if (explicitApiKey) {
     return {
@@ -79,6 +116,10 @@ function resolveWorkflowLLMConfig() {
       model: explicitOpenAIModel || DEFAULT_OPENAI_MODEL,
       authSource: 'env:OPENAI_API_KEY',
       cliPath: null,
+      jsonMode: 'response-format',
+      extraBody: null,
+      requestTimeoutMs: resolveTimeoutMs(process.env.OPENAI_WORKFLOW_TIMEOUT_MS, DEFAULT_OPENAI_TIMEOUT_MS),
+      maxRetries: 2,
     };
   }
 
@@ -99,6 +140,10 @@ function resolveWorkflowLLMConfig() {
       model: openClawModel,
       authSource: `config:${openClawConfigPath}`,
       cliPath: openClawCliPath,
+      jsonMode: 'cli-json',
+      extraBody: null,
+      requestTimeoutMs: resolveOpenClawTimeoutMs(),
+      maxRetries: 0,
     };
   }
 
@@ -111,6 +156,10 @@ function resolveWorkflowLLMConfig() {
     model: openClawModel || 'unset',
     authSource: openClawConfig ? `config:${openClawConfigPath}` : null,
     cliPath: cliAvailable ? openClawCliPath : null,
+    jsonMode: 'cli-json',
+    extraBody: null,
+    requestTimeoutMs: resolveOpenClawTimeoutMs(),
+    maxRetries: 0,
   };
 }
 
@@ -154,8 +203,8 @@ function createWorkflowClient() {
   return new OpenAI({
     apiKey: config.apiKey,
     baseURL: config.baseURL || undefined,
-    timeout: 45000,
-    maxRetries: 2,
+    timeout: config.requestTimeoutMs || DEFAULT_OPENAI_TIMEOUT_MS,
+    maxRetries: Number.isFinite(config.maxRetries) ? config.maxRetries : 2,
   });
 }
 
@@ -164,19 +213,69 @@ function safeParseJson(rawText) {
     throw new Error('LLM returned empty content');
   }
 
-  const trimmed = rawText.trim();
+  const trimmed = rawText
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/^\uFEFF/, '')
+    .trim();
   const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fencedMatch ? fencedMatch[1].trim() : trimmed;
 
   try {
     return JSON.parse(candidate);
   } catch (error) {
-    const objectMatch = candidate.match(/\{[\s\S]*\}$/);
-    if (objectMatch) {
-      return JSON.parse(objectMatch[0]);
+    const extracted = extractBalancedJsonObject(candidate);
+    if (extracted) {
+      return JSON.parse(extracted);
     }
+    error.input = candidate;
     throw error;
   }
+}
+
+function extractBalancedJsonObject(text) {
+  const source = typeof text === 'string' ? text : '';
+  const start = source.indexOf('{');
+  if (start === -1) {
+    return '';
+  }
+
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (char === '{') {
+      depth += 1;
+    } else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, index + 1);
+      }
+    }
+  }
+
+  return '';
 }
 
 function safeParseCliJson(rawText) {
@@ -208,6 +307,96 @@ function buildOpenClawPrompt(messages, {temperature, topP}) {
       return `[${role}]\n${content}`;
     }),
   ].join('\n\n');
+}
+
+function buildJsonOnlyMessages(messages) {
+  const normalizedMessages = Array.isArray(messages) ? messages : [];
+  const guardrail = {
+    role: 'system',
+    content: [
+      '你必须只返回一个合法 JSON 对象。',
+      '不要输出 markdown，不要输出解释，不要输出额外前后缀。',
+      '如果你有思考过程，不要展示出来。',
+    ].join(' '),
+  };
+
+  if (normalizedMessages[0]?.role === 'system' || normalizedMessages[0]?.role === 'developer') {
+    return [
+      {
+        ...normalizedMessages[0],
+        content: `${normalizeValue(normalizedMessages[0]?.content)}\n\n${guardrail.content}`.trim(),
+      },
+      ...normalizedMessages.slice(1),
+    ];
+  }
+
+  return [guardrail, ...normalizedMessages];
+}
+
+function normalizeOpenAiMessages(messages, config) {
+  const normalizedMessages = Array.isArray(messages) ? messages : [];
+  return normalizedMessages.map((message) => {
+    const role = normalizeValue(message?.role) || 'user';
+    let nextRole = role;
+
+    if (config?.provider === 'minimax-openai-compatible' && role === 'developer') {
+      nextRole = 'system';
+    }
+
+    return {
+      ...message,
+      role: nextRole,
+    };
+  });
+}
+
+async function requestOpenAiContent(client, config, {messages, temperature, topP}) {
+  const baseRequestMessages = config.jsonMode === 'response-format'
+    ? messages
+    : buildJsonOnlyMessages(messages);
+  const requestMessages = normalizeOpenAiMessages(baseRequestMessages, config);
+  const completion = await client.chat.completions.create({
+    model: config.model,
+    temperature,
+    top_p: topP,
+    messages: requestMessages,
+    ...(config.jsonMode === 'response-format'
+      ? {response_format: {type: 'json_object'}}
+      : {}),
+    ...(config.extraBody ? {extra_body: config.extraBody} : {}),
+  });
+
+  return completion.choices?.[0]?.message?.content;
+}
+
+function buildJsonRepairMessages(rawText, parseErrorMessage) {
+  return [
+    {
+      role: 'system',
+      content: '你是 JSON 修复器。你只能返回修复后的合法 JSON 对象，不要输出解释，不要输出 markdown。',
+    },
+    {
+      role: 'user',
+      content: [
+        '下面这段文本本来应该是 JSON，但当前无法被 JSON.parse 解析。',
+        `解析报错：${parseErrorMessage}`,
+        '请尽量保留原有字段和字段值语义，只修复成合法 JSON。',
+        '',
+        '原始内容：',
+        rawText,
+      ].join('\n'),
+    },
+  ];
+}
+
+async function repairJsonViaOpenAi(client, config, rawText, parseErrorMessage) {
+  const repairedContent = await requestOpenAiContent(client, config, {
+    messages: buildJsonRepairMessages(rawText, parseErrorMessage),
+    temperature: 0,
+    topP: 1,
+  });
+
+  return safeParseJson(repairedContent);
 }
 
 function extractOpenClawTextPayload(result) {
@@ -327,26 +516,27 @@ async function generateStructuredJson({messages, temperature = 0.65, topP = 1}) 
   if (config.transport === 'openai') {
     const client = createWorkflowClient();
     try {
-      const completion = await client.chat.completions.create({
-        model: config.model,
-        response_format: {type: 'json_object'},
-        temperature,
-        top_p: topP,
-        messages,
-      });
-      const content = completion.choices?.[0]?.message?.content;
+      const content = await requestOpenAiContent(client, config, {messages, temperature, topP});
+
       return {
         model: config.model,
         payload: safeParseJson(content),
       };
     } catch (error) {
       if (error instanceof SyntaxError) {
-        throw new WorkflowGenerationError({
-          status: 422,
-          code: 'WORKFLOW_LLM_INVALID_JSON',
-          message: '工作流模型返回了无法解析的结构化结果',
-          details: buildWorkflowLLMDetails(),
-        });
+        try {
+          return {
+            model: config.model,
+            payload: await repairJsonViaOpenAi(client, config, error.input || '', error.message),
+          };
+        } catch (repairError) {
+          throw new WorkflowGenerationError({
+            status: 422,
+            code: 'WORKFLOW_LLM_INVALID_JSON',
+            message: '工作流模型返回了无法解析的结构化结果',
+            details: buildWorkflowLLMDetails(),
+          });
+        }
       }
 
       throw new WorkflowGenerationError({

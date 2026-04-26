@@ -110,7 +110,7 @@ export const StepWorkspace: React.FC<StepWorkspaceProps> = ({
   const headerMetrics = useMemo(() => {
     if (stepId === 4) return `${shots.length} 个镜头`;
     if (stepId === 5) return `${imageCount} 张图`;
-    if (stepId === 6) return `${pipelineState.voice?.engine || 'chattts'} 引擎`;
+    if (stepId === 6) return `${pipelineState.voice?.engine || 'qwen-tts'} 引擎`;
     if (stepId === 7) return `${pipelineState.projectBuild?.compositionId || '待生成'} 载体`;
     if (stepId === 8) return `${pipelineState.render?.template || 'caption'} 模板`;
     return step.hint;

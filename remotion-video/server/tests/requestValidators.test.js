@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   normalizeRenderRequest,
   normalizeVoiceRequest,
+  normalizeProjectSlugParam,
   normalizePublicAssetPath,
 } = require('../validators/requestValidators');
 
@@ -39,4 +40,43 @@ test('normalizeRenderRequest accepts public asset references and rejects remote 
 
 test('normalizeVoiceRequest requires at least one shot', () => {
   assert.throws(() => normalizeVoiceRequest({projectId: 'demo', shots: []}), /shots required/);
+});
+
+test('normalizeRenderRequest rejects unsafe projectId values while keeping title-style input ergonomic', async () => {
+  const normalized = await normalizeRenderRequest({
+    projectId: 'Project A',
+    script: 'hello world',
+  });
+
+  assert.equal(normalized.projectId, 'project-a');
+
+  await assert.rejects(
+    () => normalizeRenderRequest({
+      projectId: '../../etc/passwd',
+      script: 'hello',
+    }),
+    /projectId must not contain path separators or traversal segments/,
+  );
+
+  await assert.rejects(
+    () => normalizeRenderRequest({
+      projectId: '!!!',
+      script: 'hello',
+    }),
+    /projectId must contain at least one lowercase letter or digit after normalization/,
+  );
+
+  await assert.rejects(
+    () => normalizeRenderRequest({
+      projectId: 'a'.repeat(33),
+      script: 'hello',
+    }),
+    /projectId must be <= 32 characters after normalization/,
+  );
+});
+
+test('normalizeProjectSlugParam requires a strict slug for project asset routes', () => {
+  assert.equal(normalizeProjectSlugParam('demo-project_2'), 'demo-project_2');
+  assert.throws(() => normalizeProjectSlugParam('../../etc'), /project must match/);
+  assert.throws(() => normalizeProjectSlugParam('Demo Project'), /project must match/);
 });

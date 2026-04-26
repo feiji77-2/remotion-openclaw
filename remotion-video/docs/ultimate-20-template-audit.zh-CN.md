@@ -46,10 +46,11 @@
 - 图片回退 SVG 与 Step 5 prompt 已切到横版
 - 默认 `build/preview/render` 出口已经优先指向 Ultimate
 
-## 仍然保留但不再作为主链路的内容
+## 物理清仓状态
 
-- 仓库中仍有 `Video1v4` 等历史组合代码，作为存量资产保留
-- 这些内容不再是工作流 Step 4 / 5 的默认真源，也不再是默认 build/preview 出口
+- `video-pipeline-storyboard + Video1v4` 旧 6 镜头链路已经从活跃源码目录清除
+- 旧脚本、旧合同、旧镜头分发器已删除，不再参与任何默认 npm 命令
+- 历史资料只保留在 `docs/archive/`，用于回溯，不参与主链路运行
 
 ## 配套文档
 

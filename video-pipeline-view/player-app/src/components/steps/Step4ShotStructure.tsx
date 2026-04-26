@@ -110,15 +110,17 @@ export const Step4ShotStructure: React.FC<Step4ShotStructureProps> = ({
                 <div className="wf-shot-edit-header">
                   <span className="wf-shot-index">镜{idx + 1}</span>
                   <div className="wf-shot-edit-row">
-                    <label>标题</label>
+                    <label htmlFor={`shot-title-${idx}`}>标题</label>
                     <input
+                      id={`shot-title-${idx}`}
                       type="text"
                       value={shot.title || ''}
                       onChange={e => updateShot(idx, 'title', e.target.value)}
                       placeholder="镜头标题"
                     />
-                    <label>时长(s)</label>
+                    <label htmlFor={`shot-duration-${idx}`}>时长(s)</label>
                     <input
+                      id={`shot-duration-${idx}`}
                       type="number"
                       value={shot.durationSeconds || 5}
                       onChange={e => updateShot(idx, 'durationSeconds', Number(e.target.value))}
@@ -128,6 +130,7 @@ export const Step4ShotStructure: React.FC<Step4ShotStructureProps> = ({
                     />
                     <button type="button" className="wf-btn-remove-block"
                       onClick={() => removeShot(idx)}
+                      aria-label={`删除镜头 ${idx + 1}`}
                     >
                       删除
                     </button>
@@ -185,7 +188,7 @@ export const Step4ShotStructure: React.FC<Step4ShotStructureProps> = ({
               onClick={onGenerate}
               disabled={loading}
             >
-              {loading ? '生成中...' : '重新生成 Step ' + stepId}
+              {loading ? '生成中…' : '重新生成 Step ' + stepId}
             </button>
             <button
               type="button"

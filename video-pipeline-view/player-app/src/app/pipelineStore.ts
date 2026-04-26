@@ -2,7 +2,7 @@ import {create} from 'zustand';
 import {DEFAULT_SHOTS} from '../workflow/steps';
 import type {JobStatus, PreviewRatio, ProjectState, RenderJobResult, Shot, VoiceJobResult, WorkflowStepId} from '../workflow/types';
 import {API_BASE_DEFAULT, API_KEY_DEFAULT, createInitialProjectState} from './pipelineConstants';
-import type {PersistedPipelineSnapshot, PipelinePayload} from './pipelineTypes';
+import type {PersistedPipelineSnapshot, PipelineAnalysisState, PipelinePayload} from './pipelineTypes';
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -11,71 +11,124 @@ function resolveUpdater<T>(next: Updater<T>, prev: T): T {
 }
 
 interface PipelineSessionState {
+  // ── Config ───────────────────────────────────────────────────────────────
   apiBase: string;
   apiKey: string;
+  previewRatio: PreviewRatio;
+
+  // ── Topic ────────────────────────────────────────────────────────────────
   titleKeywords: string;
+  appliedTitleKeywords: string;
+
+  // ── Project ──────────────────────────────────────────────────────────────
   projectState: ProjectState;
   shotsState: Shot[];
+
+  // ── Pipeline payload (all step outputs) ─────────────────────────────────
   pipelineState: PipelinePayload;
+
+  // ── Navigation ───────────────────────────────────────────────────────────
   activeStep: WorkflowStepId;
+
+  // ── Step flags (Record<stepId, value>) ─────────────────────────────────
   stepLoading: Record<number, boolean>;
   stepDone: Record<number, boolean>;
+  stepConfirmed: Record<number, boolean>;
+  stepSkillDirty: Record<number, boolean>;
+
+  // ── Selection ───────────────────────────────────────────────────────────
+  selectedAnalysis: PipelineAnalysisState | null;
+  selectedTitleId: string | null;
+  selectedShotId: string;
+
+  // ── Voice job ──────────────────────────────────────────────────────────
   voiceJobId: string | null;
   voiceJobResult: VoiceJobResult | null;
+  voiceJobStatus: JobStatus;
+  voiceProgress: number;
+
+  // ── Render job ──────────────────────────────────────────────────────────
   renderJobId: string | null;
   renderJobResult: RenderJobResult | null;
-  voiceJobStatus: JobStatus;
   renderJobStatus: JobStatus;
-  voiceProgress: number;
   renderProgress: number;
+
+  // ── Image job ───────────────────────────────────────────────────────────
   imageStatus: JobStatus;
   imageCount: number;
-  stepSkillDirty: Record<number, boolean>;
+
+  // ── Regeneration ─────────────────────────────────────────────────────────
   regenerateAttempts: Record<number, number>;
-  previewRatio: PreviewRatio;
+
+  // ── UI ─────────────────────────────────────────────────────────────────
   busyAll: boolean;
   errorMsg: string | null;
   toast: string | null;
-  selectedAnalysis: any;
-  selectedTitleId: string | null;
-  stepConfirmed: Record<number, boolean>;
-  selectedShotId: string;
   playbackResetKey: number;
   hasHydrated: boolean;
 }
 
 interface PipelineSessionActions {
+  // ── Config ───────────────────────────────────────────────────────────────
   setApiBase: (next: Updater<string>) => void;
   setApiKey: (next: Updater<string>) => void;
+  setPreviewRatio: (next: Updater<PreviewRatio>) => void;
   setTitleKeywords: (next: Updater<string>) => void;
+  setAppliedTitleKeywords: (next: Updater<string>) => void;
+
+  // ── Project ──────────────────────────────────────────────────────────────
   setProjectState: (next: Updater<ProjectState>) => void;
   setShotsState: (next: Updater<Shot[]>) => void;
   setPipelineState: (next: Updater<PipelinePayload>) => void;
+
+  // ── Navigation ──────────────────────────────────────────────────────────
   setActiveStep: (next: Updater<WorkflowStepId>) => void;
+
+  // ── Step flags (individual — kept for orchestrator's functional updater pattern) ──
   setStepLoading: (next: Updater<Record<number, boolean>>) => void;
   setStepDone: (next: Updater<Record<number, boolean>>) => void;
-  setVoiceJobId: (next: Updater<string | null>) => void;
-  setVoiceJobResult: (next: Updater<VoiceJobResult | null>) => void;
-  setRenderJobId: (next: Updater<string | null>) => void;
-  setRenderJobResult: (next: Updater<RenderJobResult | null>) => void;
-  setVoiceJobStatus: (next: Updater<JobStatus>) => void;
-  setRenderJobStatus: (next: Updater<JobStatus>) => void;
-  setVoiceProgress: (next: Updater<number>) => void;
-  setRenderProgress: (next: Updater<number>) => void;
-  setImageStatus: (next: Updater<JobStatus>) => void;
-  setImageCount: (next: Updater<number>) => void;
+  setStepConfirmed: (next: Updater<Record<number, boolean>>) => void;
   setStepSkillDirty: (next: Updater<Record<number, boolean>>) => void;
   setRegenerateAttempts: (next: Updater<Record<number, number>>) => void;
-  setPreviewRatio: (next: Updater<PreviewRatio>) => void;
+
+  // ── Step flags (bulk) ─────────────────────────────────────────────────
+  /** Bulk-update step flags. Partial update — only provided keys are merged. */
+  patchStepFlags: (flags: {
+    loading?: Record<number, boolean>;
+    done?: Record<number, boolean>;
+    confirmed?: Record<number, boolean>;
+    dirty?: Record<number, boolean>;
+  }) => void;
+
+  // ── Selection ────────────────────────────────────────────────────────────
+  setSelectedAnalysis: (next: Updater<PipelineAnalysisState | null>) => void;
+  setSelectedTitleId: (next: Updater<string | null>) => void;
+  setSelectedShotId: (next: Updater<string>) => void;
+
+  // ── Voice job ───────────────────────────────────────────────────────────
+  setVoiceJobId: (next: Updater<string | null>) => void;
+  setVoiceJobResult: (next: Updater<VoiceJobResult | null>) => void;
+  setVoiceJobStatus: (next: Updater<JobStatus>) => void;
+  setVoiceProgress: (next: Updater<number>) => void;
+
+  // ── Render job ──────────────────────────────────────────────────────────
+  setRenderJobId: (next: Updater<string | null>) => void;
+  setRenderJobResult: (next: Updater<RenderJobResult | null>) => void;
+  setRenderJobStatus: (next: Updater<JobStatus>) => void;
+  setRenderProgress: (next: Updater<number>) => void;
+
+  // ── Image job ───────────────────────────────────────────────────────────
+  setImageStatus: (next: Updater<JobStatus>) => void;
+  setImageCount: (next: Updater<number>) => void;
+
+  // ── UI ─────────────────────────────────────────────────────────────────
   setBusyAll: (next: Updater<boolean>) => void;
   setErrorMsg: (next: Updater<string | null>) => void;
   setToast: (next: Updater<string | null>) => void;
-  setSelectedAnalysis: (next: Updater<any>) => void;
-  setSelectedTitleId: (next: Updater<string | null>) => void;
-  setStepConfirmed: (next: Updater<Record<number, boolean>>) => void;
-  setSelectedShotId: (next: Updater<string>) => void;
   setPlaybackResetKey: (next: Updater<number>) => void;
   setHasHydrated: (next: Updater<boolean>) => void;
+
+  // ── Persistence ─────────────────────────────────────────────────────────
   hydrateFromSnapshot: (snapshot: PersistedPipelineSnapshot) => void;
 }
 
@@ -85,83 +138,120 @@ function createInitialPipelineSessionState(): PipelineSessionState {
   return {
     apiBase: API_BASE_DEFAULT,
     apiKey: API_KEY_DEFAULT,
+    previewRatio: 'landscape',
     titleKeywords: 'OpenClaw 小龙虾为什么这么火？',
+    appliedTitleKeywords: '',
     projectState: createInitialProjectState(),
     shotsState: DEFAULT_SHOTS,
     pipelineState: {},
     activeStep: 1,
     stepLoading: {},
     stepDone: {},
+    stepConfirmed: {},
+    stepSkillDirty: {},
+    selectedAnalysis: null,
+    selectedTitleId: null,
+    selectedShotId: DEFAULT_SHOTS[0]?.id || '',
     voiceJobId: null,
     voiceJobResult: null,
+    voiceJobStatus: 'idle',
+    voiceProgress: 0,
     renderJobId: null,
     renderJobResult: null,
-    voiceJobStatus: 'idle',
     renderJobStatus: 'idle',
-    voiceProgress: 0,
     renderProgress: 0,
     imageStatus: 'idle',
     imageCount: 0,
-    stepSkillDirty: {},
     regenerateAttempts: {},
-    previewRatio: 'landscape',
     busyAll: false,
     errorMsg: null,
     toast: null,
-    selectedAnalysis: null,
-    selectedTitleId: null,
-    stepConfirmed: {},
-    selectedShotId: DEFAULT_SHOTS[0]?.id || '',
     playbackResetKey: 0,
     hasHydrated: false,
   };
 }
 
-function createSetter<K extends keyof PipelineSessionState>(key: K) {
+// ── Per-key setter factory ────────────────────────────────────────────────────
+
+function makeSetter<K extends keyof PipelineSessionState>(key: K) {
   return (set: (partial: (state: PipelineSessionStore) => Partial<PipelineSessionStore>) => void) =>
     (next: Updater<PipelineSessionState[K]>) => {
       set((state) => ({
-        [key]: resolveUpdater(next, state[key]),
+        [key]: resolveUpdater(next, state[key] as PipelineSessionState[K]),
       }));
     };
 }
 
+// ── Store ───────────────────────────────────────────────────────────────────
+
 export const usePipelineSessionStore = create<PipelineSessionStore>((set) => {
-  const initialState = createInitialPipelineSessionState();
+  const initial = createInitialPipelineSessionState();
 
   return {
-    ...initialState,
-    setApiBase: createSetter('apiBase')(set),
-    setApiKey: createSetter('apiKey')(set),
-    setTitleKeywords: createSetter('titleKeywords')(set),
-    setProjectState: createSetter('projectState')(set),
-    setShotsState: createSetter('shotsState')(set),
-    setPipelineState: createSetter('pipelineState')(set),
-    setActiveStep: createSetter('activeStep')(set),
-    setStepLoading: createSetter('stepLoading')(set),
-    setStepDone: createSetter('stepDone')(set),
-    setVoiceJobId: createSetter('voiceJobId')(set),
-    setVoiceJobResult: createSetter('voiceJobResult')(set),
-    setRenderJobId: createSetter('renderJobId')(set),
-    setRenderJobResult: createSetter('renderJobResult')(set),
-    setVoiceJobStatus: createSetter('voiceJobStatus')(set),
-    setRenderJobStatus: createSetter('renderJobStatus')(set),
-    setVoiceProgress: createSetter('voiceProgress')(set),
-    setRenderProgress: createSetter('renderProgress')(set),
-    setImageStatus: createSetter('imageStatus')(set),
-    setImageCount: createSetter('imageCount')(set),
-    setStepSkillDirty: createSetter('stepSkillDirty')(set),
-    setRegenerateAttempts: createSetter('regenerateAttempts')(set),
-    setPreviewRatio: createSetter('previewRatio')(set),
-    setBusyAll: createSetter('busyAll')(set),
-    setErrorMsg: createSetter('errorMsg')(set),
-    setToast: createSetter('toast')(set),
-    setSelectedAnalysis: createSetter('selectedAnalysis')(set),
-    setSelectedTitleId: createSetter('selectedTitleId')(set),
-    setStepConfirmed: createSetter('stepConfirmed')(set),
-    setSelectedShotId: createSetter('selectedShotId')(set),
-    setPlaybackResetKey: createSetter('playbackResetKey')(set),
-    setHasHydrated: createSetter('hasHydrated')(set),
+    // ── Initial state ──────────────────────────────────────────────────────
+    ...initial,
+
+    // ── Config ────────────────────────────────────────────────────────────
+    setApiBase: makeSetter('apiBase')(set),
+    setApiKey: makeSetter('apiKey')(set),
+    setPreviewRatio: makeSetter('previewRatio')(set),
+    setTitleKeywords: makeSetter('titleKeywords')(set),
+    setAppliedTitleKeywords: makeSetter('appliedTitleKeywords')(set),
+
+    // ── Project ───────────────────────────────────────────────────────────
+    setProjectState: makeSetter('projectState')(set),
+    setShotsState: makeSetter('shotsState')(set),
+    setPipelineState: makeSetter('pipelineState')(set),
+
+    // ── Navigation ────────────────────────────────────────────────────────
+    setActiveStep: makeSetter('activeStep')(set),
+
+    // ── Step flags (individual — functional updaters used by orchestrator) ──
+    setStepLoading: makeSetter('stepLoading')(set),
+    setStepDone: makeSetter('stepDone')(set),
+    setStepConfirmed: makeSetter('stepConfirmed')(set),
+    setStepSkillDirty: makeSetter('stepSkillDirty')(set),
+    setRegenerateAttempts: makeSetter('regenerateAttempts')(set),
+
+    // ── Step flags (bulk) ─────────────────────────────────────────────────
+    patchStepFlags: (flags) => {
+      set((state) => ({
+        stepLoading: flags.loading !== undefined ? flags.loading : state.stepLoading,
+        stepDone: flags.done !== undefined ? flags.done : state.stepDone,
+        stepConfirmed: flags.confirmed !== undefined ? flags.confirmed : state.stepConfirmed,
+        stepSkillDirty: flags.dirty !== undefined ? flags.dirty : state.stepSkillDirty,
+      }));
+    },
+
+    // ── Selection ─────────────────────────────────────────────────────────
+    setSelectedAnalysis: makeSetter('selectedAnalysis')(set),
+    setSelectedTitleId: makeSetter('selectedTitleId')(set),
+    setSelectedShotId: makeSetter('selectedShotId')(set),
+
+    // ── Voice job ─────────────────────────────────────────────────────────
+    setVoiceJobId: makeSetter('voiceJobId')(set),
+    setVoiceJobResult: makeSetter('voiceJobResult')(set),
+    setVoiceJobStatus: makeSetter('voiceJobStatus')(set),
+    setVoiceProgress: makeSetter('voiceProgress')(set),
+
+    // ── Render job ─────────────────────────────────────────────────────────
+    setRenderJobId: makeSetter('renderJobId')(set),
+    setRenderJobResult: makeSetter('renderJobResult')(set),
+    setRenderJobStatus: makeSetter('renderJobStatus')(set),
+    setRenderProgress: makeSetter('renderProgress')(set),
+
+    // ── Image job ─────────────────────────────────────────────────────────
+    setImageStatus: makeSetter('imageStatus')(set),
+    setImageCount: makeSetter('imageCount')(set),
+
+    // ── UI ─────────────────────────────────────────────────────────────────
+    setBusyAll: makeSetter('busyAll')(set),
+    setErrorMsg: makeSetter('errorMsg')(set),
+    setToast: makeSetter('toast')(set),
+    setPlaybackResetKey: makeSetter('playbackResetKey')(set),
+    setHasHydrated: makeSetter('hasHydrated')(set),
+
+    // ── Persistence ────────────────────────────────────────────────────────
     hydrateFromSnapshot: (snapshot) => {
       const migratedStep7Done = Boolean(
         snapshot.stepDone?.[7]
@@ -170,24 +260,21 @@ export const usePipelineSessionStore = create<PipelineSessionStore>((set) => {
         || snapshot.renderJobId
         || snapshot.renderJobResult,
       );
-      const migratedStepDone = Object.entries({
-        ...(snapshot.stepDone || {}),
-        ...(migratedStep7Done ? {7: true} : {}),
-      }).reduce<Record<number, boolean>>((acc, [key, value]) => {
-        acc[Number(key)] = Boolean(value);
-        return acc;
-      }, {});
-      const migratedStepConfirmed = Object.entries({
-        ...(snapshot.stepConfirmed || {}),
+
+      const migratedStepDone = Object.fromEntries([
+        ...Object.entries(snapshot.stepDone ?? {}),
+        ...(migratedStep7Done ? [['7', true as boolean]] : []),
+      ].map(([k, v]) => [Number(k), Boolean(v)]));
+
+      const migratedStepConfirmed = Object.fromEntries([
+        ...Object.entries(snapshot.stepConfirmed ?? {}),
         ...(migratedStep7Done
-          ? {7: Boolean(snapshot.stepConfirmed?.[7] || snapshot.stepConfirmed?.[8] || snapshot.stepDone?.[8])}
-          : {}),
-      }).reduce<Record<number, boolean>>((acc, [key, value]) => {
-        acc[Number(key)] = Boolean(value);
-        return acc;
-      }, {});
-      const migratedPipelineState = {
-        ...(snapshot.pipelineState || {}),
+          ? [['7', Boolean(snapshot.stepConfirmed?.[7] ?? snapshot.stepConfirmed?.[8] ?? snapshot.stepDone?.[8])]]
+          : []),
+      ].map(([k, v]) => [Number(k), Boolean(v)]));
+
+      const migratedPipelineState: PipelinePayload = {
+        ...(snapshot.pipelineState ?? {}),
         ...(migratedStep7Done && !snapshot.pipelineState?.projectBuild
           ? {
             projectBuild: {
@@ -209,20 +296,20 @@ export const usePipelineSessionStore = create<PipelineSessionStore>((set) => {
         activeStep: snapshot.activeStep,
         stepDone: migratedStepDone,
         stepConfirmed: migratedStepConfirmed,
-        selectedAnalysis: snapshot.selectedAnalysis,
-        selectedTitleId: snapshot.selectedTitleId,
+        selectedAnalysis: snapshot.selectedAnalysis ?? null,
+        selectedTitleId: snapshot.selectedTitleId ?? null,
         previewRatio: snapshot.previewRatio,
-        voiceJobId: snapshot.voiceJobId,
-        voiceJobResult: snapshot.voiceJobResult,
-        renderJobId: snapshot.renderJobId,
-        renderJobResult: snapshot.renderJobResult,
-        voiceJobStatus: snapshot.voiceJobStatus,
-        renderJobStatus: snapshot.renderJobStatus,
-        voiceProgress: snapshot.voiceProgress,
-        renderProgress: snapshot.renderProgress,
-        imageStatus: snapshot.imageStatus,
-        imageCount: snapshot.imageCount,
-        stepSkillDirty: snapshot.stepSkillDirty || {},
+        voiceJobId: snapshot.voiceJobId ?? null,
+        voiceJobResult: snapshot.voiceJobResult ?? null,
+        renderJobId: snapshot.renderJobId ?? null,
+        renderJobResult: snapshot.renderJobResult ?? null,
+        voiceJobStatus: snapshot.voiceJobStatus ?? 'idle',
+        renderJobStatus: snapshot.renderJobStatus ?? 'idle',
+        voiceProgress: snapshot.voiceProgress ?? 0,
+        renderProgress: snapshot.renderProgress ?? 0,
+        imageStatus: snapshot.imageStatus ?? 'idle',
+        imageCount: snapshot.imageCount ?? 0,
+        stepSkillDirty: snapshot.stepSkillDirty ?? {},
         hasHydrated: true,
       }));
     },

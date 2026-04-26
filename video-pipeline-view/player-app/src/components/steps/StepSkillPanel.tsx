@@ -83,7 +83,9 @@ export const StepSkillPanel: React.FC<StepSkillPanelProps> = ({
         <div className="mac-step-skill-topic">
           <span className="mac-kicker">主题输入</span>
           <div className="mac-step-skill-topic-row">
+            <label htmlFor="topic-keywords-input" className="sr-only">主题关键词</label>
             <input
+              id="topic-keywords-input"
               className="mac-input mac-step-skill-topic-input"
               type="text"
               value={titleKeywords}
@@ -126,10 +128,11 @@ export const StepSkillPanel: React.FC<StepSkillPanelProps> = ({
 
       {isStep3 ? (
         <div className="mac-step-skill-grid">
-          <label className="mac-step-skill-card">
+          <label className="mac-step-skill-card" htmlFor="target-duration-input">
             <span>目标口播时长</span>
             <div className="mac-step-skill-inline-input">
               <input
+                id="target-duration-input"
                 className="mac-input"
                 type="number"
                 min={15}
@@ -169,9 +172,10 @@ export const StepSkillPanel: React.FC<StepSkillPanelProps> = ({
             </div>
           </div>
 
-          <label className="mac-step-skill-card">
+          <label className="mac-step-skill-card" htmlFor="spoken-persona-input">
             <span>拟人口播人设</span>
             <input
+              id="spoken-persona-input"
               className="mac-input"
               type="text"
               value={normalizedSkill.spokenPersona || ''}

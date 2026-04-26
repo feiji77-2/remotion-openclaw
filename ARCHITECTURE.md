@@ -2,7 +2,7 @@
 
 > 更新：2026-04-25
 
-当前仓库的主运行链路已经统一为 Ultimate 横版场景系统。Step 4 / 5 不再使用 `video-pipeline-storyboard` 固定 6 镜头合同，而是改为可变场景数的 `scene planner + scene prompts`。
+当前仓库的主运行链路已经统一为 Ultimate 横版场景系统。Step 4 / 5 不再使用 `video-pipeline-storyboard` 固定 6 镜头合同，而是改为可变场景数的 `scene planner + scene prompts`。旧 `Video1v4` 主轨已经从活跃源码目录清除，历史资料仅保留在 `docs/archive/`。
 
 ## 1. 工程分层
 
@@ -59,8 +59,9 @@ flowchart LR
 - 主控：`video-pipeline-master`
 - 质检：`video-pipeline-eval`
 
-Step 4 / 5 的 skill source 不再依赖用户本机 `~/.openclaw` 里的旧文件，而是直接指向仓库内文档：
+Step 3 / 4 / 5 的 skill source 不再依赖用户本机 `~/.openclaw` 里的旧文件，而是直接指向仓库内文档：
 
+- `remotion-video/docs/workflow-skills/video-pipeline-content.SKILL.md`
 - `remotion-video/docs/workflow-skills/video-pipeline-scene-planner.SKILL.md`
 - `remotion-video/docs/workflow-skills/video-pipeline-scene-prompts.SKILL.md`
 
@@ -181,4 +182,6 @@ Step 5 输出重点：
 - Remotion typecheck
 - 后端关键文件 `node --check`
 - 前端 build
+- release smoke 视频渲染
+- release smoke MP4 时长 / 帧数校验
 - 运行目录清洁检查
