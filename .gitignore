@@ -48,3 +48,6 @@ remotion-video/src/data/contracts/
 
 # Local generated project packages
 remotion-video/projects/
+
+# Local knowledge base
+obsidian-vault-remotion-kb/
