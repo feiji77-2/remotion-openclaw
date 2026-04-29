@@ -1,6 +1,7 @@
 export const ultimateAccents = {
   cyan: '#63ddff',
   green: '#5df4bf',
+  lime: '#cdff3d',
   yellow: '#ffd66c',
   orange: '#ffad63',
   red: '#ff7a73',
@@ -21,6 +22,7 @@ export const ultimateKitTokens = {
     bgSoft: '#111828',
     panel: '#141d32',
     panelSoft: 'rgba(20, 28, 50, 0.84)',
+    brandLime: '#cdff3d',
     line: 'rgba(140, 176, 255, 0.18)',
     text: '#f5f7ff',
     textMuted: 'rgba(228, 236, 255, 0.62)',

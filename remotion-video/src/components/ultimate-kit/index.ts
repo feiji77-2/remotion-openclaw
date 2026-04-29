@@ -24,6 +24,8 @@ export {
   UltimateTimeline,
   UltimateCodePanel,
 } from './UltimateElements';
+export {UltimateCaptionOverlay} from './UltimateCaptionOverlay';
+export {UltimateDirectorEffects} from './UltimateDirectorEffects';
 export {UltimateSceneTransition} from './UltimateSceneTransition';
 export type {
   UltimateArchitectureMapProps,
@@ -86,6 +88,8 @@ export type {
   UltimateSceneConfig,
   UltimateSceneFamily,
   UltimateSceneTemplateProps,
+  UltimateSubtitleCue,
+  UltimateSubtitleWord,
   UltimateStepFlowScene,
   UltimateTagMatrixScene,
   UltimateTerminalScene,
@@ -116,7 +120,9 @@ export type {
 } from './project';
 export {
   estimateUltimateSceneDuration,
+  getUltimateIncomingTransitionDurationInFrames,
   getUltimateProjectDuration,
+  getUltimateTimelineDurationInFrames,
   normalizeUltimateProjectConfig,
 } from './project';
 export {ultimateAccents, ultimateKitTokens, ultimateKitVideo, resolveUltimateAccent, ultimateGlow} from './tokens';

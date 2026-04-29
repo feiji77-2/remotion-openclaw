@@ -1,6 +1,6 @@
 # Remotion Pipeline 开发指南
 
-> **本文档范围**：Step 1-8 完整链路说明
+> **本文档范围**：6 步主链路 + 可选 QA 支线
 >
 > **真源原则**：代码 > 测试 > 文档。用户目录 Skill 可能过时。
 
@@ -8,52 +8,45 @@
 
 ## 1. 当前系统总览
 
-### 1.1 当前真实流水线
+### 1.1 6 步主链路 + QA 支线
 
 ```
-Step 1  Research / Analysis
-  输入: 主题、标题关键词
+Phase 1  研究选题
+  内部 step: 1
   输出: analysis + researchFacts + topicResearch
-  ⚠️ 检索策略：代码内建搜索适配器（Bing RSS）
 
-Step 2  Title Strategy
-  输入: Step 1 analysis
+Phase 2  标题确认
+  内部 step: 2
   输出: titles.options[] + selectedId + selectedReason
-  ⚠️ 外部 skill 合同参与 prompt/defaults/evaluation
 
-Step 3  Content Copy
-  输入: Step 1/2
+Phase 3  口播文案
+  内部 step: 3
   输出: copy.brief + copy.outline[] + copy.hook/body/cta
 
-Step 4  Scene Planning (Ultimate 20 模板)
-  输入: Step 3 copy
-  输出: shots[] + scenePlan
+Phase 4  分镜与视觉
+  内部 step: 4, 5
+  输出: shots[] + scenePlan + prompts.byShotId[]
 
-Step 5  Visual Prompts
-  输入: Step 4 shots
-  输出: prompts.byShotId[] + templateCatalog
+  ── 可选 QA 支线（Phase 4 → Phase 5 之间）──
+  QA branch: 生成静态分镜图，写入 qa/storyboard/
+  不污染 public/assets/，不更新 project.json
+  ─────────────────────────────────────────────
 
-Step 6  Voice Script / TTS
-  输入: shots[] + copy
+Phase 5  配音与时长
+  内部 step: 6
   输出: voice.engine + voice.script[] + totalDuration
-  ⚠️ 当前语音引擎: qwen-tts
 
-Step 7  Project Build Adaptation
-  输入: pipelineState
-  输出: projectBuild.projectPath + compositionId + buildCommand
-  ⚠️ deterministic 适配层，不执行渲染
-
-Step 8  Final Render
-  输入: template + quality + fps + width + height
-  输出: render.* + 最终导出参数
+Phase 6  出片
+  内部 step: 7, 8
+  输出: projectBuild + render 参数
 ```
 
 ### 1.2 当前核心约束
 
-- 默认是 `Ultimate` 横版系统
 - 默认渲染规格是 **`1920x1080 / 30fps`**
 - Step 4 / 5 要对齐 `20` 个模板 family
 - **语音链路当前只保留 `qwen-tts`**
+- 图片生成默认开启（`--no-images` 关闭）
 
 ---
 

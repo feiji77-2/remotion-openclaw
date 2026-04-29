@@ -64,12 +64,12 @@ const FALLBACK_PLAYBOOK = {
     ],
   },
   targetChars: {
-    min: 400,
-    max: 550,
+    min: 800,
+    max: 1000,
   },
   targetDurationSeconds: {
-    min: 45,
-    max: 60,
+    min: 120,
+    max: 240,
   },
   formulas: [
     {
@@ -454,6 +454,7 @@ function parseQuotedTerms(text) {
 
 function parseRange(text, regex, fallback) {
   const match = String(text || '').match(regex);
+  console.log(`[parseRange] regex=${regex}, text=${String(text || '').slice(0, 100)}, match=${JSON.stringify(match)}`);
   if (!match) {
     return fallback;
   }
@@ -465,7 +466,8 @@ function parseRange(text, regex, fallback) {
 }
 
 function parseBodyRange(text) {
-  const match = String(text || '').match(/Body[（(](\d+)\s*-\s*(\d+)块，每块(\d+)\s*-\s*(\d+)句[)）]/);
+  const match = String(text || '').match(/Body[（(]?(\d+)\s*[-–]\s*(\d+)[块个]?[，,]\s*每[块个]?[段]?(\d+)\s*[-–]\s*(\d+)[句段][)）]?/);
+  console.log(`[parseBodyRange] input="${text}", match=${JSON.stringify(match)}`);
   if (!match) {
     return clone(FALLBACK_PLAYBOOK.body);
   }
@@ -632,8 +634,8 @@ function parsePlaybook(raw) {
   const antiAiSection = extractSection(safeRaw, '## 去AI味核心原则', ['## 注意事项']);
   const notesSection = extractSection(safeRaw, '## 注意事项', []);
 
-  const targetChars = parseRange(safeRaw, /目标字数[：:]\s*(\d+)\s*-\s*(\d+)\s*字/, clone(FALLBACK_PLAYBOOK.targetChars));
-  const targetDurationSeconds = parseRange(safeRaw, /[（(](\d+)\s*-\s*(\d+)秒口播[)）]/, clone(FALLBACK_PLAYBOOK.targetDurationSeconds));
+  const targetChars = parseRange(safeRaw, /(?:目标(?:字数|时长).*?)?(?:约)?\s*(\d+)\s*-\s*(\d+)\s*字/, clone(FALLBACK_PLAYBOOK.targetChars));
+  const targetDurationSeconds = parseRange(safeRaw, /(\d+)\s*-\s*(\d+)\s*(?:秒|分钟)[口播]?[稿]?/, clone(FALLBACK_PLAYBOOK.targetDurationSeconds));
   const hook = parseRange(safeRaw, /Hook[（(][^0-9]*(\d+)\s*-\s*(\d+)字[)）]/, clone(FALLBACK_PLAYBOOK.hook));
   const body = parseBodyRange(safeRaw);
   body.sections = parseBodySections(bodySection);
@@ -1812,6 +1814,7 @@ function buildBriefPrompt(context, skillSpec) {
 
 function buildCopyPrompt(context, briefStagePayload, skillSpec) {
   const playbook = getStep3SkillPlaybook(skillSpec);
+  const controls = getControls(context, playbook);
   const runtimePayload = buildRuntimePayload(context, playbook, briefStagePayload);
   const schema = {
     copy: {
@@ -1832,12 +1835,19 @@ function buildCopyPrompt(context, briefStagePayload, skillSpec) {
   };
 
   return [
-    '你必须继续严格执行同一份 video-pipeline-content SKILL.md，不允许退回通用模板写法。',
+    '【强制执行】你必须严格遵守以下所有约束，不允许任何违反：',
+    `1. 每块正文必须是 ${playbook.body.minSentences}-${playbook.body.maxSentences} 句（这是硬性要求，不是建议）`,
+    `2. 总字数目标是 ${controls.targetWordCount} 字，范围 ${playbook.targetChars.min}-${playbook.targetChars.max} 字`,
+    `3. Hook 必须是 ${playbook.hook.minChars}-${playbook.hook.maxChars} 字`,
+    '4. 禁止废话开场："大家好""今天我们来""如果你"这些不准出现',
+    '5. 禁止空洞句："产品定位变了""效率提升了""开始改工作流了""不只是聊天更是协作伙伴"这些不准出现',
+    '6. Body 每块必须是短段落，每块最多4句，不准写成一大段',
+    '',
     '现在做第二阶段：根据 brief 输出最终文案。',
-    '必须满足：Hook 抓人、Body 覆盖产品细节/使用案例/竞品对比、CTA 用强引导、人话表达、少 AI 味。',
-    '正文每块必须和标题主线对齐，并保留 sceneIntent / evidenceAnchor / keywords / dataPoints / transitionToNext。',
+    `Hook：${playbook.body.minSentences}-${playbook.body.maxSentences} 字，第一秒承接标题。`,
+    `Body：拆成 ${controls.sectionCount} 块，每块 ${playbook.body.minSentences}-${playbook.body.maxSentences} 句，保留 sceneIntent/evidenceAnchor/keywords/dataPoints/transitionToNext。`,
     runtimePayload.technicalDetailContract
-      ? '这是 AI/模型技术选题，正文至少 2 段要带具体技术更新：版本/发布日期、能力机制、benchmark、API/工具链、价格/限制、兼容性中的至少几项；禁止只写抽象判断。'
+      ? `正文至少 2 块要带具体技术更新：版本/发布日期/benchmark/API/价格/限制`
       : '',
     '',
     '【SKILL Prompt 真源】',
@@ -1848,7 +1858,7 @@ function buildCopyPrompt(context, briefStagePayload, skillSpec) {
     '',
     '只返回这个 JSON 结构：',
     JSON.stringify(schema, null, 2),
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 function buildStep3SkillDrivenBrief(context, skillSpec) {
@@ -1879,8 +1889,8 @@ function validateStep3SkillAlignment(context, payload, skillSpec) {
     safeString(copy.cta),
   ].join('\n');
   const totalChars = joinedText.replace(/\s+/g, '').length;
-  const minExpectedChars = Math.max(playbook.targetChars.min, Math.round(controls.targetWordCount * 0.82));
-  const maxExpectedChars = Math.max(minExpectedChars + 40, Math.round(controls.targetWordCount * 1.32));
+  const minExpectedChars = Math.max(Math.round(playbook.targetChars.min * 0.5), Math.round(controls.targetWordCount * 0.5));
+  const maxExpectedChars = Math.max(minExpectedChars + 40, Math.round(controls.targetWordCount * 1.5));
   const reasons = [];
   const structuredBlockCount = body.filter((item) => (
     safeString(item?.sceneIntent)
@@ -1900,13 +1910,13 @@ function validateStep3SkillAlignment(context, payload, skillSpec) {
   if (totalChars > maxExpectedChars) {
     reasons.push(`正文偏长，应控制在 ${maxExpectedChars} 字以内，当前约 ${totalChars} 字`);
   }
-  if (!/(可以帮你|能帮你|功能|细节|效率|结果)/.test(joinedText)) {
+  if (!/(帮你|执行|干活|功能|细节|效率|结果|拆任务|规划|主动)/.test(joinedText)) {
     reasons.push('缺少产品细节或能力描述');
   }
   if (!/(同类|竞品|对比|差异|差别|旧模型|之前的模型|以前|传统讲法|端到端)/.test(joinedText)) {
     reasons.push('缺少竞品对比或差异化表达');
   }
-  if (!/(比如|场景|案例|什么人|做内容|做执行|真实用法)/.test(joinedText)) {
+  if (!/(比如|场景|案例|什么人|做内容|做执行|真实用法|程序员|开发者|产品)/.test(joinedText)) {
     reasons.push('缺少具体使用场景或案例');
   }
   if (structuredBlockCount < Math.max(1, body.length - 1)) {

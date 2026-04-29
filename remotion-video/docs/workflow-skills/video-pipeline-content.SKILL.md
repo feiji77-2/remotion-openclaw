@@ -2,150 +2,346 @@
 name: video-pipeline-content
 step: 3
 owner: repo
+version: 3.1
 ---
 
-# Step 3 内容生成 Skill
+# Step 3 内容生成 Skill（v3.1）
 
 你负责把已确认标题、分析结论和搜索事实，写成可以直接进入 Step 4 的中文口播内容合同。
 
-核心原则：
+## 输入规格
 
-- 先承接标题主判断，再展开事实和差异，不要退回泛背景介绍
-- 输出必须能服务后续场景编排，所以不能只有纯文本，必须带结构化线索
-- 结果要口语化、结论先行、少 AI 味，但不能牺牲信息密度
+**Step 1 和 Step 2 必须同时就绪，才进入 Step 3。两者缺一不可。**
 
-目标字数：220-340字
-（60-90秒口播）
+| 字段 | 必填 | 来源 | 说明 |
+|------|------|------|------|
+| `analysis.thesis` | ✅ | Step 1 | 主命题 |
+| `analysis.audience` | ✅ | Step 1 | 目标受众 |
+| `analysis.corePromise` | ✅ | Step 1 | 核心承诺 |
+| `analysis.keyDataPoints[]` | ✅ | Step 1 | 搜索事实锚点 |
+| `title.selectedTitle` | ✅ | Step 2 | 已确认标题 |
+| `title.titleKeywords[]` | ✅ | Step 2 | 标题关键词 |
+| `title.score` | ✅ | Step 2 | 标题评分 |
 
-## 抖音爆款4大底层公式
+---
 
-1. 结论先行：第一句先给判断，让观众知道为什么值得继续看
-   例："别再只看热度了，真正该先看的，是它开始改工作流"
+## 目标时长
 
-2. 硬事实推进：每往下一段，都要补一条更硬的事实或结果
-   例："不是参数好看，而是 benchmark、开源能力和落地场景一起变了"
+约800-1000字（2-4分钟口播稿，按每分钟200字标准语速）
 
-3. 差异化拆解：一定要讲清和旧讲法、竞品或传统流程的差异
-   例："以前只是会答题，现在开始能直接接多段任务"
+---
 
-4. 强互动收束：结尾要把观众带进评论、关注、转发或下一条内容
-   例："你最想继续看哪一层，评论区留一句，我下一条继续拆"
+## 完整输出结构
 
-## AI / 模型技术选题硬约束
+```json
+{
+  "copy": {
+    "brief": {
+      "hookAngle": "Hook角度描述",
+      "tone": "口语化短句，像真人拆重点",
+      "pacing": "硬事实快速推进，每块要有数据或具体能力点",
+      "ctaIntent": "CTA意图描述",
+      "techDepth": "shallow | medium | deep（技术讲解深度）"
+    },
+    "hook": "Hook文案（18-40字，1-2句）",
+    "hookMeta": {
+      "title": "对应的标题原文",
+      "score": 92,
+      "keywords": ["标题关键词1", "关键词2"],
+      "hookStyle": "Hook风格描述"
+    },
+    "outline": [
+      {
+        "id": "copy-outline-N",
+        "label": "块标签",
+        "type": "fact-hammer | tech-mechanism | capability | comparison | scenario | cta",
+        "beat": "节拍描述",
+        "goal": "本块要达到的目标",
+        "evidenceAnchor": "证据锚点",
+        "sceneIntent": "中文场景意图描述（Step 4 消费此字段）",
+        "transitionToNext": "承接到下一块的过渡语（建议输出，非必须）",
+        "mustInclude": ["必须包含的点1", "点2"],
+        "keywords": ["关键词1", "关键词2"]
+      }
+    ],
+    "body": [
+      {
+        "id": "copy-N",
+        "label": "块标签",
+        "type": "fact-hammer | tech-mechanism | capability | comparison | scenario | cta",
+        "text": "正文（2-4句为一单元）",
+        "sceneIntent": "中文场景意图（直接抄自 outline.sceneIntent）",
+        "evidenceAnchor": "证据锚点（与 outline 一致）",
+        "transitionToNext": "承接到下一块的过渡语（建议输出）",
+        "keywords": ["关键词1", "关键词2"],
+        "dataPoints": ["具体数字或事实1", "事实2"],
+        "mechanismDepth": {
+          "level": "shallow | medium | deep",
+          "explains": "WHAT | HOW | WHY",
+          "technicalTerms": ["术语1", "术语2"],
+          "analogy": "生活化类比（可选，用于把复杂技术讲简单）",
+          "visualHint": "Step4视觉提示：曲线图/流程图/数据流/对比图"
+        }
+      }
+    ],
+    "cta": "CTA文案（互动型或关注型）",
+    "ctaMeta": {
+      "intent": "CTA意图",
+      "style": "互动型 | 关注型 | 情绪引导型"
+    },
+    "totalChars": 820,
+    "readingTime": 245,
+    "keywords": ["词1", "词2"],
+    "titleAlignment": {
+      "selectedTitle": "已确认标题原文",
+      "titleKeywords": ["标题拆出的词"],
+      "matchedKeywords": ["在正文中出现的词"],
+      "missingKeywords": ["在正文中缺失的词"],
+      "score": 50
+    },
+    "storySpine": {
+      "openingPromise": "开场承诺句",
+      "mainClaim": "核心主张",
+      "audience": "受众关心什么",
+      "sceneIntents": ["场景意图1", "场景意图2", "场景意图3"],
+      "closingMove": "收尾动作"
+    },
+    "coverage": {
+      "bodyBlockCount": 4,
+      "evidenceAnchors": ["证据1", "证据2"],
+      "keywordCount": 10,
+      "matchedKeywordCount": 3,
+      "targetDurationSeconds": 240,
+      "estimatedSceneCount": 12,
+      "hasTechMechanism": true
+    }
+  }
+}
+```
 
-- 只要标题或事实里出现 GPT、Claude、Gemini、Kimi、DeepSeek、OpenAI、Anthropic、模型发布、版本升级 这类主题，就不能写成泛泛科技感口播
-- 正文至少 2 块必须带具体技术更新，优先级从高到低：
-  - 版本号 / 发布日期 / 发布时间线
-  - 具体能力或机制变化，例如 Agent、工具调用、上下文窗口、代码能力、推理、多模态、API、MCP、工作流
-  - benchmark / 第三方评测 / 排名 / 分数 / 胜率
-  - 工具链 / API / SDK / 价格 / 速率限制 / 兼容性 / 已知限制
-- 禁止只写这些抽象句：
-  - “产品定位变了”
-  - “效率提升了”
-  - “开始改工作流了”
-  - “压力变大了”
-  - “不只是聊天，更是协作伙伴”
-- 如果是“发布 / 上线 / 升级”类标题，Hook 或正文前两块里必须讲清版本或发布时间，不准跳过
-- 对比块不能只喊“更强”，必须落到 benchmark、能力机制、工具链、价格限制或真实任务结果中的至少一项
+---
 
-## 内容结构要求
+## Body 块类型（5种，必须用 4-5 种）
 
-### Hook（18-36字）
+| 块 | type | 核心要求 |
+|----|------|---------|
+| 块1 | `fact-hammer` | 结论先行，抛出数字锚点 |
+| 块2 | `tech-mechanism` | **技术原理解析（新增，必须有）** |
+| 块3 | `capability` | 硬事实+能力，不能只写"很强" |
+| 块4 | `comparison` | benchmark分数，明确vs旧版/竞品差异 |
+| 块5（可选） | `scenario` | 具体人群+具体场景+具体影响 |
 
-- 第一秒先承接标题主判断
-- 不准用"大家好""今天我们来""如果你"这种废话开场
-- 必须能让 Step 4 直接拿去做 hero / focus / quote-highlight 开场
+**技术类内容（AI/模型/代码类）必须包含 `tech-mechanism` 块，不得用 capability 块替代。**
 
-### Body（3-4块，每块2-4句）
+---
 
-**块1：主判断 / 发布背景**
-- 用结论先行或反常识起手
-- 先把这次事件、产品或模型为什么值得看讲透
-- 必须留一个可做中段场景标题的 scene intent
+## tech-mechanism 块写作规范
 
-**块2：具体能力 / 产品细节**
-- 用硬事实推进
-- 至少落到功能、结果、能力、效率中的一个具体点
-- 不能只写"很强""很厉害""很先进"
+这是技术类内容的核心层。位置在 fact-hammer 之后、capability 之前。
 
-**块3：差异化 / 对比**
-- 用差异化拆解
-- 必须明确讲出和旧讲法、竞品、旧流程或传统方案的差异
-- 这一块优先给 compare-board / benchmark-chart / evidence-wall 提供素材
+### 技术讲解 Prompt 模板
 
-**块4：场景 / 影响 / 结果**
-- 用场景化收束
-- 讲清楚什么人、在什么任务里、会受到什么影响
-- 结尾前要能把观众带到 CTA
+```
+"你刚才说了"62%"，那这个62%到底是怎么测出来的？
+SWE-bench 考的不是你背答案，是你能不能把一个真实issue关掉。
+AI要过这关，得先读懂代码库——这就是为什么200K上下文是关键。"
+```
 
-## 必须包含的三要素
+### 写作要求
 
-### 1. 标题主判断
-- 标题关键词必须在 Hook 或第一块正文里被承接
-- 不能写成和标题不同的另一条主线
+每个 tech-mechanism 块必须满足以下之一：
 
-### 2. 搜索事实或证据锚点
-- 每条正文块都要尽量带 evidenceAnchor、factsUsed 或 dataPoints
-- 不能整条只剩抽象判断
+- **HOW型**：XXX是怎么实现的（不能只说"很强"）
+- **WHY型**：为什么XX%能代表真实能力（解释benchmark机制）
+- **MECHANISM型**：关键部件是怎么工作的（类比要生活化）
 
-### 3. 场景编排线索
-- 每条正文块都要带 sceneIntent
-- 每条正文块都要给出 keywords 或 dataPoints
-- 最好带 transitionToNext，方便 Step 4 做衔接
+### 结构模板（3句展开）
 
-## CTA 强引导公式
+```
+第1句：抛出技术术语或数字（锚点）
+第2句：解释机制/原理（核心，2-3种选择之一）
+  - "这个数字是怎么测出来的？"
+  - "它是怎么做到的？"
+  - "为什么这个能力是突破？"
+第3句：类比（把复杂技术用生活化例子讲清楚）
+```
 
-- 互动型："评论区告诉我你最想继续拆哪一层"
-- 关注型："关注我，下一条继续往实战和案例里拆"
-- 转发型："觉得这条有用，就转给也在盯这件事的人"
-- 问答型："你更关心 benchmark、工程落地还是开源生态？"
+### mechanismDepth 字段说明
 
-## 输出格式
+| level | 含义 |
+|-------|------|
+| `shallow` | 只说WHAT，不解释原理（不推荐） |
+| `medium` | 说了HOW，用了类比 |
+| `deep` | 说了HOW+WHY，有benchmark机制解析 |
 
-- 先生成 brief 和 outline，再生成最终 copy
-- outline 每块都要给：
-  - label
-  - beat
-  - goal
-  - evidenceAnchor
-  - sceneIntent
-  - mustInclude
-  - transitionToNext
-  - keywords
-- copy.body 每块都要给：
-  - label
-  - text
-  - sceneIntent
-  - evidenceAnchor
-  - keywords
-  - dataPoints
-  - transitionToNext
+Step 4 visualHint 映射：
+
+- HOW型 → `data-stream` / `architecture-map`
+- WHY型 → `benchmark-chart` / `terminal`
+- MECHANISM型 → `flow-chart` / `pipeline-flow`
+
+### 类比库（可直接用）
+
+| 技术点 | 类比 |
+|--------|------|
+| 200K上下文 | "相当于把整个图书馆的书一次读完再写摘要" |
+| AI agent | "不是帮你订外卖，是直接帮你吃完" |
+| SWE-bench | "相当于AI去真实公司实习，通过了才能毕业" |
+| benchmark | "不是考试，是真刀真枪上项目" |
+| 上下文窗口 | "短上下文是看照片写影评，长上下文是看电影写剧本" |
+
+---
+
+## sceneIntent 字段说明（重要）
+
+**Step 4 实际消费的是中文描述，不是视觉类型枚举。**
+
+sceneIntent 格式：「让观众理解XXX」「让程序员知道YYY」
+示例：「让程序员理解这从问答工具升级为任务执行者」
+
+不要写：`fullscreen | split-screen | hud-overlay | timeline`
+
+这些视觉类型由 Step 4 根据 body 块的 dataPoints / comparisons / keywords 自行判断。
+
+---
+
+## CTA 类型（必须用一种）
+
+**互动型（优先）：**
+- "评论区告诉我你最想拆哪一层"
+- "你更关心 benchmark 还是工程落地？"
+
+**关注型：**
+- "关注我，下一条继续往实战里拆"
+- "觉得这期有用的，转给你也在盯这件事的朋友"
+
+**情绪引导型：**
+- "看完我沉默了，你呢？"
+- "扎心了吗？点赞告诉我"
+
+**禁止：** 感谢观看型（"感谢观看"等）
+
+---
+
+## P0 DeAI 量化检测（硬拦截）
+
+### AI词汇黑名单（出现即 FAIL）
+
+```
+赋能、迭代、显著提升、全方位、多维度、系统性、值得关注、
+不得不说、不得不承认、本质上、显而易见、毋庸置疑、赋能、
+构建、打通、做深做透、全方位的、多维度的、立体化的
+```
+
+### 三段式识别（≥1处即 FAIL）
+
+检测 `A、B和C` 结构，如"高效、便捷、安全"
+允许出现 1 处，多于 1 处 FAIL
+
+### 空洞词（出现即 FAIL）
+
+```
+翻倍、碾压、大幅提升、压力变大、效率提升（不说具体数字）
+```
+
+### 自检清单（全部通过才可输出）
+
+```
+[ ] Hook ≤ 2句，18-40字
+[ ] AI词汇黑名单 0处
+[ ] 三段式套话 ≤ 1处
+[ ] 空洞词 0处
+[ ] 无"不只是…更是…"空模板
+[ ] 无"不得不说/不得不承认"
+[ ] CTA 是互动型或关注型（不是感谢型）
+[ ] 总字数 600-900字
+[ ] tech-mechanism 块有类比（第3句）
+[ ] tech-mechanism 块的 mechanismDepth.level 不是 shallow
+[ ] body 每块有具体数字或硬事实（技术类必须有）
+[ ] titleAlignment.score ≥ 60
+```
+
+---
+
+## 技术选题硬约束（AI/模型/代码类主题）
+
+技术类选题必须同时满足以下所有条件，否则 FAIL：
+
+```
+【必须满足】（三选一，每块至少一项）
+A. 机制解释：XXX是怎么实现的（不能只说"很强"）
+B. benchmark来源：XX%是怎么测出来的（不能只说"行业最高"）
+C. 对比原理：为什么A比B好（不能只说"差距大"）
+
+【禁止】
+- 禁止用"很强""很厉害""很先进""突破性进展"代替具体机制描述
+- 禁止只列功能清单而不解释背后的工作原理
+- 禁止空泛的"重新定义"而不解释重新定义了什么
+```
+
+---
+
+## Hook 要求（直接决定留存）
+
+- 第一秒承接标题主判断
+- 不准用"大家好"、"今天我们来"、"如果你"、"可能"
+- 段落 ≤ 2句
+- Hook Meta 的 score 来自 Step 2 标题评分，低于 70 须重写
+
+---
 
 ## 去AI味核心原则
 
-**人话说出来检查法：**
-- 像真人在当面拆重点，不像总结报告
-- 用短句和硬信息，不用套话和空洞价值词
-- 每段都尽量像"先给判断，再补事实，再推进下一段"
-- 能删掉的形容词就删，能换成事实就换成事实
+- 像真人在当面讲重点，不是在背报告
+- 短句+硬信息，能删的形容词删掉
+- 每段：先给判断→再补事实→推进下一段
+- 禁止废话开场、感谢观看、纯营销腔
 
-- 禁止废话开场
-- 禁止结尾感谢观看
-- 禁止"不只是…更是…"这种空模板
-- 禁止纯营销腔、纯鸡汤腔
+---
 
-## 注意事项
+## 输出顺序要求
 
-- 如果标题已经很强，正文不要改主线，只能补细节和推进层次
-- 如果搜索事实有噪音，只提炼共同结论和有效证据
-- 如果 requirements 提供了 focus / avoid / style / length，优先遵守
-- 正文必须能继续服务 Step 4 的场景拆分，不能写成一整段长文
+1. 先输出 brief + outline（策略层，含 type 标注）
+2. 再输出 hook + hookMeta
+3. 再输出 body[]（每块对齐 outline，tech-mechanism 块优先排第2位）
+4. 最后输出 cta + ctaMeta + totalChars + readingTime + keywords
+5. 最后做 titleAlignment + storySpine + coverage
+6. **所有步骤完成后，才做 DeAI 自检**
+7. **DeAI 通过后才算完成，未通过则重写对应块**
 
-## 内容生成 Prompt 模板
+---
 
-```text
-围绕已确认标题和分析结论，先输出结构化 brief，再输出可直接口播的 Hook / Body / CTA。
-先承接标题主判断，再用硬事实推进，再讲差异化，最后用场景或影响收束。
-正文每块都要有 sceneIntent、evidenceAnchor、keywords、dataPoints 和 transitionToNext。
-口语化、短句、少 AI 味，但要保留技术信息密度。
-```
+## Step 4 消费字段说明
+
+Step 4 分镜系统消费以下字段构建镜头：
+
+| Step 3 字段 | Step 4 用途 |
+|------------|------------|
+| `body[].text` | narration（口播原文） |
+| `body[].sceneIntent` | storyboardCueZh（分镜意图描述） |
+| `body[].dataPoints` | dataPoints（画面数字标注） |
+| `body[].keywords` | keywords（画面元素关键词） |
+| `body[].comparisons` | comparisons（split 镜头对比） |
+| `body[].evidenceAnchor` | evidenceAnchor（证据标注） |
+| `body[].mechanismDepth.visualHint` | 视觉类型推荐（参考，不是强制） |
+
+`sceneIntent` 是 Step 4 最重要的分镜决策依据，必须是**可读的中文描述**，不是枚举值。
+
+`transitionToNext` 不被 Step 4 消费，仅作文案连贯性参考，保留但不强制。
+
+---
+
+## 质量评估维度
+
+| 维度 | 说明 |
+|------|------|
+| density | 信息密度（每块是否有硬事实） |
+| spoken | 口语化程度（是否像真人说话） |
+| pacing | 节奏（句长变化、块间推进） |
+| cta | CTA 力度（是否用互动型） |
+| alignment | 标题对齐度（titleAlignment.score） |
+| evidence | 证据锚点覆盖率 |
+| compliance | DeAI 合规（禁词/空洞词/三段式） |
+| techDepth | 技术讲解深度（是否有HOW/WHY/mechanism解析） |
+
+总评分 = 各维度加权，低于 70 分须重写。

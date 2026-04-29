@@ -21,7 +21,7 @@ const ALLOWED_FAMILIES = new Set([
   'cta',
 ]);
 
-const ALLOWED_TRANSITIONS = new Set(['fade', 'lift', 'flash']);
+const ALLOWED_TRANSITIONS = new Set(['fade', 'lift', 'flash', 'slide', 'wipe', 'flip', 'clock-wipe']);
 const ALLOWED_DIAGRAMS = new Set(['framing', 'rings', 'scale']);
 const ALLOWED_ACCENTS = new Set(['cyan', 'green', 'yellow', 'orange', 'red', 'purple']);
 

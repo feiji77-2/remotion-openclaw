@@ -1,5 +1,10 @@
 /**
- * KineticText.tsx — 动态字体效果库
+ * KineticText.tsx — 动态字体效果库 v2
+ *
+ * v2 新增：
+ * - GlitchText: 字符级故障效果（借鉴 remotion-bits）
+ * - 所有效果接入统一 motion.ts 框架
+ * - Oklch 渐变色文字
  *
  * 支持效果：
  * - Typewriter: 逐字打字机效果
@@ -7,12 +12,25 @@
  * - WaveText: 波浪效果
  * - BlurReveal: 模糊到清晰
  * - ScaleReveal: 缩放入场
- * - GradientText: 渐变色文字
- * - StrikethroughReveal: 斜切入场
+ * - GradientText: 渐变色文字（Oklch）
+ * - SkewReveal: 斜切入场
+ * - GlitchText: 故障效果 ★ 新增
  */
 
 import React, { useMemo } from 'react';
-import { interpolate, spring, useCurrentFrame } from 'remotion';
+import { interpolate, spring, useCurrentFrame, random } from 'remotion';
+import {
+  useMotionTiming,
+  useSpring,
+  buildMotionStyles,
+  transformToString,
+  type EasingName,
+  type TimingConfig,
+} from '../utils/motion';
+import {
+  buildGradientTextStyle,
+  type PaletteName,
+} from '../utils/gradient';
 
 // ===== 基础类型 =====
 
@@ -26,7 +44,7 @@ interface KineticTextProps {
 // ===== 打字机效果 =====
 
 interface TypewriterProps extends KineticTextProps {
-  speed?: number;      // 每帧显示字符数（可小数）
+  speed?: number;
   cursor?: boolean;
   cursorColor?: string;
 }
@@ -45,7 +63,6 @@ export const Typewriter: React.FC<TypewriterProps> = ({
   const visibleText = text.slice(0, charCount);
   const currentChar = text[charCount];
   const isTyping = charCount < text.length;
-
   const blink = Math.sin(frame * 0.3) > 0;
 
   return (
@@ -74,9 +91,9 @@ export const Typewriter: React.FC<TypewriterProps> = ({
 // ===== 字符分离展开 =====
 
 interface SplitRevealProps extends KineticTextProps {
-  stagger?: number;    // 每字符延迟（帧）
+  stagger?: number;
   direction?: 'up' | 'down' | 'left' | 'right';
-  overshoot?: boolean;   // 弹性过冲
+  overshoot?: boolean;
 }
 
 export const SplitReveal: React.FC<SplitRevealProps> = ({
@@ -112,22 +129,19 @@ const SplitChar: React.FC<{
   overshoot: boolean;
   style?: React.CSSProperties;
 }> = ({ char, startFrame, direction, overshoot, style }) => {
-  const frame = useCurrentFrame();
-  const f = Math.max(0, frame - startFrame);
-
-  const springCfg = overshoot
-    ? { damping: 80, stiffness: 200, mass: 0.8 }
-    : { damping: 200, stiffness: 200, mass: 1 };
-
-  const s = spring({ fps: 30, frame: f, config: springCfg });
+  const { spring: s } = useSpring({
+    duration: 30,
+    delay: startFrame,
+    config: overshoot ? 'bounce' : 'soft',
+  });
 
   const getOffset = () => {
     const dist = (1 - s) * 50;
     switch (direction) {
-      case 'up': return { y: dist };
+      case 'up':   return { y: dist };
       case 'down': return { y: -dist };
       case 'left': return { x: dist };
-      case 'right': return { x: -dist };
+      case 'right':return { x: -dist };
     }
   };
 
@@ -150,9 +164,9 @@ const SplitChar: React.FC<{
 // ===== 波浪效果 =====
 
 interface WaveTextProps extends KineticTextProps {
-  amplitude?: number;   // 振幅（像素）
-  frequency?: number;    // 频率
-  stagger?: number;      // 相位差
+  amplitude?: number;
+  frequency?: number;
+  stagger?: number;
 }
 
 export const WaveText: React.FC<WaveTextProps> = ({
@@ -194,7 +208,7 @@ export const WaveText: React.FC<WaveTextProps> = ({
 // ===== 模糊到清晰 =====
 
 interface BlurRevealProps extends KineticTextProps {
-  maxBlur?: number;      // 最大模糊半径
+  maxBlur?: number;
 }
 
 export const BlurReveal: React.FC<BlurRevealProps> = ({
@@ -203,9 +217,11 @@ export const BlurReveal: React.FC<BlurRevealProps> = ({
   maxBlur = 20,
   style,
 }) => {
-  const frame = useCurrentFrame();
-  const f = Math.max(0, frame - startFrame);
-  const s = spring({ fps: 30, frame: f, config: { damping: 150, stiffness: 100 } });
+  const { spring: s } = useSpring({
+    duration: 30,
+    delay: startFrame,
+    config: 'gentle',
+  });
 
   const blur = interpolate(s, [0, 1], [maxBlur, 0], { extrapolateRight: 'clamp' });
   const opacity = interpolate(s, [0, 0.5, 1], [0, 0.5, 1], { extrapolateRight: 'clamp' });
@@ -237,14 +253,10 @@ export const ScaleReveal: React.FC<ScaleRevealProps> = ({
   overshoot = true,
   style,
 }) => {
-  const frame = useCurrentFrame();
-  const f = Math.max(0, frame - startFrame);
-  const s = spring({
-    fps: 30,
-    frame: f,
-    config: overshoot
-      ? { damping: 80, stiffness: 200, mass: 0.8 }
-      : { damping: 200, stiffness: 200 },
+  const { spring: s } = useSpring({
+    duration: 30,
+    delay: startFrame,
+    config: overshoot ? 'bounce' : 'soft',
   });
 
   const scale = interpolate(s, [0, 1], [fromScale, 1], { extrapolateRight: 'clamp' });
@@ -264,45 +276,29 @@ export const ScaleReveal: React.FC<ScaleRevealProps> = ({
   );
 };
 
-// ===== 渐变色文字 =====
+// ===== 渐变色文字（Oklch）=====
 
 interface GradientTextProps {
   text: string;
-  fromColor?: string;
-  toColor?: string;
-  angle?: number;        // 渐变角度（度）
-  animated?: boolean;    // 是否随帧动画
+  palette?: PaletteName;
+  angle?: number;
+  animated?: boolean;
   style?: React.CSSProperties;
 }
 
 export const GradientText: React.FC<GradientTextProps> = ({
   text,
-  fromColor = '#00d4ff',
-  toColor = '#FF6B35',
+  palette = 'techBlue',
   angle = 90,
   animated = false,
   style,
 }) => {
-  const frame = useCurrentFrame();
-
-  const angleRad = animated
-    ? ((angle + Math.sin(frame * 0.05) * 30) * Math.PI) / 180
-    : (angle * Math.PI) / 180;
-
-  const x1 = `${50 - Math.sin(angleRad) * 50}%`;
-  const y1 = `${50 - Math.cos(angleRad) * 50}%`;
-  const x2 = `${50 + Math.sin(angleRad) * 50}%`;
-  const y2 = `${50 + Math.cos(angleRad) * 50}%`;
-
-  const gradient = `linear-gradient(to bottom, ${fromColor}, ${toColor})`;
+  const gradientStyle = buildGradientTextStyle(palette, angle);
 
   return (
     <span
       style={{
-        background: `-webkit-linear-gradient(${angle}deg, ${fromColor}, ${toColor})`,
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent',
-        backgroundClip: 'text',
+        ...gradientStyle,
         ...style,
       }}
     >
@@ -323,9 +319,11 @@ export const SkewReveal: React.FC<SkewRevealProps> = ({
   direction = 'left',
   style,
 }) => {
-  const frame = useCurrentFrame();
-  const f = Math.max(0, frame - startFrame);
-  const s = spring({ fps: 30, frame: f, config: { damping: 150, stiffness: 120 } });
+  const { spring: s } = useSpring({
+    duration: 30,
+    delay: startFrame,
+    config: 'gentle',
+  });
 
   const skewX = interpolate(
     s,
@@ -350,6 +348,166 @@ export const SkewReveal: React.FC<SkewRevealProps> = ({
       }}
     >
       {text}
+    </span>
+  );
+};
+
+// ===== ★ 新增：故障效果（借鉴 remotion-bits）=====
+
+interface GlitchTextProps extends KineticTextProps {
+  intensity?: number;       // 故障强度 0~1
+  glitchProbability?: number; // 每帧触发概率
+  glitchChars?: string;     // 替换字符集
+}
+
+export const GlitchText: React.FC<GlitchTextProps> = ({
+  text,
+  startFrame = 0,
+  intensity = 0.3,
+  glitchProbability = 0.08,
+  glitchChars = '!@#$%^&*<>?/|\\',
+  style,
+}) => {
+  const frame = useCurrentFrame();
+  const f = Math.max(0, frame - startFrame);
+
+  // 主文字淡入
+  const opacity = interpolate(f, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+
+  // 故障层1：横向偏移
+  const glitchOffsetX = intensity * 8 * (Math.random() > 0.5 ? 1 : -1);
+
+  // 故障层2：RGB 分色
+  const rgbSplit = intensity * 3;
+
+  const glitchText = useMemo(() => {
+    return text.split('').map((char, i) => {
+      // 确定此字符是否故障
+      const seed = i * 100 + frame;
+      const r = random(seed as unknown as string);
+
+      if (r < glitchProbability) {
+        // 随机替换字符
+        const replacementIndex = Math.floor(random(seed + 1 as unknown as string) * glitchChars.length);
+        return glitchChars[replacementIndex];
+      }
+      return char;
+    }).join('');
+  }, [text, frame, glitchProbability, glitchChars]);
+
+  if (f <= 0) return null;
+
+  return (
+    <span style={{ position: 'relative', display: 'inline-block', ...style }}>
+      {/* 主文字层 */}
+      <span style={{ opacity, color: '#fff' }}>{text}</span>
+
+      {/* 故障阴影层（红偏） */}
+      {glitchOffsetX !== 0 && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: glitchOffsetX,
+            opacity: opacity * intensity * 0.8,
+            color: '#ff0040',
+            clipPath: `inset(${Math.random() * 100}% 0 0 0)`,
+          }}
+          aria-hidden
+        >
+          {glitchText}
+        </span>
+      )}
+
+      {/* 故障阴影层（青偏） */}
+      {glitchOffsetX !== 0 && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: -glitchOffsetX,
+            opacity: opacity * intensity * 0.8,
+            color: '#00ffff',
+            clipPath: `inset(${Math.random() * 100}% 0 0 0)`,
+          }}
+          aria-hidden
+        >
+          {glitchText}
+        </span>
+      )}
+
+      {/* 扫描线效果 */}
+      {intensity > 0.2 && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '100%',
+            background: `repeating-linear-gradient(
+              0deg,
+              transparent,
+              transparent 2px,
+              rgba(0,255,255,${intensity * 0.1}) 2px,
+              rgba(0,255,255,${intensity * 0.1}) 4px
+            )`,
+            pointerEvents: 'none',
+          }}
+          aria-hidden
+        />
+      )}
+    </span>
+  );
+};
+
+// ===== 交错动画（借鉴 remotion-bits StaggeredMotion）=====
+
+type StaggerDirection = 'forward' | 'reverse' | 'center' | 'random';
+
+interface StaggeredTextProps {
+  text: string;
+  startFrame?: number;
+  stagger?: number;
+  staggerDirection?: StaggerDirection;
+  style?: React.CSSProperties;
+  children: (char: string, index: number) => React.ReactNode;
+}
+
+export const StaggeredText: React.FC<StaggeredTextProps> = ({
+  text,
+  startFrame = 0,
+  stagger = 3,
+  staggerDirection = 'forward',
+  style,
+  children,
+}) => {
+  const chars = useMemo(() => text.split(''), [text]);
+
+  function getStaggerIndex(actualIndex: number): number {
+    const total = chars.length;
+    if (staggerDirection === 'reverse') return total - 1 - actualIndex;
+    if (staggerDirection === 'center') {
+      const mid = Math.floor(total / 2);
+      return Math.abs(actualIndex - mid);
+    }
+    if (staggerDirection === 'random') {
+      const seed = `stagger-${actualIndex}`;
+      return Math.floor(random(seed as unknown as string) * total);
+    }
+    return actualIndex;
+  }
+
+  return (
+    <span style={{ display: 'inline-flex', ...style }}>
+      {chars.map((char, i) => {
+        const staggerIndex = getStaggerIndex(i);
+        return (
+          <span key={i} style={{ display: 'inline-block' }}>
+            {children(char, i)}
+          </span>
+        );
+      })}
     </span>
   );
 };

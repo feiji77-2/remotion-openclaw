@@ -23,11 +23,24 @@ const STEP_TO_SKILL_ID = {
   8: 'video-pipeline-video',
 };
 
+const STEP_TO_PHASE = {
+  1: { phaseId: 1, phaseLabel: '研究选题' },
+  2: { phaseId: 2, phaseLabel: '标题确认' },
+  3: { phaseId: 3, phaseLabel: '口播文案' },
+  4: { phaseId: 4, phaseLabel: '分镜与视觉' },
+  5: { phaseId: 4, phaseLabel: '分镜与视觉' },
+  6: { phaseId: 5, phaseLabel: '配音与时长' },
+  7: { phaseId: 6, phaseLabel: '出片' },
+  8: { phaseId: 6, phaseLabel: '出片' },
+};
+
 const SKILL_DEFINITIONS = [
   {
     skillId: 'video-pipeline-analysis',
     category: 'step',
     stepId: 1,
+    phaseId: 1,
+    phaseLabel: '研究选题',
     stepLabel: 'Step 1 · 逻辑分析',
     name: 'video-pipeline-analysis',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-analysis', 'SKILL.md'),
@@ -67,6 +80,8 @@ const SKILL_DEFINITIONS = [
     skillId: 'video-pipeline-title',
     category: 'step',
     stepId: 2,
+    phaseId: 2,
+    phaseLabel: '标题确认',
     stepLabel: 'Step 2 · 标题生成',
     name: 'video-pipeline-title',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-title', 'SKILL.md'),
@@ -74,11 +89,39 @@ const SKILL_DEFINITIONS = [
     inputs: ['inputTopic', 'analysis.thesis', 'analysis.audience', 'analysis.corePromise'],
     outputs: ['titles.options[].title', 'titles.options[].angle', 'titles.options[].platform', 'titles.options[].hookStrength', 'titles.options[].suitableFor'],
     defaults: {
-      goal: '生成 4-5 个差异明显的短视频标题候选。',
-      style: '短促、抓人、先给判断。',
+      goal: '生成 4-5 个差异明显的短视频标题候选，每个必须包含爆款手法。',
+      style: '短促、抓人、先给判断。口语化，25字以内。',
       emphasis: '多角度、平台适配、主标题可选。',
-      avoid: '标题党、标题重复、摘要式平铺直叙。',
-      notes: '默认优先抖音/视频号传播语气。',
+      avoid: [
+        '空洞表达：开始替你干活、颠覆认知、重新定义XX',
+        '通用描述：所有大模型都适用的描述（如"能回答问题""能干活""更智能"）',
+        '模糊承诺：带来革命、改变未来、引领新时代',
+        '无数据支撑：没有具体数字或事实的泛泛而谈',
+        '重复句式：换汤不换药的近似表达',
+        '"替你干活"这个表达要具象化，不能单独出现（如要改成"从工具变成实习生"）',
+      ].join('。'),
+      notes: `爆款标题六大手法（必须至少用一种）：
+1. 数字法：具体数字制造记忆锚点（如"82.7%编码能力"）
+2. 反差法（最吸睛）：认知/身份反差制造矛盾（如"程序员开始抢产品经理的活"）
+3. 悬念法：制造信息缺口让人想点开（如"OpenAI没告诉你的三个秘密"）
+4. 身份标签法：精准人群定位（如"程序员必看"）
+5. 疑问法：抛出观众最想问的问题（如"GPT-5.5到底强在哪？"）
+6. 对话/情绪法：口语化制造对话感（如"凭什么卖这么贵？看完我沉默了"）
+
+爆款标题公式（科技AI类主攻）：
+- [具体数字/事件] + [核心变化] + [悬念/价值]："82.7%编码能力背后，GPT-5.5真正改变的是这件事"
+- [身份] + [反差行为/结果]："程序员开始用GPT-5.5抢产品经理的活了"
+- [否定/颠覆] + [常识] + [新结论]："别再说AI只会聊天了，它现在能替你做决策"
+- [时间/事件] + [悬念] + [具体动作]："GPT-5.5发布后，第一批用的程序员都在用它做这件事"
+- [极端数据] + [反差说明]："编码82.7%不是最重要的，GPT-5.5真正突破的是这个"
+
+每个标题必须：
+- 至少包含一种爆款手法
+- 有具体数据或场景（不能泛泛而谈）
+- 角度之间差异明显
+- 前3秒必须抓人（让人停下来想看）
+- 控制在25字以内
+- 口语化，符合抖音/视频号传播语气`,
     },
     constraints: [
       '必须依赖已确认的 Step 1 分析。',
@@ -102,6 +145,8 @@ const SKILL_DEFINITIONS = [
     skillId: 'video-pipeline-content',
     category: 'step',
     stepId: 3,
+    phaseId: 3,
+    phaseLabel: '口播文案',
     stepLabel: 'Step 3 · 内容生成',
     name: 'video-pipeline-content',
     sourcePath: path.join(WORKFLOW_SKILLS_DIR, 'video-pipeline-content.SKILL.md'),
@@ -130,8 +175,8 @@ const SKILL_DEFINITIONS = [
       emphasis: 'Hook 留人、正文递进、CTA 自然。',
       avoid: '机器人说明文、过长铺垫、空洞价值词。',
       notes: '支持单独控制时长、字数、去 AI 味和拟人口播。',
-      targetDurationSeconds: 60,
-      targetWordCount: 230,
+      targetDurationSeconds: 180,
+      targetWordCount: 900,
       antiAiLevel: 'strong',
       spokenPersona: '像真人面对面讲，不背稿，不端着。',
     },
@@ -159,6 +204,8 @@ const SKILL_DEFINITIONS = [
     skillId: 'video-pipeline-scene-planner',
     category: 'step',
     stepId: 4,
+    phaseId: 4,
+    phaseLabel: '分镜与视觉',
     stepLabel: 'Step 4 · 场景编排',
     name: 'video-pipeline-scene-planner',
     sourcePath: path.join(WORKFLOW_SKILLS_DIR, 'video-pipeline-scene-planner.SKILL.md'),
@@ -194,6 +241,8 @@ const SKILL_DEFINITIONS = [
     skillId: 'video-pipeline-scene-prompts',
     category: 'step',
     stepId: 5,
+    phaseId: 4,
+    phaseLabel: '分镜与视觉',
     stepLabel: 'Step 5 · 视觉提示词',
     name: 'video-pipeline-scene-prompts',
     sourcePath: path.join(WORKFLOW_SKILLS_DIR, 'video-pipeline-scene-prompts.SKILL.md'),
@@ -229,6 +278,8 @@ const SKILL_DEFINITIONS = [
     skillId: 'video-pipeline-audio',
     category: 'step',
     stepId: 6,
+    phaseId: 5,
+    phaseLabel: '配音与时长',
     stepLabel: 'Step 6 · 配音脚本',
     name: 'video-pipeline-audio',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-audio', 'SKILL.md'),
@@ -266,6 +317,8 @@ const SKILL_DEFINITIONS = [
     skillId: 'remotion-video-maker',
     category: 'step',
     stepId: 7,
+    phaseId: 6,
+    phaseLabel: '出片',
     stepLabel: 'Step 7 · Remotion 项目生成',
     name: 'remotion-video-maker',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'remotion-video-maker', 'SKILL.md'),
@@ -300,6 +353,8 @@ const SKILL_DEFINITIONS = [
     skillId: 'video-pipeline-video',
     category: 'step',
     stepId: 8,
+    phaseId: 6,
+    phaseLabel: '出片',
     stepLabel: 'Step 8 · 最终渲染',
     name: 'video-pipeline-video',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-video', 'SKILL.md'),
@@ -782,7 +837,7 @@ function normalizeStep1Payload(payload, input) {
 
   analysis.searchPhase = {
     scope: results.length > 0 ? '轻量' : '回退',
-    searchTools: ['bing-rss'],
+    searchTools: ['duckduckgo-html'],
     hotTopicsFound: results.slice(0, 3).map((item) => compactText(item?.title, 30)),
     topVideoCount: 0,
     articleCount: results.length,
@@ -825,15 +880,105 @@ function normalizeStep2Payload(payload) {
   titles.options = options.map((item) => {
     const score = clamp(round(item?.score || 0), 0, 100);
     const angle = safeString(item?.angle) || '解释型';
+    const titleText = safeString(item?.title) || '';
+    const titleMetrics = calculateTitleMetrics(titleText);
+
     return {
       ...item,
       platform: safeString(item?.platform) || (/问题|揭秘|反差/.test(angle) ? '抖音 / 视频号' : '抖音 / B站'),
-      hookStrength: safeString(item?.hookStrength) || (score >= 88 ? '高' : score >= 76 ? '中' : '低'),
+      hookStrength: safeString(item?.hookStrength) || (titleMetrics.hookScore >= 85 ? '高' : titleMetrics.hookScore >= 70 ? '中' : '低'),
       suitableFor: safeString(item?.suitableFor) || (/问题/.test(angle) ? '问题开场' : /反差|揭秘/.test(angle) ? '首屏钩子' : '解释型开场'),
+      hookScore: titleMetrics.hookScore,
+      ctrPredict: titleMetrics.ctrPredict,
+      first3Sec: titleMetrics.first3Sec,
+      infoDensity: titleMetrics.infoDensity,
+      noveltyScore: titleMetrics.noveltyScore,
+      hookType: detectHookType(titleText),
     };
   });
   nextPayload.titles = titles;
   return nextPayload;
+}
+
+function calculateTitleMetrics(title) {
+  const safe = safeString(title);
+  if (!safe) {
+    return { hookScore: 50, ctrPredict: 50, first3Sec: 50, infoDensity: 50, noveltyScore: 50 };
+  }
+
+  const length = safe.length;
+  const hasNumber = /\d/.test(safe);
+  const hasQuestion = /[？?]/.test(safe);
+  const hasExclamation = /[!！]/.test(safe);
+  const hasContrast = /不是|而是|从.*到|把.*变成|让|让.*变成|开始|终于|第一次|没告诉|秘密|背后|真正|其实/.test(safe);
+  const hasIdentity = /程序员|产品经理|老板|大学生|普通人|打工|职场/.test(safe);
+  const hasSpecificData = /\d+\.\d+%|\d+%|\d+个|\d+分钟|\d+秒|\d+天/.test(safe);
+  const hasEmotion = /扎心|太卷|凭什么|看完我|没想到|惊讶|震惊|慌了|崩溃|哭了|笑死/.test(safe);
+  const hasSuspense = /发生了|你没|不知道|三个秘密|第一件事|真正原因|原来/.test(safe);
+
+  const first3Chars = safe.slice(0, 3);
+  const first3Hook = /GPT|OpenAI|程序员|凭什么|别再|太|扎心|82/.test(first3Chars);
+
+  let hookScore = 70;
+  if (hasExclamation) hookScore += 5;
+  if (hasContrast) hookScore += 10;
+  if (hasSpecificData) hookScore += 8;
+  if (hasEmotion) hookScore += 7;
+  if (hasSuspense) hookScore += 8;
+  if (hasQuestion) hookScore += 5;
+  if (first3Hook) hookScore += 7;
+  if (length > 30) hookScore -= 5;
+  if (length < 10) hookScore -= 3;
+
+  let ctrPredict = 65;
+  if (hasNumber) ctrPredict += 8;
+  if (hasSpecificData) ctrPredict += 10;
+  if (hasContrast) ctrPredict += 8;
+  if (hasIdentity) ctrPredict += 6;
+  if (hasSuspense) ctrPredict += 7;
+  if (hasEmotion) ctrPredict += 5;
+  if (length > 35) ctrPredict -= 8;
+
+  let first3Sec = 65;
+  if (first3Hook) first3Sec += 15;
+  if (hasQuestion) first3Sec += 10;
+  if (hasExclamation) first3Sec += 8;
+  if (/^[^a-zA-Z]+/.test(safe.slice(0, 2))) first3Sec += 5;
+
+  let infoDensity = 60;
+  if (hasSpecificData) infoDensity += 15;
+  if (hasNumber) infoDensity += 8;
+  if (hasIdentity) infoDensity += 5;
+  if (length > 25 && !hasSpecificData) infoDensity -= 5;
+
+  let noveltyScore = 55;
+  if (hasContrast) noveltyScore += 15;
+  if (hasSuspense) noveltyScore += 12;
+  if (hasEmotion) noveltyScore += 10;
+  if (hasSpecificData) noveltyScore += 8;
+  if (/GPT-5|OpenAI|gpt5\.5/.test(safe)) noveltyScore += 5;
+
+  return {
+    hookScore: clamp(hookScore, 0, 100),
+    ctrPredict: clamp(ctrPredict, 0, 100),
+    first3Sec: clamp(first3Sec, 0, 100),
+    infoDensity: clamp(infoDensity, 0, 100),
+    noveltyScore: clamp(noveltyScore, 0, 100),
+  };
+}
+
+function detectHookType(title) {
+  const safe = safeString(title);
+  if (!safe) return '解释型';
+
+  if (/凭什么|为什么|到底|是不是|能不能|怎么/.test(safe)) return '疑问型';
+  if (/不是|而是|从.*到|把.*变成|让.*变成|开始|终于|第一次/.test(safe)) return '反差型';
+  if (/\d+[.%个分钟秒天]|82\.7%/.test(safe)) return '数字型';
+  if (/发生了|你没|不知道|三个秘密|真正原因|原来/.test(safe)) return '悬念型';
+  if (/扎心|太卷|看完我|没想到|慌了|崩溃|哭了|笑死/.test(safe)) return '情绪型';
+  if (/程序员|产品经理|老板|大学生|必看|注意|人群/.test(safe)) return '身份型';
+
+  return '解释型';
 }
 
 function detectCtaStyle(text) {
@@ -2054,7 +2199,11 @@ function evaluateStep2(payload) {
     2,
     'video-pipeline-title',
     {
-      hookStrength: options.length > 0 ? average(options.map((item) => clamp(round(item?.score || 0), 60, 96))) : 42,
+      hookStrength: options.length > 0 ? average(options.map((item) => clamp(round(item?.hookScore || item?.score || 80), 60, 100))) : 42,
+      ctrPredict: options.length > 0 ? average(options.map((item) => clamp(round(item?.ctrPredict || 65), 0, 100))) : 50,
+      first3Sec: options.length > 0 ? average(options.map((item) => clamp(round(item?.first3Sec || 65), 0, 100))) : 50,
+      infoDensity: options.length > 0 ? average(options.map((item) => clamp(round(item?.infoDensity || 60), 0, 100))) : 50,
+      noveltyScore: options.length > 0 ? average(options.map((item) => clamp(round(item?.noveltyScore || 55), 0, 100))) : 50,
       platformFit: options.every((item) => safeString(item?.platform)) ? 88 : 70,
       originality: uniqueAngles >= 4 ? 86 : uniqueAngles >= 3 ? 74 : 58,
       completeness: options.length >= 4 && safeString(titles.selectedReason) ? 90 : 68,
@@ -2275,10 +2424,12 @@ function enrichStepResult(stepId, payload, input, providedSkillSpec = null) {
 
 module.exports = {
   STEP_TO_SKILL_ID,
+  STEP_TO_PHASE,
   alignPayloadToSkill,
   ensureStepSkillReady,
   enrichStepResult,
   evaluateStepPayload,
+  getPhaseForStep: (stepId) => STEP_TO_PHASE[Number(stepId)] || null,
   getSkillSpec,
   getStepSkillId,
   getStepSkillSpec,

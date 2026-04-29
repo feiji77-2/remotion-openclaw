@@ -8,6 +8,7 @@ import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import dotenv from 'dotenv';
 import {resolveWorkflowVoiceDefaults} from './lib/workflow-voice-defaults.mjs';
+import {aggregatePhases} from '../server/workflow/phaseRegistry.js';
 
 const require = createRequire(import.meta.url);
 const {generateWorkflowStep} = require('../server/workflow/workflowGenerator');
@@ -197,8 +198,11 @@ Options:
   --voice-model <name>      指定千问 TTS 模型，例如 qwen3-tts-vc-2026-01-22
   --package-version <ver>   指定打包版本号，默认读取 remotion-video/package.json
   --output <path>           指定最终视频输出路径
+  --with-storyboard-qa       Phase 4 结束后生成静态分镜 QA 图（不阻塞主链路）
+  --storyboard-qa-only       仅生成分镜 QA 图，不跑主链路（需配合 --project-id）
+  --apply-storyboard-qa-images 将 QA 图写回 project.json 的 imageUrl（谨慎使用）
   --resume                  复用已有 step/voice/images/render 产物继续执行
-  --no-images               跳过分镜图资产生成
+  --no-images               跳过分镜图资产生成（主链路默认生成）
   --no-voice                跳过 TTS，只生成带旁白文本的项目
   --no-render               只生成 workflow + project + render props，不直接出片
   --help                    显示帮助
@@ -217,6 +221,9 @@ const parseArgs = (argv) => {
     voice: true,
     images: true,
     resume: false,
+    withStoryboardQa: false,
+    storyboardQaOnly: false,
+    applyStoryboardQaImages: false,
     quality: DEFAULT_QUALITY,
     fps: DEFAULT_FPS,
     width: DEFAULT_WIDTH,
@@ -323,6 +330,15 @@ const parseArgs = (argv) => {
         break;
       case '--images':
         options.images = true;
+        break;
+      case '--with-storyboard-qa':
+        options.withStoryboardQa = true;
+        break;
+      case '--storyboard-qa-only':
+        options.storyboardQaOnly = true;
+        break;
+      case '--apply-storyboard-qa-images':
+        options.applyStoryboardQaImages = true;
         break;
       case '--no-voice':
         options.voice = false;
@@ -1608,6 +1624,128 @@ const runGenerateProjectImages = async (projectId, imagePromptsPath) => {
   };
 };
 
+/**
+ * Storyboard QA — writes to projects/<id>/qa/storyboard/ (NOT public/assets/),
+ * writes storyboard-manifest.json, and does NOT update project.json imageUrl.
+ */
+const runStoryboardQa = async ({projectId, projectDir, shotsState, pipelineState, options, stageTimings, imagePromptsPath}) => {
+  const qaDir = path.join(projectDir, 'qa', 'storyboard');
+  const manifestPath = path.join(qaDir, 'storyboard-manifest.json');
+  await fs.mkdir(qaDir, {recursive: true});
+
+  // Prefer the caller-supplied path (set by the caller to buildResult.imagePromptsPath
+  // when QA runs after Build). Fall back to projectDir/image-prompts.json only for
+  // backwards-compatible direct invocations.
+  const promptsSource = imagePromptsPath || path.join(projectDir, 'image-prompts.json');
+  let imagePromptsData;
+  try {
+    imagePromptsData = await loadJson(promptsSource);
+  } catch {
+    process.stdout.write('[qa] no image-prompts.json found, skipping QA\n');
+    return null;
+  }
+
+  // Inject QA output dir via env override is not possible (OUTPUT_DIR is hardcoded in generate-shot-images.mjs)
+  // Instead: write a temp prompts file and accept the hardcoded path.
+  // QA will write to public/assets/<id>/images — we copy from there to qa/storyboard.
+  const tempPromptsPath = path.join(projectDir, `qa-temp-prompts.${Date.now()}.json`);
+  await writeJson(tempPromptsPath, imagePromptsData);
+
+  let qaResult;
+  try {
+    // Pass --qa-mode so generate-shot-images writes directly to
+    // projects/<id>/qa/storyboard/images/ instead of public/assets/<id>/images/
+    const {stdout} = await executeCommand(
+      process.execPath,
+      ['scripts/generate-shot-images.mjs', projectId, tempPromptsPath, '--qa-mode'],
+      {cwd: REMOTION_ROOT, label: 'storyboard-qa'},
+    );
+    const lines = stdout.trim().split('\n');
+    const lastLine = lines.at(-1) || '{}';
+    const parsed = JSON.parse(lastLine);
+    if (parsed?.type === 'result') {
+      qaResult = {
+        total: Array.isArray(parsed.images) ? parsed.images.length : Number(parsed.total) || 0,
+        images: Array.isArray(parsed.images) ? parsed.images : [],
+      };
+    }
+  } finally {
+    await fs.unlink(tempPromptsPath).catch(() => {});
+  }
+
+  if (!qaResult || qaResult.images.length === 0) {
+    process.stdout.write('[qa] no images generated, skipping manifest\n');
+    return null;
+  }
+
+  // QA images now land directly in qa/storyboard/images/ via --qa-mode.
+  // No copy from public/assets/ needed — build the manifest from the known qa dir.
+  const qaImagesDir = path.join(projectDir, 'qa', 'storyboard', 'images');
+  const copied = [];
+  for (const img of qaResult.images) {
+    const fileName = path.basename(img.path || `${img.shotId || 'shot'}.svg`);
+    const qaPath = path.join(qaImagesDir, fileName);
+    copied.push({...img, qaPath, relativePath: `qa/storyboard/${fileName}`});
+  }
+
+  const manifest = {
+    generatedAt: new Date().toISOString(),
+    projectId,
+    total: copied.length,
+    images: copied,
+  };
+  await writeJson(manifestPath, manifest);
+
+  // Apply QA images back to project.json (only if explicitly requested)
+  // QA images live in projects/<id>/qa/storyboard/ — NOT in public/.
+  // To make them accessible to Remotion, copy them to public/assets/<id>/qa-storyboard/
+  // and write the public path as imageUrl.
+  if (options.applyStoryboardQaImages) {
+    const projectJsonPath = path.join(projectDir, 'project.json');
+    const workflowStatePath = path.join(projectDir, 'workflow-state.json');
+    const publicQaDir = path.join(REMOTION_ROOT, 'public', 'assets', projectId, 'qa-storyboard');
+    await fs.mkdir(publicQaDir, {recursive: true});
+    const imageMap = new Map();
+    for (const img of copied) {
+      if (!img.shotId || !img.qaPath) continue;
+      const fileName = path.basename(img.path || img.shotId);
+      const publicDst = path.join(publicQaDir, fileName);
+      try {
+        await fs.copyFile(img.qaPath, publicDst);
+        imageMap.set(img.shotId, `/assets/${projectId}/qa-storyboard/${fileName}`);
+      } catch (err) {
+        // skip files that failed to copy
+      }
+    }
+    try {
+      const projectJson = await loadJson(projectJsonPath);
+      projectJson.shots = (Array.isArray(projectJson.shots) ? projectJson.shots : []).map((shot) => ({
+        ...shot,
+        imageUrl: imageMap.get(shot?.id) || shot?.imageUrl || null,
+      }));
+      await writeJson(projectJsonPath, projectJson);
+      const workflowState = await loadJson(workflowStatePath);
+      workflowState.pipelineState = {
+        ...(workflowState.pipelineState && typeof workflowState.pipelineState === 'object' ? workflowState.pipelineState : {}),
+        storyboardQa: {
+          status: 'applied',
+          appliedAt: new Date().toISOString(),
+          total: manifest.total,
+          publicDir: publicQaDir,
+        },
+      };
+      await writeJson(workflowStatePath, workflowState);
+      process.stdout.write(`[qa] images copied to public/assets/${projectId}/qa-storyboard/ and applied to project.json\n`);
+    } catch (err) {
+      process.stdout.write(`[qa] warning: could not apply images to project.json: ${err.message}\n`);
+    }
+  } else {
+    process.stdout.write(`[qa] manifest written to ${manifestPath} (project.json NOT modified — use --apply-storyboard-qa-images to enable)\n`);
+  }
+
+  return {manifest, manifestPath, total: manifest.total};
+};
+
 const runRenderProject = async (projectId, outputPath) => {
   const renderPropsArg = path.join('projects', projectId, 'render-props.json');
   const args = ['scripts/render-project.mjs', renderPropsArg];
@@ -1763,7 +1901,7 @@ async function main() {
     process.exit(0);
   }
 
-  if (!safeString(topic)) {
+  if (!safeString(topic) && !options.storyboardQaOnly) {
     printUsage();
     process.exit(1);
   }
@@ -1779,6 +1917,30 @@ async function main() {
     }
     process.stdout.write(`${logParts.join(' ')}\n`);
   }
+
+  // ── Storyboard QA only mode ─────────────────────────────────────────────
+  if (options.storyboardQaOnly) {
+    if (!options.projectId) {
+      process.stderr.write('--storyboard-qa-only requires --project-id\n');
+      printUsage();
+      process.exit(1);
+    }
+    const qaProjectId = options.projectId;
+    const qaProjectDir = path.join(PROJECTS_DIR, qaProjectId);
+    const qaWorkflowStatePath = path.join(qaProjectDir, 'workflow-state.json');
+    const qaWorkflowState = await loadJson(qaWorkflowStatePath);
+    const qaResult = await runStoryboardQa({
+      projectId: qaProjectId,
+      projectDir: qaProjectDir,
+      shotsState: qaWorkflowState?.shotsState || [],
+      pipelineState: qaWorkflowState?.pipelineState || {},
+      options,
+      stageTimings: {},
+    });
+    process.stdout.write(`[qa] done. ${qaResult ? qaResult.total + ' images' : 'no output'}.\n`);
+    process.exit(0);
+  }
+  // ───────────────────────────────────────────────────────────────────────
 
   const projectId = buildProjectId(topic, options.projectId);
   const projectDir = path.join(PROJECTS_DIR, projectId);
@@ -2126,6 +2288,7 @@ async function main() {
     pipelineState,
     shotsState,
     stepResults,
+    phases: aggregatePhases(stepResults),
     warnings,
   };
 
@@ -2140,6 +2303,36 @@ async function main() {
     return await runBuildProject(projectId);
   });
   let generatedImageSummary = null;
+
+  // ── Optional storyboard QA branch — AFTER Build so it reads the fresh image-prompts ─
+  // QA now reads buildResult.imagePromptsPath (the one just written by Build), not the
+  // stale projectDir/image-prompts.json that existed before this run started.
+  if (options.withStoryboardQa) {
+    const qaDir = path.join(projectDir, 'qa', 'storyboard');
+    await ensureDir(qaDir);
+    const qaResult = await runStoryboardQa({
+      projectId,
+      projectDir,
+      // Pass the Build-fresh image-prompts so QA validates against current content,
+      // not against whatever was left in projectDir/ from a previous run.
+      imagePromptsPath: buildResult.imagePromptsPath,
+      shotsState: workflowState.shotsState || [],
+      pipelineState,
+      options,
+      stageTimings,
+    });
+    pipelineState.storyboardQa = {
+      status: 'done',
+      outputDir: qaDir,
+      manifest: path.join(qaDir, 'storyboard-manifest.json'),
+      total: qaResult?.total ?? 0,
+      timings: stageTimings,
+    };
+    await writeJson(workflowStatePath, workflowState);
+    logSection('Storyboard QA');
+    process.stdout.write(`  images: ${qaResult?.total ?? 0} | dir: qa/storyboard/\n`);
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
 
   if (options.images) {
     logSection('Images');
@@ -2305,10 +2498,12 @@ async function main() {
     imagesEnabled: Boolean(options.images),
     voiceEnabled: Boolean(options.voice),
     resumeEnabled: Boolean(options.resume),
+    storyboardQaEnabled: Boolean(options.withStoryboardQa),
     resumedFromCache,
     resumedStepCount,
     reusedWorkflowStepIds,
     regeneratedWorkflowStepIds,
+    phases: aggregatePhases(stepResults),
     reusedVoice,
     reusedVoiceCount,
     generatedVoiceCount,
@@ -2331,6 +2526,7 @@ async function main() {
       steps: stepTimings,
     },
     warnings,
+    storyboardQa: pipelineState?.storyboardQa || null,
   };
 
   await writeJson(path.join(projectDir, 'run-report.json'), report);

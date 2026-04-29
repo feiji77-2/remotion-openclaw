@@ -274,12 +274,12 @@ async function generateSpecificFactsViaLLM(topicLabel, categories, generateFn) {
 
 function buildDefaultFact(category, topicLabel) {
   const defaults = {
-    release: `这是 ${topicLabel || '该技术'} 的重要版本更新，发布动作值得关注`,
-    capability: `${topicLabel || '该技术'} 在核心能力上有实质性提升`,
-    benchmark: `具体性能数据需要参考官方 benchmark 测试结果`,
-    api: `${topicLabel || '该技术'} 的 API 接口有所更新`,
-    pricing: `${topicLabel || '该技术'} 的定价策略和限制条件值得注意`,
-    comparison: `${topicLabel || '该技术'} 与竞品存在差异，具体需要对比测试`,
+    release: `${topicLabel || '该技术'} 这类发布至少要确认版本号、发布时间和官方 release note，先判断是不是主线升级。`,
+    capability: `${topicLabel || '该技术'} 至少要补一条机制变化，例如 Agent、多步骤 tool calling、长上下文或代码任务能力，不要只说“更强了”。`,
+    benchmark: `${topicLabel || '该技术'} 还需要 benchmark 锚点，例如 SWE-bench、MMLU、成功率或 pass@1 这类评测结果，不能只写“性能提升”。`,
+    api: `${topicLabel || '该技术'} 要补开发者侧更新，比如 Responses API、函数调用、SDK 兼容性或 rate limit 变化。`,
+    pricing: `${topicLabel || '该技术'} 的真实落地还要看 token 定价、配额、上下文窗口成本或速率限制。`,
+    comparison: `${topicLabel || '该技术'} 最好补充与 GPT、Claude、Gemini 或旧版本的 benchmark / API 差异。`,
   };
   return {
     label: REQUIRED_FACT_CATEGORIES[category].label,

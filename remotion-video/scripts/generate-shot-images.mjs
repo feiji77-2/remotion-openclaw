@@ -1746,9 +1746,13 @@ async function main() {
   }
 
   const projectId = args[0];
+  const qaMode = args[2] === '--qa-mode';
   const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
   const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..');
-  const OUTPUT_DIR = path.join(PROJECT_ROOT, 'public/assets', projectId, 'images');
+  // QA mode: write to projects/<id>/qa/storyboard/images/ (not public/assets/)
+  const OUTPUT_DIR = qaMode
+    ? path.join(PROJECT_ROOT, 'projects', projectId, 'qa', 'storyboard', 'images')
+    : path.join(PROJECT_ROOT, 'public/assets', projectId, 'images');
 
   let promptsData;
   if (args[1] && args[1] !== '-') {

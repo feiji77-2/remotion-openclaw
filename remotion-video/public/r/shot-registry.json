@@ -1,0 +1,936 @@
+{
+  "generatedAt": "2026-04-29T05:52:47.825Z",
+  "shots": [
+    {
+      "family": "hero",
+      "label": "Hero / Title Card",
+      "description": "Full-screen opening title with strong visual focal point. Used for opening shots.",
+      "semanticTags": [
+        "opening",
+        "title",
+        "hero",
+        "hook",
+        "intro",
+        "开场",
+        "标题"
+      ],
+      "requiredFields": [
+        "title"
+      ],
+      "optionalFields": [
+        "kicker",
+        "subtitle",
+        "visualSummary",
+        "heroMark",
+        "topLabel"
+      ],
+      "defaultArchetype": "lock-on reveal",
+      "defaultCameraIntent": "pin",
+      "defaultDataEvent": "pin",
+      "defaultEnterFrames": 12,
+      "defaultEmphasisFrames": 40,
+      "defaultStaggerGap": 0,
+      "rhythm": {
+        "layer": "context",
+        "staggerGap": 0,
+        "revealStiffness": 96,
+        "preferredCameraMotion": "push-in",
+        "backdropCycle": [
+          "god-rays",
+          "particle-grid",
+          "dot-grid"
+        ]
+      },
+      "memoryObject": {
+        "type": "word",
+        "role": "画面里最重的一个词，被钉在中心",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] lock-on reveal | pin | mem:word"
+    },
+    {
+      "family": "feature-rail",
+      "label": "Feature Card Rail",
+      "description": "Horizontal scrolling or static rail of feature cards. Used for listing capabilities.",
+      "semanticTags": [
+        "feature",
+        "capability",
+        "list",
+        "rail",
+        "card",
+        "功能",
+        "特性",
+        "列表"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading",
+        "subtitle"
+      ],
+      "defaultArchetype": "burst spread",
+      "defaultCameraIntent": "reveal",
+      "defaultDataEvent": "burst-spread",
+      "defaultEnterFrames": 12,
+      "defaultEmphasisFrames": 40,
+      "defaultStaggerGap": 6,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 2,
+        "revealStiffness": 260,
+        "backdropCycle": [
+          "particle-grid",
+          "dot-grid",
+          "god-rays"
+        ]
+      },
+      "memoryObject": {
+        "type": "node",
+        "role": "爆发中心点，从这里扩散出去",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] burst spread | burst-spread | mem:node"
+    },
+    {
+      "family": "focus",
+      "label": "Focus / Keyword Highlight",
+      "description": "Single keyword or phrase pulled into visual focus with supporting context.",
+      "semanticTags": [
+        "focus",
+        "keyword",
+        "highlight",
+        "single",
+        "emphasis",
+        "聚焦",
+        "重点",
+        "单点"
+      ],
+      "requiredFields": [
+        "keyword",
+        "description"
+      ],
+      "optionalFields": [
+        "eyebrow",
+        "question",
+        "diagram",
+        "kicker"
+      ],
+      "defaultArchetype": "lock-on reveal",
+      "defaultCameraIntent": "pin",
+      "defaultDataEvent": "pin",
+      "defaultEnterFrames": 12,
+      "defaultEmphasisFrames": 40,
+      "defaultStaggerGap": 0,
+      "rhythm": {
+        "layer": "context",
+        "staggerGap": 0,
+        "revealStiffness": 120,
+        "backdropCycle": [
+          "god-rays",
+          "dot-grid",
+          "particle-grid"
+        ]
+      },
+      "memoryObject": {
+        "type": "word",
+        "role": "画面里最重的一个词，被钉在中心",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] lock-on reveal | pin | mem:word"
+    },
+    {
+      "family": "number-strip",
+      "label": "Number Strip",
+      "description": "Large animated numbers with supporting detail. Used for key stats and metrics.",
+      "semanticTags": [
+        "number",
+        "stat",
+        "metric",
+        "count",
+        "data",
+        "数字",
+        "统计",
+        "指标"
+      ],
+      "requiredFields": [
+        "count"
+      ],
+      "optionalFields": [
+        "items",
+        "summary",
+        "heading"
+      ],
+      "defaultArchetype": "bullet train",
+      "defaultCameraIntent": "pin",
+      "defaultDataEvent": "count-up",
+      "defaultEnterFrames": 8,
+      "defaultEmphasisFrames": 25,
+      "defaultStaggerGap": 3,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 4,
+        "revealStiffness": 300,
+        "backdropCycle": [
+          "particle-grid",
+          "god-rays",
+          "dot-grid"
+        ]
+      },
+      "memoryObject": {
+        "type": "line",
+        "role": "一条水平线，数据沿线高速轰出",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] bullet train | count-up | mem:line"
+    },
+    {
+      "family": "step-flow",
+      "label": "Step Flow",
+      "description": "Sequential numbered steps with icons. Used for processes and workflows.",
+      "semanticTags": [
+        "step",
+        "process",
+        "workflow",
+        "sequence",
+        "numbered",
+        "步骤",
+        "流程",
+        "顺序"
+      ],
+      "requiredFields": [
+        "steps"
+      ],
+      "optionalFields": [
+        "items",
+        "variant",
+        "stepVariants"
+      ],
+      "defaultArchetype": "follow focus",
+      "defaultCameraIntent": "chase",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 14,
+      "defaultEmphasisFrames": 40,
+      "defaultStaggerGap": 10,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 6,
+        "revealStiffness": 150,
+        "preferredCameraMotion": "pan-y",
+        "backdropCycle": [
+          "dot-grid",
+          "particle-grid",
+          "god-rays"
+        ]
+      },
+      "memoryObject": {
+        "type": "node",
+        "role": "当前跟随的节点，沿路径移动",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] follow focus | trace-flow | mem:node"
+    },
+    {
+      "family": "timeline",
+      "label": "Timeline",
+      "description": "Horizontal timeline with labeled milestones. Used for historical or sequential events.",
+      "semanticTags": [
+        "timeline",
+        "history",
+        "milestone",
+        "sequence",
+        "chronological",
+        "时间线",
+        "时间轴"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading",
+        "subtitle"
+      ],
+      "defaultArchetype": "follow focus",
+      "defaultCameraIntent": "chase",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 14,
+      "defaultEmphasisFrames": 40,
+      "defaultStaggerGap": 10,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 6,
+        "revealStiffness": 140,
+        "preferredCameraMotion": "pan-y",
+        "backdropCycle": [
+          "dot-grid",
+          "god-rays",
+          "particle-grid"
+        ]
+      },
+      "memoryObject": {
+        "type": "node",
+        "role": "当前跟随的节点，沿路径移动",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] follow focus | trace-flow | mem:node"
+    },
+    {
+      "family": "compare-board",
+      "label": "Comparison Board",
+      "description": "Side-by-side bilateral comparison rows. Used for before/after, pro/con, A/B analysis.",
+      "semanticTags": [
+        "compare",
+        "comparison",
+        "bilateral",
+        "before-after",
+        "pro-con",
+        "对比",
+        "比较",
+        "A/B"
+      ],
+      "requiredFields": [
+        "rows"
+      ],
+      "optionalFields": [
+        "leftTitle",
+        "rightTitle",
+        "comparisons",
+        "dataPoints"
+      ],
+      "defaultArchetype": "compress compare",
+      "defaultCameraIntent": "compress",
+      "defaultDataEvent": "overtake",
+      "defaultEnterFrames": 10,
+      "defaultEmphasisFrames": 35,
+      "defaultStaggerGap": 4,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 6,
+        "revealStiffness": 240,
+        "backdropCycle": [
+          "particle-grid",
+          "dot-grid",
+          "god-rays"
+        ]
+      },
+      "memoryObject": {
+        "type": "block",
+        "role": "两个被压缩在一起的对比块",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] compress compare | overtake | mem:block"
+    },
+    {
+      "family": "terminal",
+      "label": "Terminal / Code Panel",
+      "description": "Simulated terminal or code window. Used for commands, outputs, and technical demos.",
+      "semanticTags": [
+        "terminal",
+        "code",
+        "command",
+        "cli",
+        "technical",
+        "terminal",
+        "代码",
+        "命令"
+      ],
+      "requiredFields": [
+        "command"
+      ],
+      "optionalFields": [
+        "windowTitle",
+        "outputs",
+        "note",
+        "heading",
+        "filename",
+        "language"
+      ],
+      "defaultArchetype": "evidence pin",
+      "defaultCameraIntent": "pin",
+      "defaultDataEvent": "pin",
+      "defaultEnterFrames": 10,
+      "defaultEmphasisFrames": 40,
+      "defaultStaggerGap": 0,
+      "rhythm": {
+        "layer": "proof",
+        "staggerGap": 0,
+        "revealStiffness": 180,
+        "backdropCycle": [
+          "dot-grid",
+          "particle-grid",
+          "god-rays"
+        ]
+      },
+      "memoryObject": {
+        "type": "card",
+        "role": "一张证据卡，别针钉入画面",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] evidence pin | pin | mem:card"
+    },
+    {
+      "family": "evidence-wall",
+      "label": "Evidence Wall",
+      "description": "Grid or stack of evidence cards with quotes and citations. Used for proof and social proof.",
+      "semanticTags": [
+        "evidence",
+        "proof",
+        "quote",
+        "citation",
+        "wall",
+        "testimonial",
+        "证据",
+        "引用",
+        "证言"
+      ],
+      "requiredFields": [
+        "cards"
+      ],
+      "optionalFields": [
+        "comparisons",
+        "heading"
+      ],
+      "defaultArchetype": "burst spread",
+      "defaultCameraIntent": "reveal",
+      "defaultDataEvent": "burst-spread",
+      "defaultEnterFrames": 12,
+      "defaultEmphasisFrames": 40,
+      "defaultStaggerGap": 6,
+      "rhythm": {
+        "layer": "proof",
+        "staggerGap": 6,
+        "revealStiffness": 180,
+        "backdropCycle": [
+          "dot-grid",
+          "god-rays",
+          "particle-grid"
+        ]
+      },
+      "memoryObject": {
+        "type": "node",
+        "role": "爆发中心点，从这里扩散出去",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] burst spread | burst-spread | mem:node"
+    },
+    {
+      "family": "architecture-map",
+      "label": "Architecture / System Map",
+      "description": "Radial or stacked node graph representing system architecture.",
+      "semanticTags": [
+        "architecture",
+        "system",
+        "graph",
+        "nodes",
+        "radial",
+        "架构",
+        "系统图",
+        "节点"
+      ],
+      "requiredFields": [
+        "nodes",
+        "centerTitle"
+      ],
+      "optionalFields": [
+        "centerDetail",
+        "layout",
+        "items",
+        "heading"
+      ],
+      "defaultArchetype": "trace flow",
+      "defaultCameraIntent": "chase",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 16,
+      "defaultEmphasisFrames": 45,
+      "defaultStaggerGap": 10,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 10,
+        "revealStiffness": 110,
+        "backdropCycle": [
+          "dot-grid",
+          "particle-grid",
+          "god-rays"
+        ]
+      },
+      "memoryObject": {
+        "type": "axis",
+        "role": "追踪的路径本身，河流一样的轨迹",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] trace flow | trace-flow | mem:axis"
+    },
+    {
+      "family": "tag-matrix",
+      "label": "Tag Matrix",
+      "description": "Tabbed or grid layout of tags and labels. Used for categorisation and overviews.",
+      "semanticTags": [
+        "tag",
+        "matrix",
+        "grid",
+        "category",
+        "overview",
+        "标签",
+        "分类",
+        "矩阵"
+      ],
+      "requiredFields": [
+        "tabs"
+      ],
+      "optionalFields": [
+        "activeTab",
+        "items",
+        "heading"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 6,
+        "revealStiffness": 170,
+        "backdropCycle": [
+          "particle-grid",
+          "dot-grid",
+          "god-rays"
+        ]
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "code",
+      "label": "Code Panel",
+      "description": "Syntax-highlighted code block with optional filename and line annotations.",
+      "semanticTags": [
+        "code",
+        "snippet",
+        "syntax",
+        "programming",
+        "代码",
+        "代码块"
+      ],
+      "requiredFields": [
+        "lines"
+      ],
+      "optionalFields": [
+        "filename",
+        "language",
+        "heading",
+        "visualProps"
+      ],
+      "defaultArchetype": "evidence pin",
+      "defaultCameraIntent": "pin",
+      "defaultDataEvent": "pin",
+      "defaultEnterFrames": 10,
+      "defaultEmphasisFrames": 40,
+      "defaultStaggerGap": 0,
+      "rhythm": {
+        "layer": "proof",
+        "staggerGap": 0,
+        "revealStiffness": 200,
+        "backdropCycle": [
+          "dot-grid",
+          "particle-grid",
+          "god-rays"
+        ]
+      },
+      "memoryObject": {
+        "type": "card",
+        "role": "一张证据卡，别针钉入画面",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] evidence pin | pin | mem:card"
+    },
+    {
+      "family": "metrics",
+      "label": "Metrics / KPI Bars",
+      "description": "Animated horizontal bars showing KPI values and ratios.",
+      "semanticTags": [
+        "metric",
+        "kpi",
+        "bar",
+        "ratio",
+        "data",
+        "指标",
+        "KPI",
+        "数据"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "dataPoints",
+        "heading",
+        "layout"
+      ],
+      "defaultArchetype": "pressure countdown",
+      "defaultCameraIntent": "pin",
+      "defaultDataEvent": "count-up",
+      "defaultEnterFrames": 8,
+      "defaultEmphasisFrames": 30,
+      "defaultStaggerGap": 4,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 6,
+        "revealStiffness": 320,
+        "backdropCycle": [
+          "particle-grid",
+          "god-rays",
+          "dot-grid"
+        ]
+      },
+      "memoryObject": {
+        "type": "block",
+        "role": "数字的主体块，高速冲入",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] pressure countdown | count-up | mem:block"
+    },
+    {
+      "family": "data-stream",
+      "label": "Data Stream / Live Feed",
+      "description": "Scrolling or animated stream of data points with trend indicators.",
+      "semanticTags": [
+        "data",
+        "stream",
+        "live",
+        "feed",
+        "realtime",
+        "数据流",
+        "实时",
+        "动态数据"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "summary",
+        "dataPoints",
+        "heading"
+      ],
+      "defaultArchetype": "trace flow",
+      "defaultCameraIntent": "chase",
+      "defaultDataEvent": "count-up",
+      "defaultEnterFrames": 16,
+      "defaultEmphasisFrames": 45,
+      "defaultStaggerGap": 10,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 6,
+        "revealStiffness": 280,
+        "preferredCameraMotion": "zoom-pulse",
+        "backdropCycle": [
+          "particle-grid",
+          "dot-grid",
+          "god-rays"
+        ]
+      },
+      "memoryObject": {
+        "type": "axis",
+        "role": "追踪的路径本身，河流一样的轨迹",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] trace flow | count-up | mem:axis"
+    },
+    {
+      "family": "memory-graph",
+      "label": "Memory / Knowledge Graph",
+      "description": "Node-graph with a central concept and surrounding related nodes.",
+      "semanticTags": [
+        "graph",
+        "nodes",
+        "memory",
+        "knowledge",
+        "network",
+        "关系图",
+        "知识图",
+        "节点"
+      ],
+      "requiredFields": [
+        "centerTitle",
+        "nodes"
+      ],
+      "optionalFields": [
+        "centerDetail",
+        "items",
+        "heading"
+      ],
+      "defaultArchetype": "trace flow",
+      "defaultCameraIntent": "chase",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 16,
+      "defaultEmphasisFrames": 45,
+      "defaultStaggerGap": 10,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 10,
+        "revealStiffness": 120,
+        "backdropCycle": [
+          "dot-grid",
+          "god-rays",
+          "particle-grid"
+        ]
+      },
+      "memoryObject": {
+        "type": "axis",
+        "role": "追踪的路径本身，河流一样的轨迹",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] trace flow | trace-flow | mem:axis"
+    },
+    {
+      "family": "pipeline-flow",
+      "label": "Pipeline Flow",
+      "description": "Horizontal or vertical pipeline with labelled stages. Used for process illustration.",
+      "semanticTags": [
+        "pipeline",
+        "flow",
+        "stage",
+        "process",
+        "pipeline",
+        "流程",
+        "管道",
+        "阶段"
+      ],
+      "requiredFields": [
+        "stages"
+      ],
+      "optionalFields": [
+        "heading",
+        "summary",
+        "items"
+      ],
+      "defaultArchetype": "trace flow",
+      "defaultCameraIntent": "chase",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 16,
+      "defaultEmphasisFrames": 45,
+      "defaultStaggerGap": 10,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 6,
+        "revealStiffness": 110,
+        "preferredCameraMotion": "pan-y",
+        "backdropCycle": [
+          "dot-grid",
+          "particle-grid",
+          "god-rays"
+        ]
+      },
+      "memoryObject": {
+        "type": "axis",
+        "role": "追踪的路径本身，河流一样的轨迹",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] trace flow | trace-flow | mem:axis"
+    },
+    {
+      "family": "benchmark-chart",
+      "label": "Benchmark Chart",
+      "description": "Dual-bar benchmark comparison between primary and secondary candidates.",
+      "semanticTags": [
+        "benchmark",
+        "chart",
+        "comparison",
+        "dual-bar",
+        "performance",
+        "基准",
+        "对比图"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "primaryLabel",
+        "secondaryLabel",
+        "dataPoints",
+        "heading"
+      ],
+      "defaultArchetype": "overtake race",
+      "defaultCameraIntent": "chase",
+      "defaultDataEvent": "overtake",
+      "defaultEnterFrames": 16,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 6,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 6,
+        "revealStiffness": 330,
+        "preferredCameraMotion": "push-in",
+        "backdropCycle": [
+          "particle-grid",
+          "god-rays",
+          "dot-grid"
+        ]
+      },
+      "memoryObject": {
+        "type": "line",
+        "role": "追及线，两个数据的差距线",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] overtake race | overtake | mem:line"
+    },
+    {
+      "family": "quote-highlight",
+      "label": "Quote Highlight",
+      "description": "Large-format pull quote with optional attribution. Used for key statements.",
+      "semanticTags": [
+        "quote",
+        "highlight",
+        "statement",
+        "attribution",
+        "引用",
+        "金句",
+        "语录"
+      ],
+      "requiredFields": [
+        "quote"
+      ],
+      "optionalFields": [
+        "attribution",
+        "tags",
+        "heading",
+        "visualProps"
+      ],
+      "defaultArchetype": "evidence pin",
+      "defaultCameraIntent": "pin",
+      "defaultDataEvent": "pin",
+      "defaultEnterFrames": 10,
+      "defaultEmphasisFrames": 40,
+      "defaultStaggerGap": 0,
+      "rhythm": {
+        "layer": "context",
+        "staggerGap": 0,
+        "revealStiffness": 120,
+        "backdropCycle": [
+          "god-rays",
+          "particle-grid",
+          "dot-grid"
+        ]
+      },
+      "memoryObject": {
+        "type": "card",
+        "role": "一张证据卡，别针钉入画面",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] evidence pin | pin | mem:card"
+    },
+    {
+      "family": "glossary-term",
+      "label": "Glossary Term",
+      "description": "Definition card for a single term or concept. Used for explainers.",
+      "semanticTags": [
+        "glossary",
+        "term",
+        "definition",
+        "explain",
+        "概念",
+        "术语",
+        "定义"
+      ],
+      "requiredFields": [
+        "term",
+        "definition"
+      ],
+      "optionalFields": [
+        "heading",
+        "visualProps"
+      ],
+      "defaultArchetype": "lock-on reveal",
+      "defaultCameraIntent": "pin",
+      "defaultDataEvent": "pin",
+      "defaultEnterFrames": 12,
+      "defaultEmphasisFrames": 40,
+      "defaultStaggerGap": 0,
+      "rhythm": {
+        "layer": "context",
+        "staggerGap": 0,
+        "revealStiffness": 130,
+        "backdropCycle": [
+          "dot-grid",
+          "god-rays",
+          "particle-grid"
+        ]
+      },
+      "memoryObject": {
+        "type": "word",
+        "role": "画面里最重的一个词，被钉在中心",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] lock-on reveal | pin | mem:word"
+    },
+    {
+      "family": "cta",
+      "label": "Call to Action",
+      "description": "Closing CTA screen with title and optional action label.",
+      "semanticTags": [
+        "cta",
+        "closing",
+        "call-to-action",
+        "end",
+        "action",
+        "收尾",
+        "号召",
+        "结束"
+      ],
+      "requiredFields": [
+        "heading"
+      ],
+      "optionalFields": [
+        "subtitle",
+        "badge"
+      ],
+      "defaultArchetype": "threshold breach",
+      "defaultCameraIntent": "reveal",
+      "defaultDataEvent": "threshold-cross",
+      "defaultEnterFrames": 12,
+      "defaultEmphasisFrames": 40,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "closing",
+        "staggerGap": 0,
+        "revealStiffness": 180,
+        "preferredCameraMotion": "push-in",
+        "backdropCycle": [
+          "god-rays",
+          "particle-grid",
+          "dot-grid"
+        ]
+      },
+      "memoryObject": {
+        "type": "axis",
+        "role": "阈值线，被穿过的那个边界",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] threshold breach | threshold-cross | mem:axis"
+    }
+  ]
+}

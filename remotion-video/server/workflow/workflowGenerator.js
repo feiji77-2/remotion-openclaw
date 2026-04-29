@@ -1,11 +1,57 @@
-const {generateStep123Workflow} = require('./step123/pipeline');
 const {
   DEFAULT_MODEL,
   generateStructuredJson,
   getWorkflowLLMCapabilities,
   hasWorkflowLLM,
 } = require('./step123/llm');
-const { ensureStepSkillReady, enrichStepResult } = require('./skillRegistry');
+const {generateStep123Workflow} = require('./step123/pipeline');
+const { ensureStepSkillReady, enrichStepResult, getPhaseForStep } = require('./skillRegistry');
+const { execSync } = require('child_process');
+const path = require('path');
+const SHOULD_SKIP_EXTERNAL_SEARCH = process.execArgv.some((arg) => String(arg).startsWith('--test'))
+  || process.env.DISABLE_EXTERNAL_SEARCH === '1';
+
+// Path to the DuckDuckGo HTML search script (relative to this file)
+const SCRIPT_DIR = path.resolve(__dirname, '../../scripts');
+const DDG_SCRIPT = path.join(SCRIPT_DIR, 'fetch-ddg-search.py');
+
+/**
+ * Fetch search results via DuckDuckGo HTML (no API key required).
+ * Falls back to empty array on error — LLM fills in from knowledge base.
+ *
+ * @param {string} query
+ * @param {'pd'|'pw'|'pm'|'24h'} [freshness]
+ * @returns {Promise<Array<{title:string, link:string, snippet:string, publishedAt:string}>>}
+ */
+async function fetchDDGSearch(query, freshness = 'pd') {
+  if (SHOULD_SKIP_EXTERNAL_SEARCH) {
+    return [];
+  }
+  try {
+    const raw = execSync(
+      `python3 "${DDG_SCRIPT}" "${query.replace(/"/g, '\\"')}" ${freshness}`,
+      {
+        cwd: SCRIPT_DIR,
+        timeout: 20000,
+        maxBuffer: 512 * 1024,
+        encoding: 'utf8',
+        windowsHide: true,
+      },
+    );
+    const parsed = JSON.parse(raw);
+    if (parsed.error || !Array.isArray(parsed.results)) {
+      return [];
+    }
+    return parsed.results.map((r) => ({
+      title: String(r.title || '').trim(),
+      link: String(r.link || '').trim(),
+      snippet: String(r.snippet || '').trim(),
+      publishedAt: '', // DDG HTML doesn't expose pub dates
+    }));
+  } catch {
+    return [];
+  }
+}
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -215,7 +261,7 @@ function normalizeTopicResearch(candidateResearch, input) {
   return {
     topicResearch: {
       query,
-      source: String(incoming.source || current.source || 'bing-rss').trim(),
+      source: String(incoming.source || current.source || 'duckduckgo-html').trim(),
       fetchedAt: String(incoming.fetchedAt || current.fetchedAt || new Date().toISOString()).trim(),
       results,
     },
@@ -228,20 +274,10 @@ async function fetchTopicResearchOnce(query) {
     return [];
   }
 
-  const response = await fetch(`https://www.bing.com/search?format=rss&q=${encodeURIComponent(normalizedQuery)}`, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) OpenClaw/1.0',
-      'Accept': 'application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5',
-    },
-    signal: AbortSignal.timeout(12000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Search request failed: ${response.status}`);
-  }
-
-  const xml = await response.text();
-  return parseBingRssItems(xml);
+  // DuckDuckGo HTML search — no API key required, Python/urllib fallback works
+  // from this sandbox environment where curl/node https calls timeout.
+  const results = await fetchDDGSearch(normalizedQuery, 'pd');
+  return results;
 }
 
 async function searchTopicResearch(query) {
@@ -304,7 +340,7 @@ async function searchTopicResearch(query) {
 
   return {
     query: normalizedQuery,
-    source: 'bing-rss',
+    source: 'duckduckgo-html',
     fetchedAt: new Date().toISOString(),
     results,
   };
@@ -1539,6 +1575,7 @@ async function generateWorkflowStep(input) {
 
     return {
       stepId,
+      ...getPhaseForStep(stepId),
       source: 'deterministic',
       model: 'remotion-project-build',
       generatedAt: new Date().toISOString(),
@@ -1564,6 +1601,7 @@ async function generateWorkflowStep(input) {
       );
       return {
         stepId,
+        ...getPhaseForStep(stepId),
         source: 'openai',
         model: result.model,
         generatedAt: new Date().toISOString(),
@@ -1584,6 +1622,7 @@ async function generateWorkflowStep(input) {
   );
   return {
     stepId,
+    ...getPhaseForStep(stepId),
     source: 'fallback',
     model: 'local-template',
     generatedAt: new Date().toISOString(),

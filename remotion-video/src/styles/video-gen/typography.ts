@@ -26,6 +26,8 @@ export const fontFamilies = {
   sans: '"Inter", "PingFang SC", "Microsoft YaHei", sans-serif',
   mono: '"JetBrains Mono", "Fira Code", "SF Mono", monospace',
   serif: '"Playfair Display", "Songti SC", serif',
+  morfeoSans: '"DM Sans", "Inter", "PingFang SC", "Microsoft YaHei", sans-serif',
+  morfeoSerif: '"Instrument Serif", "Iowan Old Style", "Georgia", "Songti SC", serif',
 };
 
 /**

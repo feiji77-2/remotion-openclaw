@@ -25,8 +25,20 @@
         "title": "把你的文案填进来",
         "subtitle": "这不是写死的视频，而是一套 1920×1080 的统一场景语言。你后面只需要替换 JSON 里的文字和模块数据。",
         "badge": "hero / opener / cover",
-        "accent": "orange",
-        "avatarLabel": "YOU"
+        "accent": "lime",
+        "avatarLabel": "YOU",
+        "visualStyle": "morfeo",
+        "tag": "OpenClaw / Remotion / Hero",
+        "tagEmoji": "🎬",
+        "heroEmoji": "🎙️",
+        "highlightedWord": "文案",
+        "lines": [
+          "先用亮绿色标签把品牌语气立住。",
+          "再用斜体标题和 Emoji 做出更强开场感。",
+          "最后让固定入场顺序接管 hero 画面。"
+        ],
+        "brandIcon": "github",
+        "brandLabel": "SceneLab"
       }
     },
     {

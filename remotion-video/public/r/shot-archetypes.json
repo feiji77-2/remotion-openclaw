@@ -1,0 +1,246 @@
+{
+  "generatedAt": "2026-04-29T05:52:47.825Z",
+  "archetypes": [
+    {
+      "archetype": "lock-on reveal",
+      "description": "信息像被钉住一样出现。画面先黑/模糊，然后一个元素被\"咔\"一声锁定。",
+      "whenToUse": [
+        "强调关键词",
+        "引入核心概念",
+        "切换到最重要信息"
+      ],
+      "cameraIntent": "pin",
+      "dataEvent": "pin",
+      "enterFramesRange": [
+        12,
+        24
+      ],
+      "emphasisFramesRange": [
+        40,
+        80
+      ],
+      "typicalStaggerGap": 0
+    },
+    {
+      "archetype": "pressure countdown",
+      "description": "数字像子弹一样高速打出来。从大数快速倒数，或从零爆炸性冲到一个大数。",
+      "whenToUse": [
+        "强调性能差距",
+        "建立紧迫感",
+        "数据对比的戏剧化"
+      ],
+      "cameraIntent": "pin",
+      "dataEvent": "count-up",
+      "enterFramesRange": [
+        8,
+        16
+      ],
+      "emphasisFramesRange": [
+        30,
+        60
+      ],
+      "typicalStaggerGap": 4
+    },
+    {
+      "archetype": "overtake race",
+      "description": "两列数据像在赛跑。一个指标慢慢追上并超过另一个，有明显的\"超车\"瞬间。",
+      "whenToUse": [
+        "性能对比",
+        "市场份额变化",
+        "进步vs退步"
+      ],
+      "cameraIntent": "chase",
+      "dataEvent": "overtake",
+      "enterFramesRange": [
+        16,
+        30
+      ],
+      "emphasisFramesRange": [
+        50,
+        90
+      ],
+      "typicalStaggerGap": 6
+    },
+    {
+      "archetype": "evidence pin",
+      "description": "证据像别针一样钉入画面。一个事实被固定下来作为论点支撑。",
+      "whenToUse": [
+        "引用高光",
+        "专家观点",
+        "关键发现揭示"
+      ],
+      "cameraIntent": "pin",
+      "dataEvent": "pin",
+      "enterFramesRange": [
+        10,
+        20
+      ],
+      "emphasisFramesRange": [
+        40,
+        70
+      ],
+      "typicalStaggerGap": 0
+    },
+    {
+      "archetype": "threshold breach",
+      "description": "数字穿膜而出。一个阈值被跨越，画面有明显的\"穿过去了\"的物理感。",
+      "whenToUse": [
+        "突破性数据",
+        "历史首次",
+        "超越标杆"
+      ],
+      "cameraIntent": "reveal",
+      "dataEvent": "threshold-cross",
+      "enterFramesRange": [
+        12,
+        20
+      ],
+      "emphasisFramesRange": [
+        40,
+        70
+      ],
+      "typicalStaggerGap": 8
+    },
+    {
+      "archetype": "aftershock hold",
+      "description": "高潮后画面凝固在那里。像地震后的余震停留，让冲击感沉淀下来。",
+      "whenToUse": [
+        "数据峰值后",
+        "重大揭示后",
+        "情感高点后的沉默"
+      ],
+      "cameraIntent": "linger",
+      "dataEvent": "settle",
+      "enterFramesRange": [
+        20,
+        35
+      ],
+      "emphasisFramesRange": [
+        60,
+        100
+      ],
+      "typicalStaggerGap": 0
+    },
+    {
+      "archetype": "follow focus",
+      "description": "镜头跟随最重要的元素。画面里最重要的东西移动，camera 追着它走。",
+      "whenToUse": [
+        "时间线推进",
+        "流程步骤",
+        "排行榜滚动"
+      ],
+      "cameraIntent": "chase",
+      "dataEvent": "trace-flow",
+      "enterFramesRange": [
+        14,
+        24
+      ],
+      "emphasisFramesRange": [
+        40,
+        70
+      ],
+      "typicalStaggerGap": 10
+    },
+    {
+      "archetype": "compress compare",
+      "description": "把两个东西压在一起比较。左右或上下对比，差异被物理压缩到同一画面。",
+      "whenToUse": [
+        "新旧对比",
+        "方案A vs 方案B",
+        "前后变化"
+      ],
+      "cameraIntent": "compress",
+      "dataEvent": "delta-hit",
+      "enterFramesRange": [
+        10,
+        18
+      ],
+      "emphasisFramesRange": [
+        35,
+        60
+      ],
+      "typicalStaggerGap": 4
+    },
+    {
+      "archetype": "drift reveal",
+      "description": "信息漂移入场，像在水里浮上来。不急不慢，信息从画面边缘漂进。",
+      "whenToUse": [
+        "背景介绍",
+        "概念引入",
+        "铺垫性信息"
+      ],
+      "cameraIntent": "drift",
+      "dataEvent": "trace-flow",
+      "enterFramesRange": [
+        20,
+        35
+      ],
+      "emphasisFramesRange": [
+        50,
+        80
+      ],
+      "typicalStaggerGap": 8
+    },
+    {
+      "archetype": "bullet train",
+      "description": "连续多个数据依次高速轰出。一个接一个，数据像子弹一样飞入画面。",
+      "whenToUse": [
+        "多项目排名",
+        "多个特性列表",
+        "连续里程碑"
+      ],
+      "cameraIntent": "pin",
+      "dataEvent": "count-up",
+      "enterFramesRange": [
+        6,
+        12
+      ],
+      "emphasisFramesRange": [
+        25,
+        45
+      ],
+      "typicalStaggerGap": 3
+    },
+    {
+      "archetype": "burst spread",
+      "description": "从一个点爆发扩散。一个核心爆发成多个碎片，散开到整个画面。",
+      "whenToUse": [
+        "特性展开",
+        "优点爆发",
+        "从一到多"
+      ],
+      "cameraIntent": "reveal",
+      "dataEvent": "burst-spread",
+      "enterFramesRange": [
+        12,
+        22
+      ],
+      "emphasisFramesRange": [
+        40,
+        70
+      ],
+      "typicalStaggerGap": 6
+    },
+    {
+      "archetype": "trace flow",
+      "description": "像追踪一条河流的轨迹。路径被逐帧绘制，数据沿路径流动。",
+      "whenToUse": [
+        "流程步骤",
+        "时间线",
+        "依赖链",
+        "架构图"
+      ],
+      "cameraIntent": "chase",
+      "dataEvent": "trace-flow",
+      "enterFramesRange": [
+        16,
+        28
+      ],
+      "emphasisFramesRange": [
+        45,
+        75
+      ],
+      "typicalStaggerGap": 10
+    }
+  ]
+}

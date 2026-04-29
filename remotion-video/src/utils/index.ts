@@ -2,3 +2,5 @@
 
 export * from './srt';
 export * from './colors';
+export * from './motion';
+export * from './gradient';

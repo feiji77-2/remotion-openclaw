@@ -2108,6 +2108,7 @@ function buildUltimateRenderProps(project) {
     renderHeight: height,
     voiceFile: safeString(project?.voiceFile) || null,
     audioSegments: Array.isArray(project?.audioSegments) ? project.audioSegments : null,
+    subtitleData: Array.isArray(project?.subtitleData) ? project.subtitleData : null,
     config: buildUltimateProjectConfig({
       ...project,
       render: {

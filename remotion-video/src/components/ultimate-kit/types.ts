@@ -1,9 +1,13 @@
 import type {UltimateAccentTone} from './tokens';
+import type {BrandIconName} from '../BrandIcon';
 
 export interface UltimateStageProps {
   children: React.ReactNode;
   warm?: boolean;
   showGrid?: boolean;
+  family?: string;
+  sceneIndex?: number;
+  sceneDurationFrames?: number;
 }
 
 export interface UltimatePlatformOverlayProps {
@@ -20,6 +24,14 @@ export interface UltimateHeroPanelProps {
   badge?: string;
   accent?: UltimateAccentTone;
   avatarLabel?: string;
+  visualStyle?: 'classic' | 'morfeo';
+  tag?: string;
+  tagEmoji?: string;
+  heroEmoji?: string;
+  highlightedWord?: string;
+  lines?: string[];
+  brandIcon?: BrandIconName | string;
+  brandLabel?: string;
 }
 
 export interface UltimateFeatureCardItem {
@@ -250,7 +262,14 @@ export interface UltimateBenchmarkChartProps {
   primaryLabel: string;
   secondaryLabel: string;
   items: UltimateBenchmarkItem[];
+  /** 强调色 */
   accent?: UltimateAccentTone;
+  /** 导演层 grammar（staggerGap / dataEvent / enterFrames）*/
+  grammar?: {
+    staggerGap?: number;
+    dataEvent?: string;
+    enterFrames?: number;
+  };
 }
 
 export interface UltimateQuoteHighlightProps {

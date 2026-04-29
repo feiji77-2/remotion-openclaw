@@ -1,0 +1,1012 @@
+{
+  "generatedAt": "2026-04-29T05:52:47.825Z",
+  "families": [
+    {
+      "family": "hero",
+      "label": "Hero / Title Card",
+      "description": "Full-screen opening title with strong visual focal point. Used for opening shots.",
+      "semanticTags": [
+        "opening",
+        "title",
+        "hero",
+        "hook",
+        "intro",
+        "开场",
+        "标题"
+      ],
+      "requiredFields": [
+        "title"
+      ],
+      "optionalFields": [
+        "kicker",
+        "subtitle",
+        "visualSummary",
+        "heroMark",
+        "topLabel"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 90,
+        "enterFrames": 20,
+        "emphasisFrames": 50,
+        "exitFrames": 20,
+        "staggerFrames": 0,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "push-in"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 18
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "context",
+        "staggerGap": 0,
+        "revealStiffness": 96,
+        "preferredCameraMotion": "push-in",
+        "backdropCycle": [
+          "god-rays",
+          "particle-grid",
+          "dot-grid"
+        ]
+      }
+    },
+    {
+      "family": "feature-rail",
+      "label": "Feature Card Rail",
+      "description": "Horizontal scrolling or static rail of feature cards. Used for listing capabilities.",
+      "semanticTags": [
+        "feature",
+        "capability",
+        "list",
+        "rail",
+        "card",
+        "功能",
+        "特性",
+        "列表"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading",
+        "subtitle"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 82,
+        "enterFrames": 18,
+        "emphasisFrames": 48,
+        "exitFrames": 16,
+        "staggerFrames": 8,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "pan-x"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 2,
+        "revealStiffness": 260,
+        "backdropCycle": [
+          "particle-grid",
+          "dot-grid",
+          "god-rays"
+        ]
+      }
+    },
+    {
+      "family": "focus",
+      "label": "Focus / Keyword Highlight",
+      "description": "Single keyword or phrase pulled into visual focus with supporting context.",
+      "semanticTags": [
+        "focus",
+        "keyword",
+        "highlight",
+        "single",
+        "emphasis",
+        "聚焦",
+        "重点",
+        "单点"
+      ],
+      "requiredFields": [
+        "keyword",
+        "description"
+      ],
+      "optionalFields": [
+        "eyebrow",
+        "question",
+        "diagram",
+        "kicker"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 72,
+        "enterFrames": 16,
+        "emphasisFrames": 40,
+        "exitFrames": 16,
+        "staggerFrames": 0,
+        "easing": "ease-out",
+        "springPreset": "snappy",
+        "cameraMotion": "push-in"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": {
+        "showIconOrbit": false
+      },
+      "rhythm": {
+        "layer": "context",
+        "staggerGap": 0,
+        "revealStiffness": 120,
+        "backdropCycle": [
+          "god-rays",
+          "dot-grid",
+          "particle-grid"
+        ]
+      }
+    },
+    {
+      "family": "number-strip",
+      "label": "Number Strip",
+      "description": "Large animated numbers with supporting detail. Used for key stats and metrics.",
+      "semanticTags": [
+        "number",
+        "stat",
+        "metric",
+        "count",
+        "data",
+        "数字",
+        "统计",
+        "指标"
+      ],
+      "requiredFields": [
+        "count"
+      ],
+      "optionalFields": [
+        "items",
+        "summary",
+        "heading"
+      ],
+      "defaultAccent": "orange",
+      "timing": {
+        "baseDurationFrames": 75,
+        "enterFrames": 18,
+        "emphasisFrames": 42,
+        "exitFrames": 15,
+        "staggerFrames": 6,
+        "easing": "ease-out",
+        "springPreset": "bouncy",
+        "cameraMotion": "zoom-pulse"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 4,
+        "revealStiffness": 300,
+        "backdropCycle": [
+          "particle-grid",
+          "god-rays",
+          "dot-grid"
+        ]
+      }
+    },
+    {
+      "family": "step-flow",
+      "label": "Step Flow",
+      "description": "Sequential numbered steps with icons. Used for processes and workflows.",
+      "semanticTags": [
+        "step",
+        "process",
+        "workflow",
+        "sequence",
+        "numbered",
+        "步骤",
+        "流程",
+        "顺序"
+      ],
+      "requiredFields": [
+        "steps"
+      ],
+      "optionalFields": [
+        "items",
+        "variant",
+        "stepVariants"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 84,
+        "enterFrames": 16,
+        "emphasisFrames": 52,
+        "exitFrames": 16,
+        "staggerFrames": 10,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "pan-y"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 6,
+        "revealStiffness": 150,
+        "preferredCameraMotion": "pan-y",
+        "backdropCycle": [
+          "dot-grid",
+          "particle-grid",
+          "god-rays"
+        ]
+      }
+    },
+    {
+      "family": "timeline",
+      "label": "Timeline",
+      "description": "Horizontal timeline with labeled milestones. Used for historical or sequential events.",
+      "semanticTags": [
+        "timeline",
+        "history",
+        "milestone",
+        "sequence",
+        "chronological",
+        "时间线",
+        "时间轴"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading",
+        "subtitle"
+      ],
+      "defaultAccent": "orange",
+      "timing": {
+        "baseDurationFrames": 80,
+        "enterFrames": 18,
+        "emphasisFrames": 46,
+        "exitFrames": 16,
+        "staggerFrames": 10,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "pan-y"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 6,
+        "revealStiffness": 140,
+        "preferredCameraMotion": "pan-y",
+        "backdropCycle": [
+          "dot-grid",
+          "god-rays",
+          "particle-grid"
+        ]
+      }
+    },
+    {
+      "family": "compare-board",
+      "label": "Comparison Board",
+      "description": "Side-by-side bilateral comparison rows. Used for before/after, pro/con, A/B analysis.",
+      "semanticTags": [
+        "compare",
+        "comparison",
+        "bilateral",
+        "before-after",
+        "pro-con",
+        "对比",
+        "比较",
+        "A/B"
+      ],
+      "requiredFields": [
+        "rows"
+      ],
+      "optionalFields": [
+        "leftTitle",
+        "rightTitle",
+        "comparisons",
+        "dataPoints"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 82,
+        "enterFrames": 16,
+        "emphasisFrames": 50,
+        "exitFrames": 16,
+        "staggerFrames": 6,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "pan-x"
+      },
+      "defaultTransition": {
+        "preset": "lift",
+        "durationInFrames": 12
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 6,
+        "revealStiffness": 240,
+        "backdropCycle": [
+          "particle-grid",
+          "dot-grid",
+          "god-rays"
+        ]
+      }
+    },
+    {
+      "family": "terminal",
+      "label": "Terminal / Code Panel",
+      "description": "Simulated terminal or code window. Used for commands, outputs, and technical demos.",
+      "semanticTags": [
+        "terminal",
+        "code",
+        "command",
+        "cli",
+        "technical",
+        "terminal",
+        "代码",
+        "命令"
+      ],
+      "requiredFields": [
+        "command"
+      ],
+      "optionalFields": [
+        "windowTitle",
+        "outputs",
+        "note",
+        "heading",
+        "filename",
+        "language"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 75,
+        "enterFrames": 14,
+        "emphasisFrames": 46,
+        "exitFrames": 15,
+        "staggerFrames": 0,
+        "easing": "ease-out",
+        "springPreset": "snappy",
+        "cameraMotion": "none"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 12
+      },
+      "stageConfig": {
+        "showOverlay": false,
+        "showMediaCard": false
+      },
+      "rhythm": {
+        "layer": "proof",
+        "staggerGap": 0,
+        "revealStiffness": 180,
+        "backdropCycle": [
+          "dot-grid",
+          "particle-grid",
+          "god-rays"
+        ]
+      }
+    },
+    {
+      "family": "evidence-wall",
+      "label": "Evidence Wall",
+      "description": "Grid or stack of evidence cards with quotes and citations. Used for proof and social proof.",
+      "semanticTags": [
+        "evidence",
+        "proof",
+        "quote",
+        "citation",
+        "wall",
+        "testimonial",
+        "证据",
+        "引用",
+        "证言"
+      ],
+      "requiredFields": [
+        "cards"
+      ],
+      "optionalFields": [
+        "comparisons",
+        "heading"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 85,
+        "enterFrames": 20,
+        "emphasisFrames": 48,
+        "exitFrames": 17,
+        "staggerFrames": 8,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "pan-y"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "proof",
+        "staggerGap": 6,
+        "revealStiffness": 180,
+        "backdropCycle": [
+          "dot-grid",
+          "god-rays",
+          "particle-grid"
+        ]
+      }
+    },
+    {
+      "family": "architecture-map",
+      "label": "Architecture / System Map",
+      "description": "Radial or stacked node graph representing system architecture.",
+      "semanticTags": [
+        "architecture",
+        "system",
+        "graph",
+        "nodes",
+        "radial",
+        "架构",
+        "系统图",
+        "节点"
+      ],
+      "requiredFields": [
+        "nodes",
+        "centerTitle"
+      ],
+      "optionalFields": [
+        "centerDetail",
+        "layout",
+        "items",
+        "heading"
+      ],
+      "defaultAccent": "purple",
+      "timing": {
+        "baseDurationFrames": 82,
+        "enterFrames": 18,
+        "emphasisFrames": 48,
+        "exitFrames": 16,
+        "staggerFrames": 10,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "drift"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 10,
+        "revealStiffness": 110,
+        "backdropCycle": [
+          "dot-grid",
+          "particle-grid",
+          "god-rays"
+        ]
+      }
+    },
+    {
+      "family": "tag-matrix",
+      "label": "Tag Matrix",
+      "description": "Tabbed or grid layout of tags and labels. Used for categorisation and overviews.",
+      "semanticTags": [
+        "tag",
+        "matrix",
+        "grid",
+        "category",
+        "overview",
+        "标签",
+        "分类",
+        "矩阵"
+      ],
+      "requiredFields": [
+        "tabs"
+      ],
+      "optionalFields": [
+        "activeTab",
+        "items",
+        "heading"
+      ],
+      "defaultAccent": "orange",
+      "timing": {
+        "baseDurationFrames": 70,
+        "enterFrames": 14,
+        "emphasisFrames": 40,
+        "exitFrames": 16,
+        "staggerFrames": 6,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "pan-x"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 6,
+        "revealStiffness": 170,
+        "backdropCycle": [
+          "particle-grid",
+          "dot-grid",
+          "god-rays"
+        ]
+      }
+    },
+    {
+      "family": "code",
+      "label": "Code Panel",
+      "description": "Syntax-highlighted code block with optional filename and line annotations.",
+      "semanticTags": [
+        "code",
+        "snippet",
+        "syntax",
+        "programming",
+        "代码",
+        "代码块"
+      ],
+      "requiredFields": [
+        "lines"
+      ],
+      "optionalFields": [
+        "filename",
+        "language",
+        "heading",
+        "visualProps"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 78,
+        "enterFrames": 14,
+        "emphasisFrames": 48,
+        "exitFrames": 16,
+        "staggerFrames": 0,
+        "easing": "ease-out",
+        "springPreset": "snappy",
+        "cameraMotion": "none"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": {
+        "showOverlay": false,
+        "showMediaCard": false
+      },
+      "rhythm": {
+        "layer": "proof",
+        "staggerGap": 0,
+        "revealStiffness": 200,
+        "backdropCycle": [
+          "dot-grid",
+          "particle-grid",
+          "god-rays"
+        ]
+      }
+    },
+    {
+      "family": "metrics",
+      "label": "Metrics / KPI Bars",
+      "description": "Animated horizontal bars showing KPI values and ratios.",
+      "semanticTags": [
+        "metric",
+        "kpi",
+        "bar",
+        "ratio",
+        "data",
+        "指标",
+        "KPI",
+        "数据"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "dataPoints",
+        "heading",
+        "layout"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 76,
+        "enterFrames": 16,
+        "emphasisFrames": 44,
+        "exitFrames": 16,
+        "staggerFrames": 8,
+        "easing": "ease-out",
+        "springPreset": "bouncy",
+        "cameraMotion": "growth"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 6,
+        "revealStiffness": 320,
+        "backdropCycle": [
+          "particle-grid",
+          "god-rays",
+          "dot-grid"
+        ]
+      }
+    },
+    {
+      "family": "data-stream",
+      "label": "Data Stream / Live Feed",
+      "description": "Scrolling or animated stream of data points with trend indicators.",
+      "semanticTags": [
+        "data",
+        "stream",
+        "live",
+        "feed",
+        "realtime",
+        "数据流",
+        "实时",
+        "动态数据"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "summary",
+        "dataPoints",
+        "heading"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 80,
+        "enterFrames": 16,
+        "emphasisFrames": 48,
+        "exitFrames": 16,
+        "staggerFrames": 6,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "zoom-pulse"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 6,
+        "revealStiffness": 280,
+        "preferredCameraMotion": "zoom-pulse",
+        "backdropCycle": [
+          "particle-grid",
+          "dot-grid",
+          "god-rays"
+        ]
+      }
+    },
+    {
+      "family": "memory-graph",
+      "label": "Memory / Knowledge Graph",
+      "description": "Node-graph with a central concept and surrounding related nodes.",
+      "semanticTags": [
+        "graph",
+        "nodes",
+        "memory",
+        "knowledge",
+        "network",
+        "关系图",
+        "知识图",
+        "节点"
+      ],
+      "requiredFields": [
+        "centerTitle",
+        "nodes"
+      ],
+      "optionalFields": [
+        "centerDetail",
+        "items",
+        "heading"
+      ],
+      "defaultAccent": "purple",
+      "timing": {
+        "baseDurationFrames": 82,
+        "enterFrames": 18,
+        "emphasisFrames": 48,
+        "exitFrames": 16,
+        "staggerFrames": 10,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "drift"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 10,
+        "revealStiffness": 120,
+        "backdropCycle": [
+          "dot-grid",
+          "god-rays",
+          "particle-grid"
+        ]
+      }
+    },
+    {
+      "family": "pipeline-flow",
+      "label": "Pipeline Flow",
+      "description": "Horizontal or vertical pipeline with labelled stages. Used for process illustration.",
+      "semanticTags": [
+        "pipeline",
+        "flow",
+        "stage",
+        "process",
+        "pipeline",
+        "流程",
+        "管道",
+        "阶段"
+      ],
+      "requiredFields": [
+        "stages"
+      ],
+      "optionalFields": [
+        "heading",
+        "summary",
+        "items"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 80,
+        "enterFrames": 16,
+        "emphasisFrames": 48,
+        "exitFrames": 16,
+        "staggerFrames": 10,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "pan-y"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 6,
+        "revealStiffness": 110,
+        "preferredCameraMotion": "pan-y",
+        "backdropCycle": [
+          "dot-grid",
+          "particle-grid",
+          "god-rays"
+        ]
+      }
+    },
+    {
+      "family": "benchmark-chart",
+      "label": "Benchmark Chart",
+      "description": "Dual-bar benchmark comparison between primary and secondary candidates.",
+      "semanticTags": [
+        "benchmark",
+        "chart",
+        "comparison",
+        "dual-bar",
+        "performance",
+        "基准",
+        "对比图"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "primaryLabel",
+        "secondaryLabel",
+        "dataPoints",
+        "heading"
+      ],
+      "defaultAccent": "orange",
+      "timing": {
+        "baseDurationFrames": 82,
+        "enterFrames": 16,
+        "emphasisFrames": 50,
+        "exitFrames": 16,
+        "staggerFrames": 8,
+        "easing": "ease-out",
+        "springPreset": "bouncy",
+        "cameraMotion": "push-in"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": null,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 6,
+        "revealStiffness": 330,
+        "preferredCameraMotion": "push-in",
+        "backdropCycle": [
+          "particle-grid",
+          "god-rays",
+          "dot-grid"
+        ]
+      }
+    },
+    {
+      "family": "quote-highlight",
+      "label": "Quote Highlight",
+      "description": "Large-format pull quote with optional attribution. Used for key statements.",
+      "semanticTags": [
+        "quote",
+        "highlight",
+        "statement",
+        "attribution",
+        "引用",
+        "金句",
+        "语录"
+      ],
+      "requiredFields": [
+        "quote"
+      ],
+      "optionalFields": [
+        "attribution",
+        "tags",
+        "heading",
+        "visualProps"
+      ],
+      "defaultAccent": "orange",
+      "timing": {
+        "baseDurationFrames": 70,
+        "enterFrames": 16,
+        "emphasisFrames": 38,
+        "exitFrames": 16,
+        "staggerFrames": 0,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "push-in"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": {
+        "showIconOrbit": false
+      },
+      "rhythm": {
+        "layer": "context",
+        "staggerGap": 0,
+        "revealStiffness": 120,
+        "backdropCycle": [
+          "god-rays",
+          "particle-grid",
+          "dot-grid"
+        ]
+      }
+    },
+    {
+      "family": "glossary-term",
+      "label": "Glossary Term",
+      "description": "Definition card for a single term or concept. Used for explainers.",
+      "semanticTags": [
+        "glossary",
+        "term",
+        "definition",
+        "explain",
+        "概念",
+        "术语",
+        "定义"
+      ],
+      "requiredFields": [
+        "term",
+        "definition"
+      ],
+      "optionalFields": [
+        "heading",
+        "visualProps"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 68,
+        "enterFrames": 14,
+        "emphasisFrames": 38,
+        "exitFrames": 16,
+        "staggerFrames": 0,
+        "easing": "ease-out",
+        "springPreset": "snappy",
+        "cameraMotion": "push-in"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": {
+        "showIconOrbit": false
+      },
+      "rhythm": {
+        "layer": "context",
+        "staggerGap": 0,
+        "revealStiffness": 130,
+        "backdropCycle": [
+          "dot-grid",
+          "god-rays",
+          "particle-grid"
+        ]
+      }
+    },
+    {
+      "family": "cta",
+      "label": "Call to Action",
+      "description": "Closing CTA screen with title and optional action label.",
+      "semanticTags": [
+        "cta",
+        "closing",
+        "call-to-action",
+        "end",
+        "action",
+        "收尾",
+        "号召",
+        "结束"
+      ],
+      "requiredFields": [
+        "heading"
+      ],
+      "optionalFields": [
+        "subtitle",
+        "badge"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 72,
+        "enterFrames": 16,
+        "emphasisFrames": 40,
+        "exitFrames": 16,
+        "staggerFrames": 0,
+        "easing": "ease-out",
+        "springPreset": "bouncy",
+        "cameraMotion": "push-in"
+      },
+      "defaultTransition": {
+        "preset": "lift",
+        "durationInFrames": 16
+      },
+      "stageConfig": {
+        "showOverlay": false,
+        "showMediaCard": false,
+        "showIconOrbit": false
+      },
+      "rhythm": {
+        "layer": "closing",
+        "staggerGap": 0,
+        "revealStiffness": 180,
+        "preferredCameraMotion": "push-in",
+        "backdropCycle": [
+          "god-rays",
+          "particle-grid",
+          "dot-grid"
+        ]
+      }
+    }
+  ]
+}

@@ -1,5 +1,44 @@
+const path = require('path');
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+const DDG_SCRIPT = String(process.env.DDG_SCRIPT || '').trim()
+  || path.resolve(__dirname, '../../../scripts/fetch-ddg-search.py');
+const SHOULD_SKIP_EXTERNAL_SEARCH = process.execArgv.some((arg) => String(arg).startsWith('--test'))
+  || process.env.DISABLE_EXTERNAL_SEARCH === '1';
+
+function fetchDDGSearch(query, freshness = 'd') {
+  const { execSync } = require('child_process');
+  const safeQuery = String(query || '').replace(/'/g, "'\"'\"'");
+  if (SHOULD_SKIP_EXTERNAL_SEARCH) {
+    return [];
+  }
+  try {
+    const raw = execSync(
+      `python3 '${DDG_SCRIPT}' '${safeQuery}' ${freshness}`,
+      { timeout: 25000, encoding: 'utf8', maxBuffer: 1024 * 512 },
+    );
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.results)) return [];
+    return parsed.results.map((r) => ({
+      title: String(r.title || ''),
+      link: String(r.link || ''),
+      snippet: String(r.snippet || ''),
+      publishedAt: String(r.snippet || '').slice(0, 50),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchTopicResearchOnce(query) {
+  const normalizedQuery = String(query || '').trim();
+  if (!normalizedQuery) return [];
+  if (SHOULD_SKIP_EXTERNAL_SEARCH) return [];
+  const raw = fetchDDGSearch(normalizedQuery, 'pd');
+  return raw;
 }
 
 function toNumber(value, fallback = 0) {
@@ -366,33 +405,11 @@ function normalizeTopicResearch(candidateResearch, input) {
   return {
     topicResearch: {
       query,
-      source: String(incoming.source || current.source || 'bing-rss').trim(),
+      source: String(incoming.source || current.source || 'duckduckgo-html').trim(),
       fetchedAt: String(incoming.fetchedAt || current.fetchedAt || new Date().toISOString()).trim(),
       results,
     },
   };
-}
-
-async function fetchTopicResearchOnce(query) {
-  const normalizedQuery = String(query || '').trim();
-  if (!normalizedQuery) {
-    return [];
-  }
-
-  const response = await fetch(`https://www.bing.com/search?format=rss&q=${encodeURIComponent(normalizedQuery)}`, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) OpenClaw/1.0',
-      'Accept': 'application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5',
-    },
-    signal: AbortSignal.timeout(12000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Search request failed: ${response.status}`);
-  }
-
-  const xml = await response.text();
-  return parseBingRssItems(xml);
 }
 
 async function searchTopicResearch(query) {
@@ -454,7 +471,7 @@ async function searchTopicResearch(query) {
 
   return {
     query: normalizedQuery,
-    source: 'bing-rss',
+    source: 'duckduckgo-html',
     fetchedAt: new Date().toISOString(),
     results,
   };

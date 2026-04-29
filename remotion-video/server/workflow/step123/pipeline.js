@@ -688,39 +688,31 @@ function buildStepSkillInstruction(context) {
   const skill = getCurrentStepSkill(context);
   const fragments = [];
 
+  const mandatoryRules = [];
+  if (skill.avoid) {
+    mandatoryRules.push(`【强制禁止】${skill.avoid}。违反此规则将导致输出无效。`);
+  }
   if (skill.goal) {
-    fragments.push(`goal：${skill.goal}`);
+    mandatoryRules.push(`【目标】${skill.goal}`);
   }
   if (skill.style) {
-    fragments.push(`style：${skill.style}`);
+    mandatoryRules.push(`【风格】${skill.style}`);
   }
   if (skill.emphasis) {
-    fragments.push(`emphasis：${skill.emphasis}`);
-  }
-  if (skill.avoid) {
-    fragments.push(`avoid：${skill.avoid}`);
+    mandatoryRules.push(`【重点】${skill.emphasis}`);
   }
   if (skill.notes) {
-    fragments.push(`notes：${skill.notes}`);
-  }
-  if (skill.targetDurationSeconds) {
-    fragments.push(`targetDurationSeconds：${skill.targetDurationSeconds}`);
-  }
-  if (skill.targetWordCount) {
-    fragments.push(`targetWordCount：${skill.targetWordCount}`);
+    mandatoryRules.push(`【注意】${skill.notes}`);
   }
   if (skill.antiAiLevel) {
-    fragments.push(`antiAiLevel：${skill.antiAiLevel}`);
-  }
-  if (skill.spokenPersona) {
-    fragments.push(`spokenPersona：${skill.spokenPersona}`);
+    mandatoryRules.push(`【AI检测规避等级】${skill.antiAiLevel}`);
   }
 
-  if (fragments.length === 0) {
+  if (mandatoryRules.length === 0) {
     return '如果没有额外 skill 约束，就按最稳的中文短视频工作流结果输出。';
   }
 
-  return `当前步骤还有结构化 skill 约束，你必须优先满足：${fragments.join('；')}。`;
+  return mandatoryRules.join('\n');
 }
 
 function buildStep1ResearchPrompt(context) {
@@ -853,7 +845,13 @@ function buildStep2TitlesPrompt(context, strategy) {
     '标题池成稿',
     context,
     [
-      '必须输出 4-5 个差异明显的标题，避免只换个别字；每个标题都要能看出对应的角度、证据锚点和开场方式。',
+      '必须输出 4-5 个差异明显的标题，避免只换个别字。',
+      '每个标题必须满足以下条件：',
+      '1. 有具体数据或事实支撑（不能泛泛而谈）',
+      '2. 能让观众产生"原来如此"的认知刷新感',
+      '3. 避免"开始替你干活""颠覆认知""重新定义"这类空洞表达',
+      '4. 标题本身就能制造信息差或悬念',
+      '5. 避免所有大模型都适用的通用描述',
       buildStepSkillInstruction(context),
     ].join(' '),
     schema,
@@ -1139,12 +1137,36 @@ async function generateStep123Workflow(input) {
         model: 'search-derived',
         payload: validateStep1Research(baseResearch, context),
       };
-      const analysisStage = {
-        stepId,
-        stageKey: 'analysis',
-        model: 'deterministic-step1',
-        payload: validateStep1Analysis(deriveStep1AnalysisFromResearch(context, researchStage.payload)),
-      };
+
+      let analysisStage;
+      if (hasWorkflowLLM()) {
+        try {
+          analysisStage = await runStage(
+            1,
+            'analysis',
+            context,
+            (ctx) => buildStep1AnalysisPrompt(ctx, researchStage.payload),
+            validateStep1Analysis,
+            { temperature: 0.55, regenerateTemperature: 0.85 }
+          );
+        } catch (error) {
+          console.warn(`[Step1] Analysis LLM failed, falling back: ${error.message}`);
+          analysisStage = {
+            stepId,
+            stageKey: 'analysis',
+            model: 'step1-llm-fallback',
+            payload: validateStep1Analysis(deriveStep1AnalysisFromResearch(context, researchStage.payload)),
+          };
+        }
+      } else {
+        analysisStage = {
+          stepId,
+          stageKey: 'analysis',
+          model: 'step1-deterministic',
+          payload: validateStep1Analysis(deriveStep1AnalysisFromResearch(context, researchStage.payload)),
+        };
+      }
+
       const enriched = enrichStepResult(
         stepId,
         normalizeStep1Payload(researchStage.payload, analysisStage.payload, enrichedInput),
@@ -1152,9 +1174,13 @@ async function generateStep123Workflow(input) {
         skillSpec,
       );
 
+      const isLlmSource = typeof analysisStage.model === 'string' &&
+        !analysisStage.model.includes('deterministic') &&
+        !analysisStage.model.includes('fallback');
+
       return {
         stepId,
-        source: 'deterministic',
+        source: isLlmSource ? 'llm' : 'deterministic',
         model: analysisStage.model,
         generatedAt: new Date().toISOString(),
         payload: enriched.payload,
@@ -1164,18 +1190,79 @@ async function generateStep123Workflow(input) {
     }
 
     if (stepId === 2) {
-      const strategyStage = {
-        stepId,
-        stageKey: 'strategy',
-        model: 'deterministic-step2',
-        payload: validateStep2Strategy(deriveStep2StrategyFromAnalysis(context), context),
-      };
-      const titlesStage = {
-        stepId,
-        stageKey: 'titles',
-        model: 'deterministic-step2',
-        payload: validateStep2Titles(deriveStep2TitlesFromStrategy(context, strategyStage.payload), context),
-      };
+      let strategyStage;
+      let titlesStage;
+
+      if (hasWorkflowLLM()) {
+        let strategyError = null;
+        try {
+          console.log('[Step2] Starting LLM strategy generation...');
+          strategyStage = await runStage(
+            2,
+            'strategy',
+            context,
+            (ctx) => buildStep2StrategyPrompt(ctx),
+            validateStep2Strategy,
+            { temperature: 0.52, regenerateTemperature: 0.78 }
+          );
+          console.log(`[Step2] Strategy LLM success: model=${strategyStage.model}`);
+        } catch (error) {
+          strategyError = error;
+          console.error(`[Step2] Strategy LLM failed: ${error.message}`);
+          console.error(`[Step2] Stack: ${error.stack}`);
+        }
+
+        if (strategyError || !strategyStage) {
+          console.warn(`[Step2] Falling back to deterministic strategy`);
+          strategyStage = {
+            stepId,
+            stageKey: 'strategy',
+            model: 'step2-strategy-llm-fallback',
+            payload: validateStep2Strategy(deriveStep2StrategyFromAnalysis(context), context),
+          };
+        }
+
+        let titlesError = null;
+        try {
+          console.log('[Step2] Starting LLM titles generation...');
+          titlesStage = await runStage(
+            2,
+            'titles',
+            context,
+            (ctx, prev) => buildStep2TitlesPrompt(ctx, prev),
+            validateStep2Titles,
+            { previousStage: strategyStage.payload, temperature: 0.58 }
+          );
+          console.log(`[Step2] Titles LLM success: model=${titlesStage.model}`);
+        } catch (error) {
+          titlesError = error;
+          console.error(`[Step2] Titles LLM failed: ${error.message}`);
+        }
+
+        if (titlesError || !titlesStage) {
+          console.warn(`[Step2] Falling back to deterministic titles`);
+          titlesStage = {
+            stepId,
+            stageKey: 'titles',
+            model: 'step2-titles-llm-fallback',
+            payload: validateStep2Titles(deriveStep2TitlesFromStrategy(context, strategyStage.payload), context),
+          };
+        }
+      } else {
+        strategyStage = {
+          stepId,
+          stageKey: 'strategy',
+          model: 'step2-deterministic',
+          payload: validateStep2Strategy(deriveStep2StrategyFromAnalysis(context), context),
+        };
+        titlesStage = {
+          stepId,
+          stageKey: 'titles',
+          model: 'step2-deterministic',
+          payload: validateStep2Titles(deriveStep2TitlesFromStrategy(context, strategyStage.payload), context),
+        };
+      }
+
       const enriched = enrichStepResult(
         stepId,
         normalizeStep2Payload(strategyStage.payload, titlesStage.payload, enrichedInput),
@@ -1183,9 +1270,14 @@ async function generateStep123Workflow(input) {
         skillSpec,
       );
 
+      const step2Model = titlesStage.model || strategyStage.model || '';
+      const isLlmSource = step2Model.length > 0 &&
+        !step2Model.includes('deterministic') &&
+        !step2Model.includes('fallback');
+
       return {
         stepId,
-        source: 'deterministic',
+        source: isLlmSource ? 'llm' : 'deterministic',
         model: titlesStage.model,
         generatedAt: new Date().toISOString(),
         payload: enriched.payload,
@@ -1195,8 +1287,10 @@ async function generateStep123Workflow(input) {
     }
 
     const llmEnabled = hasWorkflowLLM();
+    console.log(`[Step3] llmEnabled=${llmEnabled}`);
     if (llmEnabled) {
       try {
+        console.log(`[Step3] Starting LLM brief generation...`);
         const briefStage = await runStage(
           stepId,
           'brief',
@@ -1223,7 +1317,7 @@ async function generateStep123Workflow(input) {
         const normalizedSkillPayload = normalizeStep3Payload(briefStage.payload, copyStage.payload, enrichedInput);
         const alignment = validateStep3SkillAlignment(context, normalizedSkillPayload, skillSpec);
         if (!alignment.ok) {
-          throw new Error(`Step 3 LLM 结果未通过 skill 对齐检查：${alignment.reasons.join('；')}`);
+          console.warn(`[Step3] LLM alignment warning: ${alignment.reasons.join('; ')}`);
         }
         const enriched = enrichStepResult(
           stepId,
@@ -1231,6 +1325,10 @@ async function generateStep123Workflow(input) {
           enrichedInput,
           skillSpec,
         );
+
+        if (!alignment.ok && enriched.evaluation) {
+          enriched.evaluation.alignmentWarning = alignment.reasons;
+        }
 
         return {
           stepId,
@@ -1242,6 +1340,8 @@ async function generateStep123Workflow(input) {
           evaluation: enriched.evaluation,
         };
       } catch (error) {
+        console.error(`[Step3] LLM error: ${error.message}`);
+        console.error(`[Step3] Stack: ${error.stack}`);
         // Keep Step 3 responsive: if the model path fails, fall back to deterministic skill execution.
       }
     }

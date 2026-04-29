@@ -53,11 +53,36 @@ const readNumber = (value) => {
 const resolveInputConfig = () => {
   const configArg = readFlag('--config');
   const outlineArg = readFlag('--outline');
+  const step4Arg = readFlag('--step4');
 
-  if (!configArg && !outlineArg) {
+  if (!configArg && !outlineArg && !step4Arg) {
     console.error('Usage: node scripts/verify-render-output.mjs --config <json-file> --video <output.mp4>');
     console.error('   or: node scripts/verify-render-output.mjs --outline <outline-json> --video <output.mp4>');
+    console.error('   or: node scripts/verify-render-output.mjs --step4 <step-04.json> --video <output.mp4>');
     process.exit(1);
+  }
+
+  // Step-4 mode: read meta.totalFrames / meta.totalDuration directly
+  if (step4Arg) {
+    const step4Path = path.resolve(process.cwd(), step4Arg);
+    if (!fs.existsSync(step4Path)) {
+      console.error(`Step-4 file not found: ${step4Path}`);
+      process.exit(1);
+    }
+    const json = JSON.parse(fs.readFileSync(step4Path, 'utf8'));
+    const meta = json?.payload?.meta ?? json?.meta ?? {};
+    const expectedFrames = meta.totalFrames ?? 0;
+    const expectedDuration = meta.totalDuration ?? 0;
+    if (!expectedFrames || !expectedDuration) {
+      console.error('[verify] Step-4 meta.totalFrames / meta.totalDuration not found');
+      process.exit(1);
+    }
+    return {
+      inputPath: step4Path,
+      expectedFrames,
+      expectedDurationSeconds: expectedDuration,
+      isStep4: true,
+    };
   }
 
   const inputPath = path.resolve(process.cwd(), configArg ?? outlineArg);
@@ -92,6 +117,7 @@ const resolveInputConfig = () => {
   return {
     inputPath,
     config,
+    isStep4: false,
   };
 };
 
@@ -177,7 +203,7 @@ const probeVideo = (ffprobePath, videoPath) => {
   };
 };
 
-const {inputPath, config} = resolveInputConfig();
+const resolvedConfig = resolveInputConfig();
 const videoArg = readFlag('--video');
 const resolvedVideoPath = path.resolve(process.cwd(), videoArg ?? 'out/ultimate-scene-demo.mp4');
 
@@ -192,12 +218,26 @@ if (fileSizeBytes <= 0) {
   process.exit(1);
 }
 
-const summary = summarizeUltimateConfig(config);
 const ffprobePath = resolveFfprobePath();
 const metadata = probeVideo(ffprobePath, resolvedVideoPath);
-const expectedFrames = summary.durationInFrames;
-const expectedDurationSeconds = summary.durationInSeconds;
-const frameTolerance = Number(process.env.RELEASE_RENDER_FRAME_TOLERANCE || '2');
+
+let expectedFrames;
+let expectedDurationSeconds;
+let frameTolerance;
+
+if (resolvedConfig.isStep4) {
+  // Step-4 mode: expected values from resolveInputConfig
+  expectedFrames = resolvedConfig.expectedFrames;
+  expectedDurationSeconds = resolvedConfig.expectedDurationSeconds;
+  frameTolerance = Number(process.env.RELEASE_RENDER_FRAME_TOLERANCE || '2');
+} else {
+  // Ultimate config mode: derive from config
+  const summary = summarizeUltimateConfig(resolvedConfig.config);
+  expectedFrames = summary.durationInFrames;
+  expectedDurationSeconds = summary.durationInSeconds;
+  frameTolerance = Number(process.env.RELEASE_RENDER_FRAME_TOLERANCE || '2');
+}
+
 const durationToleranceRatio = Number(process.env.RELEASE_RENDER_DURATION_TOLERANCE_RATIO || '0.02');
 const durationToleranceSeconds = Math.max(0.2, expectedDurationSeconds * durationToleranceRatio);
 
@@ -230,7 +270,7 @@ if (durationDiff > durationToleranceSeconds) {
 }
 
 console.log('[verify-render-output] render contract verified');
-console.log(`- input: ${inputPath}`);
+console.log(`- input: ${resolvedConfig.inputPath}`);
 console.log(`- video: ${resolvedVideoPath}`);
 console.log(`- expected: ${expectedFrames}f / ${expectedDurationSeconds}s`);
 console.log(`- actual: ${metadata.frameCount}f / ${metadata.durationSeconds.toFixed(3)}s @ ${metadata.fps.toFixed(3)} fps`);

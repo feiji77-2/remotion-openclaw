@@ -1,11 +1,20 @@
 import React from 'react';
-import {Audio, Img, Sequence, interpolate, spring, staticFile, useCurrentFrame} from 'remotion';
+import {Audio, Img, Sequence, interpolate, spring, staticFile, useCurrentFrame, AbsoluteFill} from 'remotion';
+import {TransitionSeries, linearTiming, springTiming, type TransitionPresentation} from '@remotion/transitions';
+import {fade} from '@remotion/transitions/fade';
+import {slide} from '@remotion/transitions/slide';
+import {wipe} from '@remotion/transitions/wipe';
+import {flip} from '@remotion/transitions/flip';
+import {clockWipe} from '@remotion/transitions/clock-wipe';
+import {SpeedLines, PulseRing, Orbit} from '../components/MotionFX';
 import {
   UltimateArchitectureMap,
   UltimateBenchmarkChart,
+  UltimateCaptionOverlay,
   UltimateCodePanel,
   UltimateCompareBoard,
   UltimateCtaPanel,
+  UltimateDirectorEffects,
   UltimateDataStream,
   UltimateEvidenceWall,
   UltimateFeatureCardRail,
@@ -25,8 +34,10 @@ import {
   UltimateTerminalPanel,
   UltimateTimeline,
   type UltimatePlatformOverlayProps,
+  getUltimateIncomingTransitionDurationInFrames,
   normalizeUltimateProjectConfig,
   resolveUltimateAccent,
+  type ResolvedUltimateTransitionConfig,
   type ResolvedUltimateSceneConfig,
   type UltimateSceneTemplateProps,
 } from '../components/ultimate-kit';
@@ -37,52 +48,40 @@ import {
   type UltimateIconName,
 } from '../components/ultimate-kit/iconography';
 import {appendUltimateMicroJitter, createUltimateMicroJitter} from '../components/ultimate-kit/motion';
+import {getFamily} from '../data/registry';
+import {hydrateUltimateProjectConfigWithDirectorGrammar} from '../data/storyboardLoader';
 
 const renderSceneContent = (scene: ResolvedUltimateSceneConfig) => {
-  switch (scene.family) {
-    case 'hero':
-      return <UltimateHeroPanel {...scene.data} />;
-    case 'feature-rail':
-      return <UltimateFeatureCardRail {...scene.data} />;
-    case 'focus':
-      return <UltimateFocusDiagram {...scene.data} />;
-    case 'number-strip':
-      return <UltimateNumberStrip {...scene.data} />;
-    case 'step-flow':
-      return <UltimateStepFlow {...scene.data} />;
-    case 'timeline':
-      return <UltimateTimeline {...scene.data} />;
-    case 'compare-board':
-      return <UltimateCompareBoard {...scene.data} />;
-    case 'terminal':
-      return <UltimateTerminalPanel {...scene.data} />;
-    case 'evidence-wall':
-      return <UltimateEvidenceWall {...scene.data} />;
-    case 'architecture-map':
-      return <UltimateArchitectureMap {...scene.data} />;
-    case 'tag-matrix':
-      return <UltimateTagMatrix {...scene.data} />;
-    case 'code':
-      return <UltimateCodePanel {...scene.data} />;
-    case 'metrics':
-      return <UltimateMetricBars {...scene.data} />;
-    case 'data-stream':
-      return <UltimateDataStream {...scene.data} />;
-    case 'memory-graph':
-      return <UltimateMemoryGraph {...scene.data} />;
-    case 'pipeline-flow':
-      return <UltimatePipelineFlow {...scene.data} />;
-    case 'benchmark-chart':
-      return <UltimateBenchmarkChart {...scene.data} />;
-    case 'quote-highlight':
-      return <UltimateQuoteHighlight {...scene.data} />;
-    case 'glossary-term':
-      return <UltimateGlossaryTerm {...scene.data} />;
-    case 'cta':
-      return <UltimateCtaPanel {...scene.data} />;
-    default:
-      return null;
-  }
+  const entry = getFamily(scene.family);
+  if (!entry) return null;
+
+  const componentMap = {
+    hero: UltimateHeroPanel,
+    'feature-rail': UltimateFeatureCardRail,
+    focus: UltimateFocusDiagram,
+    'number-strip': UltimateNumberStrip,
+    'step-flow': UltimateStepFlow,
+    timeline: UltimateTimeline,
+    'compare-board': UltimateCompareBoard,
+    terminal: UltimateTerminalPanel,
+    'evidence-wall': UltimateEvidenceWall,
+    'architecture-map': UltimateArchitectureMap,
+    'tag-matrix': UltimateTagMatrix,
+    code: UltimateCodePanel,
+    metrics: UltimateMetricBars,
+    'data-stream': UltimateDataStream,
+    'memory-graph': UltimateMemoryGraph,
+    'pipeline-flow': UltimatePipelineFlow,
+    'benchmark-chart': UltimateBenchmarkChart,
+    'quote-highlight': UltimateQuoteHighlight,
+    'glossary-term': UltimateGlossaryTerm,
+    cta: UltimateCtaPanel,
+  };
+
+  const Component = componentMap[scene.family] as unknown as React.ComponentType<Record<string, unknown>> | undefined;
+  if (!Component) return null;
+
+  return <Component {...scene.data} grammar={scene.grammar} />;
 };
 
 const resolveSceneOverlay = (
@@ -118,6 +117,44 @@ const resolveAudioSource = (src: string) => {
 
 const resolveMediaSource = (src: string) => {
   return /^https?:\/\//.test(src) ? src : staticFile(normalizeStaticAssetPath(src));
+};
+
+const resolveTransitionPresentation = (
+  transition: ResolvedUltimateTransitionConfig,
+): TransitionPresentation<Record<string, unknown>> => {
+  switch (transition.preset) {
+    case 'lift':
+    case 'slide':
+      return slide({direction: 'from-bottom'}) as unknown as TransitionPresentation<Record<string, unknown>>;
+    case 'wipe':
+      return wipe() as unknown as TransitionPresentation<Record<string, unknown>>;
+    case 'flip':
+      return flip() as unknown as TransitionPresentation<Record<string, unknown>>;
+    case 'clock-wipe':
+      return clockWipe({width: 1920, height: 1080}) as unknown as TransitionPresentation<Record<string, unknown>>;
+    case 'flash':
+    case 'fade':
+    default:
+      return fade() as unknown as TransitionPresentation<Record<string, unknown>>;
+  }
+};
+
+const resolveTransitionTiming = (transition: ResolvedUltimateTransitionConfig, durationInFrames: number) => {
+  switch (transition.preset) {
+    case 'lift':
+    case 'slide':
+      return springTiming({
+        durationInFrames,
+        config: {damping: 18, stiffness: 120, mass: 0.9},
+      });
+    case 'fade':
+    case 'flash':
+    case 'wipe':
+    case 'flip':
+    case 'clock-wipe':
+    default:
+      return linearTiming({durationInFrames});
+  }
 };
 
 const sceneMediaLayout: Partial<Record<ResolvedUltimateSceneConfig['family'], {
@@ -577,9 +614,12 @@ export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
   config,
   voiceFile,
   audioSegments,
+  subtitleData,
 }) => {
-  const normalizedConfig = React.useMemo(() => normalizeUltimateProjectConfig(config), [config]);
-  let currentFrame = 0;
+  const normalizedConfig = React.useMemo(() => {
+    const hydratedConfig = hydrateUltimateProjectConfigWithDirectorGrammar(config, {directorQA: 'error'});
+    return normalizeUltimateProjectConfig(hydratedConfig);
+  }, [config]);
 
   return (
     <>
@@ -587,34 +627,78 @@ export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
         <Audio src={resolveAudioSource(voiceFile)} />
       ) : null}
       {Array.isArray(audioSegments) && (!voiceFile || voiceFile.trim().length === 0)
-        ? audioSegments.map((segment) => (
+        ? audioSegments.map((segment) => {
+          const fadeFrames = Math.min(10, Math.floor(segment.durationInFrames * 0.05));
+          return (
             <Sequence
               key={`${segment.src}-${segment.startFrame}`}
               from={segment.startFrame}
               durationInFrames={segment.durationInFrames}
+              premountFor={segment.durationInFrames}
             >
-              <Audio src={resolveAudioSource(segment.src)} />
+              <Audio
+                src={resolveAudioSource(segment.src)}
+                volume={(f) => {
+                  const fadeIn = fadeFrames > 0 ? Math.min(1, f / fadeFrames) : 1;
+                  const fadeOut = fadeFrames > 0 ? Math.min(1, (segment.durationInFrames - 1 - f) / fadeFrames) : 1;
+                  return fadeIn * fadeOut;
+                }}
+              />
             </Sequence>
-          ))
+          );
+        })
         : null}
-      {normalizedConfig.scenes.map((scene, sceneIndex) => {
-        const startFrame = currentFrame;
-        currentFrame += scene.durationInFrames;
-        const overlay = resolveSceneOverlay(normalizedConfig, scene);
+      <TransitionSeries>
+        {normalizedConfig.scenes.map((scene, sceneIndex) => {
+          const overlay = resolveSceneOverlay(normalizedConfig, scene);
+          const previousScene = sceneIndex > 0 ? normalizedConfig.scenes[sceneIndex - 1] : null;
+          const transitionDuration = getUltimateIncomingTransitionDurationInFrames(previousScene, scene);
 
-        return (
-          <Sequence key={scene.id} from={startFrame} durationInFrames={scene.durationInFrames}>
-            <UltimateSceneTransition scene={scene}>
-              <UltimateStage warm={scene.warm} showGrid={scene.showGrid}>
-                {overlay ? <UltimatePlatformOverlay {...overlay} /> : null}
-                <UltimateSceneMediaCard scene={scene} />
-                <UltimateSceneIconOrbit scene={scene} sceneIndex={sceneIndex} />
-                {renderSceneContent(scene)}
-              </UltimateStage>
-            </UltimateSceneTransition>
-          </Sequence>
-        );
-      })}
+          return (
+            <React.Fragment key={scene.id}>
+              {sceneIndex > 0 && scene.transition !== false && transitionDuration > 0 ? (
+                <TransitionSeries.Transition
+                  presentation={resolveTransitionPresentation(scene.transition)}
+                  timing={resolveTransitionTiming(scene.transition, transitionDuration)}
+                />
+              ) : null}
+              <TransitionSeries.Sequence durationInFrames={scene.durationInFrames} name={scene.id}>
+                <UltimateSceneTransition scene={scene}>
+                  <div
+                    data-grammar={
+                      scene.grammar
+                        ? `${scene.grammar.archetype} | ${scene.grammar.cameraIntent}→${scene.grammar.dataEvent} | mem:${scene.grammar.memoryObject.type}`
+                        : scene.family
+                    }
+                    data-director-note={scene.grammar?.directorNote ?? ''}
+                  >
+                    <UltimateStage
+                      warm={scene.warm}
+                      showGrid={scene.showGrid}
+                      family={scene.family}
+                      sceneIndex={sceneIndex}
+                      sceneDurationFrames={scene.durationInFrames}
+                    >
+                      {(scene.stageConfig?.showOverlay !== false && overlay) ? (
+                        <UltimatePlatformOverlay {...overlay} />
+                      ) : null}
+                      {(scene.stageConfig?.showMediaCard !== false) ? (
+                        <UltimateSceneMediaCard scene={scene} />
+                      ) : null}
+                      <UltimateDirectorEffects scene={scene} />
+                      {(scene.stageConfig?.showIconOrbit !== false) ? (
+                        <UltimateSceneIconOrbit scene={scene} sceneIndex={sceneIndex} />
+                      ) : null}
+                      {renderSceneContent(scene)}
+                    </UltimateStage>
+                  </div>
+                </UltimateSceneTransition>
+              </TransitionSeries.Sequence>
+            </React.Fragment>
+          );
+        })}
+      </TransitionSeries>
+      <UltimateCaptionOverlay subtitleData={subtitleData} />
     </>
   );
 };

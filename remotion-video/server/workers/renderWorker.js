@@ -360,6 +360,11 @@ async function stageRemotionRender(job, files, update) {
   const resolvedRenderWidth = directRenderWidth || getPositiveInt(designRenderData.renderWidth);
   const resolvedRenderHeight = directRenderHeight || getPositiveInt(designRenderData.renderHeight);
   const publicVoiceFile = voiceFile ? `/assets/voice/${projectId}/${path.basename(voiceFile)}` : null;
+  const resolvedUltimateSubtitleData = resolvedSubtitleData.length > 0
+    ? resolvedSubtitleData
+    : subtitleFile
+      ? parseSrtFileToSubtitleData(subtitleFile, resolvedRenderFps)
+      : [];
   const canUseUltimate = Array.isArray(resolvedShots) && resolvedShots.length > 0;
   const useUltimate = canUseUltimate && isUltimateProject({
     template,
@@ -389,6 +394,7 @@ async function stageRemotionRender(job, files, update) {
         shots: resolvedShots,
         voiceFile: publicVoiceFile,
         audioSegments: Array.isArray(audioSegments) && audioSegments.length > 0 ? audioSegments : null,
+        subtitleData: resolvedUltimateSubtitleData.length > 0 ? resolvedUltimateSubtitleData : null,
       })
     : {
         template,
@@ -818,6 +824,68 @@ function serializeSubtitlesToSrt(subtitleData) {
       ].join('\n');
     })
     .join('\n\n');
+}
+
+function parseSrtFileToSubtitleData(filePath, fps) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    return [];
+  }
+
+  const content = fs.readFileSync(filePath, 'utf8');
+  return parseSrtContentToSubtitleData(content, fps);
+}
+
+function parseSrtContentToSubtitleData(content, fps) {
+  if (typeof content !== 'string' || !content.trim()) {
+    return [];
+  }
+
+  return content
+    .trim()
+    .split(/\r?\n\r?\n+/)
+    .map((block, index) => {
+      const lines = block.split(/\r?\n/).map((line) => line.trimEnd());
+      if (lines.length < 3) {
+        return null;
+      }
+
+      const timeMatch = lines[1].match(
+        /(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/,
+      );
+      if (!timeMatch) {
+        return null;
+      }
+
+      const startMs =
+        Number(timeMatch[1]) * 3600000 +
+        Number(timeMatch[2]) * 60000 +
+        Number(timeMatch[3]) * 1000 +
+        Number(timeMatch[4]);
+      const endMs =
+        Number(timeMatch[5]) * 3600000 +
+        Number(timeMatch[6]) * 60000 +
+        Number(timeMatch[7]) * 1000 +
+        Number(timeMatch[8]);
+      const text = lines.slice(2).join('\n').replace(/<[^>]+>/g, '').trim();
+
+      if (!text) {
+        return null;
+      }
+
+      const startFrame = Math.round((startMs / 1000) * fps);
+      const endFrame = Math.max(startFrame + 1, Math.round((endMs / 1000) * fps));
+
+      return {
+        index: index + 1,
+        startFrame,
+        endFrame,
+        startMs,
+        endMs,
+        text,
+        words: null,
+      };
+    })
+    .filter(Boolean);
 }
 
 function getDesignRenderData(designJson) {
@@ -1384,4 +1452,5 @@ module.exports = {
   startFileBasedWorker,
   startRedisWorker,
   generateFallbackSRT,
+  parseSrtContentToSubtitleData,
 };

@@ -44,7 +44,14 @@ export type UltimateSceneFamily =
   | 'glossary-term'
   | 'cta';
 
-export type UltimateTransitionPreset = 'fade' | 'lift' | 'flash';
+export type UltimateTransitionPreset =
+  | 'fade'
+  | 'lift'
+  | 'flash'
+  | 'slide'
+  | 'wipe'
+  | 'flip'
+  | 'clock-wipe';
 
 export type UltimateTransitionConfig = {
   preset?: UltimateTransitionPreset;
@@ -63,6 +70,27 @@ type UltimateSceneBase = {
   showGrid?: boolean;
   overlay?: Partial<UltimatePlatformOverlayProps> | false;
   transition?: Partial<UltimateTransitionConfig> | false;
+  /** 舞台外壳配置：控制 PlatformOverlay / MediaCard / IconOrbit 是否启用，null = 全部不显示 */
+  stageConfig?: {
+    showOverlay?: boolean;
+    showMediaCard?: boolean;
+    showIconOrbit?: boolean;
+  } | null;
+  /**
+   * 导演层 shot grammar 元数据（由 storyboardLoader.shotsToScenes() 注入）。
+   * 包含：archetype, cameraIntent, dataEvent, enterFrames, emphasisFrames,
+   *       staggerGap, memoryObject, directorNote
+   */
+  grammar?: {
+    archetype: string;
+    cameraIntent: string;
+    dataEvent: string;
+    enterFrames: number;
+    emphasisFrames: number;
+    staggerGap: number;
+    memoryObject: {type: string; role: string; enterFrame: number; color: string};
+    directorNote: string;
+  };
 };
 
 export type UltimateHeroScene = UltimateSceneBase & {
@@ -194,6 +222,26 @@ export type UltimateProjectConfig = {
   scenes: UltimateSceneConfig[];
 };
 
+export type UltimateSubtitleWord = {
+  text: string;
+  startFrame: number;
+  endFrame: number;
+  startMs?: number;
+  endMs?: number;
+  confidence?: number;
+  isKeyword?: boolean;
+};
+
+export type UltimateSubtitleCue = {
+  index?: number;
+  text: string;
+  startFrame: number;
+  endFrame: number;
+  startMs?: number;
+  endMs?: number;
+  words?: UltimateSubtitleWord[] | null;
+};
+
 export type UltimateSceneTemplateProps = {
   config: UltimateProjectConfig;
   voiceFile?: string | null;
@@ -202,6 +250,7 @@ export type UltimateSceneTemplateProps = {
     startFrame: number;
     durationInFrames: number;
   }> | null;
+  subtitleData?: UltimateSubtitleCue[] | null;
 };
 
 export type ResolvedUltimateTransitionConfig = Required<UltimateTransitionConfig>;
@@ -284,11 +333,11 @@ const readSceneComplexity = (scene: UltimateSceneConfig) => {
     case 'feature-rail':
       return (
         countMany([scene.data.kicker, scene.data.heading, scene.subtitle]) +
-        scene.data.items.length * 18 +
-        scene.data.items.reduce(
+        (scene.data.items?.length ?? 0) * 18 +
+        (scene.data.items?.reduce(
           (total, item) => total + countMany([item.title, item.eyebrow, item.caption]),
           0,
-        )
+        ) ?? 0)
       );
     case 'focus':
       return countMany([
@@ -301,26 +350,26 @@ const readSceneComplexity = (scene: UltimateSceneConfig) => {
     case 'number-strip':
       return (
         countMany([scene.data.count, scene.data.heading, scene.subtitle]) +
-        scene.data.items.length * 14 +
-        scene.data.items.reduce((total, item) => total + countText(item.label), 0)
+        (scene.data.items?.length ?? 0) * 14 +
+        (scene.data.items?.reduce((total, item) => total + countText(item.label), 0) ?? 0)
       );
     case 'step-flow':
       return (
         countMany([scene.data.heading, scene.subtitle]) +
-        scene.data.steps.length * 22 +
-        scene.data.steps.reduce(
+        (scene.data.steps?.length ?? 0) * 22 +
+        (scene.data.steps?.reduce(
           (total, step) => total + countMany([step.label, step.detail]),
           0,
-        )
+        ) ?? 0)
       );
     case 'timeline':
       return (
         countMany([scene.data.heading, scene.data.summary, scene.subtitle]) +
-        scene.data.items.length * 18 +
-        scene.data.items.reduce(
+        (scene.data.items?.length ?? 0) * 18 +
+        (scene.data.items?.reduce(
           (total, item) => total + countMany([item.label, item.title, item.detail]),
           0,
-        )
+        ) ?? 0)
       );
     case 'compare-board':
       return (
@@ -331,23 +380,23 @@ const readSceneComplexity = (scene: UltimateSceneConfig) => {
           scene.data.rightTitle,
           scene.subtitle,
         ]) +
-        scene.data.rows.length * 20 +
-        scene.data.rows.reduce(
+        (scene.data.rows?.length ?? 0) * 20 +
+        (scene.data.rows?.reduce(
           (total, row) => total + countMany([row.label, row.left, row.right]),
           0,
-        )
+        ) ?? 0)
       );
     case 'terminal':
       return (
         countMany([scene.data.heading, scene.data.windowTitle, scene.data.command, scene.data.note, scene.subtitle]) +
-        scene.data.outputs.length * 16 +
-        scene.data.outputs.reduce((total, line) => total + countText(line), 0)
+        (scene.data.outputs?.length ?? 0) * 16 +
+        (scene.data.outputs?.reduce((total, line) => total + countText(line), 0) ?? 0)
       );
     case 'evidence-wall':
       return (
         countMany([scene.data.heading, scene.data.summary, scene.subtitle]) +
-        scene.data.cards.length * 22 +
-        scene.data.cards.reduce(
+        (scene.data.cards?.length ?? 0) * 22 +
+        (scene.data.cards?.reduce(
           (total, card) =>
             total +
             countMany([
@@ -357,7 +406,7 @@ const readSceneComplexity = (scene: UltimateSceneConfig) => {
               ...(card.chips ?? []),
             ]),
           0,
-        )
+        ) ?? 0)
       );
     case 'architecture-map':
       return (
@@ -367,42 +416,42 @@ const readSceneComplexity = (scene: UltimateSceneConfig) => {
           scene.data.centerDetail,
           scene.subtitle,
         ]) +
-        scene.data.nodes.length * 18 +
-        scene.data.nodes.reduce(
+        (scene.data.nodes?.length ?? 0) * 18 +
+        (scene.data.nodes?.reduce(
           (total, node) => total + countMany([node.label, node.detail]),
           0,
-        )
+        ) ?? 0)
       );
     case 'tag-matrix':
       return (
         countMany([scene.data.heading, scene.data.activeTab, scene.subtitle]) +
         (scene.data.tabs?.reduce((total, tab) => total + countText(tab), 0) ?? 0) +
-        scene.data.items.length * 10 +
-        scene.data.items.reduce((total, item) => total + countText(item.label), 0)
+        (scene.data.items?.length ?? 0) * 10 +
+        (scene.data.items?.reduce((total, item) => total + countText(item.label), 0) ?? 0)
       );
     case 'code':
       return (
         countMany([scene.data.heading, scene.data.filename, scene.data.footer, scene.subtitle]) +
-        scene.data.lines.length * 12 +
-        scene.data.lines.reduce((total, line) => total + countText(line.text), 0)
+        (scene.data.lines?.length ?? 0) * 12 +
+        (scene.data.lines?.reduce((total, line) => total + countText(line.text), 0) ?? 0)
       );
     case 'metrics':
       return (
         countMany([scene.data.heading, scene.subtitle]) +
-        scene.data.items.length * 16 +
-        scene.data.items.reduce(
+        (scene.data.items?.length ?? 0) * 16 +
+        (scene.data.items?.reduce(
           (total, item) => total + countMany([item.label, item.value]),
           0,
-        )
+        ) ?? 0)
       );
     case 'data-stream':
       return (
         countMany([scene.data.heading, scene.data.summary, scene.subtitle]) +
-        scene.data.items.length * 16 +
-        scene.data.items.reduce(
+        (scene.data.items?.length ?? 0) * 16 +
+        (scene.data.items?.reduce(
           (total, item) => total + countMany([item.label, item.value, item.detail]),
           0,
-        )
+        ) ?? 0)
       );
     case 'memory-graph':
       return (
@@ -413,20 +462,20 @@ const readSceneComplexity = (scene: UltimateSceneConfig) => {
           scene.data.centerDetail,
           scene.subtitle,
         ]) +
-        scene.data.nodes.length * 16 +
-        scene.data.nodes.reduce(
+        (scene.data.nodes?.length ?? 0) * 16 +
+        (scene.data.nodes?.reduce(
           (total, node) => total + countMany([node.label, node.detail]),
           0,
-        )
+        ) ?? 0)
       );
     case 'pipeline-flow':
       return (
         countMany([scene.data.heading, scene.data.summary, scene.subtitle]) +
-        scene.data.stages.length * 18 +
-        scene.data.stages.reduce(
+        (scene.data.stages?.length ?? 0) * 18 +
+        (scene.data.stages?.reduce(
           (total, stage) => total + countMany([stage.label, stage.detail]),
           0,
-        )
+        ) ?? 0)
       );
     case 'benchmark-chart':
       return (
@@ -437,12 +486,12 @@ const readSceneComplexity = (scene: UltimateSceneConfig) => {
           scene.data.secondaryLabel,
           scene.subtitle,
         ]) +
-        scene.data.items.length * 18 +
-        scene.data.items.reduce(
+        (scene.data.items?.length ?? 0) * 18 +
+        (scene.data.items?.reduce(
           (total, item) =>
             total + countMany([item.label, item.primaryValue, item.secondaryValue]),
           0,
-        )
+        ) ?? 0)
       );
     case 'quote-highlight':
       return countMany([
@@ -583,6 +632,48 @@ const resolveTransition = (
   };
 };
 
+type SceneTimingLike = {
+  durationInFrames: number;
+  transition?: {
+    durationInFrames?: number;
+  } | false;
+};
+
+export const getUltimateIncomingTransitionDurationInFrames = (
+  previousScene: Pick<SceneTimingLike, 'durationInFrames'> | null,
+  scene: SceneTimingLike,
+) => {
+  if (!previousScene || !scene.transition) {
+    return 0;
+  }
+
+  const requestedDuration = Number(
+    scene.transition.durationInFrames ?? DEFAULT_TRANSITION.durationInFrames,
+  );
+
+  if (!Number.isFinite(requestedDuration) || requestedDuration <= 0) {
+    return 0;
+  }
+
+  const previousDuration = Math.max(1, Math.round(Number(previousScene.durationInFrames) || 1));
+  const currentDuration = Math.max(1, Math.round(Number(scene.durationInFrames) || 1));
+  const maxOverlap = Math.max(0, Math.min(previousDuration, currentDuration) - 1);
+
+  return Math.min(Math.round(requestedDuration), maxOverlap);
+};
+
+export const getUltimateTimelineDurationInFrames = (
+  scenes: readonly SceneTimingLike[],
+) => {
+  const summedDuration = scenes.reduce((total, scene) => total + scene.durationInFrames, 0);
+  const overlapDuration = scenes.reduce((total, scene, index) => {
+    const previousScene = index > 0 ? scenes[index - 1] : null;
+    return total + getUltimateIncomingTransitionDurationInFrames(previousScene, scene);
+  }, 0);
+
+  return Math.max(0, summedDuration - overlapDuration);
+};
+
 export const normalizeUltimateProjectConfig = (
   config: UltimateProjectConfig,
 ): ResolvedUltimateProjectConfig => {
@@ -607,8 +698,5 @@ export const normalizeUltimateProjectConfig = (
 };
 
 export const getUltimateProjectDuration = (config: UltimateProjectConfig) => {
-  return normalizeUltimateProjectConfig(config).scenes.reduce(
-    (total, scene) => total + scene.durationInFrames,
-    0,
-  );
+  return getUltimateTimelineDurationInFrames(normalizeUltimateProjectConfig(config).scenes);
 };

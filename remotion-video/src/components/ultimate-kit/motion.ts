@@ -12,11 +12,47 @@ type UltimateMicroJitterConfig = {
   speed?: number;
 };
 
+export type UltimateMicroJitterProfileName = 'steady' | 'standard' | 'playful';
+
+const ULTIMATE_MICRO_JITTER_PROFILES: Record<UltimateMicroJitterProfileName, Omit<
+  UltimateMicroJitterConfig,
+  'delay' | 'settleFrames' | 'rampFrames' | 'seed' | 'speed'
+>> = {
+  steady: {
+    amplitudeX: 0.3,
+    amplitudeY: 0.3,
+    rotateDeg: 0.1,
+    scaleDelta: 0.001,
+  },
+  standard: {
+    amplitudeX: 0.8,
+    amplitudeY: 0.7,
+    rotateDeg: 0.32,
+    scaleDelta: 0.003,
+  },
+  playful: {
+    amplitudeX: 1.5,
+    amplitudeY: 1.2,
+    rotateDeg: 0.5,
+    scaleDelta: 0.006,
+  },
+};
+
 type UltimateMicroJitterResult = {
   x: number;
   y: number;
   rotate: number;
   scale: number;
+};
+
+export const resolveUltimateMicroJitterConfig = (
+  profile: UltimateMicroJitterProfileName = 'standard',
+  overrides: UltimateMicroJitterConfig = {},
+): UltimateMicroJitterConfig => {
+  return {
+    ...ULTIMATE_MICRO_JITTER_PROFILES[profile],
+    ...overrides,
+  };
 };
 
 export const createUltimateMicroJitter = (

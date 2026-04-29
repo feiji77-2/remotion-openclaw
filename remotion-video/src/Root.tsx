@@ -5,8 +5,16 @@ import type {SRTSubtitle} from './components/SRTParser';
 import FileBackedOpenClawVideo from './compositions/FileBackedOpenClawVideo';
 import FileBackedUltimateSceneTemplate from './compositions/FileBackedUltimateSceneTemplate';
 import UltimateElementsLibrary, {ULTIMATE_ELEMENTS_LIBRARY_DURATION} from './compositions/UltimateElementsLibrary';
-import {type UltimateProjectConfig, getUltimateProjectDuration} from './components/ultimate-kit';
+import IconEmojiCapabilityPreview from './compositions/IconEmojiCapabilityPreview';
+import MorfeoStylePreview from './compositions/MorfeoStylePreview';
+import {type UltimateProjectConfig, getUltimateProjectDuration, normalizeUltimateProjectConfig} from './components/ultimate-kit';
 import {ULTIMATE_SCENE_DEMO} from './data/ultimateSceneDemo';
+import {
+  shotsToScenes,
+  calcTotalFrames,
+  hydrateUltimateProjectConfigWithDirectorGrammar,
+  type NormalizedShot,
+} from './data/storyboardLoader';
 
 export type AudioSegmentProps = {
   src: string;
@@ -129,9 +137,12 @@ export type VideoProps = {
 
 export type UltimateSceneCompositionProps = {
   propsFile?: string | null;
+  shots?: NormalizedShot[] | null;   // 官方方法：CLI --props='{"shots":[...]}' 传入
   config?: UltimateProjectConfig;
   voiceFile?: string | null;
   audioSegments?: AudioSegmentProps[] | null;
+  subtitleData?: SubtitleCueProps[] | null;
+  __meta?: Record<string, unknown>;
   durationInFrames?: number;
   renderFps?: number;
   renderWidth?: number;
@@ -157,6 +168,7 @@ const DEFAULT_ULTIMATE_PROPS: UltimateSceneCompositionProps = {
   config: ULTIMATE_SCENE_DEMO,
   voiceFile: null,
   audioSegments: null,
+  subtitleData: null,
 };
 
 const resolvePositiveInt = (value: number | undefined, fallback: number) => {
@@ -206,20 +218,64 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1920}
         height={1080}
-        calculateMetadata={({props}: {props: UltimateSceneCompositionProps}) => {
-          const resolvedConfig = props?.config ?? ULTIMATE_SCENE_DEMO;
-          const durationInFrames = props?.durationInFrames
-            ? resolvePositiveInt(props.durationInFrames, getUltimateProjectDuration(resolvedConfig))
-            : getUltimateProjectDuration(resolvedConfig);
+        calculateMetadata={async ({props}: {props: UltimateSceneCompositionProps}) => {
+          // 官方方法：从 props 读取 shots 数组（由 CLI --props 传入）
+          // CLI 命令: --props='{"shots": [...]}' （来自 step-04.json 的 payload.shots）
+          const shots = props?.shots;
+          let totalFrames = 0;
 
+          if (shots && Array.isArray(shots) && shots.length > 0) {
+            const scenes = shotsToScenes(shots, {directorQA: 'error'});
+            totalFrames = calcTotalFrames(scenes);
+            return {
+              durationInFrames: totalFrames,
+              fps: 30,
+              width: 1920,
+              height: 1080,
+              props: {
+                ...props,
+                config: {
+                  title: shots[0]?.title?.slice(0, 50) ?? 'Video',
+                  defaultTransition: false, // per-shot transitions in scenes[]
+                  scenes,
+                },
+              } as UltimateSceneCompositionProps,
+            };
+          }
+
+          // 无 shots 时降级到 demo（仅预览用）
+          const resolvedConfig = hydrateUltimateProjectConfigWithDirectorGrammar(
+            props?.config ?? ULTIMATE_SCENE_DEMO,
+            {directorQA: 'error'},
+          );
           return {
-            durationInFrames,
-            fps: resolvePositiveInt(props?.renderFps, 30),
-            width: resolvePositiveInt(props?.renderWidth, 1920),
-            height: resolvePositiveInt(props?.renderHeight, 1080),
+            durationInFrames: getUltimateProjectDuration(resolvedConfig),
+            fps: 30,
+            width: 1920,
+            height: 1080,
+            props: {
+              ...props,
+              config: resolvedConfig,
+            } as UltimateSceneCompositionProps,
           };
         }}
         defaultProps={DEFAULT_ULTIMATE_PROPS}
+      />
+      <Composition
+        id="IconEmojiCapabilityPreview"
+        component={IconEmojiCapabilityPreview}
+        durationInFrames={1}
+        fps={30}
+        width={1600}
+        height={900}
+      />
+      <Composition
+        id="MorfeoStylePreview"
+        component={MorfeoStylePreview}
+        durationInFrames={180}
+        fps={30}
+        width={1600}
+        height={900}
       />
     </>
   );
