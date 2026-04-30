@@ -1,0 +1,84 @@
+{
+  "stepId": 6,
+  "generationMeta": {
+    "mode": "generate",
+    "trigger": "manual",
+    "attempt": 0
+  },
+  "projectState": {
+    "id": "step6-test",
+    "name": "gpt5.5",
+    "fps": 30,
+    "width": 1920,
+    "height": 1080
+  },
+  "shotsState": [
+    {
+      "id": "shot-01",
+      "title": "开场钩子",
+      "narration": "GPT-5.5正式发布，编码能力冲到82.7%。这个数字让程序员真正开始慌了。",
+      "durationSeconds": 5,
+      "sceneFamily": "hero"
+    },
+    {
+      "id": "shot-02",
+      "title": "让观众理解GPT-5.5发布是真实事件",
+      "narration": "GPT-5.5正式发布。OpenAI把它定位成全新智能层级，不只是新版本。核心数据：编码能力benchmark冲到82.7%。6大核心升级同步放出，第一个功能已经让程序员群体开始紧张。",
+      "durationSeconds": 5,
+      "sceneFamily": "benchmark-chart"
+    },
+    {
+      "id": "shot-03",
+      "title": "让程序员理解200K上下文的技术含义",
+      "narration": "82.7%来自SWE-bench测试。这不是考试，是AI去真实开源项目里关issue。模型得先读懂代码库上下文，理解bug在哪里，再生成修复方案。短上下文是看照片写影评，长上下文是看电影写剧本。GPT-5.5的200K上下文窗口让它能处理整个代码库，而不是几百行片段。",
+      "durationSeconds": 5,
+      "sceneFamily": "memory-graph"
+    },
+    {
+      "id": "shot-04",
+      "title": "让程序员理解具体有哪些功能",
+      "narration": "第一个让程序员慌了的功能：原生工具调用。不用再写复杂prompt，模型直接理解你要调用什么API、什么工具。第二个：多步骤Agent任务执行，能在代码库里自主导航、定位问题、生成修复。第三个：实时协作调试，模型能跟上程序员的输入节奏给出建议。",
+      "durationSeconds": 5,
+      "sceneFamily": "step-flow"
+    },
+    {
+      "id": "shot-05",
+      "title": "让程序员理解具体有哪些功能 · 2",
+      "narration": "原生工具调用、多步骤Agent任务执行、实时协作调试",
+      "durationSeconds": 5,
+      "sceneFamily": "code"
+    },
+    {
+      "id": "shot-06",
+      "title": "让程序员理解具体有哪些功能 · 3",
+      "narration": "实时协作调试，模型能跟上程序员的输入节奏给出建议",
+      "durationSeconds": 5,
+      "sceneFamily": "data-stream"
+    },
+    {
+      "id": "shot-07",
+      "title": "让程序员理解这不是优化是范式转移",
+      "narration": "跟前代比，编码任务完成率从64%跳到82.7%。跟前代比，上下文窗口从128K扩到200K。前代还是问答助手，GPT-5.5已经能独立完成任务闭环。这个差距不是优化，是范式转移。",
+      "durationSeconds": 4,
+      "sceneFamily": "compare-board"
+    },
+    {
+      "id": "shot-08",
+      "title": "让程序员理解这不是优化是范式转移 · 2",
+      "narration": "64%到82.7%，128K到200K，差距不是优化，是范式转移",
+      "durationSeconds": 4,
+      "sceneFamily": "compare-board"
+    },
+    {
+      "id": "shot-09",
+      "title": "互动收束",
+      "narration": "你觉得哪个功能最让你慌？评论区告诉我，我们下期实战拆。",
+      "durationSeconds": 4,
+      "sceneFamily": "cta"
+    }
+  ],
+  "pipelineState": {
+    "inputTopic": "gpt5.5更新",
+    "selectedTitle": "GPT-5.5的6大核心升级，第一个功能让程序员开始慌了"
+  }
+}

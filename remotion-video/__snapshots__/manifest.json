@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "updatedAt": "2026-04-30T09:39:31.811Z",
+  "families": [
+    {
+      "family": "hero",
+      "frame": 45,
+      "durationFrames": 90,
+      "renderedAt": "2026-04-30T09:35:13.216Z",
+      "hash": "dbb6e837460e226f467f52aa9451a025ae5514e3"
+    },
+    {
+      "family": "feature-rail",
+      "frame": 60,
+      "durationFrames": 120,
+      "renderedAt": "2026-04-30T09:35:31.139Z",
+      "hash": "5cf90fa7c814c058deb5382d4fa535364343947b"
+    },
+    {
+      "family": "code",
+      "frame": 40,
+      "durationFrames": 80,
+      "renderedAt": "2026-04-30T09:35:47.547Z",
+      "hash": "9a8204bf9a37c4e46206f2c288e26b4aabddade1"
+    },
+    {
+      "family": "compare-board",
+      "frame": 45,
+      "durationFrames": 90,
+      "renderedAt": "2026-04-30T09:36:03.588Z",
+      "hash": "ec62cf1411cdd9f212d96cd35a189ab86027af37"
+    },
+    {
+      "family": "number-strip",
+      "frame": 50,
+      "durationFrames": 100,
+      "renderedAt": "2026-04-30T09:36:20.626Z",
+      "hash": "bbc9aa253e1ac4b87680fde671edb8d391c961ac"
+    },
+    {
+      "family": "terminal",
+      "frame": 45,
+      "durationFrames": 90,
+      "renderedAt": "2026-04-30T09:36:37.790Z",
+      "hash": "9ab7ad798510c20ddd2c601cf73b88eebeaf5559"
+    },
+    {
+      "family": "pipeline-flow",
+      "frame": 55,
+      "durationFrames": 110,
+      "renderedAt": "2026-04-30T09:36:53.806Z",
+      "hash": "baa4702a1f6ea30f83fc0273e5dc93a51cb43b2b"
+    },
+    {
+      "family": "timeline",
+      "frame": 50,
+      "durationFrames": 100,
+      "renderedAt": "2026-04-30T09:37:10.733Z",
+      "hash": "b481bfcc8d56339de444c923f5c7e0df1fb185d1"
+    },
+    {
+      "family": "focus",
+      "frame": 45,
+      "durationFrames": 90,
+      "renderedAt": "2026-04-30T09:37:24.136Z",
+      "hash": "0543f60696cd14bdced6e97807f41a496e6c637c"
+    },
+    {
+      "family": "step-flow",
+      "frame": 55,
+      "durationFrames": 110,
+      "renderedAt": "2026-04-30T09:37:35.978Z",
+      "hash": "fa60df188b0967f098227919f989936c2c7a39f0"
+    },
+    {
+      "family": "evidence-wall",
+      "frame": 50,
+      "durationFrames": 100,
+      "renderedAt": "2026-04-30T09:37:47.639Z",
+      "hash": "50e49d2c15dc77191f2ea26d29abebcbdf6b3c79"
+    },
+    {
+      "family": "architecture-map",
+      "frame": 60,
+      "durationFrames": 120,
+      "renderedAt": "2026-04-30T09:37:59.209Z",
+      "hash": "477ea0b5a9d6352caf8593d4c56ff9ed8ab1ff36"
+    },
+    {
+      "family": "tag-matrix",
+      "frame": 45,
+      "durationFrames": 90,
+      "renderedAt": "2026-04-30T09:38:10.615Z",
+      "hash": "add5ab768dd0703483c8b60adea8f6a89aec45d4"
+    },
+    {
+      "family": "data-stream",
+      "frame": 50,
+      "durationFrames": 100,
+      "renderedAt": "2026-04-30T09:38:22.332Z",
+      "hash": "3d040cbcc934fb0b62ed419e1be3b9d25180c93f"
+    },
+    {
+      "family": "memory-graph",
+      "frame": 55,
+      "durationFrames": 110,
+      "renderedAt": "2026-04-30T09:38:34.018Z",
+      "hash": "851134acf132fda22abb74bab3b33c81a90785ce"
+    },
+    {
+      "family": "benchmark-chart",
+      "frame": 50,
+      "durationFrames": 100,
+      "renderedAt": "2026-04-30T09:38:45.905Z",
+      "hash": "63732014b95cb69a905e276893f19bc796218521"
+    },
+    {
+      "family": "quote-highlight",
+      "frame": 45,
+      "durationFrames": 90,
+      "renderedAt": "2026-04-30T09:38:57.235Z",
+      "hash": "3f11167ec136952880df4f9691907d6d95548198"
+    },
+    {
+      "family": "glossary-term",
+      "frame": 40,
+      "durationFrames": 80,
+      "renderedAt": "2026-04-30T09:39:08.760Z",
+      "hash": "7c94d0598d987c3236e5e08b17dfcc2da8f2b5c3"
+    },
+    {
+      "family": "metrics",
+      "frame": 45,
+      "durationFrames": 90,
+      "renderedAt": "2026-04-30T09:39:20.330Z",
+      "hash": "536393bd24fbe44aa70b629b4686a7923cea1a8d"
+    },
+    {
+      "family": "cta",
+      "frame": 45,
+      "durationFrames": 90,
+      "renderedAt": "2026-04-30T09:39:31.810Z",
+      "hash": "6795c5ea95a4a57ccb3d801d97487808a0a8ccb6"
+    }
+  ]
+}

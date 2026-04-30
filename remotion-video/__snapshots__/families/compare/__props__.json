@@ -1,0 +1,27 @@
+{
+  "family": "compare",
+  "title": "Comparison",
+  "subtitle": "Snapshot test — compare board",
+  "badge": "COMPARE",
+  "kicker": "SNAPSHOT TEST",
+  "heading": "Before vs After",
+  "leftTitle": "Before",
+  "rightTitle": "After",
+  "rows": [
+    {
+      "label": "Metric A",
+      "left": "100ms",
+      "right": "42ms",
+      "accent": "cyan"
+    },
+    {
+      "label": "Metric B",
+      "left": "200ms",
+      "right": "38ms",
+      "accent": "orange"
+    }
+  ],
+  "accent": "cyan",
+  "durationInFrames": 90,
+  "fps": 30
+}
