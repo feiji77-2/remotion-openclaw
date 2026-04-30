@@ -19,6 +19,7 @@ import type {
   UltimateSceneFamily,
   UltimateTransitionPreset,
 } from '../components/ultimate-kit/project';
+import type {UltimateHudMode, UltimateStagePreset} from '../components/ultimate-kit/types';
 
 // ─── Timing config shape ────────────────────────────────────────────────────
 
@@ -114,7 +115,63 @@ export interface FamilyStageConfig {
   showOverlay?: boolean;
   showMediaCard?: boolean;
   showIconOrbit?: boolean;
+  stagePreset?: UltimateStagePreset;
+  hudMode?: UltimateHudMode;
 }
+
+const FAMILY_STAGE_PRESET: Record<UltimateSceneFamily, UltimateStagePreset> = {
+  hero: 'opening',
+  'feature-rail': 'data',
+  focus: 'evidence',
+  'number-strip': 'data',
+  'step-flow': 'data',
+  timeline: 'data',
+  'compare-board': 'climax',
+  terminal: 'data',
+  'evidence-wall': 'evidence',
+  'architecture-map': 'evidence',
+  'tag-matrix': 'evidence',
+  code: 'data',
+  metrics: 'data',
+  'data-stream': 'data',
+  'memory-graph': 'evidence',
+  'pipeline-flow': 'data',
+  'benchmark-chart': 'data',
+  'quote-highlight': 'climax',
+  'glossary-term': 'evidence',
+  cta: 'cta',
+};
+
+const STAGE_PRESET_SHELLS: Record<UltimateStagePreset, Required<Pick<FamilyStageConfig, 'showOverlay' | 'showMediaCard' | 'showIconOrbit'>> & {hudMode: UltimateHudMode}> = {
+  opening: {showOverlay: false, showMediaCard: false, showIconOrbit: true, hudMode: 'minimal'},
+  data: {showOverlay: true, showMediaCard: false, showIconOrbit: false, hudMode: 'terminal'},
+  evidence: {showOverlay: false, showMediaCard: true, showIconOrbit: false, hudMode: 'minimal'},
+  climax: {showOverlay: false, showMediaCard: false, showIconOrbit: false, hudMode: 'minimal'},
+  cta: {showOverlay: false, showMediaCard: false, showIconOrbit: false, hudMode: 'minimal'},
+};
+
+const ARCHETYPE_TRANSITIONS: Partial<Record<string, {preset: UltimateTransitionPreset; durationInFrames: number}>> = {
+  'lock-on reveal': {preset: 'fade', durationInFrames: 12},
+  'pressure countdown': {preset: 'lift', durationInFrames: 12},
+  'overtake race': {preset: 'slide', durationInFrames: 12},
+  'evidence pin': {preset: 'flash', durationInFrames: 10},
+  'threshold breach': {preset: 'flash', durationInFrames: 12},
+  'aftershock hold': {preset: 'fade', durationInFrames: 16},
+  'follow focus': {preset: 'slide', durationInFrames: 14},
+  'compress compare': {preset: 'wipe', durationInFrames: 12},
+  'drift reveal': {preset: 'fade', durationInFrames: 14},
+  'bullet train': {preset: 'wipe', durationInFrames: 10},
+  'burst spread': {preset: 'lift', durationInFrames: 12},
+  'trace flow': {preset: 'wipe', durationInFrames: 14},
+};
+
+const STAGE_BACKDROP_CYCLE: Record<UltimateStagePreset, readonly BackdropVariant[]> = {
+  opening: ['god-rays', 'particle-grid', 'dot-grid'],
+  data: ['dot-grid', 'particle-grid', 'god-rays'],
+  evidence: ['particle-grid', 'god-rays', 'dot-grid'],
+  climax: ['god-rays', 'dot-grid', 'particle-grid'],
+  cta: ['god-rays', 'particle-grid', 'dot-grid'],
+};
 
 export interface FamilyEntry {
   family: UltimateSceneFamily;
@@ -757,9 +814,14 @@ export function getFamily(family: string): FamilyEntry | undefined {
 export function resolveTransitionFromRegistry(
   family: UltimateSceneFamily,
   level?: string,
+  archetype?: string,
 ): {preset: UltimateTransitionPreset; durationInFrames: number} {
   const entry = REGISTRY[family];
   if (!entry) return {preset: 'fade', durationInFrames: 14};
+
+  if (archetype && ARCHETYPE_TRANSITIONS[archetype]) {
+    return ARCHETYPE_TRANSITIONS[archetype]!;
+  }
 
   const lvl = level?.toLowerCase();
   if (lvl === 'opening' || lvl === 'hook') {
@@ -778,7 +840,16 @@ export function resolveTransitionFromRegistry(
 export function resolveStageConfigFromRegistry(
   family: UltimateSceneFamily,
 ): FamilyStageConfig | null {
-  return REGISTRY[family]?.stageConfig ?? null;
+  const entry = REGISTRY[family];
+  const explicit = entry?.stageConfig ?? {};
+  const stagePreset = explicit.stagePreset ?? FAMILY_STAGE_PRESET[family] ?? 'data';
+  const defaults = STAGE_PRESET_SHELLS[stagePreset];
+  return {
+    ...defaults,
+    ...explicit,
+    stagePreset,
+    hudMode: explicit.hudMode ?? defaults.hudMode,
+  };
 }
 
 /**
@@ -832,9 +903,15 @@ export function getPreferredCameraMotion(family: string): CameraMotionPreset | u
 export function resolveBackdropVariant(
   family: string,
   sceneIndex: number,
+  stagePreset?: UltimateStagePreset,
 ): BackdropVariant {
   const contract = getRhythmContract(family);
-  const cycle = contract.backdropCycle.length > 0 ? contract.backdropCycle : DEFAULT_BACKDROP_CYCLE;
+  const presetCycle = stagePreset ? STAGE_BACKDROP_CYCLE[stagePreset] : undefined;
+  const cycle = presetCycle && presetCycle.length > 0
+    ? presetCycle
+    : contract.backdropCycle.length > 0
+      ? contract.backdropCycle
+      : DEFAULT_BACKDROP_CYCLE;
   const blockIndex = Math.floor(Math.max(0, sceneIndex) / 3);
   const familySeed = Array.from(family).reduce(
     (sum, char, index) => sum + (char.charCodeAt(0) * (index + 1)),

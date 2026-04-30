@@ -452,7 +452,7 @@ const SKILL_DEFINITIONS = [
 const SKILL_CACHE = new Map();
 const EVAL_FORBIDDEN_WORDS = {
   title: ['震惊', '必看', '不看后悔', '删前速看', '绝了'],
-  copy: ['最强', '第一', '顶级', '国家级', '100%', '绝对'],
+  copy: ['最强', '顶级', '国家级', '100%', '绝对'],
   cta: ['立即', '赶紧', '马上', '立刻'],
 };
 

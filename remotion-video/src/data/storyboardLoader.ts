@@ -433,12 +433,17 @@ export function parseShots(
 }
 
 /** Resolve transition type per shot level/family — sourced from registry.ts */
-function resolveTransition(shot: NormalizedShot): ReturnType<typeof resolveTransitionFromRegistry> {
-  return resolveTransitionFromRegistry(shot.family as UltimateSceneFamily, shot.level);
+function resolveTransition(
+  shot: NormalizedShot,
+  grammar?: ResolvedShotGrammar,
+): ReturnType<typeof resolveTransitionFromRegistry> {
+  return resolveTransitionFromRegistry(shot.family as UltimateSceneFamily, shot.level, grammar?.archetype);
 }
 
 /** Resolve stage shell config per family — sourced from registry.ts */
-function resolveStageConfig(family: string): {showOverlay?: boolean; showMediaCard?: boolean; showIconOrbit?: boolean} | null {
+function resolveStageConfig(
+  family: string,
+): {showOverlay?: boolean; showMediaCard?: boolean; showIconOrbit?: boolean; stagePreset?: string; hudMode?: string} | null {
   return resolveStageConfigFromRegistry(family as UltimateSceneFamily);
 }
 
@@ -587,7 +592,7 @@ export function shotsToScenes(
       durationInFrames: shot.frames,
       warm: true,
       showGrid: false,
-      transition: resolveTransition(shot),
+      transition: resolveTransition(shot, grammar),
       stageConfig: resolveStageConfig(shot.family),
       grammar, // ← 导演层元数据注入
       data: buildSceneData(shot),
@@ -870,6 +875,10 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
         heading,
         subtitle: shot.narration,
         badge: 'CTA',
+        searchLabel: typeof shot.visualProps?.searchLabel === 'string' ? shot.visualProps.searchLabel : undefined,
+        highlights: Array.isArray(shot.visualProps?.highlights)
+          ? shot.visualProps.highlights.filter((value): value is string => typeof value === 'string' && value.length > 0)
+          : (shot.items ?? []).map((item) => item.label).filter((value) => value.length > 0).slice(0, 4),
       };
 
     case 'glossary-term':
@@ -877,7 +886,11 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
         ...base,
         heading,
         term: shot.visualProps?.term ?? shot.title,
+        pronunciation: typeof shot.visualProps?.pronunciation === 'string' ? shot.visualProps.pronunciation : undefined,
         definition: shot.narration,
+        related: (Array.isArray(shot.visualProps?.related)
+          ? shot.visualProps.related
+          : (shot.items ?? []).map((item) => item.label)).filter((value: unknown): value is string => typeof value === 'string' && value.length > 0).slice(0, 5).map((label) => ({label, accent: 'cyan' as const})),
       };
 
     case 'focus': {
@@ -950,7 +963,8 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
         heading,
         tabs,
         activeTab,
-        items: (shot.visualProps?.items ?? []).map((it) => {
+        items: (((shot.visualProps?.items as Array<string | {label?: string; accent?: string}> | undefined) ?? undefined)
+          ?? (shot.items ?? []).map((item) => ({label: item.label, accent: item.accent}))).map((it) => {
           if (typeof it === 'string') {
             return {label: it, accent: 'cyan' as const};
           }

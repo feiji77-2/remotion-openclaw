@@ -16,3 +16,8 @@ export {PerspectiveCard, type PerspectiveCardProps, ParallaxLayer, type Parallax
 export {PathDrawLink, type PathDrawLinkProps, type FlowMarkerShape} from './PathDrawLink';
 export {RadialGauge, type RadialGaugeProps} from './RadialGauge';
 export {GeometryAccent, type GeometryAccentProps, type GeometryAccentVariant} from './GeometryAccent';
+export {ReticleLockOn, type ReticleLockOnProps} from './ReticleLockOn';
+export {SplitAxisClash, type SplitAxisClashProps, type SplitAxisNode} from './SplitAxisClash';
+export {OrbitLabels, type OrbitLabelsProps, type OrbitLabelItem} from './OrbitLabels';
+export {CodeTraceSweep, type CodeTraceSweepProps} from './CodeTraceSweep';
+export {ShockwaveWord, type ShockwaveWordProps} from './ShockwaveWord';

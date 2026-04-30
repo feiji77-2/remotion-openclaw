@@ -678,9 +678,15 @@ export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
                       family={scene.family}
                       sceneIndex={sceneIndex}
                       sceneDurationFrames={scene.durationInFrames}
+                      stagePreset={scene.stageConfig?.stagePreset}
+                      hudMode={scene.stageConfig?.hudMode}
                     >
                       {(scene.stageConfig?.showOverlay !== false && overlay) ? (
-                        <UltimatePlatformOverlay {...overlay} />
+                        <UltimatePlatformOverlay
+                          {...overlay}
+                          family={scene.family}
+                          mode={scene.stageConfig?.hudMode}
+                        />
                       ) : null}
                       {(scene.stageConfig?.showMediaCard !== false) ? (
                         <UltimateSceneMediaCard scene={scene} />

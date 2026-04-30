@@ -1595,6 +1595,8 @@ function buildCopy(context, briefStagePayload, playbook) {
 
   const minTargetLength = Math.round(controls.targetWordCount * 0.9);
   const maxTargetLength = Math.round(controls.targetWordCount * 1.1);
+  const minExpectedChars = minTargetLength;
+  const maxExpectedChars = maxTargetLength;
   let currentLength = measureCopyLength(copy);
 
   const expansionPool = uniqueStrings([
@@ -1889,8 +1891,6 @@ function validateStep3SkillAlignment(context, payload, skillSpec) {
     safeString(copy.cta),
   ].join('\n');
   const totalChars = joinedText.replace(/\s+/g, '').length;
-  const minExpectedChars = Math.max(Math.round(playbook.targetChars.min * 0.5), Math.round(controls.targetWordCount * 0.5));
-  const maxExpectedChars = Math.max(minExpectedChars + 40, Math.round(controls.targetWordCount * 1.5));
   const reasons = [];
   const structuredBlockCount = body.filter((item) => (
     safeString(item?.sceneIntent)

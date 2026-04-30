@@ -15,6 +15,8 @@ import type {
   UltimateNumberStripProps,
   UltimatePlatformOverlayProps,
   UltimatePipelineFlowProps,
+  UltimateStagePreset,
+  UltimateHudMode,
   UltimateQuoteHighlightProps,
   UltimateStepFlowProps,
   UltimateTagMatrixProps,
@@ -75,6 +77,8 @@ type UltimateSceneBase = {
     showOverlay?: boolean;
     showMediaCard?: boolean;
     showIconOrbit?: boolean;
+    stagePreset?: UltimateStagePreset;
+    hudMode?: UltimateHudMode;
   } | null;
   /**
    * 导演层 shot grammar 元数据（由 storyboardLoader.shotsToScenes() 注入）。

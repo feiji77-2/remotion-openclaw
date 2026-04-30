@@ -548,9 +548,10 @@ function resolveFromFamilyFallback(ctx: ShotContext): ResolvedShotGrammar {
     'data-stream': 'trace flow',
     hero: 'lock-on reveal',
     focus: 'lock-on reveal',
-    code: 'evidence pin',
-    terminal: 'evidence pin',
-    'quote-highlight': 'evidence pin',
+    code: 'trace flow',
+    terminal: 'trace flow',
+    'tag-matrix': 'burst spread',
+    'quote-highlight': 'aftershock hold',
     'glossary-term': 'lock-on reveal',
     cta: 'threshold breach',
   };

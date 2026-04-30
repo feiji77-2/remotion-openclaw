@@ -25,7 +25,7 @@
         "title": "把你的文案填进来",
         "subtitle": "这不是写死的视频，而是一套 1920×1080 的统一场景语言。你后面只需要替换 JSON 里的文字和模块数据。",
         "badge": "hero / opener / cover",
-        "accent": "lime",
+        "accent": "green",
         "avatarLabel": "YOU",
         "visualStyle": "morfeo",
         "tag": "OpenClaw / Remotion / Hero",

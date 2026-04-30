@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-29T05:52:47.825Z",
+  "generatedAt": "2026-04-30T09:44:01.680Z",
   "shots": [
     {
       "family": "hero",
@@ -352,12 +352,12 @@
         "filename",
         "language"
       ],
-      "defaultArchetype": "evidence pin",
-      "defaultCameraIntent": "pin",
-      "defaultDataEvent": "pin",
-      "defaultEnterFrames": 10,
-      "defaultEmphasisFrames": 40,
-      "defaultStaggerGap": 0,
+      "defaultArchetype": "trace flow",
+      "defaultCameraIntent": "chase",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 16,
+      "defaultEmphasisFrames": 45,
+      "defaultStaggerGap": 10,
       "rhythm": {
         "layer": "proof",
         "staggerGap": 0,
@@ -369,12 +369,12 @@
         ]
       },
       "memoryObject": {
-        "type": "card",
-        "role": "一张证据卡，别针钉入画面",
+        "type": "axis",
+        "role": "追踪的路径本身，河流一样的轨迹",
         "enterFrame": 8,
         "color": "orange"
       },
-      "directorNote": "[archetype命中] evidence pin | pin | mem:card"
+      "directorNote": "[archetype命中] trace flow | trace-flow | mem:axis"
     },
     {
       "family": "evidence-wall",
@@ -492,12 +492,12 @@
         "items",
         "heading"
       ],
-      "defaultArchetype": "drift reveal",
-      "defaultCameraIntent": "drift",
-      "defaultDataEvent": "trace-flow",
-      "defaultEnterFrames": 20,
-      "defaultEmphasisFrames": 50,
-      "defaultStaggerGap": 8,
+      "defaultArchetype": "burst spread",
+      "defaultCameraIntent": "reveal",
+      "defaultDataEvent": "burst-spread",
+      "defaultEnterFrames": 12,
+      "defaultEmphasisFrames": 40,
+      "defaultStaggerGap": 6,
       "rhythm": {
         "layer": "structure",
         "staggerGap": 6,
@@ -509,12 +509,12 @@
         ]
       },
       "memoryObject": {
-        "type": "beam",
-        "role": "一束漂移的光，把信息从边缘带进来",
+        "type": "node",
+        "role": "爆发中心点，从这里扩散出去",
         "enterFrame": 8,
         "color": "orange"
       },
-      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+      "directorNote": "[archetype命中] burst spread | burst-spread | mem:node"
     },
     {
       "family": "code",
@@ -537,12 +537,12 @@
         "heading",
         "visualProps"
       ],
-      "defaultArchetype": "evidence pin",
-      "defaultCameraIntent": "pin",
-      "defaultDataEvent": "pin",
-      "defaultEnterFrames": 10,
-      "defaultEmphasisFrames": 40,
-      "defaultStaggerGap": 0,
+      "defaultArchetype": "trace flow",
+      "defaultCameraIntent": "chase",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 16,
+      "defaultEmphasisFrames": 45,
+      "defaultStaggerGap": 10,
       "rhythm": {
         "layer": "proof",
         "staggerGap": 0,
@@ -554,12 +554,12 @@
         ]
       },
       "memoryObject": {
-        "type": "card",
-        "role": "一张证据卡，别针钉入画面",
+        "type": "axis",
+        "role": "追踪的路径本身，河流一样的轨迹",
         "enterFrame": 8,
         "color": "orange"
       },
-      "directorNote": "[archetype命中] evidence pin | pin | mem:card"
+      "directorNote": "[archetype命中] trace flow | trace-flow | mem:axis"
     },
     {
       "family": "metrics",
@@ -817,11 +817,11 @@
         "heading",
         "visualProps"
       ],
-      "defaultArchetype": "evidence pin",
-      "defaultCameraIntent": "pin",
+      "defaultArchetype": "aftershock hold",
+      "defaultCameraIntent": "linger",
       "defaultDataEvent": "pin",
-      "defaultEnterFrames": 10,
-      "defaultEmphasisFrames": 40,
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 60,
       "defaultStaggerGap": 0,
       "rhythm": {
         "layer": "context",
@@ -834,12 +834,12 @@
         ]
       },
       "memoryObject": {
-        "type": "card",
-        "role": "一张证据卡，别针钉入画面",
+        "type": "ring",
+        "role": "一个圆环，高潮后凝固在那里",
         "enterFrame": 8,
         "color": "orange"
       },
-      "directorNote": "[archetype命中] evidence pin | pin | mem:card"
+      "directorNote": "[archetype命中] aftershock hold | pin | mem:ring"
     },
     {
       "family": "glossary-term",

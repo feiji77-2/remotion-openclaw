@@ -1,6 +1,9 @@
 import type {UltimateAccentTone} from './tokens';
 import type {BrandIconName} from '../BrandIcon';
 
+export type UltimateStagePreset = 'opening' | 'data' | 'evidence' | 'climax' | 'cta';
+export type UltimateHudMode = 'auto' | 'minimal' | 'terminal';
+
 export interface UltimateStageProps {
   children: React.ReactNode;
   warm?: boolean;
@@ -8,6 +11,8 @@ export interface UltimateStageProps {
   family?: string;
   sceneIndex?: number;
   sceneDurationFrames?: number;
+  stagePreset?: UltimateStagePreset;
+  hudMode?: UltimateHudMode;
 }
 
 export interface UltimatePlatformOverlayProps {
@@ -15,6 +20,9 @@ export interface UltimatePlatformOverlayProps {
   account?: string;
   searchLabel?: string;
   watermark?: string;
+  family?: string;
+  mode?: UltimateHudMode;
+  accent?: UltimateAccentTone;
 }
 
 export interface UltimateHeroPanelProps {
