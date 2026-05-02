@@ -12,6 +12,9 @@ const DEFAULT_QWEN_TTS_CLONE_MODEL = 'qwen3-tts-vc-2026-01-22';
 const DEFAULT_QWEN_TTS_SYSTEM_MODEL = 'qwen3-tts-flash';
 const DEFAULT_QWEN_TTS_VOICE = 'Cherry';
 const QWEN_VOICE_ENROLLMENT_MODEL = 'qwen-voice-enrollment';
+const DEFAULT_QWEN_REQUEST_TIMEOUT_MS = 120000;
+const DEFAULT_QWEN_RETRY_ATTEMPTS = 4;
+const DEFAULT_QWEN_RETRY_BACKOFF_MS = 2000;
 
 const MIME_BY_EXT = {
   '.wav': 'audio/wav',
@@ -155,6 +158,71 @@ function buildDashscopeHeaders(apiKey) {
     Authorization: `Bearer ${apiKey}`,
     'Content-Type': 'application/json',
   };
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parsePositiveInt(value, fallback) {
+  const parsed = Number.parseInt(String(value || '').trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function resolveQwenRequestTimeoutMs(env = process.env) {
+  return parsePositiveInt(env.QWEN_TTS_REQUEST_TIMEOUT_MS, DEFAULT_QWEN_REQUEST_TIMEOUT_MS);
+}
+
+function resolveQwenRetryAttempts(env = process.env) {
+  return parsePositiveInt(env.QWEN_TTS_RETRY_ATTEMPTS, DEFAULT_QWEN_RETRY_ATTEMPTS);
+}
+
+function resolveQwenRetryBackoffMs(env = process.env) {
+  return parsePositiveInt(env.QWEN_TTS_RETRY_BACKOFF_MS, DEFAULT_QWEN_RETRY_BACKOFF_MS);
+}
+
+function isRetryableDashscopeStatus(status) {
+  return [408, 409, 425, 429, 500, 502, 503, 504].includes(Number(status));
+}
+
+function isRetryableDashscopeBody(bodyText) {
+  const normalized = safeString(bodyText).toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  return [
+    'responsetimeout',
+    'timeout',
+    'temporarily unavailable',
+    'temporarily_unavailable',
+    'rate limit',
+    'throttl',
+    'too many requests',
+    'internalerror',
+    'internal error',
+  ].some((needle) => normalized.includes(needle));
+}
+
+function isRetryableNetworkError(error) {
+  const message = safeString(error?.message).toLowerCase();
+  return [
+    'econnreset',
+    'econnrefused',
+    'etimedout',
+    'timeout',
+    'networkerror',
+    'socket hang up',
+    'fetch failed',
+    'terminated',
+    'aborted',
+  ].some((needle) => message.includes(needle));
+}
+
+function buildRetryDelay(attempt, env = process.env) {
+  const base = resolveQwenRetryBackoffMs(env);
+  const multiplier = 2 ** Math.max(0, attempt - 1);
+  return base * multiplier;
 }
 
 function resolveLocalAudioPath(value) {
@@ -332,35 +400,99 @@ function removeVoiceRegistryEntry(voice, registryPath = QWEN_VOICE_REGISTRY_PATH
 
 async function requestDashscopeJson(url, payload, {env = process.env, fetchImpl = fetch} = {}) {
   const apiKey = ensureDashscopeApiKey(env);
-  const response = await fetchImpl(url, {
-    method: 'POST',
-    headers: buildDashscopeHeaders(apiKey),
-    body: JSON.stringify(payload),
-  });
+  const maxAttempts = resolveQwenRetryAttempts(env);
+  const timeoutMs = resolveQwenRequestTimeoutMs(env);
+  let lastError = null;
 
-  const bodyText = await response.text().catch(() => '');
-  let json = null;
-  try {
-    json = bodyText ? JSON.parse(bodyText) : {};
-  } catch {
-    json = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(new Error(`DashScope 请求超时 (${timeoutMs}ms)`)), timeoutMs);
+      let response;
+
+      try {
+        response = await fetchImpl(url, {
+          method: 'POST',
+          headers: buildDashscopeHeaders(apiKey),
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+
+      const bodyText = await response.text().catch(() => '');
+      let json = null;
+      try {
+        json = bodyText ? JSON.parse(bodyText) : {};
+      } catch {
+        json = null;
+      }
+
+      if (!response.ok) {
+        const retryable = isRetryableDashscopeStatus(response.status) || isRetryableDashscopeBody(bodyText);
+        const message = `DashScope 请求失败: HTTP ${response.status} ${bodyText}`.trim();
+        if (retryable && attempt < maxAttempts) {
+          await sleep(buildRetryDelay(attempt, env));
+          continue;
+        }
+        throw new Error(message);
+      }
+
+      return json || {};
+    } catch (error) {
+      lastError = error;
+      if (attempt >= maxAttempts || !isRetryableNetworkError(error)) {
+        throw error;
+      }
+      await sleep(buildRetryDelay(attempt, env));
+    }
   }
 
-  if (!response.ok) {
-    throw new Error(`DashScope 请求失败: HTTP ${response.status} ${bodyText}`.trim());
-  }
-
-  return json || {};
+  throw lastError || new Error('DashScope 请求失败');
 }
 
 async function downloadRemoteFile(url, outputPath, {fetchImpl = fetch} = {}) {
-  const response = await fetchImpl(url);
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(`下载 Qwen TTS 音频失败: HTTP ${response.status} ${detail}`.trim());
+  const env = process.env;
+  const maxAttempts = resolveQwenRetryAttempts(env);
+  const timeoutMs = resolveQwenRequestTimeoutMs(env);
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(new Error(`Qwen TTS 音频下载超时 (${timeoutMs}ms)`)), timeoutMs);
+      let response;
+
+      try {
+        response = await fetchImpl(url, {signal: controller.signal});
+      } finally {
+        clearTimeout(timer);
+      }
+
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        const message = `下载 Qwen TTS 音频失败: HTTP ${response.status} ${detail}`.trim();
+        if ((isRetryableDashscopeStatus(response.status) || isRetryableDashscopeBody(detail)) && attempt < maxAttempts) {
+          await sleep(buildRetryDelay(attempt, env));
+          continue;
+        }
+        throw new Error(message);
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      fs.writeFileSync(outputPath, buffer);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt >= maxAttempts || !isRetryableNetworkError(error)) {
+        throw error;
+      }
+      await sleep(buildRetryDelay(attempt, env));
+    }
   }
-  const buffer = Buffer.from(await response.arrayBuffer());
-  fs.writeFileSync(outputPath, buffer);
+
+  throw lastError || new Error('下载 Qwen TTS 音频失败');
 }
 
 async function listQwenClonedVoices({

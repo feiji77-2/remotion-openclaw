@@ -179,6 +179,58 @@ const splitNarrationUnits = (value) => {
   return uniqueList(output, 12);
 };
 
+const getDisplayTitle = (shot, fallback = '') => {
+  return safeString(shot?.displayTitle || shot?.title || fallback);
+};
+
+const getDisplaySummary = (shot, fallback = '') => {
+  return safeString(shot?.displaySummary || shot?.narration || fallback);
+};
+
+const getDisplayPoints = (shot, max = Infinity) => {
+  const preferred = semanticArray(shot?.displayPoints, max);
+  if (preferred.length > 0) {
+    return preferred;
+  }
+
+  return semanticArray(shot?.dataPoints, max);
+};
+
+const buildHeroHighlightWord = (shot, primaryText) => {
+  const keywordModel = extractTargetModel(`${safeString(shot?.narration)} ${getDisplayTitle(shot)}`);
+  if (keywordModel) {
+    return keywordModel.toLowerCase();
+  }
+
+  const asciiPhrase = extractAsciiPhrases(`${safeString(shot?.narration)} ${getDisplayTitle(shot)}`)
+    .find((item) => item.length >= 4);
+  if (asciiPhrase) {
+    return asciiPhrase.toLowerCase();
+  }
+
+  const titleTokens = splitTitleTokens(primaryText);
+  const longToken = titleTokens.find((item) => item.length >= 4);
+  return safeString(longToken || titleTokens[0] || '');
+};
+
+const buildFeatureRailHeading = (shot, fallbackTitle) => {
+  const summary = getDisplaySummary(shot, shot?.narration);
+
+  if (/不是在回答问题/u.test(summary) && /做完/u.test(summary)) {
+    return '它不是回答问题，它是在替你做完';
+  }
+
+  if (/输入含糊/u.test(summary) && /输出/u.test(summary)) {
+    return '输入很糊，输出直接可跑';
+  }
+
+  if (/完整(?:的)?可执行方案/u.test(summary)) {
+    return '它直接给出完整可执行方案';
+  }
+
+  return compactText(buildSceneSummary(shot, getDisplayTitle(shot), 28) || fallbackTitle, 28);
+};
+
 const splitTitleTokens = (value) => {
   const text = safeString(value);
 
@@ -475,7 +527,7 @@ const collectListTokens = (shot, max = 4) => {
   const narrationUnits = splitNarrationUnits(shot?.narration);
   return uniqueList(
     [
-      ...semanticArray(shot?.dataPoints),
+      ...getDisplayPoints(shot),
       ...asArray(shot?.keywords),
       ...narrationUnits,
     ],
@@ -490,23 +542,79 @@ const inferManualGlyph = (value) => {
 
 const buildFeatureItems = (shot) => {
   const narrationUnits = splitNarrationUnits(shot?.narration);
-  const baseItems = uniqueList(
+  const narrationLead = safeString(narrationUnits[0] || shot?.narration);
+  const displayPoints = getDisplayPoints(shot);
+  const sourceItems = uniqueList(
     [
-      ...semanticArray(shot?.dataPoints),
+      ...displayPoints,
       ...narrationUnits,
     ],
-    4,
+    8,
   );
 
-  return baseItems.map((item, index) => ({
-      title: compactText(item, 18),
-      eyebrow: '',
-      caption: compactText(
-        narrationUnits[index + 1]
-          || semanticArray(shot?.dataPoints)[index + 1]
-          || '',
-        34,
-      ),
+  const items = [];
+
+  for (const item of sourceItems) {
+    const text = safeString(item);
+    if (!text) {
+      continue;
+    }
+
+    if (
+      isCompactDuplicate(text, getDisplayTitle(shot))
+      || isCompactDuplicate(text, shot?.narration)
+      || isCompactDuplicate(text, narrationLead)
+    ) {
+      continue;
+    }
+
+    const chips = extractEvidenceChips(text, 2);
+    const label =
+      compactText(
+        chips[0]
+          || splitTitleTokens(text).find((token) => token.length >= 2)
+          || extractModelTokens(text)[0]
+          || extractAsciiPhrases(text)[0]
+          || text,
+        16,
+      );
+
+    const caption = compactText(
+      isCompactDuplicate(text, label) || isCompactDuplicate(text, narrationLead)
+        ? ''
+        : text,
+      28,
+    );
+
+    if (!label) {
+      continue;
+    }
+
+    if (items.some((entry) => isCompactDuplicate(entry.title, label) || (caption && isCompactDuplicate(entry.caption, caption)))) {
+      continue;
+    }
+
+    items.push({
+      title: label,
+      eyebrow: chips[1] || '',
+      caption,
+      icon: inferManualGlyph(text) || undefined,
+      accent: inferAccent(shot, items.length),
+    });
+
+    if (items.length >= 4) {
+      break;
+    }
+  }
+
+  if (items.length > 0) {
+    return items;
+  }
+
+  return displayPoints.slice(0, 4).map((item, index) => ({
+    title: compactText(item, 16),
+    eyebrow: '',
+    caption: '',
     icon: inferManualGlyph(item) || undefined,
     accent: inferAccent(shot, index),
   }));
@@ -515,7 +623,7 @@ const buildFeatureItems = (shot) => {
 const buildStepItems = (shot) => {
   const narrationUnits = splitNarrationUnits(shot?.narration);
   const steps = uniqueList(
-    [...semanticArray(shot?.dataPoints), ...narrationUnits],
+    [...getDisplayPoints(shot), ...narrationUnits],
     5,
   );
 
@@ -556,9 +664,9 @@ const buildTimelineLabel = (value, index) => {
 };
 
 const buildTimelineItems = (shot) => {
-  const narrationUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+  const narrationUnits = splitNarrationUnits(getDisplaySummary(shot, shot?.visualSummaryZh));
   const sourceItems = uniqueList(
-    [...semanticArray(shot?.dataPoints), ...narrationUnits],
+    [...getDisplayPoints(shot), ...narrationUnits],
     8,
   );
   const items = [];
@@ -640,7 +748,7 @@ const buildCompareRows = (shot) => {
 const buildTagItems = (shot) => {
   const narrationUnits = splitNarrationUnits(shot?.narration);
   return uniqueList(
-    [...semanticArray(shot?.dataPoints), ...narrationUnits],
+    [...getDisplayPoints(shot), ...narrationUnits],
     10,
   ).map((item, index) => ({
     label: compactText(item, 18),
@@ -649,9 +757,9 @@ const buildTagItems = (shot) => {
 };
 
 const buildEvidenceCards = (shot) => {
-  const narrationUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+  const narrationUnits = splitNarrationUnits(getDisplaySummary(shot, shot?.visualSummaryZh));
   const sourceItems = uniqueList(
-    [...semanticArray(shot?.dataPoints), ...narrationUnits],
+    [...getDisplayPoints(shot), ...narrationUnits],
     8,
   );
   const cards = [];
@@ -689,14 +797,14 @@ const buildEvidenceCards = (shot) => {
 };
 
 const buildArchitectureNodes = (shot) => {
-  const narrationUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+  const narrationUnits = splitNarrationUnits(getDisplaySummary(shot, shot?.visualSummaryZh));
   const nodes = uniqueList(
-    [...semanticArray(shot?.dataPoints), ...narrationUnits],
+    [...getDisplayPoints(shot), ...narrationUnits],
     8,
   );
 
   return nodes
-    .filter((item) => !isCompactDuplicate(item, shot?.title))
+    .filter((item) => !isCompactDuplicate(item, getDisplayTitle(shot)))
     .slice(0, 6)
     .map((item, index) => ({
       label: compactText(item, 18),
@@ -789,8 +897,8 @@ const metricPriority = (label) => {
 const buildMetricItems = (shot) => {
   const sourceItems = uniqueList(
     [
-      ...semanticArray(shot?.dataPoints),
-      ...splitNarrationUnits(shot?.narration || shot?.visualSummaryZh),
+      ...getDisplayPoints(shot),
+      ...splitNarrationUnits(getDisplaySummary(shot, shot?.visualSummaryZh)),
     ],
     8,
   );
@@ -801,7 +909,7 @@ const buildMetricItems = (shot) => {
     const numbers = extractNumberTokens(source);
 
     for (const number of numbers) {
-      const label = inferMetricLabel(source, number, shot?.title, pairs.length);
+      const label = inferMetricLabel(source, number, getDisplayTitle(shot), pairs.length);
       const key = `${label}::${number}`.toLowerCase();
 
       if (seen.has(key)) {
@@ -864,7 +972,7 @@ const inferRatioFromText = (value, fallback = 0.72) => {
 
 const buildDataStreamItems = (shot) => {
   const metricItems = buildMetricItems(shot);
-  const detailUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+  const detailUnits = splitNarrationUnits(getDisplaySummary(shot, shot?.visualSummaryZh));
 
   if (metricItems.length >= 2) {
     return metricItems.slice(0, 3).map((item, index) => ({
@@ -904,7 +1012,7 @@ const buildPipelineStages = (shot) => {
 
   return collectListTokens(shot, 4).map((item, index) => ({
     label: compactText(item, 18),
-    detail: compactText(splitNarrationUnits(shot?.narration || shot?.visualSummaryZh)[index + 1] || '', 28),
+    detail: compactText(splitNarrationUnits(getDisplaySummary(shot, shot?.visualSummaryZh))[index + 1] || '', 28),
     icon: '',
     accent: inferAccent(shot, index),
   }));
@@ -937,7 +1045,7 @@ const buildBenchmarkItems = (shot) => {
 };
 
 const buildSceneSummary = (shot, primaryText, max = 40) => {
-  const narrationUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+  const narrationUnits = splitNarrationUnits(getDisplaySummary(shot, shot?.visualSummaryZh));
   const filtered = narrationUnits.filter((item) => !isCompactDuplicate(item, primaryText));
 
   if (filtered.length === 0) {
@@ -1279,11 +1387,11 @@ const summarizeTakeawayEn = (source) => {
 };
 
 const buildCodeLines = (shot) => {
-  const narrativeUnits = splitNarrationUnits(shot?.narration || shot?.visualSummaryZh);
+  const narrativeUnits = splitNarrationUnits(getDisplaySummary(shot, shot?.visualSummaryZh));
   const factSources = uniqueList(
     [
       ...narrativeUnits,
-      ...semanticArray(shot?.dataPoints),
+      ...getDisplayPoints(shot),
     ].filter(Boolean),
     10,
   );
@@ -1340,7 +1448,7 @@ const buildCodeLines = (shot) => {
   }
 
   if (!facts.some((item) => item.label === 'scenario')) {
-    pushFact('scenario', summarizeScenarioEn(shot?.title || shot?.narration, shot));
+    pushFact('scenario', summarizeScenarioEn(getDisplayTitle(shot) || shot?.narration, shot));
   }
 
   if (!facts.some((item) => item.label === 'toolRole') && /K2\.?6/i.test(textFromShot(shot))) {
@@ -1348,7 +1456,7 @@ const buildCodeLines = (shot) => {
   }
 
   if (!facts.some((item) => item.label === 'takeaway')) {
-    const takeaway = summarizeTakeawayEn(shot?.narration || shot?.title) || 'execution matters more than hype';
+    const takeaway = summarizeTakeawayEn(shot?.narration || getDisplayTitle(shot)) || 'execution matters more than hype';
     pushFact('takeaway', takeaway);
   }
 
@@ -1377,14 +1485,14 @@ const buildTerminalOutputs = (shot) => {
   const items = uniqueList(
     [
       ...splitNarrationUnits(shot?.narration),
-      ...semanticArray(shot?.dataPoints),
+      ...getDisplayPoints(shot),
     ],
     4,
   );
 
   const fallbackItems = items.length > 0
     ? items
-    : splitNarrationUnits(shot?.narration || shot?.visualSummaryZh || shot?.title || 'scene ready');
+    : splitNarrationUnits(shot?.narration || getDisplaySummary(shot, shot?.visualSummaryZh) || getDisplayTitle(shot) || 'scene ready');
 
   return fallbackItems.map((item) => `> ${compactText(item, 48)}`);
 };
@@ -1412,6 +1520,30 @@ const FAMILY_DIVERSITY_BITS = new Map(
     .filter((family) => !DIVERSITY_EXCLUDED_FAMILIES.has(family))
     .map((family, index) => [family, 1 << index]),
 );
+const RHYTHM_LAYER_MAP = new Map([
+  ['hero', 'context'],
+  ['cta', 'closing'],
+  ['feature-rail', 'emphasis'],
+  ['number-strip', 'emphasis'],
+  ['architecture-map', 'structure'],
+  ['memory-graph', 'structure'],
+  ['pipeline-flow', 'structure'],
+  ['timeline', 'structure'],
+  ['step-flow', 'structure'],
+  ['data-stream', 'emphasis'],
+  ['compare-board', 'emphasis'],
+  ['metrics', 'emphasis'],
+  ['benchmark-chart', 'emphasis'],
+  ['focus', 'context'],
+  ['quote-highlight', 'context'],
+  ['glossary-term', 'context'],
+  ['evidence-wall', 'proof'],
+  ['terminal', 'proof'],
+  ['code', 'proof'],
+  ['tag-matrix', 'structure'],
+]);
+
+const getRhythmLayer = (family) => RHYTHM_LAYER_MAP.get(family) || 'context';
 
 const buildSceneIntentText = (shot) => {
   const comparisonText = asArray(shot?.comparisons)
@@ -1423,12 +1555,12 @@ const buildSceneIntentText = (shot) => {
     .filter(Boolean);
 
   return [
-    safeString(shot?.title),
+    getDisplayTitle(shot),
     safeString(shot?.narration),
     safeString(shot?.type),
     safeString(shot?.level),
     safeString(shot?.comparisonSummaryZh),
-    ...semanticArray(shot?.dataPoints, 8),
+    ...getDisplayPoints(shot, 8),
     ...semanticArray(shot?.keywords, 8),
     ...comparisonText,
   ]
@@ -1446,7 +1578,7 @@ const buildSceneCycleCandidates = (index) => {
 };
 
 const collectSceneFamilyCandidates = (shot, index, total) => {
-  const title = safeString(shot?.title);
+  const title = getDisplayTitle(shot);
   const text = buildSceneIntentText(shot);
   const requestedFamily = safeString(shot?.family || shot?.sceneFamily).toLowerCase();
   const comparisonSummary = safeString(shot?.comparisonSummaryZh).toLowerCase();
@@ -1567,7 +1699,7 @@ const collectSceneFamilyCandidates = (shot, index, total) => {
     candidates.push('tag-matrix');
   }
 
-  if (hasQuoteIntent && splitNarrationUnits(shot?.narration || shot?.title).length <= 3) {
+  if (hasQuoteIntent && splitNarrationUnits(shot?.narration || getDisplayTitle(shot)).length <= 3) {
     candidates.push('quote-highlight');
   }
 
@@ -1619,6 +1751,10 @@ const compareFamilyPlans = (left, right) => {
     return left.adjacentRepeatCount < right.adjacentRepeatCount ? 1 : -1;
   }
 
+  if (left.layerRunPenalty !== right.layerRunPenalty) {
+    return left.layerRunPenalty < right.layerRunPenalty ? 1 : -1;
+  }
+
   if (left.weightedCost !== right.weightedCost) {
     return left.weightedCost < right.weightedCost ? 1 : -1;
   }
@@ -1635,19 +1771,20 @@ const selectSceneFamilies = (shots) => {
   const candidateMatrix = shots.map((shot, index) => collectSceneFamilyCandidates(shot, index, total));
   const memo = new Map();
 
-  const solve = (index, previousFamily, usedMask) => {
+  const solve = (index, previousFamily, usedMask, runLayer, runLength) => {
     if (index >= total) {
       return {
         uniqueCount: 0,
         repeatCount: 0,
         adjacentRepeatCount: 0,
+        layerRunPenalty: 0,
         weightedCost: 0,
         rawCost: 0,
         families: [],
       };
     }
 
-    const memoKey = `${index}::${previousFamily || '-'}::${usedMask}`;
+    const memoKey = `${index}::${previousFamily || '-'}::${usedMask}::${runLayer || '-'}::${runLength}`;
     const cached = memo.get(memoKey);
     if (cached) {
       return cached;
@@ -1664,12 +1801,16 @@ const selectSceneFamilies = (shots) => {
       const uniqueGain = isMiddleScene && diversityBit !== 0 && !isRepeatedFamily ? 1 : 0;
       const nextMask = isMiddleScene && diversityBit !== 0 ? (usedMask | diversityBit) : usedMask;
       const deviationWeight = isMiddleScene ? Math.max(1, total - index) : 0;
-      const suffixPlan = solve(index + 1, family, nextMask);
+      const layer = getRhythmLayer(family);
+      const nextRunLength = layer === runLayer ? runLength + 1 : 1;
+      const runPenalty = nextRunLength >= 3 ? 1 : 0;
+      const suffixPlan = solve(index + 1, family, nextMask, layer, nextRunLength);
       const candidatePlan = {
         uniqueCount: uniqueGain + suffixPlan.uniqueCount,
         repeatCount: (isRepeatedFamily ? 1 : 0) + suffixPlan.repeatCount,
         adjacentRepeatCount:
           (isMiddleScene && previousFamily && family === previousFamily ? 1 : 0) + suffixPlan.adjacentRepeatCount,
+        layerRunPenalty: runPenalty + suffixPlan.layerRunPenalty,
         weightedCost: candidateIndex * deviationWeight + suffixPlan.weightedCost,
         rawCost: candidateIndex + suffixPlan.rawCost,
         families: [family, ...suffixPlan.families],
@@ -1684,27 +1825,29 @@ const selectSceneFamilies = (shots) => {
     return bestPlan;
   };
 
-  return solve(0, '', 0).families;
+  return solve(0, '', 0, '', 0).families;
 };
 
 const buildSceneData = (family, shot, index) => {
   const accent = inferAccent(shot, index);
   const narrationUnits = splitNarrationUnits(shot?.narration);
-  const primaryText = narrationUnits[0] || shot?.narration || shot?.title || shot?.level || shot?.type || `Scene ${index + 1}`;
-  const secondaryText = narrationUnits.slice(1).join('，') || shot?.narration || shot?.visualSummaryZh || '';
+  const displayTitle = getDisplayTitle(shot);
+  const displaySummary = getDisplaySummary(shot, shot?.visualSummaryZh);
+  const primaryText = narrationUnits[0] || displayTitle || shot?.narration || shot?.level || shot?.type || `Scene ${index + 1}`;
+  const secondaryText = narrationUnits.slice(1).join('，') || displaySummary || '';
   const title = compactText(primaryText, 28);
-  const subtitle = compactText(shot?.narration || shot?.visualSummaryZh, 72);
+  const subtitle = compactText(displaySummary, 72);
   const summary = buildSceneSummary(shot, primaryText, 44);
   const keywords = uniqueList(
     [
-      ...semanticArray(shot?.dataPoints),
+      ...getDisplayPoints(shot),
       ...narrationUnits,
     ],
     3,
   );
   const points = uniqueList(
     [
-      ...semanticArray(shot?.dataPoints),
+      ...getDisplayPoints(shot),
       ...narrationUnits.slice(1),
     ],
     4,
@@ -1730,6 +1873,8 @@ const buildSceneData = (family, shot, index) => {
         badge: '',
         accent,
         avatarLabel: '',
+        highlightedWord: buildHeroHighlightWord(shot, primaryText),
+        brandLabel: extractTargetModel(`${safeString(shot?.narration)} ${displayTitle}`) || '',
       };
     case 'focus':
       return {
@@ -1738,12 +1883,12 @@ const buildSceneData = (family, shot, index) => {
         question: compactText(narrationUnits[1] || primaryText, 28),
         description: compactText(secondaryText, 88),
         accent,
-        diagram: /对比|parallel|系统|loop|闭环/.test(`${shot?.narration || ''} ${shot?.title || ''}`.toLowerCase()) ? 'rings' : 'framing',
+        diagram: /对比|parallel|系统|loop|闭环/.test(`${shot?.narration || ''} ${displayTitle || ''}`.toLowerCase()) ? 'rings' : 'framing',
       };
     case 'feature-rail':
       return {
         kicker: '',
-        heading: title,
+        heading: buildFeatureRailHeading(shot, title),
         items: buildFeatureItems(shot),
       };
     case 'number-strip': {
@@ -1810,7 +1955,7 @@ const buildSceneData = (family, shot, index) => {
           ? compareRows
           : [
               {
-                label: compactText(shot?.title || '核心差异', 16),
+                label: compactText(displayTitle || '核心差异', 16),
                 left: compactText(primaryText, 20),
                 right: compactText(secondaryText || summary || primaryText, 20),
                 accent,
@@ -1849,7 +1994,7 @@ const buildSceneData = (family, shot, index) => {
     case 'architecture-map':
       return {
         heading: title,
-        centerTitle: compactText(shot?.title || primaryText, 22),
+        centerTitle: compactText(displayTitle || primaryText, 22),
         centerDetail: summary || compactText(secondaryText, 52),
         nodes: architectureNodes.length > 0
           ? architectureNodes
@@ -1917,7 +2062,7 @@ const buildSceneData = (family, shot, index) => {
       return {
         heading: title,
         summary,
-        centerTitle: compactText(shot?.title || primaryText, 22),
+        centerTitle: compactText(displayTitle || primaryText, 22),
         centerDetail: summary || compactText(secondaryText, 52),
         nodes: memoryGraphNodes.length > 0
           ? memoryGraphNodes
@@ -1969,16 +2114,16 @@ const buildSceneData = (family, shot, index) => {
       };
     case 'quote-highlight':
       return {
-        heading: compactText(shot?.title || '关键判断', 18),
-        quote: compactText(primaryText || shot?.narration || shot?.title, 72),
+        heading: compactText(displayTitle || '关键判断', 18),
+        quote: compactText(primaryText || shot?.narration || displayTitle, 72),
         attribution: compactText(summary || secondaryText, 44),
         tags: tagItems.slice(0, 3),
         accent,
       };
     case 'glossary-term':
       return {
-        heading: compactText(shot?.title || '术语解释', 18),
-        term: compactText(shot?.title || primaryText, 18),
+        heading: compactText(displayTitle || '术语解释', 18),
+        term: compactText(displayTitle || primaryText, 18),
         pronunciation: '',
         definition: compactText(summary || secondaryText || shot?.narration, 88),
         related: tagItems.slice(0, 4),
@@ -1987,11 +2132,11 @@ const buildSceneData = (family, shot, index) => {
     case 'cta':
       {
         const questionLine = narrationUnits.find((item) => /[？?]/.test(item) || /哪个|怎么选|怎么看|值不值/.test(item));
-        const sourceLine = narrationUnits[0] || shot?.narration || shot?.title || '';
+        const sourceLine = narrationUnits[0] || shot?.narration || displayTitle || '';
         const highlights = compactUniqueItems(
           [
             ...splitListPhrases(sourceLine),
-            ...semanticArray(shot?.dataPoints),
+            ...getDisplayPoints(shot),
           ].filter((item) => !/[？?]/.test(item)),
           16,
           3,
@@ -2000,7 +2145,7 @@ const buildSceneData = (family, shot, index) => {
           uniqueList(
             [
               ...narrationUnits.filter((item) => item !== sourceLine && item !== questionLine),
-              ...semanticArray(shot?.dataPoints).filter(
+              ...getDisplayPoints(shot).filter(
                 (item) => !highlights.some((entry) => isCompactDuplicate(entry, item))
                   && !isCompactDuplicate(item, questionLine),
               ),
@@ -2031,7 +2176,7 @@ const buildSceneData = (family, shot, index) => {
 };
 
 function textFromShot(shot) {
-  return `${safeString(shot?.title)} ${safeString(shot?.narration)} ${safeString(shot?.visualSummaryZh)} ${safeString(shot?.visualFocusZh)} ${safeString(shot?.type)} ${safeString(shot?.level)}`.toLowerCase();
+  return `${getDisplayTitle(shot)} ${safeString(shot?.narration)} ${safeString(shot?.visualSummaryZh)} ${safeString(shot?.visualFocusZh)} ${safeString(shot?.type)} ${safeString(shot?.level)}`.toLowerCase();
 }
 
 function resolveSceneMediaSrc(family, shot) {
@@ -2081,9 +2226,9 @@ function buildUltimateProjectConfig(project) {
         family,
         iconPack: semanticArray(shot?.iconPack, 6),
         mediaSrc: resolveSceneMediaSrc(family, shot),
-        subtitle: compactText(shot?.narration || shot?.visualSummaryZh || shot?.visualFocusZh, 72),
+        subtitle: compactText(getDisplaySummary(shot, shot?.visualSummaryZh || shot?.visualFocusZh), 72),
         durationInFrames: normalizeDurationInFrames(shot, fps),
-        warm: /warm|里程碑|升级|结论|发布|收束/.test(`${safeString(shot?.style)} ${safeString(shot?.mood)} ${safeString(shot?.title)}`.toLowerCase()),
+        warm: /warm|里程碑|升级|结论|发布|收束/.test(`${safeString(shot?.style)} ${safeString(shot?.mood)} ${getDisplayTitle(shot)}`.toLowerCase()),
         showGrid: false,
         transition: index === 0 ? {preset: 'flash', durationInFrames: 14} : undefined,
         data: buildSceneData(family, shot, index, accent),

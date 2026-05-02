@@ -1,16 +1,19 @@
 import React from 'react';
 import {GeometryAccent, ReticleLockOn, TextMaskWipe} from '../../visual-atoms';
+import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
-import type {UltimateFocusDiagramProps} from '../types';
+import type {UltimateFocusDiagramProps, UltimateSceneGrammar} from '../types';
 
-export const UltimateFocusDiagram: React.FC<UltimateFocusDiagramProps> = ({
+export const UltimateFocusDiagram: React.FC<UltimateFocusDiagramProps & {grammar?: UltimateSceneGrammar}> = ({
   eyebrow,
   keyword,
   question,
   description,
   accent = 'cyan',
+  grammar,
 }) => {
   const color = resolveUltimateAccent(accent);
+  const revealDirection = resolveTextRevealDirection(grammar, 'left');
 
   return (
     <div
@@ -28,7 +31,7 @@ export const UltimateFocusDiagram: React.FC<UltimateFocusDiagramProps> = ({
           <div style={{position: 'relative', minHeight: 172}}>
             <TextMaskWipe
               text={question}
-              direction="left"
+              direction={revealDirection}
               accent={color}
               fontSize={58}
               color="#f7fbff"

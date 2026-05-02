@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {compileUltimateOutline, validateUltimateOutline} from './lib/ultimate-outline-compiler.mjs';
 import {
   summarizeUltimateConfig,
   validateUltimateConfig,
@@ -52,12 +51,10 @@ const readNumber = (value) => {
 
 const resolveInputConfig = () => {
   const configArg = readFlag('--config');
-  const outlineArg = readFlag('--outline');
   const step4Arg = readFlag('--step4');
 
-  if (!configArg && !outlineArg && !step4Arg) {
+  if (!configArg && !step4Arg) {
     console.error('Usage: node scripts/verify-render-output.mjs --config <json-file> --video <output.mp4>');
-    console.error('   or: node scripts/verify-render-output.mjs --outline <outline-json> --video <output.mp4>');
     console.error('   or: node scripts/verify-render-output.mjs --step4 <step-04.json> --video <output.mp4>');
     process.exit(1);
   }
@@ -85,26 +82,14 @@ const resolveInputConfig = () => {
     };
   }
 
-  const inputPath = path.resolve(process.cwd(), configArg ?? outlineArg);
+  const inputPath = path.resolve(process.cwd(), configArg);
   if (!fs.existsSync(inputPath)) {
     console.error(`Input file not found: ${inputPath}`);
     process.exit(1);
   }
 
   const parsed = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
-
-  if (outlineArg) {
-    const outlineErrors = validateUltimateOutline(parsed);
-    if (outlineErrors.length > 0) {
-      console.error('Outline check failed:');
-      for (const error of outlineErrors) {
-        console.error(`- ${error}`);
-      }
-      process.exit(1);
-    }
-  }
-
-  const config = outlineArg ? compileUltimateOutline(parsed) : parsed;
+  const config = parsed;
   const configErrors = validateUltimateConfig(config);
   if (configErrors.length > 0) {
     console.error('Config check failed:');

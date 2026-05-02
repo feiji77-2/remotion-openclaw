@@ -28,6 +28,27 @@ function normalizeStringArray(items, max = 8) {
   )].slice(0, max);
 }
 
+function normalizeMechanismDepth(value) {
+  const source = value && typeof value === 'object' ? value : null;
+  if (!source) {
+    return null;
+  }
+
+  const normalized = {
+    level: String(source.level || '').trim(),
+    explains: String(source.explains || '').trim(),
+    technicalTerms: normalizeStringArray(source.technicalTerms, 6),
+    analogy: String(source.analogy || '').trim(),
+    visualHint: String(source.visualHint || '').trim(),
+  };
+
+  return Object.values(normalized).some((item) => (
+    Array.isArray(item) ? item.length > 0 : Boolean(item)
+  ))
+    ? normalized
+    : null;
+}
+
 function normalizeStep1Payload(stage1, stage2, input) {
   const current = clone(input.pipelineState?.analysis || {});
   const currentLayers = Array.isArray(current.layers) ? current.layers : [];
@@ -127,11 +148,13 @@ function normalizeStep3Payload(stage1, stage2, input) {
         tone: String(stage1.brief.tone || current.brief?.tone || '').trim(),
         pacing: String(stage1.brief.pacing || current.brief?.pacing || '').trim(),
         ctaIntent: String(stage1.brief.ctaIntent || current.brief?.ctaIntent || '').trim(),
+        techDepth: String(stage1.brief.techDepth || current.brief?.techDepth || '').trim(),
       },
       outline: stage1.outline.map((item, index) => ({
         ...(currentOutline[index] && typeof currentOutline[index] === 'object' ? currentOutline[index] : {}),
         id: currentOutline[index]?.id || `copy-outline-${index + 1}`,
         label: String(item.label || currentOutline[index]?.label || `节拍 ${index + 1}`).trim(),
+        type: String(item.type || currentOutline[index]?.type || item.label || `节拍 ${index + 1}`).trim(),
         beat: String(item.beat || currentOutline[index]?.beat || '').trim(),
         goal: String(item.goal || currentOutline[index]?.goal || '').trim(),
         evidenceAnchor: String(item.evidenceAnchor || currentOutline[index]?.evidenceAnchor || '').trim(),
@@ -144,12 +167,14 @@ function normalizeStep3Payload(stage1, stage2, input) {
         ...(currentBody[index] && typeof currentBody[index] === 'object' ? currentBody[index] : {}),
         id: currentBody[index]?.id || `copy-${index + 1}`,
         label: String(item.label || currentBody[index]?.label || `段落 ${index + 1}`).trim(),
+        type: String(item.type || currentBody[index]?.type || item.label || `段落 ${index + 1}`).trim(),
         text: String(item.text || currentBody[index]?.text || '').trim(),
         sceneIntent: String(item.sceneIntent || currentBody[index]?.sceneIntent || item.label || '').trim(),
         evidenceAnchor: String(item.evidenceAnchor || currentBody[index]?.evidenceAnchor || '').trim(),
         transitionToNext: String(item.transitionToNext || currentBody[index]?.transitionToNext || '').trim(),
         keywords: normalizeStringArray(item.keywords || currentBody[index]?.keywords, 6),
         dataPoints: normalizeStringArray(item.dataPoints || currentBody[index]?.dataPoints, 5),
+        mechanismDepth: normalizeMechanismDepth(item.mechanismDepth || currentBody[index]?.mechanismDepth),
       })),
       cta: String(stage2.copy.cta || current.cta || '').trim(),
     },

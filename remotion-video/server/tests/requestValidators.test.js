@@ -22,11 +22,22 @@ test('normalizeRenderRequest accepts public asset references and rejects remote 
       {src: '/assets/voice/demo/clip.wav', startFrame: 0, durationInFrames: 30},
     ],
     subtitleFile: '/assets/subtitles/demo/clip.srt',
+    voiceSettings: {
+      speed: 1.1,
+      language: 'zh-cn',
+      byShotId: {
+        intro: {text: '替换开场'},
+      },
+    },
   });
 
   assert.equal(normalized.projectId, 'project-a');
+  assert.equal(normalized.template, 'ultimate');
   assert.equal(normalized.audioSegments?.[0]?.src, '/assets/voice/demo/clip.wav');
   assert.equal(normalized.subtitleFile, '/assets/subtitles/demo/clip.srt');
+  assert.equal(normalized.voiceSettings?.speed, 1.1);
+  assert.equal(normalized.voiceSettings?.language, 'zh-cn');
+  assert.equal(normalized.voiceSettings?.byShotId?.intro?.text, '替换开场');
 
   await assert.rejects(
     () => normalizeRenderRequest({
@@ -36,6 +47,16 @@ test('normalizeRenderRequest accepts public asset references and rejects remote 
     }),
     /Remote media URLs are disabled/,
   );
+});
+
+test('normalizeRenderRequest aliases legacy templates to ultimate', async () => {
+  const normalized = await normalizeRenderRequest({
+    projectId: 'legacy-template-demo',
+    script: 'hello world',
+    template: 'caption',
+  });
+
+  assert.equal(normalized.template, 'ultimate');
 });
 
 test('normalizeVoiceRequest requires at least one shot', () => {

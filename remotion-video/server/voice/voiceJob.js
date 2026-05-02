@@ -132,7 +132,13 @@ function resolveShotText(shot, voiceSettings) {
     ? candidate.text.trim()
     : typeof shot.narration === 'string'
       ? shot.narration.trim()
-      : '';
+      : typeof shot.text === 'string'
+        ? shot.text.trim()
+        : typeof shot.scriptExcerpt === 'string'
+          ? shot.scriptExcerpt.trim()
+          : typeof shot.scriptSourceText === 'string'
+            ? shot.scriptSourceText.trim()
+            : '';
   return text;
 }
 
@@ -276,6 +282,67 @@ async function resolveHealthyVoiceEngine(update) {
   };
 }
 
+async function prepareVoiceSynthesisPlan(voiceSettings = {}, update) {
+  const requestedEngine = resolveEngine(voiceSettings.engine, voiceSettings.preset);
+  const resolvedEngine = await resolveHealthyVoiceEngine(update);
+  if (resolvedEngine.engine !== requestedEngine) {
+    update?.(8, `已忽略旧引擎 ${requestedEngine}，统一切换到 qwen-tts`);
+  }
+
+  let voiceRequest = resolveVoiceQwenTts(voiceSettings);
+  const referenceUrl = voiceSettings.referenceUrl || voiceSettings.reference_url || null;
+  const requestLanguage = resolveVoiceLanguage(voiceSettings);
+  const requestSpeed = resolveSpeed(voiceSettings.speed);
+  let requestModel = resolveQwenSynthesisModel({
+    voiceSettings,
+    voice: voiceRequest,
+    referenceUrl,
+    env: process.env,
+  });
+
+  if (safeString(voiceSettings.instruction || voiceSettings.voiceInstruction)) {
+    update?.(7, 'Qwen TTS 链路不使用 instruction，已忽略该字段');
+  }
+
+  if (referenceUrl && !voiceRequest) {
+    update?.(8, '准备 Qwen 克隆音色...');
+    const clonedVoice = await ensureQwenCloneVoice({
+      referenceUrl,
+      preferredName: String(
+        voiceSettings?.cloneVoiceName
+          || voiceSettings?.preferredName
+          || voiceSettings?.clone_name
+          || path.basename(String(referenceUrl)).replace(path.extname(String(referenceUrl)), ''),
+      ).trim() || 'qwen-clone',
+      targetModel: resolveQwenCloneModel(voiceSettings, process.env),
+      referenceText: voiceSettings?.referenceText || voiceSettings?.cloneText || '',
+      referenceLanguage: voiceSettings?.referenceLanguage || requestLanguage,
+      env: process.env,
+    });
+    voiceRequest = clonedVoice.voice;
+    requestModel = clonedVoice.targetModel || resolveQwenCloneModel(voiceSettings, process.env);
+  }
+
+  if (!voiceRequest) {
+    voiceRequest = resolveQwenTtsDefaultVoice(process.env);
+    requestModel = resolveQwenSynthesisModel({
+      voiceSettings,
+      voice: voiceRequest,
+      referenceUrl,
+      env: process.env,
+    });
+  }
+
+  return {
+    resolvedEngine,
+    voiceRequest,
+    referenceUrl,
+    requestLanguage,
+    requestSpeed,
+    requestModel,
+  };
+}
+
 async function synthesizeClip({text, voice, speed, language, referenceUrl, outputPath, model}) {
   return await synthesizeQwenTtsToFile({
     text,
@@ -338,55 +405,14 @@ async function processVoiceJob(job, update) {
     throw new Error('Voice job requires shots');
   }
 
-  const requestedEngine = resolveEngine(voiceSettings.engine, voiceSettings.preset);
-  const resolvedEngine = await resolveHealthyVoiceEngine(update);
-  if (resolvedEngine.engine !== requestedEngine) {
-    update?.(8, `已忽略旧引擎 ${requestedEngine}，统一切换到 qwen-tts`);
-  }
-
-  let voiceRequest = resolveVoiceQwenTts(voiceSettings);
-  const referenceUrl = voiceSettings.referenceUrl || voiceSettings.reference_url || null;
-  const requestLanguage = resolveVoiceLanguage(voiceSettings);
-  const requestSpeed = resolveSpeed(voiceSettings.speed);
-  let requestModel = resolveQwenSynthesisModel({
-    voiceSettings,
-    voice: voiceRequest,
+  const {
+    resolvedEngine,
+    voiceRequest,
     referenceUrl,
-    env: process.env,
-  });
-
-  if (safeString(voiceSettings.instruction || voiceSettings.voiceInstruction)) {
-    update?.(7, 'Qwen TTS 链路不使用 instruction，已忽略该字段');
-  }
-
-  if (referenceUrl && !voiceRequest) {
-    update?.(8, '准备 Qwen 克隆音色...');
-    const clonedVoice = await ensureQwenCloneVoice({
-      referenceUrl,
-      preferredName: String(
-        voiceSettings?.cloneVoiceName
-          || voiceSettings?.preferredName
-          || voiceSettings?.clone_name
-          || path.basename(String(referenceUrl)).replace(path.extname(String(referenceUrl)), ''),
-      ).trim() || 'qwen-clone',
-      targetModel: resolveQwenCloneModel(voiceSettings, process.env),
-      referenceText: voiceSettings?.referenceText || voiceSettings?.cloneText || '',
-      referenceLanguage: voiceSettings?.referenceLanguage || requestLanguage,
-      env: process.env,
-    });
-    voiceRequest = clonedVoice.voice;
-    requestModel = clonedVoice.targetModel || resolveQwenCloneModel(voiceSettings, process.env);
-  }
-
-  if (!voiceRequest) {
-    voiceRequest = resolveQwenTtsDefaultVoice(process.env);
-    requestModel = resolveQwenSynthesisModel({
-      voiceSettings,
-      voice: voiceRequest,
-      referenceUrl,
-      env: process.env,
-    });
-  }
+    requestLanguage,
+    requestSpeed,
+    requestModel,
+  } = await prepareVoiceSynthesisPlan(voiceSettings, update);
 
   const jobVoiceDir = path.join(VOICE_DIR, projectId, job.id);
   ensureDir(jobVoiceDir);
@@ -513,5 +539,9 @@ module.exports = {
   processVoiceJob,
   getVoiceCapabilities,
   normalizeSpeechTextForTts,
+  prepareVoiceSynthesisPlan,
+  probeDurationSeconds,
   resolveTtsLanguageForText,
+  resolveShotSpeechPlan,
+  sanitizeFileSegment,
 };

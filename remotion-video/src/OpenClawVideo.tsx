@@ -1,5 +1,5 @@
 /**
- * OpenClawVideo — 主视频组件（支持多模板 + 动态字幕）
+ * OpenClawVideo — 旧兼容视频组件（已退出当前生产主链）
  *
  * props 驱动：
  *   template: 'caption' | 'split' | 'fullscreen'

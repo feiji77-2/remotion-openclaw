@@ -80,10 +80,10 @@
         "heading": "四个时间节点讲清一件事",
         "summary": "如果你做的是科技 AI 日更，这个风格特别适合处理版本发布、Roadmap、开源节奏、爆发时间线。",
         "items": [
-          {"label": "4月16日", "title": "第一波消息出现", "detail": "开始有人注意到版本更新与代码能力信号。", "accent": "cyan"},
-          {"label": "4月18日", "title": "基准信息扩散", "detail": "Benchmark、长任务能力、Agent 调度被反复提及。", "accent": "green"},
-          {"label": "4月20日", "title": "工作流案例落地", "detail": "从“跑分”过渡到“真实开发流程能不能用”。", "accent": "yellow"},
-          {"label": "4月22日", "title": "舆论进入主叙事", "detail": "故事重心变成“开源是否真正给闭源压力”。", "accent": "orange"}
+          {"label": "4月16日", "title": "第一波消息出现", "detail": "开始有人注意到版本更新与代码能力信号。", "icon": "play", "accent": "cyan"},
+          {"label": "4月18日", "title": "基准信息扩散", "detail": "Benchmark、长任务能力、Agent 调度被反复提及。", "icon": "zap", "accent": "green"},
+          {"label": "4月20日", "title": "工作流案例落地", "detail": "从“跑分”过渡到“真实开发流程能不能用”。", "icon": "wrench", "accent": "yellow"},
+          {"label": "4月22日", "title": "舆论进入主叙事", "detail": "故事重心变成“开源是否真正给闭源压力”。", "icon": "messagesSquare", "accent": "orange"}
         ],
         "accent": "cyan"
       }
@@ -151,10 +151,10 @@
         "heading": "把“证据”做成独立画面",
         "summary": "你之前的视频容易只讲结论，不讲证据来源。这个风格就是专门解决这个问题的。",
         "cards": [
-          {"source": "SWE-Bench Pro", "quote": "代码能力进入 GPT 同档讨论区间。", "detail": "适合承接 benchmark 型结论。", "chips": ["benchmark", "coding"], "accent": "cyan"},
-          {"source": "HLE", "quote": "不是单点跑分，而是多维度能力被拉上桌面。", "detail": "适合补足“为什么不是噱头”。", "chips": ["HLE", "proof"], "accent": "green"},
-          {"source": "GitHub / 开源", "quote": "开源带来的不是参数表，而是采用速度。", "detail": "适合承接生态和传播层面的影响。", "chips": ["repo", "release"], "accent": "yellow"},
-          {"source": "实战案例", "quote": "开发者最在乎的是能不能把真实问题解决掉。", "detail": "适合 workflow 和案例段落收口。", "chips": ["workflow", "case"], "accent": "orange"}
+          {"source": "SWE-Bench Pro", "quote": "代码能力进入 GPT 同档讨论区间。", "detail": "适合承接 benchmark 型结论。", "chips": ["benchmark", "coding"], "icon": "code", "accent": "cyan"},
+          {"source": "HLE", "quote": "不是单点跑分，而是多维度能力被拉上桌面。", "detail": "适合补足“为什么不是噱头”。", "chips": ["HLE", "proof"], "icon": "checkCircle", "accent": "green"},
+          {"source": "GitHub / 开源", "quote": "开源带来的不是参数表，而是采用速度。", "detail": "适合承接生态和传播层面的影响。", "chips": ["repo", "release"], "icon": "gitBranch", "accent": "yellow"},
+          {"source": "实战案例", "quote": "开发者最在乎的是能不能把真实问题解决掉。", "detail": "适合 workflow 和案例段落收口。", "chips": ["workflow", "case"], "icon": "wrench", "accent": "orange"}
         ],
         "accent": "yellow"
       }
@@ -213,11 +213,11 @@
         "centerTitle": "AI 内容生产核心",
         "centerDetail": "这个风格非常适合 2-3 分钟技术视频里解释模块依赖、Agent 协作、系统拓扑和生产链路。",
         "nodes": [
-          {"label": "搜索入口", "detail": "全球信息抓取与来源过滤", "accent": "cyan"},
-          {"label": "事实解析", "detail": "时间、指标、证据、观点抽取", "accent": "green"},
-          {"label": "分镜规划", "detail": "段落意图映射 scene family", "accent": "yellow"},
-          {"label": "口播层", "detail": "音频、字幕、时长同步", "accent": "orange"},
-          {"label": "渲染层", "detail": "Remotion 出片与打包", "accent": "purple"}
+          {"label": "搜索入口", "detail": "全球信息抓取与来源过滤", "icon": "inbox", "accent": "cyan"},
+          {"label": "事实解析", "detail": "时间、指标、证据、观点抽取", "icon": "database", "accent": "green"},
+          {"label": "分镜规划", "detail": "段落意图映射 scene family", "icon": "layers", "accent": "yellow"},
+          {"label": "口播层", "detail": "音频、字幕、时长同步", "icon": "messagesSquare", "accent": "orange"},
+          {"label": "渲染层", "detail": "Remotion 出片与打包", "icon": "play", "accent": "purple"}
         ],
         "accent": "cyan",
         "layout": "radial"
@@ -231,9 +231,9 @@
         "heading": "三档输出结果",
         "layout": "bars",
         "items": [
-          {"label": "预览版", "value": "1.4s", "ratio": 0.92, "accent": "cyan"},
-          {"label": "清晰版", "value": "1080p", "ratio": 0.84, "accent": "green"},
-          {"label": "平台切片", "value": "3种", "ratio": 0.66, "accent": "yellow"}
+          {"label": "预览版", "value": "1.4s", "ratio": 0.92, "icon": "clock", "accent": "cyan"},
+          {"label": "清晰版", "value": "1080p", "ratio": 0.84, "icon": "play", "accent": "green"},
+          {"label": "平台切片", "value": "3种", "ratio": 0.66, "icon": "layers", "accent": "yellow"}
         ]
       }
     },
@@ -262,10 +262,10 @@
         "centerTitle": "上下文核心",
         "centerDetail": "把长期记忆、当前任务和外部信号统一进一个中心节点。",
         "nodes": [
-          {"label": "用户意图", "detail": "持续追踪当前问题真正要解决什么。", "accent": "cyan"},
-          {"label": "历史记录", "detail": "保留之前的判断、修改和已验证结果。", "accent": "green"},
-          {"label": "外部事实", "detail": "把新信息映射回原有语义空间。", "accent": "yellow"},
-          {"label": "执行计划", "detail": "将上下文压缩成下一步可执行动作。", "accent": "purple"}
+          {"label": "用户意图", "detail": "持续追踪当前问题真正要解决什么。", "icon": "user", "accent": "cyan"},
+          {"label": "历史记录", "detail": "保留之前的判断、修改和已验证结果。", "icon": "database", "accent": "green"},
+          {"label": "外部事实", "detail": "把新信息映射回原有语义空间。", "icon": "fileText", "accent": "yellow"},
+          {"label": "执行计划", "detail": "将上下文压缩成下一步可执行动作。", "icon": "list", "accent": "purple"}
         ],
         "accent": "cyan"
       }
@@ -278,10 +278,10 @@
         "heading": "从脚本到成片的一条自动化链路",
         "summary": "这个模板适合解释流水线本身，而不是步骤说明。它强调阶段接力和流转关系。",
         "stages": [
-          {"label": "内容解析", "detail": "从提纲中抽取段落目标、重点信息和证据节点。", "accent": "green"},
-          {"label": "模板匹配", "detail": "为每段内容选择最合适的 scene family。", "accent": "cyan"},
-          {"label": "动画编排", "detail": "统一节奏、字幕、转场和信息进场顺序。", "accent": "yellow"},
-          {"label": "渲染输出", "detail": "导出平台适配版本并回写结果文件。", "accent": "purple"}
+          {"label": "内容解析", "detail": "从提纲中抽取段落目标、重点信息和证据节点。", "icon": "fileText", "accent": "green"},
+          {"label": "模板匹配", "detail": "为每段内容选择最合适的 scene family。", "icon": "layers", "accent": "cyan"},
+          {"label": "动画编排", "detail": "统一节奏、字幕、转场和信息进场顺序。", "icon": "settings", "accent": "yellow"},
+          {"label": "渲染输出", "detail": "导出平台适配版本并回写结果文件。", "icon": "play", "accent": "purple"}
         ],
         "accent": "green"
       }

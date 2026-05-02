@@ -17,6 +17,17 @@ const { Readable } = require('stream');
 
 // ─── Deepgram ─────────────────────────────────────────────
 async function generateWithDeepgram(audioPath, outputPath) {
+  const words = await transcribeWithDeepgram(audioPath);
+  console.log(`[Deepgram] Detected ${words.length} words`);
+
+  const srt = wordsToSRT(words);
+  fs.writeFileSync(outputPath, srt);
+  console.log(`[Deepgram] SRT saved: ${outputPath}`);
+
+  return outputPath;
+}
+
+async function transcribeWithDeepgram(audioPath) {
   const { Deepgram } = require('@deepgram/sdk');
   const apiKey = process.env.DEEPGRAM_API_KEY;
 
@@ -55,18 +66,20 @@ async function generateWithDeepgram(audioPath, outputPath) {
     throw new Error('No words detected in audio');
   }
 
-  console.log(`[Deepgram] Detected ${transcript.words.length} words`);
-
-  // 生成 SRT
-  const srt = wordsToSRT(transcript.words);
-  fs.writeFileSync(outputPath, srt);
-  console.log(`[Deepgram] SRT saved: ${outputPath}`);
-
-  return outputPath;
+  return transcript.words;
 }
 
 // ─── OpenAI Whisper ──────────────────────────────────────
 async function generateWithWhisper(audioPath, outputPath) {
+  const words = await transcribeWithWhisper(audioPath);
+  const srt = wordsToSRT(words);
+  fs.writeFileSync(outputPath, srt);
+  console.log(`[Whisper] SRT saved: ${outputPath}`);
+
+  return outputPath;
+}
+
+async function transcribeWithWhisper(audioPath) {
   const apiKey = process.env.OPENAI_WHISPER_API_KEY || process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -102,11 +115,7 @@ async function generateWithWhisper(audioPath, outputPath) {
     throw new Error('No words detected');
   }
 
-  const srt = wordsToSRT(words);
-  fs.writeFileSync(outputPath, srt);
-  console.log(`[Whisper] SRT saved: ${outputPath}`);
-
-  return outputPath;
+  return words;
 }
 
 // ─── SRT Generator ──────────────────────────────────────
@@ -195,4 +204,25 @@ async function generateSubtitles(audioPath, outputPath) {
   throw new Error('No subtitle API key set (need DEEPGRAM_API_KEY or OPENAI_WHISPER_API_KEY)');
 }
 
-module.exports = { generateSubtitles, generateWithDeepgram, generateWithWhisper };
+async function transcribeAudioToWordTimings(audioPath) {
+  if (!fs.existsSync(audioPath)) {
+    throw new Error(`Audio file not found: ${audioPath}`);
+  }
+
+  if (process.env.DEEPGRAM_API_KEY) {
+    return await transcribeWithDeepgram(audioPath);
+  }
+
+  if (process.env.OPENAI_WHISPER_API_KEY || process.env.OPENAI_API_KEY) {
+    return await transcribeWithWhisper(audioPath);
+  }
+
+  return [];
+}
+
+module.exports = {
+  generateSubtitles,
+  generateWithDeepgram,
+  generateWithWhisper,
+  transcribeAudioToWordTimings,
+};

@@ -183,7 +183,7 @@ const ICON_REGISTRY: Record<UltimateIconName, IconRegistryEntry> = {
   },
   layoutDashboard: {
     label: 'Layout Dashboard',
-    aliases: ['layout-dashboard', 'dashboard', 'panel'],
+    aliases: ['layout-dashboard', 'dashboard', 'panel', 'grid'],
     tokens: ['面板', '看板', 'dashboard', 'panel', 'board'],
     patterns: [/面板|看板|dashboard|panel|board/i],
     familyBoosts: {metrics: 14, code: 8},
@@ -255,7 +255,7 @@ const ICON_REGISTRY: Record<UltimateIconName, IconRegistryEntry> = {
   sparkles: {
     label: 'Sparkles',
     generic: true,
-    aliases: ['sparkles', 'launch', 'highlight', 'new'],
+    aliases: ['sparkles', 'spark', 'launch', 'highlight', 'new'],
     tokens: ['发布', '开源', '亮点', '升级', '首个', '第一次', 'new', 'launch'],
     patterns: [/发布|开源|亮点|升级|首个|第一次|new|launch/i],
     familyBoosts: {hero: 32, focus: 16, cta: 14},
@@ -291,7 +291,7 @@ const ICON_REGISTRY: Record<UltimateIconName, IconRegistryEntry> = {
   zap: {
     label: 'Zap',
     generic: true,
-    aliases: ['zap', 'speed', 'boost', 'fast'],
+    aliases: ['zap', 'pulse', 'speed', 'boost', 'fast'],
     tokens: ['提效', '速度', '更快', '一键', '压缩', 'boost', 'speed'],
     patterns: [/提效|速度|更快|一键|压缩|boost|speed|fast/i],
     familyBoosts: {hero: 12, metrics: 20, cta: 12, 'number-strip': 10},

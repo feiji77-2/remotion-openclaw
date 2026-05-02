@@ -5,7 +5,12 @@ const {
   hasWorkflowLLM,
 } = require('./step123/llm');
 const {generateStep123Workflow} = require('./step123/pipeline');
-const { ensureStepSkillReady, enrichStepResult, getPhaseForStep } = require('./skillRegistry');
+const {
+  ensureStepSkillReady,
+  enrichStepResult,
+  getPhaseForStep,
+  getStepSkillSpec,
+} = require('./skillRegistry');
 const { execSync } = require('child_process');
 const path = require('path');
 const SHOULD_SKIP_EXTERNAL_SEARCH = process.execArgv.some((arg) => String(arg).startsWith('--test'))
@@ -369,6 +374,12 @@ function normalizeStepSkillConfig(skill) {
     emphasis: String(safe.emphasis || '').trim(),
     avoid: String(safe.avoid || '').trim(),
     notes: String(safe.notes || '').trim(),
+    constraints: Array.isArray(safe.constraints)
+      ? safe.constraints.map((item) => String(item || '').trim()).filter(Boolean)
+      : [],
+    qualityRules: Array.isArray(safe.qualityRules)
+      ? safe.qualityRules.map((item) => String(item || '').trim()).filter(Boolean)
+      : [],
   };
 }
 
@@ -381,6 +392,8 @@ function buildStepSkillInstruction(stepId, context) {
   if (skill.emphasis) fragments.push(`emphasis：${skill.emphasis}`);
   if (skill.avoid) fragments.push(`avoid：${skill.avoid}`);
   if (skill.notes) fragments.push(`notes：${skill.notes}`);
+  if (skill.constraints.length > 0) fragments.push(`constraints：${skill.constraints.join(' / ')}`);
+  if (skill.qualityRules.length > 0) fragments.push(`quality：${skill.qualityRules.join(' / ')}`);
 
   if (fragments.length === 0) {
     return '';
@@ -532,7 +545,13 @@ function buildWorkflowContext(stepId, input) {
   const rawStepSkills = pipeline.stepSkills && typeof pipeline.stepSkills === 'object'
     ? pipeline.stepSkills
     : {};
-  const currentStepSkill = normalizeStepSkillConfig(rawStepSkills?.[stepId]);
+  const stepSkillSpec = getStepSkillSpec(stepId);
+  const currentStepSkill = normalizeStepSkillConfig({
+    ...(stepSkillSpec?.defaults || {}),
+    constraints: stepSkillSpec?.constraints || [],
+    qualityRules: stepSkillSpec?.qualityRules || [],
+    ...(rawStepSkills?.[stepId] && typeof rawStepSkills[stepId] === 'object' ? rawStepSkills[stepId] : {}),
+  });
 
   return {
     generation,
@@ -614,10 +633,10 @@ function buildStepSchemaPrompt(stepId, context) {
       ? `上一版摘要：${context.generation.previousOutputSummary}`
       : '',
     stepId === 4
-      ? 'Step 4 必须以 copy.hook / copy.body / copy.cta 为分镜真源。每个中段场景都要能回指到具体口播段落或句子，不要只围绕标题造泛镜头。'
+      ? 'Step 4 必须以 copy.hook / copy.body / copy.cta 为分镜真源。每个中段场景都要能回指到具体口播段落或句子，不要只围绕标题造泛镜头。如果某一段正文里同时包含机制、数据或对比转折，允许拆成多个 shot，不要被固定 6 镜头或平均切段绑死。'
       : '',
     stepId === 5
-      ? 'Step 5 的每条视觉提示词必须服务对应 shot 的 narration / sceneIntent / dataPoints / scriptExcerpt。画面要解释这句口播，不要退回标题海报式插图。'
+      ? 'Step 5 的每条视觉提示词必须服务对应 shot 的 narration / sceneIntent / dataPoints / scriptExcerpt。画面要解释这句口播，不要退回标题海报式插图。每条 prompt 都要明确主体、构图、信息层、留白区和负面约束。'
       : '',
     buildStepSkillInstruction(stepId, context),
   ].join('\n');
@@ -665,7 +684,7 @@ function buildStepSchemaPrompt(stepId, context) {
       },
     },
     4: {
-      description: '生成 Ultimate 场景编排结果，保持 shot id 不变，并补充 sceneFamily / templateCandidates / 横版结构信息。',
+      description: '生成 Ultimate 场景编排结果，保持 shot id 不变，并补充 script 绑定、sceneFamily、templateCandidates 和横版结构信息。',
       shape: {
         shots: shotShape.map((shot) => ({
           id: shot.id,
@@ -675,16 +694,40 @@ function buildStepSchemaPrompt(stepId, context) {
           level: 'string',
           type: 'string',
           sceneFamily: 'string',
+          scriptRole: 'string',
           sceneIntent: 'string',
           evidenceAnchor: 'string',
           scriptBlockId: 'string',
           scriptBlockLabel: 'string',
+          scriptSourceText: 'string',
           scriptExcerpt: 'string',
           storyboardCueZh: 'string',
           templateCandidates: ['string'],
           dataPoints: ['string'],
           keywords: ['string'],
+          comparisons: ['string or object'],
+          director: {
+            archetype: 'string',
+            cameraIntent: 'string',
+            cameraMotion: 'string',
+            dataEvent: 'string',
+            enterFrames: 'number',
+            emphasisFrames: 'number',
+            staggerGap: 'number',
+            revealDirection: 'string',
+            directorNote: 'string',
+          },
+          visual: {
+            description: 'string',
+            focus: 'string',
+          },
         })),
+        scenePlan: {
+          system: 'string',
+          visualSystem: 'string',
+          sceneCount: 'number',
+          familiesUsed: ['string'],
+        },
       },
     },
     5: {
@@ -703,17 +746,22 @@ function buildStepSchemaPrompt(stepId, context) {
               visualFocus: 'string',
               visualFocusZh: 'string',
               visualSummaryZh: 'string',
+              comparisonSummaryZh: 'string',
               sceneFamily: 'string',
               sceneIntent: 'string',
               evidenceAnchor: 'string',
               text: 'string',
               scriptBlockId: 'string',
               scriptBlockLabel: 'string',
+              scriptSourceText: 'string',
               scriptExcerpt: 'string',
               storyboardCueZh: 'string',
               templateCandidates: ['string'],
               dataPoints: ['string'],
               keywords: ['string'],
+              canvasRatio: 'string',
+              canvasWidth: 'number',
+              canvasHeight: 'number',
             },
           ])),
         },
@@ -741,7 +789,7 @@ function buildStepSchemaPrompt(stepId, context) {
       description: '生成渲染建议。',
       shape: {
         render: {
-          template: 'caption | split | fullscreen | ultimate',
+          template: 'ultimate',
           quality: 'low | medium | high',
         },
       },
@@ -999,19 +1047,22 @@ function normalizeVoicePayload(candidate, input) {
 function normalizeRenderPayload(candidate, input) {
   const current = clone(input.pipelineState.render || {});
   const nextRender = candidate.render && typeof candidate.render === 'object' ? candidate.render : {};
-
-  const template = ['caption', 'split', 'fullscreen', 'ultimate'].includes(nextRender.template)
-    ? nextRender.template
-    : current.template || 'ultimate';
+  const template = 'ultimate';
   const quality = ['low', 'medium', 'high'].includes(nextRender.quality)
     ? nextRender.quality
     : current.quality || 'high';
-  const isUltimate = template === 'ultimate';
+  const currentIsUltimate = current.template === 'ultimate';
+  const requestedWidth = toNumber(nextRender.width, 0);
+  const requestedHeight = toNumber(nextRender.height, 0);
+  const currentWidth = currentIsUltimate ? toNumber(current.width, 0) : 0;
+  const currentHeight = currentIsUltimate ? toNumber(current.height, 0) : 0;
+  const width = requestedWidth > 0 ? requestedWidth : currentWidth > 0 ? currentWidth : 1920;
+  const height = requestedHeight > 0 ? requestedHeight : currentHeight > 0 ? currentHeight : 1080;
 
   // Compute sensible defaults from shots if LLM returned zeros/empties
   const shotsDur = (input.shotsState || []).reduce((s, sh) => s + (sh.durationSeconds || 5), 0);
   const computedDuration = shotsDur || toNumber(nextRender.estimatedDuration, 0);
-  const fallbackBitrate = isUltimate ? 12000 : 8000;
+  const fallbackBitrate = 12000;
   const computedMB = Math.round((toNumber(nextRender.bitrate, fallbackBitrate) * computedDuration / 8) / 1024);
 
   return {
@@ -1019,8 +1070,8 @@ function normalizeRenderPayload(candidate, input) {
       template,
       quality,
       fps: toNumber(nextRender.fps || current.fps || 30, 30),
-      width: toNumber(nextRender.width || current.width || (isUltimate ? 1920 : 1080), isUltimate ? 1920 : 1080),
-      height: toNumber(nextRender.height || current.height || (isUltimate ? 1080 : 1920), isUltimate ? 1080 : 1920),
+      width,
+      height,
       format: String(nextRender.format || current.format || 'mp4').trim(),
       codec: String(nextRender.codec || current.codec || 'h264').trim(),
       bitrate: toNumber(nextRender.bitrate || current.bitrate || fallbackBitrate, fallbackBitrate),
@@ -1028,9 +1079,7 @@ function normalizeRenderPayload(candidate, input) {
       estimatedSize: computedMB > 0 ? '~' + computedMB + 'MB' : String(current.estimatedSize || '').trim(),
       notes: (nextRender.notes || current.notes || '').trim() || (
         computedDuration > 0
-          ? isUltimate
-            ? `${computedDuration}s 横版 1920x1080 Ultimate 模板，适合结构化讲解和章节化信息视频`
-            : `${computedDuration}s 竖屏视频，high 质量发布级输出`
+          ? `${computedDuration}s 横版 1920x1080 Ultimate 模板，适合结构化讲解和章节化信息视频`
           : ''
       ),
     },
@@ -1434,29 +1483,7 @@ function createFallbackWorkflowPayload(stepId, input) {
   }
 
   const totalDurationSec = shots.reduce((s, sh) => s + (sh.durationSeconds || 5), 0);
-  const estimatedMB = Math.round((8000 * totalDurationSec / 8) / 1024);
   const renderPresets = [
-    {
-      template: 'caption',
-      width: 1080,
-      height: 1920,
-      bitrate: 8000,
-      notes: '9:16 竖屏适合抖音/视频号，caption 模板突出口播内容',
-    },
-    {
-      template: 'split',
-      width: 1080,
-      height: 1920,
-      bitrate: 8000,
-      notes: '9:16 竖屏分屏模板，左侧文字右侧画面，适合对比讲解类内容',
-    },
-    {
-      template: 'fullscreen',
-      width: 1080,
-      height: 1920,
-      bitrate: 8000,
-      notes: '全屏模板适合视觉冲击力强的演示内容，建议配合高质量图片',
-    },
     {
       template: 'ultimate',
       width: 1920,
@@ -1465,7 +1492,7 @@ function createFallbackWorkflowPayload(stepId, input) {
       notes: 'Ultimate 1920x1080 横版模板，适合把搜索结果、文案和分镜压成章节化信息视频',
     },
   ];
-  const preset = renderPresets[variant % renderPresets.length] || renderPresets[0];
+  const preset = renderPresets[0];
   const presetEstimatedMB = Math.round((preset.bitrate * totalDurationSec / 8) / 1024);
 
   return normalizeRenderPayload({

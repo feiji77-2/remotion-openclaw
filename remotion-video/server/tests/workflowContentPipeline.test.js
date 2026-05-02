@@ -166,6 +166,96 @@ const buildGptReleaseInput = () => ({
   },
 });
 
+const buildLongFormDeepseekInput = () => ({
+  generationMeta: {
+    mode: 'generate',
+    trigger: 'manual',
+    attempt: 0,
+  },
+  projectState: {
+    id: 'deepseek-v4-longform',
+    name: 'deepseek v4',
+    fps: 30,
+    width: 1920,
+    height: 1080,
+  },
+  shotsState: [],
+  pipelineState: {
+    inputTopic: 'deepseek v4',
+    inputTitleKeywords: 'deepseek v4',
+    selectedTitleId: 'title-1',
+    titles: {
+      options: [
+        {
+          id: 'title-1',
+          title: '我把一个模糊需求丢给deepseek v4，18分钟后它返回了可用的完整方案',
+          angle: '数据型',
+          rationale: '时间数字 + 完整结果，直接展示任务闭环。',
+          evidenceAnchor: '18分钟完成模糊需求到可用方案',
+          hookStyle: '数字型+结果型',
+        },
+      ],
+      selectedId: 'title-1',
+      selectedReason: '直接承接任务闭环的主判断。',
+    },
+    selectedAnalysis: {
+      thesis: 'deepseek v4不是简单迭代，而是推理能力从“给答案”到“完成任务”的质变',
+      audience: '想用AI解决实际问题但不想被参数营销搞晕的普通用户和行业从业者',
+      corePromise: '看完能判断deepseek v4能替你做什么、值不值得切换',
+      analysisBrief: {
+        mainQuestion: 'deepseek v4到底强在哪，和之前版本相比普通用户能用它做什么之前做不到的事',
+        audienceFocus: '不关心参数大小，只关心“我丢个需求它能不能直接帮我搞定”',
+        narrativeApproach: '用任务完成能力而非模型参数作为衡量维度',
+        whyNow: 'deepseek v4 已形成公开讨论，适合做判断型内容',
+      },
+      researchFacts: [
+        {
+          label: '任务闭环',
+          fact: 'deepseek v4 最值得看的不是聊天顺不顺，而是它开始能把模糊需求拆成可执行步骤，再收成完整方案。',
+          evidenceAnchor: '18分钟完成模糊需求到可用方案',
+          sourceTitle: '实测记录',
+        },
+        {
+          label: '能力机制',
+          fact: '关键机制不是一句更强，而是 Agent、多步骤 tool calling、长上下文和代码任务执行开始连成一条链。',
+          evidenceAnchor: 'Agent + tool calling + 长上下文',
+          sourceTitle: '能力变化摘要',
+        },
+        {
+          label: '评测锚点',
+          fact: 'SWE-bench 这类 benchmark 真正考的是 AI 能不能处理真实代码 issue，而不是会不会背答案。',
+          evidenceAnchor: 'SWE-bench / 真实代码任务',
+          sourceTitle: 'benchmark 说明',
+        },
+        {
+          label: '落地判断',
+          fact: '决定能不能放进工作流的，不只有模型强弱，还有 API 成本、调用限制和长任务稳定性。',
+          evidenceAnchor: 'API 成本 / 调用限制 / 长任务稳定性',
+          sourceTitle: '工程落地观察',
+        },
+      ],
+      layers: [
+        {label: '本质定位', insight: '核心突破不是聊天，而是任务执行链条开始闭环。', evidence: 'Agent + tool calling'},
+        {label: '能力锚点', insight: '长上下文和真实代码任务是两个最该落地的能力点。', evidence: 'SWE-bench + 长上下文'},
+        {label: '竞争位置', insight: '真正该比的是能不能进工作流，而不是海报式跑分。', evidence: 'API 成本 + 稳定性'},
+      ],
+      process: [
+        {label: '先抛结果', detail: '先讲模糊需求在 18 分钟内闭环。'},
+        {label: '再拆机制', detail: '再讲 Agent、tool calling 和长上下文为什么有用。'},
+        {label: '最后给判断', detail: '最后判断它值不值得切换。'},
+      ],
+    },
+    copy: {
+      requirements: {
+        focus: '只讲任务闭环、能力机制、benchmark和工程落地',
+        avoid: '空话、背景铺垫、只讲热度',
+        style: '短句、硬信息、像真人当面拆重点',
+        length: '2-4 分钟口播，约800-1000字',
+      },
+    },
+  },
+});
+
 test('step 3 content pipeline emits structured content contract from repo-owned skill source', async () => {
   disableWorkflowLlm();
 
@@ -291,4 +381,28 @@ test('gpt5.5 release flow keeps deterministic titles and copy aligned', async ()
   assert.doesNotMatch(joinedText, /国产模型/);
   assert.doesNotMatch(joinedText, /…/);
   assert.ok(safetyMatches.length <= 1, 'expected safety upgrade sentence not to repeat across deterministic copy');
+});
+
+test('deterministic step3 respects long-form skill timing and keeps tech-mechanism block', async () => {
+  disableWorkflowLlm();
+
+  const baseInput = buildLongFormDeepseekInput();
+  const step3 = await generateWorkflowStep({
+    stepId: 3,
+    ...baseInput,
+  });
+
+  const copy = step3.payload?.copy || {};
+  const brief = copy.brief || {};
+  const body = Array.isArray(copy.body) ? copy.body : [];
+  const techBlock = body.find((item) => /tech-mechanism/i.test(String(item?.type || item?.label || '')));
+  const totalText = [
+    String(copy.hook || ''),
+    ...body.map((item) => String(item?.text || '')),
+    String(copy.cta || ''),
+  ].join('');
+
+  assert.match(String(brief.pacing || ''), /(1\d{2}|2\d{2}) 秒口播/, 'expected long-form pacing seconds');
+  assert.ok(totalText.length >= 700, 'expected deterministic step3 copy to be long-form');
+  assert.ok(techBlock, 'expected deterministic copy to preserve tech-mechanism block');
 });

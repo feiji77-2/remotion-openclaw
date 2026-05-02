@@ -11,13 +11,13 @@
 
 - `UltimateSceneTemplate`
 - `ultimate-config.json`
-- `outline -> compile -> render`
+- `step-04 / config -> render`
 - `project.json -> build-project-package -> ultimate-project-adapter -> render`
 
 核心代码入口：
 
 - 自动命中规则：[scripts/lib/ultimate-project-adapter.js](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/lib/ultimate-project-adapter.js)
-- Outline 风格别名映射：[scripts/lib/ultimate-outline-compiler.mjs](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/lib/ultimate-outline-compiler.mjs)
+- Outline 风格别名映射（旧兼容层，非主链）：[scripts/lib/ultimate-outline-compiler.mjs](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/lib/ultimate-outline-compiler.mjs)
 - 风格枚举定义：[src/components/ultimate-kit/project.ts](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/src/components/ultimate-kit/project.ts)
 - 场景数据类型：[src/components/ultimate-kit/types.ts](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/src/components/ultimate-kit/types.ts)
 

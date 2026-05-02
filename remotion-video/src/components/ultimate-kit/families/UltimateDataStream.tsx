@@ -632,11 +632,15 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
   const frame = useCurrentFrame();
   const gap = Math.max(6, grammar?.staggerGap ?? 6);
   const accentColor = toneToColor(accent);
-  const visibleItems = items.slice(0, 3);
+  const visibleItems = items.slice(0, 4);
+  const headingLines = splitDisplayLinesBalanced(heading, 18, 2);
+  const surgeCount = visibleItems.filter((item) => item.trend === 'up').length;
+  const alertCount = visibleItems.filter((item) => item.trend === 'alert').length;
   const lanes = [
-    {y: 430, bend: -26},
-    {y: 566, bend: 22},
-    {y: 698, bend: -18},
+    {y: 180, bendA: -46, bendB: 22},
+    {y: 316, bendA: 24, bendB: -18},
+    {y: 454, bendA: -20, bendB: 28},
+    {y: 592, bendA: 32, bendB: -24},
   ];
   const sampleCubic = (
     t: number,
@@ -659,28 +663,89 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
   };
   return (
     <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
-      <div style={{position: 'absolute', top: 118, left: 150, right: 150}}>
-        <div style={eyebrowStyle(accentColor)}>实时数据流</div>
-        <div
-          style={{
-            marginTop: 22,
-            ...sectionHeadingStyle(relaxedTypeScale.title.lg),
-          }}
-        >
-          {heading}
+      <div style={{position: 'absolute', top: 118, left: 150, right: 540}}>
+        <div style={eyebrowStyle(accentColor, false)}>realtime pulse</div>
+        <div style={{marginTop: 22, maxWidth: 820}}>
+          {headingLines.map((line, index) => (
+            <div
+              key={`${line}-${index}`}
+              style={{
+                marginTop: index === 0 ? 0 : 4,
+                ...sectionHeadingStyle(relaxedTypeScale.title.lg, false),
+              }}
+            >
+              {line}
+            </div>
+          ))}
         </div>
         {summary ? (
           <div
             style={{
-              margin: '22px auto 0',
-              maxWidth: 920,
-              ...bodyTextStyle(18, kit.colors.textMuted, true),
+              marginTop: 22,
+              maxWidth: 760,
+              ...bodyTextStyle(18, kit.colors.textMuted, false),
             }}
           >
             {summary}
           </div>
         ) : null}
       </div>
+
+      <div
+        style={{
+          position: 'absolute',
+          top: 118,
+          right: 140,
+          width: 360,
+          padding: '22px 24px 24px',
+          borderRadius: 32,
+          border: `1px solid ${accentColor}20`,
+          background: 'linear-gradient(180deg, rgba(8,12,20,0.9) 0%, rgba(6,9,16,0.98) 100%)',
+          boxShadow: `0 0 34px ${accentColor}14`,
+          overflow: 'hidden',
+        }}
+      >
+        <GeometryAccent
+          variant="ring"
+          color={accentColor}
+          opacity={0.16}
+          style={{
+            right: -18,
+            top: -16,
+            width: 160,
+            height: 160,
+          }}
+        />
+        <div style={{fontSize: 14, letterSpacing: 2.2, textTransform: 'uppercase', color: `${accentColor}cc`}}>stream pressure</div>
+        <div style={{marginTop: 18, display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'end'}}>
+          <div>
+            <div style={{fontSize: 30, lineHeight: 1.08, fontWeight: 820, color: '#f7fbff'}}>
+              {visibleItems.length} live feeds
+            </div>
+            <div style={{marginTop: 10, fontSize: 14, lineHeight: 1.34, color: 'rgba(229,236,255,0.58)'}}>
+              Pulse lanes update independently instead of rendering like terminal logs.
+            </div>
+          </div>
+          <div style={{fontSize: 54, lineHeight: 0.9, fontWeight: 860, color: accentColor}}>
+            {Math.max(1, surgeCount)}
+          </div>
+        </div>
+        <div style={{marginTop: 20, display: 'grid', gap: 12}}>
+          <div style={{display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center'}}>
+            <div style={{fontSize: 13, letterSpacing: 1.8, textTransform: 'uppercase', color: `${accentColor}cc`}}>surge lanes</div>
+            <div style={{fontSize: 18, color: accentColor}}>{surgeCount}</div>
+          </div>
+          <div style={{display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center'}}>
+            <div style={{fontSize: 13, letterSpacing: 1.8, textTransform: 'uppercase', color: `${resolveUltimateAccent('orange')}cc`}}>alert lanes</div>
+            <div style={{fontSize: 18, color: resolveUltimateAccent('orange')}}>{alertCount}</div>
+          </div>
+          <div style={{display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center'}}>
+            <div style={{fontSize: 13, letterSpacing: 1.8, textTransform: 'uppercase', color: `${resolveUltimateAccent('green')}cc`}}>cadence</div>
+            <div style={{fontSize: 18, color: resolveUltimateAccent('green')}}>30fps</div>
+          </div>
+        </div>
+      </div>
+
       <div
         style={{
           position: 'absolute',
@@ -690,7 +755,7 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
           bottom: 118,
           borderRadius: 44,
           overflow: 'hidden',
-          background: 'linear-gradient(180deg, rgba(6, 9, 18, 0.72), rgba(6, 9, 18, 0.52))',
+          background: 'linear-gradient(180deg, rgba(6, 9, 18, 0.78), rgba(6, 9, 18, 0.58))',
           border: '1px solid rgba(255,255,255,0.05)',
         }}
       >
@@ -706,22 +771,31 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
           }}
         />
         <GeometryAccent
-          variant="ring"
+          variant="arc"
           color={resolveUltimateAccent('purple')}
-          opacity={0.22}
+          opacity={0.2}
           style={{
-            right: 108,
-            top: 88,
-            width: 190,
-            height: 190,
+            right: 104,
+            top: 64,
+            width: 260,
+            height: 120,
           }}
         />
-        <div style={{position: 'absolute', left: 64, top: 74, width: 420, display: 'grid', gap: 22}}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: `linear-gradient(90deg, transparent 0%, ${accentColor}08 52%, transparent 100%)`,
+            transform: 'skewX(-14deg)',
+            pointerEvents: 'none',
+          }}
+        />
+        <div style={{position: 'absolute', left: 48, top: 64, right: 48, display: 'grid', gap: 18}}>
           {visibleItems.map((item, index) => {
-            const color = toneToColor(item.accent ?? (index === 0 ? accent : index === 1 ? 'green' : 'purple'));
+            const color = toneToColor(item.accent ?? (index === 0 ? accent : index === 1 ? 'green' : index === 2 ? 'purple' : 'orange'));
             const delay = 8 + index * gap;
             const reveal = buildReveal(frame, delay);
-            const progress = interpolate(frame, [delay + 4, delay + 26], [0, 1], {
+            const progress = interpolate(frame, [delay + 4, delay + 28], [0, 1], {
               extrapolateLeft: 'clamp',
               extrapolateRight: 'clamp',
             });
@@ -730,13 +804,13 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
                 key={`${item.label}-${index}`}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '120px minmax(0, 1fr)',
-                  gap: 22,
+                  gridTemplateColumns: '220px minmax(0, 1fr) 220px',
+                  gap: 18,
                   alignItems: 'center',
                   opacity: reveal,
                   transform: withMicroJitter(
                     frame,
-                    `translateY(${interpolate(reveal, [0, 1], [16, 0])}px)`,
+                    `translateY(${interpolate(reveal, [0, 1], [14, 0])}px)`,
                     resolveUltimateMicroJitterConfig('steady', {
                       delay,
                       seed: 320 + index,
@@ -744,32 +818,85 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
                   ),
                 }}
               >
-                <RadialGauge
-                  progress={progress}
-                  color={color}
-                  valueLabel={animateMetricDisplay(item.value, progress)}
-                  subtitle={item.trend || 'steady'}
-                />
                 <div>
-                  <div style={{...overlineLabelStyle(color), fontSize: 16}}>{item.label}</div>
+                  <div style={{...overlineLabelStyle(color), fontSize: 15}}>feed 0{index + 1}</div>
+                  <div style={{marginTop: 10, fontSize: 28, lineHeight: 1.08, fontWeight: 800, color: '#f7fbff'}}>
+                    {item.label}
+                  </div>
                   {item.detail ? (
-                    <div style={{marginTop: 12, ...bodyTextStyle(17, 'rgba(255,255,255,0.66)')}}>
+                    <div style={{marginTop: 10, ...bodyTextStyle(16, 'rgba(255,255,255,0.6)')}}>
                       {item.detail}
                     </div>
                   ) : null}
+                </div>
+                <div
+                  style={{
+                    position: 'relative',
+                    height: 10,
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,0.06)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${Math.max(8, Math.min(100, progress * 100))}%`,
+                      height: '100%',
+                      borderRadius: 999,
+                      background: `linear-gradient(90deg, ${color}, rgba(255,255,255,0.92))`,
+                      boxShadow: `0 0 18px ${color}`,
+                    }}
+                  />
+                </div>
+                <div style={{justifySelf: 'end'}}>
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: 18,
+                      border: `1px solid ${color}28`,
+                      background: `linear-gradient(180deg, ${color}10 0%, rgba(8,10,18,0.84) 100%)`,
+                      minWidth: 168,
+                      textAlign: 'right',
+                    }}
+                  >
+                    <div style={{fontSize: 30, lineHeight: 1, fontWeight: 840, color}}>
+                      {animateMetricDisplay(item.value, progress)}
+                    </div>
+                    <div style={{marginTop: 8, fontSize: 12, letterSpacing: 1.8, textTransform: 'uppercase', color: 'rgba(229,236,255,0.52)'}}>
+                      {item.trend || 'steady'}
+                    </div>
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
         <svg viewBox="0 0 1720 720" style={{position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible'}}>
+          {Array.from({length: 12}).map((_, columnIndex) => {
+            const height = 56 + ((columnIndex * 23 + frame * 3) % 88);
+            const x = 740 + columnIndex * 70;
+            return (
+              <rect
+                key={`pulse-column-${columnIndex}`}
+                x={x}
+                y={720 - height - 42}
+                width={28}
+                height={height}
+                rx={14}
+                fill={columnIndex % 2 === 0 ? `${accentColor}22` : 'rgba(255,255,255,0.06)'}
+              />
+            );
+          })}
           {visibleItems.map((item, index) => {
-            const color = toneToColor(item.accent ?? (index === 0 ? accent : index === 1 ? 'green' : 'purple'));
+            const color = toneToColor(item.accent ?? (index === 0 ? accent : index === 1 ? 'green' : index === 2 ? 'purple' : 'orange'));
             const lane = lanes[index];
-            const p0 = {x: 560, y: lane.y};
-            const p1 = {x: 860, y: lane.y + lane.bend};
-            const p2 = {x: 1180, y: lane.y - lane.bend * 0.7};
-            const p3 = {x: 1600, y: lane.y + (index % 2 === 0 ? -18 : 22)};
+            if (!lane) {
+              return null;
+            }
+            const p0 = {x: 520, y: lane.y};
+            const p1 = {x: 760, y: lane.y + lane.bendA};
+            const p2 = {x: 1120, y: lane.y + lane.bendB};
+            const p3 = {x: 1558, y: lane.y + (index % 2 === 0 ? -12 : 18)};
             const delay = 12 + index * gap * 5;
             const progress = interpolate(frame, [delay, delay + 34], [0, 1], {
               extrapolateLeft: 'clamp',
@@ -787,7 +914,7 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
                     x: point.x,
                     y: point.y,
                     size: 6,
-                    shape: 'diamond',
+                    shape: index % 2 === 0 ? 'diamond' : 'ring',
                   }}
                   baseStrokeWidth={4}
                   flowStrokeWidth={7}
@@ -795,15 +922,29 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
                   dashPattern="12 16"
                   flowOpacity={0.68}
                 />
+                <circle cx={p0.x} cy={p0.y} r={8} fill="rgba(9,12,22,0.94)" stroke={color} strokeWidth={3} />
+                {[0.22, 0.44, 0.66].map((trailProgress, trailIndex) => {
+                  const trailPoint = sampleCubic(Math.max(0.01, Math.min(progress, trailProgress)), p0, p1, p2, p3);
+                  return (
+                    <circle
+                      key={`${item.label}-trail-${trailIndex}`}
+                      cx={trailPoint.x}
+                      cy={trailPoint.y}
+                      r={trailIndex === 0 ? 4 : 3}
+                      fill={color}
+                      opacity={progress > trailProgress ? 0.2 + trailIndex * 0.12 : 0}
+                    />
+                  );
+                })}
                 <text
-                  x={p3.x - 24}
-                  y={p3.y - 20}
+                  x={p3.x - 8}
+                  y={p3.y - 26}
                   fill={color}
-                  fontSize="18"
+                  fontSize="16"
                   fontWeight="800"
                   textAnchor="end"
                 >
-                  {item.label}
+                  {item.trend || 'live'}
                 </text>
               </React.Fragment>
             );
@@ -812,10 +953,11 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
         <div
           style={{
             position: 'absolute',
-            right: 52,
+            left: 54,
             bottom: 38,
             display: 'flex',
             gap: 14,
+            flexWrap: 'wrap',
           }}
         >
           {visibleItems.map((item, index) => (
@@ -833,7 +975,7 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
                 letterSpacing: 1.6,
               }}
             >
-              {item.trend || (index === 0 ? 'up' : 'steady')}
+              {cleanDisplayText(item.label)} / {item.trend || (index === 0 ? 'up' : 'steady')}
             </div>
           ))}
         </div>

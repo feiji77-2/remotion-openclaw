@@ -1,7 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const {parseSrtContentToSubtitleData} = require('../workers/renderWorker');
+const {
+  buildShotTimelineFrames,
+  buildSubtitleDataFromShotRuntime,
+  parseSrtContentToSubtitleData,
+  splitSubtitleTokens,
+} = require('../workers/renderWorker');
 
 test('parseSrtContentToSubtitleData converts SRT into frame-aligned subtitle cues', () => {
   const subtitleData = parseSrtContentToSubtitleData(
@@ -36,4 +41,57 @@ test('parseSrtContentToSubtitleData converts SRT into frame-aligned subtitle cue
     text: '现在开始真正的工具调用。',
     words: null,
   });
+});
+
+test('splitSubtitleTokens preserves chinese rhythm chunks', () => {
+  assert.deepEqual(
+    splitSubtitleTokens('现在开始真正的工具调用。'),
+    ['现在开始', '真正的工', '具调用', '。'],
+  );
+});
+
+test('segment runtime builds sequential audio subtitle timeline', () => {
+  const shots = [
+    {
+      id: 'shot-01',
+      title: '开场',
+      narration: '第一句来了',
+      frames: 54,
+      audioDurationInFrames: 48,
+      audioDurationSeconds: 1.6,
+    },
+    {
+      id: 'shot-02',
+      title: '第二段',
+      narration: '第二句跟上',
+      frames: 66,
+      audioDurationInFrames: 60,
+      audioDurationSeconds: 2,
+    },
+  ];
+  const runtime = [
+    {
+      shot: shots[0],
+      speech: {rawText: '第一句来了'},
+      durationInFrames: 48,
+    },
+    {
+      shot: shots[1],
+      speech: {rawText: '第二句跟上'},
+      durationInFrames: 60,
+    },
+  ];
+
+  const timeline = buildShotTimelineFrames(shots, 30);
+  assert.equal(timeline[0].audioStartFrame, 0);
+  assert.equal(timeline[1].audioStartFrame, 48);
+  assert.ok(timeline[1].visualStartFrame < shots[0].frames + shots[1].frames);
+
+  const subtitleData = buildSubtitleDataFromShotRuntime(runtime, timeline, 30);
+  assert.equal(subtitleData.length, 2);
+  assert.equal(subtitleData[0].startFrame, 0);
+  assert.equal(subtitleData[0].endFrame, 48);
+  assert.equal(subtitleData[1].startFrame, 48);
+  assert.equal(subtitleData[1].endFrame, 108);
+  assert.ok(Array.isArray(subtitleData[0].words));
 });

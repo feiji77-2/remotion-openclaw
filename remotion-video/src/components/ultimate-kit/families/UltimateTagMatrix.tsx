@@ -1,10 +1,18 @@
 import React from 'react';
 import {GeometryAccent, OrbitLabels, TextMaskWipe} from '../../visual-atoms';
+import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
-import type {UltimateTagMatrixProps} from '../types';
+import type {UltimateSceneGrammar, UltimateTagMatrixProps} from '../types';
 
-export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps> = ({heading, tabs = [], activeTab, items}) => {
+export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps & {grammar?: UltimateSceneGrammar}> = ({
+  heading,
+  tabs = [],
+  activeTab,
+  items,
+  grammar,
+}) => {
   const color = resolveUltimateAccent('cyan');
+  const revealDirection = resolveTextRevealDirection(grammar, 'left');
   return (
     <div style={{display: 'grid', gridTemplateColumns: '0.82fr 1.18fr', height: '100%', gap: 28, alignItems: 'center'}}>
       <div style={{display: 'grid', gap: 18, alignSelf: 'stretch'}}>
@@ -13,7 +21,7 @@ export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps> = ({heading, ta
           <div style={{position: 'relative', minHeight: 124, marginTop: 10}}>
             <TextMaskWipe
               text={heading}
-              direction="left"
+              direction={revealDirection}
               accent={color}
               fontSize={80}
               color="#f7fbff"

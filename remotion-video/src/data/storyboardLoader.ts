@@ -33,6 +33,9 @@ import {
 import {
   directorQA,
   resolveShotGrammar,
+  type ShotArchetype,
+  type CameraIntent,
+  type DataEventVerb,
   type DirectorQAResult,
   type ResolvedShotGrammar,
 } from './shotGrammar.ts';
@@ -62,6 +65,7 @@ type NormalizedComparison = {
   text: string;
   secondary?: string;
   accent?: string;
+  icon?: string;
 };
 
 type VisualPropTagItem = string | {label?: string; accent?: string};
@@ -144,6 +148,19 @@ interface ShotItem {
     props?: ShotVisualProps;
     [key: string]: unknown;
   };
+  director?: {
+    archetype?: string;
+    cameraIntent?: string;
+    cameraMotion?: string;
+    dataEvent?: string;
+    enterFrames?: number;
+    emphasisFrames?: number;
+    staggerGap?: number;
+    revealDirection?: string;
+    memoryObject?: {type?: string; role?: string; enterFrame?: number; color?: string};
+    directorNote?: string;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -183,6 +200,18 @@ export interface NormalizedShot {
   comparisons?: NormalizedComparison[];
   dataPoints?: string[];
   visualProps: ShotVisualProps;
+  director?: {
+    archetype?: string;
+    cameraIntent?: string;
+    cameraMotion?: string;
+    dataEvent?: string;
+    enterFrames?: number;
+    emphasisFrames?: number;
+    staggerGap?: number;
+    revealDirection?: string;
+    memoryObject?: {type?: string; role?: string; enterFrame?: number; color?: string};
+    directorNote?: string;
+  };
 }
 
 type StoryboardScene = Omit<UltimateProjectConfig['scenes'][number], 'data'> & {
@@ -192,10 +221,12 @@ type StoryboardScene = Omit<UltimateProjectConfig['scenes'][number], 'data'> & {
   grammar: {
     archetype: string;
     cameraIntent: string;
+    cameraMotion?: string;
     dataEvent: string;
     enterFrames: number;
     emphasisFrames: number;
     staggerGap: number;
+    revealDirection?: string;
     memoryObject: {type: string; role: string; enterFrame: number; color: string};
     directorNote: string;
   };
@@ -340,6 +371,7 @@ export function normalizeShots(json: AnyJson, fps = DEFAULT_FPS): NormalizedShot
         comparisons: shot.comparisons,
         dataPoints: shot.dataPoints,
         visualProps: (shot.visual?.props ?? {}) as ShotVisualProps,
+        director: shot.director,
       };
     });
   }
@@ -360,13 +392,13 @@ function mergeItems(shot: AnyJson): NormalizedShotItem[] {
   const items: NormalizedShotItem[] = [];
   (shot.items ?? []).forEach((it: AnyJson) => items.push(it));
   (shot.features ?? []).forEach((f: AnyJson) => items.push({label: f.title ?? '', detail: f.desc ?? ''}));
-  (shot.comparisons ?? []).forEach((c: AnyJson) => items.push({label: c.label ?? '', detail: c.text ?? '', accent: c.accent}));
+  (shot.comparisons ?? []).forEach((c: AnyJson) => items.push({label: c.label ?? '', detail: c.text ?? '', accent: c.accent, icon: c.icon ?? ''}));
   // Fallback: visual.props 里也有可能藏着 comparisons/features
   const vprops = (shot.visual?.props ?? {}) as {
     comparisons?: NormalizedComparison[];
     features?: NormalizedFeature[];
   };
-  (vprops.comparisons ?? []).forEach((c: AnyJson) => items.push({label: c.label ?? '', detail: c.text ?? '', accent: c.accent}));
+  (vprops.comparisons ?? []).forEach((c: AnyJson) => items.push({label: c.label ?? '', detail: c.text ?? '', accent: c.accent, icon: c.icon ?? ''}));
   (vprops.features ?? []).forEach((f: AnyJson) => items.push({label: f.title ?? '', detail: f.desc ?? ''}));
   return items;
 }
@@ -399,6 +431,7 @@ function normalizeShot(shot: AnyJson, fps: number): NormalizedShot {
     comparisons: shot.comparisons,
     dataPoints: shot.dataPoints,
     visualProps: visualProps as ShotVisualProps,
+    director: shot.director,
   };
 }
 
@@ -435,7 +468,7 @@ export function parseShots(
 /** Resolve transition type per shot level/family — sourced from registry.ts */
 function resolveTransition(
   shot: NormalizedShot,
-  grammar?: ResolvedShotGrammar,
+  grammar?: {archetype?: string},
 ): ReturnType<typeof resolveTransitionFromRegistry> {
   return resolveTransitionFromRegistry(shot.family as UltimateSceneFamily, shot.level, grammar?.archetype);
 }
@@ -572,18 +605,36 @@ export function shotsToScenes(
     // 从 shot 数据里提取 numericFields，用于 DataEventVerb 选择
     const numericFields = extractNumericFields(shot);
 
-    const grammar = resolveShotGrammar({
-      family: shot.family,
-      level: shot.level,
-      shotIndex: idx,
-      totalShots: shots.length,
-      numericFields,
-      // 语义字段：来自 visualProps（storyboard 阶段可以写入学）
-      sceneIntent: (shot.visualProps?.sceneIntent as string) ?? '',
-      storyboardCueZh: (shot.visualProps?.storyboardCueZh as string) ?? '',
-      scriptBlockLabel: (shot.visualProps?.scriptBlockLabel as string) ?? '',
-      type: (shot.visualProps?.type as string) ?? shot.family,
-    });
+    const grammar = shot.director?.archetype && shot.director?.cameraIntent && shot.director?.dataEvent
+      ? {
+          archetype: shot.director.archetype as ShotArchetype,
+          cameraIntent: shot.director.cameraIntent as CameraIntent,
+          cameraMotion: shot.director.cameraMotion,
+          dataEvent: shot.director.dataEvent as DataEventVerb,
+          enterFrames: Number(shot.director.enterFrames ?? 16),
+          emphasisFrames: Number(shot.director.emphasisFrames ?? 48),
+          staggerGap: Number(shot.director.staggerGap ?? 0),
+          revealDirection: shot.director.revealDirection,
+          memoryObject: {
+            type: String(shot.director.memoryObject?.type || 'word'),
+            role: String(shot.director.memoryObject?.role || '显式导演记忆物'),
+            enterFrame: Number(shot.director.memoryObject?.enterFrame ?? 12),
+            color: String(shot.director.memoryObject?.color || '#00d4ff'),
+          },
+          directorNote: String(shot.director.directorNote || '').trim(),
+        }
+      : resolveShotGrammar({
+          family: shot.family,
+          level: shot.level,
+          shotIndex: idx,
+          totalShots: shots.length,
+          numericFields,
+          // 语义字段：来自 visualProps（storyboard 阶段可以写入学）
+          sceneIntent: (shot.visualProps?.sceneIntent as string) ?? '',
+          storyboardCueZh: (shot.visualProps?.storyboardCueZh as string) ?? '',
+          scriptBlockLabel: (shot.visualProps?.scriptBlockLabel as string) ?? '',
+          type: (shot.visualProps?.type as string) ?? shot.family,
+        });
 
     const scene = {
       id: shot.id,
@@ -709,6 +760,7 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
         label: it.label,
         title: it.detail ?? it.label,
         detail: it.detail,
+        icon: it.icon ?? '',
         accent: (it.accent as 'cyan' | 'orange' | 'purple') ?? 'cyan',
       }));
       return {
@@ -741,7 +793,7 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
       const steps = (shot.items ?? []).map((it) => ({
         label: it.label,
         detail: it.detail ?? '',
-        icon: '',
+        icon: it.icon ?? '',
         accent: (it.accent as 'cyan' | 'orange' | 'purple') ?? 'cyan',
       }));
       return {
@@ -798,6 +850,7 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
     case 'metrics': {
       // shot.dataPoints: ["label:value:ratio", "label:value", ...] — real structured data
       const points = (shot.dataPoints ?? [shot.narration]).filter((raw): raw is string => typeof raw === 'string' && raw.length > 0);
+      const iconHints = shot.items ?? [];
       const items = points.map((raw, i) => {
         // Format: "label:value" or "label:value:ratio" or just "label"
         const colonIdx = raw.indexOf(':');
@@ -807,11 +860,12 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
         const value = ratioIdx > 0 ? rest.slice(0, ratioIdx) : rest;
         const ratioStr = ratioIdx > 0 ? rest.slice(ratioIdx + 1) : '0.5';
         const ratio = parseFloat(ratioStr) || 0.5;
+        const matchedItem = iconHints[i];
         return {
           label,
           value,
           ratio: Math.min(1, Math.max(0, ratio)),
-          icon: '',
+          icon: matchedItem?.icon ?? '',
           accent: 'cyan' as const,
         };
       });
@@ -858,7 +912,7 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
         quote: c.text,
         detail: '',
         chips: [],
-        icon: '',
+        icon: c.icon ?? '',
         accent: 'cyan' as const,
       }));
       return {

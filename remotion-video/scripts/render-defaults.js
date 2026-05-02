@@ -54,7 +54,11 @@ const detectPreferredBrowserExecutable = () => {
   }
 
   const allowSystemBrowser = parseBooleanEnv(process.env.REMOTION_ALLOW_SYSTEM_BROWSER);
-  if (allowSystemBrowser === false) {
+  // Default to Remotion-managed Chromium unless the caller explicitly opts in to
+  // a system browser. This avoids macOS GPU/compositor glitches where video
+  // renders can show tiled or repeated frames while single-frame still renders
+  // remain correct.
+  if (allowSystemBrowser !== true) {
     return null;
   }
 
@@ -84,11 +88,7 @@ const resolvePreferredOpenGlRenderer = (browserExecutable) => {
     return null;
   }
 
-  if (!browserExecutable) {
-    return null;
-  }
-
-  return process.platform === 'darwin' ? 'angle' : null;
+  return null;
 };
 
 const resolvePreferredHardwareAcceleration = () => {
@@ -101,7 +101,7 @@ const resolvePreferredHardwareAcceleration = () => {
     return 'disable';
   }
 
-  return 'if-possible';
+  return null;
 };
 
 const buildPreferredRemotionFlags = ({existingArgs = [], browserExecutable} = {}) => {

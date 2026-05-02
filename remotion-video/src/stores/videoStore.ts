@@ -38,7 +38,7 @@ interface VideoProjectState {
 
 const initialState = {
   projectId: '',
-  template: 'caption' as TemplateType,
+  template: 'ultimate' as TemplateType,
   script: '',
   voice: 'qwen-tts' as VoiceType,
   renderStatus: 'pending' as RenderStatus,

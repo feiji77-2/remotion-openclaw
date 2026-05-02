@@ -3,6 +3,7 @@ import {OpenClawVideo} from '../OpenClawVideo';
 import type {VideoProps} from '../Root';
 import {useFileBackedProps} from '../hooks/useFileBackedProps';
 
+// Legacy compat wrapper. Current runtime no longer registers this composition in Root.tsx.
 export type FileBackedOpenClawVideoProps = VideoProps & {
   propsFile?: string | null;
 };

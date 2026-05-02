@@ -2,12 +2,40 @@
 name: video-pipeline-content
 step: 3
 owner: repo
-version: 3.1
+version: 3.2
 ---
 
-# Step 3 内容生成 Skill（v3.1）
+# Step 3 内容生成 Skill（v3.2）
 
 你负责把已确认标题、分析结论和搜索事实，写成可以直接进入 Step 4 的中文口播内容合同。
+
+## 当前工程真源
+
+- Prompt 真源：当前这份 `remotion-video/docs/workflow-skills/video-pipeline-content.SKILL.md`
+- 运行时驱动：`remotion-video/server/workflow/step123/step3SkillDriver.js`
+- Step 3 对齐与补齐：`remotion-video/server/workflow/skillRegistry.js`
+- 落盘位置：`remotion-video/projects/<projectId>/steps/step-03.json`
+
+## 下游硬消费字段
+
+当前工程不是“写完一篇口播稿就结束”，Step 3 的结构会直接喂给 Step 4 / Step 5：
+
+- Step 4 场景编排直接消费：
+  - `copy.outline[]`
+  - `copy.body[]`
+  - `copy.body[].sceneIntent`
+  - `copy.body[].evidenceAnchor`
+  - `copy.body[].keywords`
+  - `copy.body[].dataPoints`
+  - `copy.body[].mechanismDepth.visualHint`
+- Step 5 视觉提示词会继续回指：
+  - `scriptExcerpt`
+  - `sceneIntent`
+  - `storyboardCueZh`
+  - `dataPoints`
+
+所以这里的 `sceneIntent / evidenceAnchor / keywords / dataPoints / mechanismDepth`
+都不是装饰字段，而是当前工程的分镜真源。
 
 ## 输入规格
 
@@ -19,6 +47,7 @@ version: 3.1
 | `analysis.audience` | ✅ | Step 1 | 目标受众 |
 | `analysis.corePromise` | ✅ | Step 1 | 核心承诺 |
 | `analysis.keyDataPoints[]` | ✅ | Step 1 | 搜索事实锚点 |
+| `analysis.researchFacts[]` | ✅ | Step 1 | 原始事实与证据来源 |
 | `title.selectedTitle` | ✅ | Step 2 | 已确认标题 |
 | `title.titleKeywords[]` | ✅ | Step 2 | 标题关键词 |
 | `title.score` | ✅ | Step 2 | 标题评分 |
@@ -28,6 +57,10 @@ version: 3.1
 ## 目标时长
 
 约800-1000字（2-4分钟口播稿，按每分钟200字标准语速）
+
+Hook（18-40字）
+
+Body（4-5块，每块3-5句）
 
 ---
 
@@ -43,7 +76,7 @@ version: 3.1
       "ctaIntent": "CTA意图描述",
       "techDepth": "shallow | medium | deep（技术讲解深度）"
     },
-    "hook": "Hook文案（18-40字，1-2句）",
+    "hook": "Hook（18-40字，1-2句）文案",
     "hookMeta": {
       "title": "对应的标题原文",
       "score": 92,
@@ -179,6 +212,16 @@ Step 4 visualHint 映射：
 - HOW型 → `data-stream` / `architecture-map`
 - WHY型 → `benchmark-chart` / `terminal`
 - MECHANISM型 → `flow-chart` / `pipeline-flow`
+
+## 项目结构约束
+
+- 当前 Step 4 已切到 `Ultimate 20 family`，不是旧 `固定 6 镜头 storyboard`
+- 不要输出“像海报一样的标题总结文”，要输出能被分镜继续拆开的口播块
+- 如果一个正文块没有事实、机制、关键词或数据点，后续 `storyboardLoader` 和 `UltimateSceneTemplate` 会变虚
+- 这份文案最终要服务：
+  - `remotion-video/src/data/storyboardLoader.ts`
+  - `remotion-video/src/data/registry.ts`
+  - `remotion-video/src/compositions/UltimateSceneTemplate.tsx`
 
 ### 类比库（可直接用）
 

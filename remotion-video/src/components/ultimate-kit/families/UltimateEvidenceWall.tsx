@@ -1,151 +1,23 @@
 import React, {type CSSProperties} from 'react';
-import {AbsoluteFill, Easing, interpolate, spring, useCurrentFrame} from 'remotion';
-import {ParticleBackground} from '../ParticleBackground';
+import {interpolate, spring, useCurrentFrame} from 'remotion';
 import {GeometryAccent, PathDrawLink} from '../../visual-atoms';
-import {
-  getUltimateManualGlyph,
-  ULTIMATE_ICON_URLS,
-  isUltimateManualGlyph,
-  resolveUltimateIconPack,
-  type UltimateIconName,
-} from '../iconography';
-import {
-  resolveUltimateAccent,
-  ultimateGlow,
-  ultimateKitTokens,
-  ultimateKitVideo,
-} from '../tokens';
-import {
-  appendUltimateMicroJitter,
-  createUltimateMicroJitter,
-  resolveUltimateMicroJitterConfig,
-} from '../motion';
-import type {
-  UltimateArchitectureMapProps,
-  UltimateBenchmarkChartProps,
-  UltimateCodeLine,
-  UltimateCodePanelProps,
-  UltimateCompareBoardProps,
-  UltimateCtaPanelProps,
-  UltimateDataStreamProps,
-  UltimateEvidenceWallProps,
-  UltimateFeatureCardRailProps,
-  UltimateFocusDiagramProps,
-  UltimateGlossaryTermProps,
-  UltimateHeroPanelProps,
-  UltimateMemoryGraphProps,
-  UltimateMetricBarsProps,
-  UltimateNumberStripProps,
-  UltimatePlatformOverlayProps,
-  UltimatePipelineFlowProps,
-  UltimateQuoteHighlightProps,
-  UltimateStageProps,
-  UltimateStepFlowProps,
-  UltimateSubtitleBarProps,
-  UltimateTagMatrixProps,
-  UltimateTerminalPanelProps,
-  UltimateTimelineProps,
-} from '../types';
+import {getUltimateManualGlyph, isUltimateManualGlyph, resolveUltimateIconPack, ULTIMATE_ICON_URLS, type UltimateIconName} from '../iconography';
+import {appendUltimateMicroJitter, createUltimateMicroJitter, resolveUltimateMicroJitterConfig} from '../motion';
+import {resolveUltimateAccent, ultimateGlow, ultimateKitTokens} from '../tokens';
+import type {UltimateEvidenceWallProps} from '../types';
 
 const kit = ultimateKitTokens;
-
-const panelStyle = (accentColor: string): CSSProperties => {
-  return {
-    borderRadius: kit.radius.lg,
-    border: `1px solid ${accentColor}30`,
-    background: `linear-gradient(180deg, ${accentColor}12, rgba(9, 12, 22, 0.94))`,
-    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.03), 0 18px 60px rgba(0,0,0,0.24), 0 0 42px ${accentColor}14`,
-    overflow: 'hidden',
-  };
-};
-
-const eyebrowStyle = (accentColor: string, centered = true): CSSProperties => {
-  return {
-    fontFamily: kit.fonts.ui,
-    fontSize: 18,
-    fontWeight: 700,
-    letterSpacing: 4.2,
-    lineHeight: 1.2,
-    textTransform: 'uppercase',
-    color: accentColor,
-    opacity: 0.92,
-    textAlign: centered ? 'center' : 'left',
-  };
-};
-
-const relaxedPanelPadding = {
-  x: 32,
-  y: 28,
-  roomyX: 36,
-  roomyY: 32,
-} as const;
-
-const relaxedTypeScale = {
-  title: {
-    lg: 56,
-    md: 48,
-    sm: 42,
-  },
-  body: {
-    lg: 18,
-    md: 17,
-    sm: 16,
-  },
-} as const;
-
-const sectionHeadingStyle = (size: number, centered = true): CSSProperties => ({
-  fontFamily: kit.fonts.display,
-  fontSize: size,
-  fontWeight: 800,
-  letterSpacing: -2.4,
-  lineHeight: 1.08,
-  textAlign: centered ? 'center' : 'left',
-});
-
-const bodyTextStyle = (
-  size: number = relaxedTypeScale.body.lg,
-  color: string = kit.colors.textMuted,
-  centered = false,
-): CSSProperties => ({
-  fontSize: size,
-  lineHeight: 1.64,
-  color,
-  textAlign: centered ? 'center' : 'left',
-});
-
-const overlineLabelStyle = (color: string): CSSProperties => ({
-  fontSize: 18,
-  lineHeight: 1.2,
-  letterSpacing: 2.2,
-  textTransform: 'uppercase',
-  color,
-  fontWeight: 700,
-});
-
-const buildReveal = (frame: number, delay = 0) => {
-  return spring({
-    fps: ultimateKitVideo.fps,
-    frame: Math.max(0, frame - delay),
-    config: {damping: 200, stiffness: 160},
-  });
-};
-
-const withMicroJitter = (
-  frame: number,
-  baseTransform: string,
-  config?: Parameters<typeof createUltimateMicroJitter>[1],
-) => appendUltimateMicroJitter(baseTransform, createUltimateMicroJitter(frame, config));
 
 const toneToColor = (tone?: Parameters<typeof resolveUltimateAccent>[0]) => {
   return resolveUltimateAccent(tone ?? 'cyan');
 };
 
-const measureText = (value?: string) => Array.from(String(value || '').trim()).length;
+const cleanDisplayText = (value?: string) => {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+};
 
-const cleanDisplayText = (value?: string) => String(value || '').replace(/\s+/g, ' ').trim();
-
-const trimLineBreakPunctuation = (value: string) => {
-  return value.replace(/[，、：:]+$/u, '').trim();
+const measureText = (value?: string) => {
+  return Array.from(cleanDisplayText(value)).length;
 };
 
 const splitDisplayUnits = (value: string) => {
@@ -181,8 +53,9 @@ const splitDisplayLines = (value: string, maxChars: number, maxLines = 2) => {
   }
 
   const units = splitDisplayUnits(text);
-  const countUnits = (items: string[]) =>
-    items.reduce((total, item) => total + (/^[A-Za-z0-9.+\-']+$/u.test(item) ? item.length : 1), 0);
+  const countUnits = (items: string[]) => {
+    return items.reduce((total, item) => total + (/^[A-Za-z0-9.+\-']+$/u.test(item) ? item.length : 1), 0);
+  };
 
   if (countUnits(units) <= maxChars) {
     return [text];
@@ -193,37 +66,12 @@ const splitDisplayLines = (value: string, maxChars: number, maxLines = 2) => {
 
   while (cursor < units.length && lines.length < maxLines) {
     if (lines.length === maxLines - 1) {
-      const remainder = units.slice(cursor).join('').trim();
-      if (countUnits(splitDisplayUnits(remainder)) <= maxChars) {
-        lines.push(remainder);
-      } else {
-        let tailCount = 0;
-        const tailUnits: string[] = [];
-
-        for (let index = cursor; index < units.length; index += 1) {
-          const nextWeight = /^[A-Za-z0-9.+\-']+$/u.test(units[index]) ? units[index].length : 1;
-          if (tailCount + nextWeight > Math.max(1, maxChars - 1)) {
-            break;
-          }
-          tailUnits.push(units[index]);
-          tailCount += nextWeight;
-        }
-
-        if (tailUnits.length === 0) {
-          const oversizedUnit = units[cursor] || '';
-          const oversizedChars = Array.from(oversizedUnit);
-          const forcedTail = oversizedChars.slice(0, Math.max(1, maxChars - 1)).join('');
-          lines.push(`${trimLineBreakPunctuation(forcedTail)}…`);
-        } else {
-          lines.push(`${tailUnits.join('').trim()}…`);
-        }
-      }
+      lines.push(`${units.slice(cursor).join('').trim().slice(0, Math.max(1, maxChars - 1))}…`);
       break;
     }
 
     let splitIndex = cursor;
     let currentCount = 0;
-
     while (splitIndex < units.length) {
       const nextWeight = /^[A-Za-z0-9.+\-']+$/u.test(units[splitIndex]) ? units[splitIndex].length : 1;
       if (currentCount + nextWeight > maxChars) {
@@ -233,43 +81,12 @@ const splitDisplayLines = (value: string, maxChars: number, maxLines = 2) => {
       splitIndex += 1;
     }
 
-    for (let index = splitIndex; index > cursor + Math.floor(maxChars * 0.35); index -= 1) {
-      if (/[\s，、：:]/u.test(units[index - 1] || '')) {
-        splitIndex = index;
-        break;
-      }
-    }
-
     if (splitIndex === cursor) {
-      const oversizedUnit = units[cursor] || '';
-      const oversizedChars = Array.from(oversizedUnit);
-      const forcedSegment = trimLineBreakPunctuation(oversizedChars.slice(0, maxChars).join(''));
-      const remainder = oversizedChars.slice(maxChars).join('');
-
-      if (forcedSegment) {
-        lines.push(forcedSegment);
-      }
-
-      if (remainder) {
-        units[cursor] = remainder;
-      } else {
-        cursor += 1;
-      }
-
-      while (cursor < units.length && /\s/u.test(units[cursor] || '')) {
-        cursor += 1;
-      }
-      continue;
+      splitIndex += 1;
     }
 
-    const segment = trimLineBreakPunctuation(units.slice(cursor, splitIndex).join(''));
-    if (segment) {
-      lines.push(segment);
-    }
+    lines.push(units.slice(cursor, splitIndex).join('').trim());
     cursor = splitIndex;
-    while (cursor < units.length && /\s/u.test(units[cursor] || '')) {
-      cursor += 1;
-    }
   }
 
   return lines.filter(Boolean).slice(0, maxLines);
@@ -277,27 +94,14 @@ const splitDisplayLines = (value: string, maxChars: number, maxLines = 2) => {
 
 const splitDisplayLinesBalanced = (value: string, maxChars: number, maxLines = 2) => {
   const initial = splitDisplayLines(value, maxChars, maxLines);
-
   if (initial.length < 2) {
     return initial;
   }
-
   const tail = cleanDisplayText(initial[initial.length - 1] || '');
-  const tailUnits = measureText(tail);
-  const isOrphanAscii = /^[A-Za-z0-9.+\-']+[？?]?$/u.test(tail);
-
-  if (!isOrphanAscii && tailUnits > Math.max(3, Math.floor(maxChars * 0.28))) {
+  if (measureText(tail) > Math.max(3, Math.floor(maxChars * 0.28))) {
     return initial;
   }
-
-  const expanded = splitDisplayLines(value, maxChars + 2, maxLines);
-  const expandedTailUnits = measureText(expanded[expanded.length - 1] || '');
-
-  if (expanded.length <= initial.length && expandedTailUnits >= tailUnits) {
-    return expanded;
-  }
-
-  return initial;
+  return splitDisplayLines(value, maxChars + 2, maxLines);
 };
 
 const lineClampStyle = (lines: number): CSSProperties => ({
@@ -307,35 +111,20 @@ const lineClampStyle = (lines: number): CSSProperties => ({
   overflow: 'hidden',
 });
 
-type ArchitectureNodeCardMetrics = {
-  labelLines: string[];
-  detailLines: string[];
-  labelSize: number;
-  detailSize: number;
-  cardWidth: number;
-  cardHeight: number;
+const withMicroJitter = (
+  frame: number,
+  baseTransform: string,
+  config?: Parameters<typeof createUltimateMicroJitter>[1],
+) => {
+  return appendUltimateMicroJitter(baseTransform, createUltimateMicroJitter(frame, config));
 };
 
-const estimateArchitectureNodeCard = (label: string, detail?: string): ArchitectureNodeCardMetrics => {
-  const labelText = cleanDisplayText(label);
-  const detailText = cleanDisplayText(detail);
-  const labelLines = splitDisplayLinesBalanced(labelText, measureText(labelText) > 18 ? 10 : 12, 3);
-  const detailLines = detailText ? splitDisplayLinesBalanced(detailText, 18, 2) : [];
-  const labelSize = labelLines.length >= 3 ? 22 : labelLines.length === 2 ? 25 : 30;
-  const detailSize = detailLines.length >= 2 ? 15 : 16;
-  const labelBlockHeight = labelLines.length * labelSize * 1.14;
-  const detailBlockHeight = detailLines.length > 0 ? 18 + detailLines.length * detailSize * 1.54 : 0;
-  const cardWidth = labelLines.length >= 3 || detailLines.length >= 2 ? 328 : 314;
-  const cardHeight = Math.max(156, Math.round(54 + Math.max(36, labelBlockHeight) + detailBlockHeight + 28));
-
-  return {
-    labelLines,
-    detailLines,
-    labelSize,
-    detailSize,
-    cardWidth,
-    cardHeight,
-  };
+const buildReveal = (frame: number, delay = 0) => {
+  return spring({
+    fps: 30,
+    frame: Math.max(0, frame - delay),
+    config: {damping: 200, stiffness: 160},
+  });
 };
 
 const iconMaskStyle = (icon: UltimateIconName): CSSProperties => ({
@@ -350,79 +139,38 @@ const iconMaskStyle = (icon: UltimateIconName): CSSProperties => ({
   maskSize: 'contain',
 });
 
-const semanticFallbackIcons: UltimateIconName[] = [
-  'sparkles',
-  'layers',
-  'code',
-  'messagesSquare',
-  'zap',
-  'arrowRight',
-];
-
-const resolveSemanticIcon = (
-  iconValue: string | undefined,
-  semanticText: string,
-  fallbackIndex = 0,
-  family?: string,
-) => {
-  const iconText = cleanDisplayText(iconValue);
-  if (iconText && isUltimateManualGlyph(iconText)) {
-    return null;
-  }
-
-  return resolveUltimateIconPack({
-    hints: [semanticText, iconText],
-    requested: iconText ? [iconText] : [],
-    count: 1,
-    family,
-    seed: fallbackIndex,
-  })[0] || semanticFallbackIcons[fallbackIndex % semanticFallbackIcons.length];
-};
-
 const SemanticIconGlyph: React.FC<{
   iconValue?: string;
   semanticText: string;
   color: string;
-  size: number;
+  size?: number;
   fallbackIndex?: number;
-  family?: string;
-}> = ({
-  iconValue,
-  semanticText,
-  color,
-  size,
-  fallbackIndex = 0,
-  family,
-}) => {
-  const manualGlyph = getUltimateManualGlyph(iconValue);
+}> = ({iconValue, semanticText, color, size = 18, fallbackIndex = 0}) => {
+  const resolved = resolveUltimateIconPack({
+    hints: [semanticText],
+    requested: [iconValue],
+    count: 1,
+    family: 'evidence-wall',
+    seed: fallbackIndex,
+  })[0];
 
-  if (manualGlyph) {
+  if (isUltimateManualGlyph(iconValue)) {
     return (
-      <span style={{color, fontSize: size * 0.72, fontWeight: 800, lineHeight: 1}}>
-        {manualGlyph}
+      <span style={{fontSize: size, lineHeight: 1, fontWeight: 800, color}}>
+        {getUltimateManualGlyph(iconValue)}
       </span>
     );
   }
 
-  const icon = resolveSemanticIcon(iconValue, semanticText, fallbackIndex, family);
-
-  if (!icon) {
-    const text = cleanDisplayText(iconValue);
-    return text ? (
-      <span style={{color, fontSize: size * 0.72, fontWeight: 800, lineHeight: 1}}>{text}</span>
-    ) : null;
+  if (!resolved) {
+    return (
+      <span style={{fontSize: size, lineHeight: 1, fontWeight: 800, color}}>
+        {fallbackIndex + 1}
+      </span>
+    );
   }
 
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        color,
-        ...iconMaskStyle(icon),
-      }}
-    />
-  );
+  return <div style={{width: size, height: size, color, ...iconMaskStyle(resolved)}} />;
 };
 
 const SemanticIconBadge: React.FC<{
@@ -432,47 +180,22 @@ const SemanticIconBadge: React.FC<{
   badgeSize?: number;
   size?: number;
   fallbackIndex?: number;
-  family?: string;
-  rounded?: number;
   motionDelay?: number;
-  motionSeed?: number;
-}> = ({
-  iconValue,
-  semanticText,
-  color,
-  badgeSize = 46,
-  size = 20,
-  fallbackIndex = 0,
-  family,
-  rounded = 16,
-  motionDelay = 0,
-  motionSeed,
-}) => {
+}> = ({iconValue, semanticText, color, badgeSize = 34, size = 16, fallbackIndex = 0, motionDelay = 0}) => {
   const frame = useCurrentFrame();
-  const transform = withMicroJitter(frame, '', {
-    delay: motionDelay,
-    seed: motionSeed ?? fallbackIndex,
-    amplitudeX: 0.9,
-    amplitudeY: 0.8,
-    rotateDeg: 0.32,
-    scaleDelta: 0.003,
-    settleFrames: 16,
-  });
-
   return (
     <div
       style={{
         width: badgeSize,
         height: badgeSize,
-        borderRadius: rounded,
+        borderRadius: 12,
         border: `1px solid ${color}33`,
         background: `linear-gradient(180deg, ${color}16 0%, rgba(10, 13, 24, 0.88) 100%)`,
-        boxShadow: ultimateGlow(color, 0.2),
+        boxShadow: ultimateGlow(color, 0.16),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        flexShrink: 0,
-        transform,
+        transform: withMicroJitter(frame, '', resolveUltimateMicroJitterConfig('steady', {delay: motionDelay, seed: fallbackIndex + 200})),
       }}
     >
       <SemanticIconGlyph
@@ -481,146 +204,10 @@ const SemanticIconBadge: React.FC<{
         color={color}
         size={size}
         fallbackIndex={fallbackIndex}
-        family={family}
       />
     </div>
   );
 };
-
-const parseCodeFacts = (lines: UltimateCodeLine[]) => {
-  return lines
-    .map((line) => {
-      const match = cleanDisplayText(line.text).match(/^"?(.*?)"?\s*:\s*"(.+)"[,]?$/);
-      if (!match) {
-        return null;
-      }
-
-      return {
-        label: cleanDisplayText(match[1].replace(/^"+|"+$/g, '')),
-        value: cleanDisplayText(match[2].replace(/^"+|"+$/g, '')),
-        tone: line.tone,
-      };
-    })
-    .filter(Boolean) as Array<{label: string; value: string; tone?: UltimateCodeLine['tone']}>;
-};
-
-const parseDisplayNumericToken = (value?: string) => {
-  const text = cleanDisplayText(value);
-  const match = text.match(/-?\d+(?:\.\d+)?/);
-
-  if (!match || match.index === undefined) {
-    return null;
-  }
-
-  const numericValue = Number(match[0]);
-
-  if (!Number.isFinite(numericValue)) {
-    return null;
-  }
-
-  return {
-    raw: match[0],
-    value: numericValue,
-    start: match.index,
-    end: match.index + match[0].length,
-    decimals: (match[0].split('.')[1] || '').length,
-  };
-};
-
-const animateMetricDisplay = (value: string, progress: number) => {
-  const token = parseDisplayNumericToken(value);
-
-  if (!token) {
-    return value;
-  }
-
-  const currentValue = token.value * progress;
-  const roundedValue = token.decimals > 0
-    ? currentValue.toFixed(token.decimals)
-    : String(Math.round(currentValue));
-
-  return `${value.slice(0, token.start)}${roundedValue}${value.slice(token.end)}`;
-};
-
-const renderCodeLineText = (
-  text: string,
-  accentColor: string,
-  fallbackColor: string,
-) => {
-  const jsonStringMatch = text.match(/^(\s*)"([^"]+)"(\s*:\s*)"([^"]*)"(\s*,?)$/);
-  const jsonNumberMatch = text.match(/^(\s*)"([^"]+)"(\s*:\s*)(-?\d+(?:\.\d+)?%?)(\s*,?)$/);
-  const jsonBooleanMatch = text.match(/^(\s*)"([^"]+)"(\s*:\s*)(true|false|null)(\s*,?)$/);
-  const quoteColor = 'rgba(255,255,255,0.52)';
-  const keyColor = resolveUltimateAccent('cyan');
-  const valueColor = accentColor;
-  const numberColor = resolveUltimateAccent('yellow');
-  const punctuationColor = 'rgba(255,255,255,0.34)';
-
-  if (/^\s*[{}[\]]\s*,?\s*$/.test(text)) {
-    return <span style={{color: fallbackColor}}>{text}</span>;
-  }
-
-  if (jsonStringMatch) {
-    const [, indent, key, divider, value, comma] = jsonStringMatch;
-    return (
-      <>
-        <span style={{color: punctuationColor}}>{indent}"</span>
-        <span style={{color: keyColor}}>{key}</span>
-        <span style={{color: punctuationColor}}>"{divider}"</span>
-        <span style={{color: valueColor}}>{value}</span>
-        <span style={{color: punctuationColor}}>"{comma}</span>
-      </>
-    );
-  }
-
-  if (jsonNumberMatch) {
-    const [, indent, key, divider, value, comma] = jsonNumberMatch;
-    return (
-      <>
-        <span style={{color: punctuationColor}}>{indent}"</span>
-        <span style={{color: keyColor}}>{key}</span>
-        <span style={{color: punctuationColor}}>"{divider}</span>
-        <span style={{color: numberColor}}>{value}</span>
-        <span style={{color: punctuationColor}}>{comma}</span>
-      </>
-    );
-  }
-
-  if (jsonBooleanMatch) {
-    const [, indent, key, divider, value, comma] = jsonBooleanMatch;
-    return (
-      <>
-        <span style={{color: punctuationColor}}>{indent}"</span>
-        <span style={{color: keyColor}}>{key}</span>
-        <span style={{color: punctuationColor}}>"{divider}</span>
-        <span style={{color: resolveUltimateAccent('green')}}>{value}</span>
-        <span style={{color: punctuationColor}}>{comma}</span>
-      </>
-    );
-  }
-
-  return <span style={{color: fallbackColor}}>{text}</span>;
-};
-
-type FrameCorner = {
-  top?: number;
-  right?: number;
-  bottom?: number;
-  left?: number;
-  borderTop?: boolean;
-  borderRight?: boolean;
-  borderBottom?: boolean;
-  borderLeft?: boolean;
-};
-
-const frameCorners: FrameCorner[] = [
-  {top: 28, left: 28, borderTop: true, borderLeft: true},
-  {top: 28, right: 28, borderTop: true, borderRight: true},
-  {bottom: 28, left: 28, borderBottom: true, borderLeft: true},
-  {bottom: 28, right: 28, borderBottom: true, borderRight: true},
-];
-
-
 
 export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar?: {enterFrames?: number; emphasisFrames?: number}}> = ({
   heading,
@@ -633,97 +220,102 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
   const accentColor = toneToColor(accent);
   const visibleCards = cards.slice(0, 3);
   const pacingWindow = (grammar?.enterFrames ?? 20) + (grammar?.emphasisFrames ?? 40);
-  const center = {x: 960, y: 562};
-  const positions = [
-    {top: 332, left: 116, width: 470, labelAnchorX: 574, labelAnchorY: 432, nodeX: 598, nodeY: 448, rotate: -1.5, align: 'left' as const},
-    {top: 310, left: 1308, width: 452, labelAnchorX: 1316, labelAnchorY: 420, nodeX: 1290, nodeY: 436, rotate: 1.2, align: 'right' as const},
-    {top: 708, left: 402, width: 1120, labelAnchorX: 958, labelAnchorY: 674, nodeX: 960, nodeY: 656, rotate: -0.8, align: 'center' as const},
+  const headingLines = splitDisplayLinesBalanced(heading, 15, 3);
+  const railPath = 'M 970 214 C 844 348, 1116 470, 986 602 C 850 742, 1076 844, 962 930';
+  const anchors = [
+    {x: 886, y: 364},
+    {x: 1106, y: 520},
+    {x: 980, y: 772},
   ];
-  const sampleCubic = (
-    t: number,
-    p0: {x: number; y: number},
-    p1: {x: number; y: number},
-    p2: {x: number; y: number},
-    p3: {x: number; y: number},
-  ) => {
-    const inverse = 1 - t;
-    return {
-      x: (inverse ** 3) * p0.x
-        + 3 * (inverse ** 2) * t * p1.x
-        + 3 * inverse * (t ** 2) * p2.x
-        + (t ** 3) * p3.x,
-      y: (inverse ** 3) * p0.y
-        + 3 * (inverse ** 2) * t * p1.y
-        + 3 * inverse * (t ** 2) * p2.y
-        + (t ** 3) * p3.y,
-    };
-  };
+  const placements = [
+    {left: 114, top: 300, width: 486, align: 'left' as const, rotate: -2.5, quoteSize: 34},
+    {left: 1248, top: 342, width: 520, align: 'right' as const, rotate: 2.2, quoteSize: 32},
+    {left: 252, top: 700, width: 1030, align: 'left' as const, rotate: -0.6, quoteSize: 42},
+  ];
 
   return (
     <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
-      <div style={{position: 'absolute', top: 90, left: 130, right: 130}}>
-        <div style={eyebrowStyle(accentColor, false)}>证据层</div>
+      <div style={{position: 'absolute', top: 92, left: 126, right: 126}}>
         <div
           style={{
-            marginTop: 22,
-            ...sectionHeadingStyle(relaxedTypeScale.title.lg, false),
-            maxWidth: 1100,
+            fontSize: 18,
+            fontWeight: 700,
+            letterSpacing: 4.2,
+            lineHeight: 1.2,
+            textTransform: 'uppercase',
+            color: accentColor,
+            opacity: 0.92,
           }}
         >
-          {heading}
+          证据层
+        </div>
+        <div style={{marginTop: 22, maxWidth: 980}}>
+          {headingLines.map((line, index) => (
+            <div
+              key={`${line}-${index}`}
+              style={{
+                marginTop: index === 0 ? 0 : 4,
+                fontFamily: kit.fonts.display,
+                fontSize: index === 0 ? 58 : 54,
+                fontWeight: 800,
+                letterSpacing: -2.4,
+                lineHeight: 1.08,
+              }}
+            >
+              {line}
+            </div>
+          ))}
         </div>
         {summary ? (
-          <div
-            style={{
-              marginTop: 22,
-              maxWidth: 720,
-              ...bodyTextStyle(18),
-            }}
-          >
+          <div style={{marginTop: 22, maxWidth: 700, fontSize: 18, lineHeight: 1.64, color: kit.colors.textMuted}}>
             {summary}
           </div>
         ) : null}
       </div>
+
+      <div
+        style={{
+          position: 'absolute',
+          right: 104,
+          top: 110,
+          fontSize: 188,
+          lineHeight: 0.82,
+          fontWeight: 900,
+          letterSpacing: -11,
+          color: `${accentColor}12`,
+          textTransform: 'uppercase',
+          pointerEvents: 'none',
+        }}
+      >
+        PROOF
+      </div>
+
       <GeometryAccent
         variant="ring"
         color={accentColor}
         opacity={0.22}
-        style={{
-          left: center.x - 104,
-          top: center.y - 104,
-          width: 208,
-          height: 208,
-        }}
+        style={{left: 850, top: 448, width: 232, height: 232}}
       />
       <GeometryAccent
         variant="slanted-panel"
         color={resolveUltimateAccent('cyan')}
         opacity={0.12}
-        style={{
-          left: 172,
-          top: 246,
-          width: 280,
-          height: 90,
-        }}
+        style={{left: 122, top: 246, width: 320, height: 98}}
       />
       <GeometryAccent
         variant="arc"
         color={resolveUltimateAccent('purple')}
         opacity={0.16}
-        style={{
-          right: 188,
-          top: 236,
-          width: 240,
-          height: 120,
-        }}
+        style={{right: 142, top: 238, width: 280, height: 120}}
       />
+
       <div
         style={{
           position: 'absolute',
-          left: center.x - 72,
-          top: center.y - 72,
-          width: 144,
-          height: 144,
+          left: 892,
+          top: 496,
+          width: 156,
+          height: 156,
           borderRadius: '50%',
           background: 'rgba(8,10,18,0.76)',
           border: `1px solid ${accentColor}24`,
@@ -742,20 +334,38 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
           sources
         </div>
       </div>
+
       <svg viewBox="0 0 1920 1080" style={{position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible'}}>
+        <PathDrawLink
+          d={railPath}
+          color={accentColor}
+          progress={1}
+          frame={frame}
+          marker={null}
+          baseColor="rgba(255,255,255,0.04)"
+          guideOpacity={0.7}
+          baseStrokeWidth={4}
+          flowStrokeWidth={6}
+          drawStrokeWidth={2}
+          dashPattern="12 18"
+          flowOpacity={0.44}
+          drawOpacity={0.36}
+        />
         {visibleCards.map((card, index) => {
-          const position = positions[index] || positions[positions.length - 1];
+          const position = placements[index] || placements[placements.length - 1];
           const cardColor = toneToColor(card.accent ?? accent);
           const delay = Math.round(pacingWindow * 0.08 * (index + 1));
-          const p0 = {x: center.x, y: center.y};
-          const p1 = {x: center.x + (position.nodeX > center.x ? 120 : -120), y: center.y + (index === 2 ? 84 : -28)};
-          const p2 = {x: position.nodeX + (position.nodeX > center.x ? -110 : 110), y: position.nodeY + (index === 2 ? -72 : 26)};
-          const p3 = {x: position.nodeX, y: position.nodeY};
+          const anchor = anchors[index] || anchors[anchors.length - 1];
+          const targetX = position.align === 'right' ? position.left + position.width - 36 : position.left + 42;
+          const targetY = position.top + 76;
+          const p0 = {x: anchor.x, y: anchor.y};
+          const p1 = {x: anchor.x + (targetX > anchor.x ? 120 : -120), y: anchor.y + 16};
+          const p2 = {x: targetX + (targetX > anchor.x ? -124 : 124), y: targetY - 18};
+          const p3 = {x: targetX, y: targetY};
           const progress = interpolate(frame, [delay, delay + 28], [0, 1], {
             extrapolateLeft: 'clamp',
             extrapolateRight: 'clamp',
           });
-          const point = sampleCubic(Math.max(0.01, progress), p0, p1, p2, p3);
 
           return (
             <PathDrawLink
@@ -765,31 +375,27 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
               progress={progress}
               frame={frame}
               marker={{
-                x: point.x,
-                y: point.y,
+                x: p0.x,
+                y: p0.y,
                 size: 7,
                 shape: index === 2 ? 'ring' : 'diamond',
               }}
-              baseStrokeWidth={4}
-              flowStrokeWidth={7}
+              baseStrokeWidth={2}
+              flowStrokeWidth={5}
               drawStrokeWidth={2}
-              dashPattern="12 16"
-              flowOpacity={0.66}
+              dashPattern="10 14"
+              flowOpacity={0.54}
             />
           );
         })}
       </svg>
+
       {visibleCards.map((card, index) => {
         const delay = Math.round(pacingWindow * 0.08 * (index + 1));
         const reveal = buildReveal(frame, delay);
         const cardColor = toneToColor(card.accent ?? accent);
-        const position = positions[index] || positions[positions.length - 1];
-        const alignStyle =
-          position.align === 'right'
-            ? {textAlign: 'right' as const}
-            : position.align === 'center'
-              ? {textAlign: 'center' as const}
-              : {textAlign: 'left' as const};
+        const position = placements[index] || placements[placements.length - 1];
+        const alignStyle = position.align === 'right' ? {textAlign: 'right' as const} : {textAlign: 'left' as const};
 
         return (
           <div
@@ -802,11 +408,8 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
               opacity: reveal,
               transform: withMicroJitter(
                 frame,
-                `translateY(${interpolate(reveal, [0, 1], [18, 0])}px) rotate(${position.rotate}deg)`,
-                resolveUltimateMicroJitterConfig('steady', {
-                  delay,
-                  seed: 150 + index,
-                }),
+                `translateY(${interpolate(reveal, [0, 1], [22, 0])}px) rotate(${position.rotate}deg)`,
+                resolveUltimateMicroJitterConfig('steady', {delay, seed: 150 + index}),
               ),
               ...alignStyle,
             }}
@@ -814,31 +417,30 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
             <div
               style={{
                 position: 'absolute',
-                left: position.align === 'right' ? 'auto' : position.align === 'center' ? '50%' : -10,
+                left: position.align === 'right' ? 'auto' : -10,
                 right: position.align === 'right' ? -10 : 'auto',
-                top: 18,
-                width: 74,
+                top: 16,
+                width: index === 2 ? 124 : 84,
                 height: 2,
                 background: `linear-gradient(90deg, ${cardColor}, transparent)`,
-                transform: position.align === 'center' ? 'translateX(-50%)' : undefined,
                 opacity: 0.8,
               }}
             />
             <div
               style={{
                 position: 'absolute',
-                left: position.align === 'right' ? 'auto' : position.align === 'center' ? '50%' : -8,
+                left: position.align === 'right' ? 'auto' : -8,
                 right: position.align === 'right' ? -8 : 'auto',
-                top: 0,
-                fontSize: 112,
+                top: -8,
+                fontSize: index === 2 ? 138 : 112,
                 lineHeight: 0.9,
                 color: `${cardColor}12`,
                 fontWeight: 900,
-                transform: position.align === 'center' ? 'translateX(-50%)' : undefined,
               }}
             >
-              "
+              0{index + 1}
             </div>
+
             <div
               style={{
                 display: 'inline-flex',
@@ -847,9 +449,9 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
                 flexDirection: position.align === 'right' ? 'row-reverse' : 'row',
                 padding: '12px 16px',
                 borderRadius: kit.radius.pill,
-                border: `1px solid ${cardColor}30`,
+                border: `1px solid ${cardColor}26`,
                 color: cardColor,
-                background: `${cardColor}12`,
+                background: `${cardColor}0f`,
                 fontSize: 16,
                 lineHeight: 1.2,
                 letterSpacing: 1.6,
@@ -864,18 +466,16 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
                 badgeSize={34}
                 size={15}
                 fallbackIndex={index}
-                family="evidence-wall"
-                rounded={12}
                 motionDelay={delay}
-                motionSeed={150 + index}
               />
               <span>{card.source}</span>
             </div>
+
             <div
               style={{
                 marginTop: 24,
-                fontSize: index === 2 ? 34 : 30,
-                lineHeight: 1.44,
+                fontSize: position.quoteSize,
+                lineHeight: index === 2 ? 1.24 : 1.34,
                 fontWeight: 780,
                 color: kit.colors.text,
                 ...lineClampStyle(index === 2 ? 3 : 2),
@@ -884,11 +484,14 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
             >
               {card.quote}
             </div>
+
             {card.detail ? (
               <div
                 style={{
                   marginTop: 14,
-                  ...bodyTextStyle(17, 'rgba(255,255,255,0.66)', position.align !== 'left'),
+                  fontSize: 17,
+                  lineHeight: 1.64,
+                  color: 'rgba(255,255,255,0.66)',
                   ...lineClampStyle(index === 2 ? 2 : 3),
                   ...alignStyle,
                 }}
@@ -896,6 +499,7 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
                 {card.detail}
               </div>
             ) : null}
+
             {card.chips && card.chips.length > 0 ? (
               <div
                 style={{
@@ -903,7 +507,7 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
                   display: 'flex',
                   flexWrap: 'wrap',
                   gap: 10,
-                  justifyContent: position.align === 'right' ? 'flex-end' : position.align === 'center' ? 'center' : 'flex-start',
+                  justifyContent: position.align === 'right' ? 'flex-end' : 'flex-start',
                 }}
               >
                 {card.chips.slice(0, 3).map((chip) => (

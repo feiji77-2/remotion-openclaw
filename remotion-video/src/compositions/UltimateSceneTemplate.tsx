@@ -167,9 +167,9 @@ const sceneMediaLayout: Partial<Record<ResolvedUltimateSceneConfig['family'], {
   tiltDeg?: number;
   mode?: 'frame' | 'ambient';
 }>> = {
-  hero: {top: 186, right: 88, width: 704, height: 396, opacity: 0.74, tiltDeg: -3},
+  hero: {top: 248, right: 64, width: 520, height: 292, opacity: 0.28, tiltDeg: -2, mode: 'ambient'},
   focus: {top: 214, right: 94, width: 600, height: 338, opacity: 0.68, tiltDeg: -3},
-  'feature-rail': {top: 214, right: 92, width: 612, height: 344, opacity: 0.64, tiltDeg: -3},
+  'feature-rail': {top: 198, right: 86, width: 520, height: 292, opacity: 0.22, tiltDeg: -2, mode: 'ambient'},
   timeline: {top: 178, left: 150, width: 1620, height: 520, opacity: 0.18, tiltDeg: 0, mode: 'ambient'},
   'compare-board': {top: 236, left: 138, width: 1644, height: 500, opacity: 0.16, tiltDeg: 0, mode: 'ambient'},
   metrics: {top: 300, right: 102, width: 704, height: 412, opacity: 0.88, tiltDeg: -2, mode: 'frame'},
@@ -620,13 +620,14 @@ export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
     const hydratedConfig = hydrateUltimateProjectConfigWithDirectorGrammar(config, {directorQA: 'error'});
     return normalizeUltimateProjectConfig(hydratedConfig);
   }, [config]);
+  const hasSegmentAudio = Array.isArray(audioSegments) && audioSegments.length > 0;
 
   return (
     <>
-      {typeof voiceFile === 'string' && voiceFile.trim().length > 0 ? (
+      {!hasSegmentAudio && typeof voiceFile === 'string' && voiceFile.trim().length > 0 ? (
         <Audio src={resolveAudioSource(voiceFile)} />
       ) : null}
-      {Array.isArray(audioSegments) && (!voiceFile || voiceFile.trim().length === 0)
+      {hasSegmentAudio
         ? audioSegments.map((segment) => {
           const fadeFrames = Math.min(10, Math.floor(segment.durationInFrames * 0.05));
           return (
@@ -641,7 +642,7 @@ export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
                 volume={(f) => {
                   const fadeIn = fadeFrames > 0 ? Math.min(1, f / fadeFrames) : 1;
                   const fadeOut = fadeFrames > 0 ? Math.min(1, (segment.durationInFrames - 1 - f) / fadeFrames) : 1;
-                  return fadeIn * fadeOut;
+                  return 2.4 * fadeIn * fadeOut;
                 }}
               />
             </Sequence>
@@ -667,7 +668,7 @@ export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
                   <div
                     data-grammar={
                       scene.grammar
-                        ? `${scene.grammar.archetype} | ${scene.grammar.cameraIntent}→${scene.grammar.dataEvent} | mem:${scene.grammar.memoryObject.type}`
+                        ? `${scene.grammar.archetype} | ${scene.grammar.cameraIntent}→${scene.grammar.dataEvent} | mem:${scene.grammar.memoryObject?.type ?? 'word'}`
                         : scene.family
                     }
                     data-director-note={scene.grammar?.directorNote ?? ''}

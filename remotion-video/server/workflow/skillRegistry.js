@@ -1,13 +1,15 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const {resolveFamilyShotContract, CAMERA_INTENT_TO_MOTION} = require('../../src/data/shotGrammar.ts');
+const {getRhythmContract, getPreferredCameraMotion, getCameraMotion} = require('../../src/data/registry.ts');
 
 const HOME_DIR = os.homedir();
 const REMOTION_PROJECT_ROOT = path.resolve(__dirname, '../..');
 const WORKFLOW_SKILLS_DIR = path.join(REMOTION_PROJECT_ROOT, 'docs', 'workflow-skills');
 const REMOTION_BUILD_FILES = [
   'src/Root.tsx',
-  'src/OpenClawVideo.tsx',
+  'src/compositions/UltimateSceneTemplate.tsx',
   'src/data/storyboard.ts',
   'src/animations/video-effects.tsx',
 ];
@@ -44,9 +46,22 @@ const SKILL_DEFINITIONS = [
     stepLabel: 'Step 1 · 逻辑分析',
     name: 'video-pipeline-analysis',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-analysis', 'SKILL.md'),
-    displaySummary: '先检索相关内容，再提炼事实、多角度切口和分析骨架。',
+    displaySummary: '先补 topicResearch，再归一化为 analysis / researchFacts / keyDataPoints，供 Step 2/3/4 直接复用。',
     inputs: ['topic', 'platform', 'tone', 'targetDuration', 'audienceHint', 'searchScope'],
-    outputs: ['searchPhase', 'thesis', 'audience', 'corePromise', 'multiAngleExploration', 'structure', 'keyDataPoints', 'sources'],
+    outputs: [
+      'topicResearch',
+      'analysis.searchPhase',
+      'analysis.thesis',
+      'analysis.audience',
+      'analysis.corePromise',
+      'analysis.layers[]',
+      'analysis.process[]',
+      'analysis.researchFacts[]',
+      'analysis.multiAngleExploration[]',
+      'analysis.structure',
+      'analysis.keyDataPoints[]',
+      'analysis.sources',
+    ],
     defaults: {
       platform: '抖音',
       tone: '专业',
@@ -56,7 +71,7 @@ const SKILL_DEFINITIONS = [
       style: '数据驱动、结论先行、避免空泛背景。',
       emphasis: '事实线索、观众关注点、多角度切口。',
       avoid: '模板化分析、无证据判断、长背景铺垫。',
-      notes: 'Step 1 输出要同时服务 Step 2/3/4。',
+      notes: 'Step 1 输出要同时服务 Step 2/3/4，当前搜索链路使用工程内建 duckduckgo-html 适配。',
     },
     constraints: [
       '必须先有检索事实，再进入分析成稿。',
@@ -85,9 +100,23 @@ const SKILL_DEFINITIONS = [
     stepLabel: 'Step 2 · 标题生成',
     name: 'video-pipeline-title',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-title', 'SKILL.md'),
-    displaySummary: '围绕已确认分析生成多角度标题池，并附平台适配和钩子强度。',
-    inputs: ['inputTopic', 'analysis.thesis', 'analysis.audience', 'analysis.corePromise'],
-    outputs: ['titles.options[].title', 'titles.options[].angle', 'titles.options[].platform', 'titles.options[].hookStrength', 'titles.options[].suitableFor'],
+    displaySummary: '围绕已确认分析生成多角度标题池，输出当前工程消费的 selectedId、title metrics 和主标题理由。',
+    inputs: ['inputTopic', 'analysis.thesis', 'analysis.audience', 'analysis.corePromise', 'analysis.researchFacts[]', 'analysis.multiAngleExploration[]'],
+    outputs: [
+      'titles.options[].id',
+      'titles.options[].title',
+      'titles.options[].angle',
+      'titles.options[].platform',
+      'titles.options[].hookStrength',
+      'titles.options[].suitableFor',
+      'titles.options[].hookScore',
+      'titles.options[].ctrPredict',
+      'titles.options[].first3Sec',
+      'titles.options[].infoDensity',
+      'titles.options[].noveltyScore',
+      'titles.selectedId',
+      'titles.selectedReason',
+    ],
     defaults: {
       goal: '生成 4-5 个差异明显的短视频标题候选，每个必须包含爆款手法。',
       style: '短促、抓人、先给判断。口语化，25字以内。',
@@ -151,7 +180,7 @@ const SKILL_DEFINITIONS = [
     name: 'video-pipeline-content',
     sourcePath: path.join(WORKFLOW_SKILLS_DIR, 'video-pipeline-content.SKILL.md'),
     displaySummary: '根据标题、分析和生成要求，产出口语化 Hook / Body / CTA。',
-    inputs: ['inputTopic', 'selectedTitle', 'analysis.thesis', 'analysis.audience', 'analysis.searchPhase'],
+    inputs: ['inputTopic', 'selectedTitle', 'analysis.thesis', 'analysis.audience', 'analysis.searchPhase', 'analysis.researchFacts[]'],
     outputs: [
       'copy.brief',
       'copy.outline[]',
@@ -209,25 +238,42 @@ const SKILL_DEFINITIONS = [
     stepLabel: 'Step 4 · 场景编排',
     name: 'video-pipeline-scene-planner',
     sourcePath: path.join(WORKFLOW_SKILLS_DIR, 'video-pipeline-scene-planner.SKILL.md'),
-    displaySummary: '把文案编排成可变场景数的 Ultimate 横版场景计划，并为每段预分配 20 模板 family。',
-    inputs: ['copy.hook', 'copy.body[]', 'copy.cta', 'analysis.keyDataPoints'],
-    outputs: ['shots[]', 'shots[].sceneFamily', 'shots[].templateCandidates', 'scenePlan', 'templateCatalog'],
+    displaySummary: '把文案编排成可变场景数的 Ultimate 横版场景计划，并补齐 script 绑定、director 合同和 20 family 命中。',
+    inputs: ['copy.hook', 'copy.body[]', 'copy.cta', 'copy.body[].mechanismDepth.visualHint', 'analysis.keyDataPoints', 'analysis.researchFacts[]'],
+    outputs: [
+      'shots[]',
+      'shots[].sceneFamily',
+      'shots[].templateCandidates',
+      'shots[].scriptBlockId',
+      'shots[].scriptSourceText',
+      'shots[].storyboardCueZh',
+      'shots[].director.cameraMotion',
+      'shots[].director.revealDirection',
+      'scenePlan',
+      'templateCatalog',
+      'visualSystem',
+    ],
     defaults: {
-      goal: '把文案拆成 Ultimate 1920x1080 横版场景计划，而不是固定 6 镜头。',
-      style: '章节化、讲解型、适合科技 AI 视频的横版信息结构。',
-      emphasis: 'Hero 开场、信息拆解、证据支撑、节奏分层、模板多样性。',
-      avoid: '固定 6 镜头、family 重复、画面语义漂移、竖屏旧提示词。',
-      notes: 'Step 4 负责场景数、场景角色和 template family 预命中。',
+      goal: '把 Step 3 结构化口播拆成 Ultimate 1920x1080 横版场景计划，而不是固定 6 镜头。',
+      style: '导演化分镜、章节推进、服务口播原句的横版信息视频。',
+      emphasis: 'Hero 开场、机制拆解、图形表达、证据支撑、family 去重、镜头主次。',
+      avoid: '固定 6 镜头、family 重复、空泛标题镜头、竖屏旧提示词、全是框的信息面板。',
+      notes: 'Step 4 负责场景数、场景角色、script 绑定、director 合同和 template family 预命中；如果一段正文同时包含机制、数据、对比，可以拆成多个 shot。',
     },
     constraints: [
       '第一屏固定 hero，最后一屏固定 cta。',
       '中段场景数可变，但必须保持 20 模板系统兼容。',
       '每个场景都要有层级、类型、时长、sceneFamily 和候选 family。',
+      '每个场景都要保留 scriptRole / scriptBlockId / scriptBlockLabel / scriptSourceText / scriptExcerpt。',
+      '每个中段场景都必须回指到具体口播段落，不允许只围绕标题造泛镜头。',
+      '每个场景都要补 director.cameraMotion / director.staggerGap / director.revealDirection。',
     ],
     qualityRules: [
       'shots 长度至少为 6，且不能只是旧 6 镜头模板复写。',
       '每个场景都要有 16:9 横版语义和可复用的结构化字段。',
       'scenePlan 需要给出 familiesUsed / sceneCount / visualSystem。',
+      '输出需要带 visualSystem=ultimate-1080p 和 templateCatalog。',
+      '如果正文里出现数据、流程、架构或对比，至少要命中一次对应图形型 family，不要全部压成 feature-rail 或信息面板。',
     ],
     uiHints: [
       'Step 4 适合按 scene family 展示场景卡和时长分配。',
@@ -246,25 +292,39 @@ const SKILL_DEFINITIONS = [
     stepLabel: 'Step 5 · 视觉提示词',
     name: 'video-pipeline-scene-prompts',
     sourcePath: path.join(WORKFLOW_SKILLS_DIR, 'video-pipeline-scene-prompts.SKILL.md'),
-    displaySummary: '基于 Ultimate 场景计划生成 16:9 横版视觉提示词、画面重点和图片任务字段。',
+    displaySummary: '基于 Ultimate 场景计划生成 16:9 横版视觉提示词、脚本绑定字段和图片任务字段。',
     inputs: ['shots[]', 'shots[].sceneFamily', 'analysis.keyDataPoints', 'copy'],
-    outputs: ['prompts.byShotId', 'prompts.byShotId[].imagePrompt', 'prompts.byShotId[].sceneFamily', 'templateCatalog'],
+    outputs: [
+      'prompts.byShotId',
+      'prompts.byShotId[].prompt',
+      'prompts.byShotId[].promptZh',
+      'prompts.byShotId[].imagePrompt',
+      'prompts.byShotId[].sceneFamily',
+      'prompts.byShotId[].scriptExcerpt',
+      'prompts.byShotId[].storyboardCueZh',
+      'prompts.byShotId[].canvasRatio',
+      'prompts.byShotId[].canvasWidth',
+      'prompts.byShotId[].canvasHeight',
+      'templateCatalog',
+    ],
     defaults: {
-      goal: '为每个场景生成适合 1920x1080 的视觉提示词和画面摘要。',
-      style: '科技信息视频、横版卡片化、适合 Ultimate 20 模板命中。',
-      emphasis: '结构清晰、画面重点明确、可服务图片和后续渲染。',
-      avoid: '9:16 竖屏语义、抽象海报词、family 与画面内容错位。',
-      notes: 'Step 5 只做视觉和图片任务语义，不再退回旧 storyboard prompt。',
+      goal: '为每个场景生成适合 1920x1080 的视觉提示词和画面摘要，严格服务对应口播原句。',
+      style: '科技信息视频、横版导演化构图、适合 Ultimate 20 family 命中。',
+      emphasis: '主体清晰、构图明确、信息层分明、图形演示优先、可服务图片和后续渲染。',
+      avoid: '9:16 竖屏语义、抽象海报词、family 与画面内容错位、只有氛围没有主体。',
+      notes: 'Step 5 只做视觉和图片任务语义，不再退回旧 storyboard prompt；每条 prompt 都要写清主体现身、信息层、标题留白区，并对齐 16:9 画布字段。',
     },
     constraints: [
       '每个 prompt 都必须和对应 sceneFamily 对齐。',
       '默认使用 16:9 横版、1920x1080、科技讲解视频语义。',
       '图片提示词数量必须和场景数量一致。',
+      '每个 prompt 都必须服务对应 shot 的 sceneIntent / dataPoints / scriptExcerpt / storyboardCueZh。',
     ],
     qualityRules: [
       'prompts.byShotId 不能为空。',
-      '每个 prompt 至少包含画面重点、摘要、negativePrompt 和 sceneFamily。',
+      '每个 prompt 至少包含画面重点、摘要、negativePrompt、sceneFamily 和脚本绑定字段。',
       '每条提示词都要能支撑后续图片任务和 Ultimate 场景复用。',
+      '不得把 architecture-map 和 memory-graph、timeline 和 step-flow、terminal 和 code 写成同构画面。',
     ],
     uiHints: [
       '适合按 scene family 展示 prompt 卡片和图片状态。',
@@ -283,8 +343,8 @@ const SKILL_DEFINITIONS = [
     stepLabel: 'Step 6 · 配音脚本',
     name: 'video-pipeline-audio',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-audio', 'SKILL.md'),
-    displaySummary: '根据场景结构产出配音引擎、参数、逐场景脚本和时长统计。',
-    inputs: ['shots[]', 'copy', 'targetDuration'],
+    displaySummary: '根据场景结构产出 qwen-tts 合同、逐场景脚本和时长统计，供 voiceJob / subtitles / renderWorker 复用。',
+    inputs: ['shots[]', 'shots[].durationSeconds', 'copy'],
     outputs: ['voice.engine', 'voice.language', 'voice.speed', 'voice.pitch', 'voice.script[]', 'voice.totalDuration', 'voice.totalChars'],
     defaults: {
       engine: 'qwen-tts',
@@ -295,7 +355,7 @@ const SKILL_DEFINITIONS = [
       style: '口语化、节奏稳定、适合千问 TTS。',
       emphasis: '场景时长匹配、总时长统计、脚本清晰。',
       avoid: '书面腔、场景间时长失衡。',
-      notes: '当前统一使用阿里千问 TTS 链路。',
+      notes: '当前统一使用阿里千问 TTS 链路；Step 6 只产出语音合同，不直接生成音频文件。',
     },
     constraints: [
       '脚本数量要和场景数量对齐。',
@@ -319,19 +379,29 @@ const SKILL_DEFINITIONS = [
     stepId: 7,
     phaseId: 6,
     phaseLabel: '出片',
-    stepLabel: 'Step 7 · Remotion 项目生成',
+    stepLabel: 'Step 7 · 项目构建摘要',
     name: 'remotion-video-maker',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'remotion-video-maker', 'SKILL.md'),
-    displaySummary: '复用现有 remotion-video 工程，生成项目构建摘要、composition 和渲染命令。',
-    inputs: ['analysis', 'titles', 'copy', 'shots', 'images', 'voice'],
-    outputs: ['projectBuild.projectPath', 'projectBuild.compositionId', 'projectBuild.stylePreset', 'projectBuild.buildStatus', 'projectBuild.renderCommand', 'projectBuild.eval'],
+    displaySummary: '复用现有 remotion-video 工程，生成 projectBuild 摘要、核心文件列表和 renderCommand，不执行渲染。',
+    inputs: ['analysis', 'titles', 'copy', 'shots', 'prompts', 'voice', 'render'],
+    outputs: [
+      'projectBuild.projectPath',
+      'projectBuild.compositionId',
+      'projectBuild.stylePreset',
+      'projectBuild.buildStatus',
+      'projectBuild.files',
+      'projectBuild.summary',
+      'projectBuild.notes',
+      'projectBuild.renderCommand',
+      'projectBuild.eval',
+    ],
     defaults: {
       stylePreset: 'tech-dark',
       goal: '把当前流水线结果映射到 Remotion 项目载体上。',
       style: '复用现有工程，不重复搭仓库。',
       emphasis: 'composition、项目路径、渲染命令、构建可用性。',
       avoid: '重新创建新工程、丢失已有产物路径。',
-      notes: 'Step 7 只做项目构建摘要，Step 8 只做渲染设置和导出。',
+      notes: 'Step 7 只做项目构建摘要，固定复用当前 remotion-video 工程；Step 8 只做渲染设置和导出。',
     },
     constraints: [
       '底层复用当前 remotion-video 工程。',
@@ -358,8 +428,8 @@ const SKILL_DEFINITIONS = [
     stepLabel: 'Step 8 · 最终渲染',
     name: 'video-pipeline-video',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-video', 'SKILL.md'),
-    displaySummary: '只负责最终渲染参数、预估时长大小、预览和导出，不再混入项目构建。',
-    inputs: ['script', 'shots.length', 'template', 'quality'],
+    displaySummary: '只负责最终渲染参数、预估时长大小和导出语义，不再混入项目构建。',
+    inputs: ['shots.length', 'shots[].durationSeconds', 'template', 'quality'],
     outputs: ['render.template', 'render.quality', 'render.fps', 'render.width', 'render.height', 'render.format', 'render.codec', 'render.bitrate', 'render.estimatedDuration', 'render.estimatedSize', 'render.notes'],
     defaults: {
       template: 'ultimate',
@@ -374,7 +444,7 @@ const SKILL_DEFINITIONS = [
       style: '参数清楚、推荐理由简洁。',
       emphasis: '模板、质量、预计时长、大小和导出说明。',
       avoid: '把项目生成职责继续塞进 Step 8。',
-      notes: '默认采用 Ultimate 1920x1080 横版参数。',
+      notes: '默认采用 Ultimate 1920x1080 横版参数；竖屏只保留给非-ultimate 兼容分支。',
     },
     constraints: [
       'Step 8 只输出渲染语义。',
@@ -398,7 +468,7 @@ const SKILL_DEFINITIONS = [
     stepLabel: '主控',
     name: 'video-pipeline-master',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-master', 'SKILL.md'),
-    displaySummary: '负责步骤顺序、checkpoint、重试建议和全链路编排。',
+    displaySummary: '负责步骤顺序、checkpoint、资产路径和全链路编排，按当前 repo-owned + external skill 映射执行。',
     inputs: ['topic', 'platform', 'tone', 'targetDuration', 'autoConfirm'],
     outputs: ['step order', 'checkpoint', 'retry policy', 'progress report'],
     defaults: {
@@ -426,7 +496,7 @@ const SKILL_DEFINITIONS = [
     stepLabel: '质检',
     name: 'video-pipeline-eval',
     sourcePath: path.join(HOME_DIR, '.openclaw', 'skills', 'video-pipeline-eval', 'SKILL.md'),
-    displaySummary: '提供评分维度、禁词和提示建议，首版只做 advisory，不做硬阻断。',
+    displaySummary: '提供评分维度、禁词和提示建议；当前只做 advisory，统一由 skillRegistry 返回 evaluation。',
     inputs: ['step payload', 'baseline', 'attempts'],
     outputs: ['score', 'status', 'issues', 'suggestions', 'forbiddenWords'],
     defaults: {
@@ -1368,6 +1438,82 @@ function buildShotStoryboardCue(segment, narration) {
   return cueParts.join(' ｜ ');
 }
 
+function normalizeVisualHintToFamily(segment) {
+  const hint = safeString(
+    segment?.mechanismDepth?.visualHint
+    || segment?.visualHint
+    || segment?.visual?.hint,
+  ).toLowerCase();
+
+  if (!hint) {
+    return '';
+  }
+
+  const aliases = {
+    'flow-chart': 'pipeline-flow',
+    flowchart: 'pipeline-flow',
+    pipeline: 'pipeline-flow',
+    'pipeline-flow': 'pipeline-flow',
+    'step-flow': 'step-flow',
+    steps: 'step-flow',
+    'architecture-map': 'architecture-map',
+    architecture: 'architecture-map',
+    topology: 'architecture-map',
+    'memory-graph': 'memory-graph',
+    memory: 'memory-graph',
+    graph: 'memory-graph',
+    'benchmark-chart': 'benchmark-chart',
+    benchmark: 'benchmark-chart',
+    chart: 'benchmark-chart',
+    metrics: 'metrics',
+    metric: 'metrics',
+    'data-stream': 'data-stream',
+    stream: 'data-stream',
+    terminal: 'terminal',
+    code: 'code',
+    timeline: 'timeline',
+    compare: 'compare-board',
+    'compare-board': 'compare-board',
+  };
+
+  return aliases[hint] || (ULTIMATE_SCENE_FAMILIES.has(hint) ? hint : '');
+}
+
+function resolveSceneFamilyConflicts(requestedFamily, segment, text) {
+  const safeText = String(text || '').toLowerCase();
+  const family = safeString(requestedFamily).toLowerCase();
+  const hasCommandSignals = /(命令|终端|日志|运行|控制台|报错|输出)/.test(safeText)
+    || ['shell', 'bash', 'terminal', 'cli', 'pnpm', 'npm', 'tsx', 'ffmpeg', 'render'].some((token) => hasStandaloneAsciiToken(safeText, token));
+  const hasCodeSignals = /(配置|脚本|函数|接口|参数|字段|结构|schema|json|typescript|tsx|组件|源码)/.test(safeText)
+    || ['api', 'json', 'code', 'schema', 'props'].some((token) => hasStandaloneAsciiToken(safeText, token));
+  const hasTimelineSignals = /(发布时间|时间线|roadmap|里程碑|版本演进|发布|历史|阶段演进|先后)/.test(safeText)
+    || /(年|月|日|q[1-4]|第[一二三四五六七八九十]阶段)/.test(safeText);
+  const hasStepSignals = /(步骤|流程|工作流|依次|第一|第二|第三|先|再|最后|接着|然后)/.test(safeText);
+  const hasArchitectureSignals = /(架构|系统|模块|分层|拓扑|工具链|编排|调度|router|orchestr|stack|agent|toolchain)/.test(safeText);
+  const hasMemorySignals = /(memory|context|上下文|记忆|知识图谱|graph|embedding|召回|检索|知识库|关系网络)/.test(safeText);
+
+  if (family === 'terminal' && hasCodeSignals && !hasCommandSignals) {
+    return 'code';
+  }
+  if (family === 'code' && hasCommandSignals && !hasCodeSignals) {
+    return 'terminal';
+  }
+  if (family === 'timeline' && hasStepSignals && !hasTimelineSignals) {
+    return 'step-flow';
+  }
+  if (family === 'step-flow' && hasTimelineSignals && !hasStepSignals) {
+    return 'timeline';
+  }
+  if (family === 'architecture-map' && hasMemorySignals && !hasArchitectureSignals) {
+    return 'memory-graph';
+  }
+  if (family === 'memory-graph' && hasArchitectureSignals && !hasMemorySignals) {
+    return 'architecture-map';
+  }
+
+  return family;
+}
+
 function mergeStep4Segments(segments, maxCount) {
   const output = [...segments];
 
@@ -1413,9 +1559,16 @@ function inferUltimateSceneFamily(segment, index, total) {
     safeString(segment?.narration),
     safeString(segment?.type),
     safeString(segment?.level),
+    safeString(segment?.sceneIntent),
+    safeString(segment?.evidenceAnchor),
     ...(Array.isArray(segment?.keywords) ? segment.keywords : []),
     ...(Array.isArray(segment?.dataPoints) ? segment.dataPoints : []),
   ].join(' ').toLowerCase();
+  const visualHintFamily = normalizeVisualHintToFamily(segment);
+
+  if (visualHintFamily) {
+    return resolveSceneFamilyConflicts(visualHintFamily, segment, text);
+  }
 
   if (/(命令|终端|日志|运行)/.test(text) || ['shell', 'bash', 'terminal', 'cli', 'render'].some((token) => hasStandaloneAsciiToken(text, token))) {
     return 'terminal';
@@ -1475,7 +1628,11 @@ function inferUltimateSceneFamily(segment, index, total) {
     return 'focus';
   }
 
-  return ULTIMATE_MIDDLE_SCENE_ROTATION[(index - 1) % ULTIMATE_MIDDLE_SCENE_ROTATION.length];
+  return resolveSceneFamilyConflicts(
+    ULTIMATE_MIDDLE_SCENE_ROTATION[(index - 1) % ULTIMATE_MIDDLE_SCENE_ROTATION.length],
+    segment,
+    text,
+  );
 }
 
 function buildStep4TemplateCandidates(primaryFamily, index) {
@@ -1535,6 +1692,267 @@ function buildStep4ScenePlanMetadata(shots, input) {
     familiesUsed,
     title: compactText(getSelectedTitle(input, null)?.title || input?.pipelineState?.inputTitleKeywords || '当前主题', 42),
   };
+}
+
+function pickShotAccent(family) {
+  return {
+    hero: 'lime',
+    'benchmark-chart': 'orange',
+    terminal: 'cyan',
+    code: 'cyan',
+    timeline: 'orange',
+    'step-flow': 'cyan',
+    'architecture-map': 'purple',
+    'memory-graph': 'purple',
+    'compare-board': 'orange',
+    metrics: 'cyan',
+    'data-stream': 'cyan',
+    'quote-highlight': 'orange',
+    'number-strip': 'orange',
+  }[family] || 'cyan';
+}
+
+function inferRevealDirection(family, sceneIntent, storyboardCueZh, level) {
+  const text = `${safeString(sceneIntent)} ${safeString(storyboardCueZh)}`.toLowerCase();
+
+  if (/开场|首屏|第一秒|建立/.test(text) || /hook/i.test(safeString(level))) {
+    return 'center';
+  }
+  if (/揭示|曝光|下拉|倾泻|发布|时间线/.test(text) || family === 'timeline') {
+    return 'down';
+  }
+  if (/收尾|总结|回收|结论|cta|互动/.test(text) || family === 'cta') {
+    return 'right';
+  }
+  if (/对比|压缩|碰撞|对峙/.test(text) || family === 'compare-board') {
+    return 'up';
+  }
+
+  return 'left';
+}
+
+function buildShotDirectorContract(family, index, total, level, type, sceneIntent, storyboardCueZh, scriptBlockLabel, dataPoints) {
+  const numericFields = (Array.isArray(dataPoints) ? dataPoints : [])
+    .map((item) => {
+      const match = String(item || '').match(/[-+]?\d+(?:\.\d+)?/);
+      return match ? {field: 'dataPoint', value: Number(match[0]), label: item} : null;
+    })
+    .filter(Boolean);
+  const grammar = resolveFamilyShotContract(family, {
+    shotIndex: index,
+    totalShots: total,
+    numericFields,
+  });
+  const rhythm = getRhythmContract(family);
+  const cameraMotion = CAMERA_INTENT_TO_MOTION[grammar.cameraIntent]
+    || getPreferredCameraMotion(family)
+    || getCameraMotion(family);
+
+  return {
+    archetype: grammar.archetype,
+    cameraIntent: grammar.cameraIntent,
+    cameraMotion,
+    dataEvent: grammar.dataEvent,
+    enterFrames: grammar.enterFrames,
+    emphasisFrames: grammar.emphasisFrames,
+    staggerGap: Math.max(grammar.staggerGap || 0, rhythm?.staggerGap || 0),
+    revealDirection: inferRevealDirection(family, sceneIntent, storyboardCueZh, level),
+    memoryObject: grammar.memoryObject,
+    directorNote: grammar.directorNote,
+    scriptBlockLabel: safeString(scriptBlockLabel || ''),
+    type: safeString(type || ''),
+  };
+}
+
+function buildShotItemsForFamily(family, segment, narration, keywords, dataPoints) {
+  const dp = Array.isArray(dataPoints) ? dataPoints.filter(Boolean) : [];
+  const kw = Array.isArray(keywords) ? keywords.filter(Boolean) : [];
+
+  if (family === 'timeline') {
+    return uniqueBy([...dp, ...kw], (item) => item).slice(0, 4).map((item, index) => ({
+      label: /(\d{4}|\d+月|\d+日|q[1-4])/i.test(item) ? item : `阶段 ${index + 1}`,
+      detail: item,
+      accent: 'orange',
+    }));
+  }
+
+  if (family === 'step-flow' || family === 'pipeline-flow') {
+    return splitNarrationClauses(narration).slice(0, 4).map((item, index) => ({
+      label: kw[index] || `步骤 ${index + 1}`,
+      detail: item,
+      accent: 'cyan',
+    }));
+  }
+
+  if (family === 'architecture-map' || family === 'memory-graph') {
+    return uniqueBy([...kw, ...dp], (item) => item).slice(0, 5).map((item, index) => ({
+      label: item,
+      detail: family === 'memory-graph' ? `关系节点 ${index + 1}` : `系统模块 ${index + 1}`,
+      accent: 'purple',
+    }));
+  }
+
+  if (family === 'feature-rail') {
+    return uniqueBy([...kw, ...dp], (item) => item).slice(0, 4).map((item) => ({
+      label: item,
+      detail: compactText(narration, 40),
+      accent: 'cyan',
+    }));
+  }
+
+  if (family === 'terminal') {
+    return splitNarrationClauses(narration).slice(0, 3).map((item, index) => ({
+      label: index === 0 ? '$ command' : `log ${index}`,
+      detail: item,
+      accent: 'cyan',
+    }));
+  }
+
+  return [];
+}
+
+function buildShotFeaturesForFamily(family, segment, narration, keywords, dataPoints) {
+  if (family !== 'feature-rail') {
+    return [];
+  }
+
+  return uniqueBy([...(Array.isArray(keywords) ? keywords : []), ...(Array.isArray(dataPoints) ? dataPoints : [])], (item) => item)
+    .slice(0, 4)
+    .map((item) => ({
+      icon: '',
+      title: item,
+      desc: compactText(narration, 42),
+    }));
+}
+
+function buildShotVisualProps(family, segment, narration, sceneIntent, storyboardCueZh, scriptBlockLabel, dataPoints, keywords) {
+  const props = {
+    sceneIntent,
+    storyboardCueZh,
+    scriptBlockLabel,
+    type: safeString(segment?.type),
+  };
+
+  if (family === 'terminal') {
+    return {
+      ...props,
+      windowTitle: safeString(segment?.title || 'terminal'),
+      command: compactText(splitNarrationClauses(narration)[0] || narration, 72),
+      outputs: splitNarrationClauses(narration).slice(1, 4),
+      note: safeString(segment?.evidenceAnchor || sceneIntent),
+    };
+  }
+
+  if (family === 'code') {
+    return {
+      ...props,
+      filename: 'workflow.ts',
+      lines: splitNarrationClauses(narration).slice(0, 5),
+    };
+  }
+
+  if (family === 'architecture-map') {
+    return {
+      ...props,
+      centerTitle: safeString(segment?.title || scriptBlockLabel),
+      centerDetail: compactText(sceneIntent || narration, 80),
+      layout: 'radial',
+    };
+  }
+
+  if (family === 'memory-graph') {
+    return {
+      ...props,
+      centerTitle: safeString(segment?.title || scriptBlockLabel),
+      centerDetail: compactText(sceneIntent || narration, 80),
+      layout: 'stack',
+    };
+  }
+
+  if (family === 'timeline') {
+    return {
+      ...props,
+      heading: safeString(segment?.title || scriptBlockLabel),
+    };
+  }
+
+  if (family === 'hero') {
+    return {
+      ...props,
+      visualStyle: 'morfeo',
+      highlightedWord: (Array.isArray(keywords) ? keywords[0] : '') || '',
+      lines: splitNarrationClauses(narration).slice(0, 3),
+      tag: safeString(segment?.evidenceAnchor || ''),
+    };
+  }
+
+  if (family === 'benchmark-chart') {
+    return {
+      ...props,
+      primaryLabel: '当前方案',
+      secondaryLabel: '旧方案',
+    };
+  }
+
+  if (family === 'data-stream' || family === 'pipeline-flow') {
+    return {
+      ...props,
+      summary: compactText(sceneIntent || narration, 64),
+    };
+  }
+
+  return props;
+}
+
+function diversifySceneFamilies(shots) {
+  const output = [];
+
+  for (const shot of Array.isArray(shots) ? shots : []) {
+    const prev = output[output.length - 1];
+    const prev2 = output[output.length - 2];
+    let family = safeString(shot?.sceneFamily || shot?.family);
+    const templateCandidates = Array.isArray(shot?.templateCandidates) ? shot.templateCandidates : [];
+
+    if (prev && prev2 && family && family === prev.sceneFamily && family === prev2.sceneFamily) {
+      const replacement = templateCandidates.find((candidate) => (
+        candidate
+        && candidate !== family
+        && candidate !== prev.sceneFamily
+        && candidate !== prev2.sceneFamily
+      ));
+      if (replacement) {
+        family = replacement;
+      }
+    }
+
+    if (family === 'architecture-map' && prev?.sceneFamily === 'memory-graph') {
+      family = templateCandidates.find((candidate) => candidate && candidate !== 'memory-graph') || family;
+    }
+    if (family === 'memory-graph' && prev?.sceneFamily === 'architecture-map') {
+      family = templateCandidates.find((candidate) => candidate && candidate !== 'architecture-map') || family;
+    }
+    if (family === 'timeline' && prev?.sceneFamily === 'step-flow') {
+      family = templateCandidates.find((candidate) => candidate && candidate !== 'step-flow') || family;
+    }
+    if (family === 'step-flow' && prev?.sceneFamily === 'timeline') {
+      family = templateCandidates.find((candidate) => candidate && candidate !== 'timeline') || family;
+    }
+    if (family === 'terminal' && prev?.sceneFamily === 'code') {
+      family = templateCandidates.find((candidate) => candidate && candidate !== 'code') || family;
+    }
+    if (family === 'code' && prev?.sceneFamily === 'terminal') {
+      family = templateCandidates.find((candidate) => candidate && candidate !== 'terminal') || family;
+    }
+
+    output.push({
+      ...shot,
+      family,
+      sceneFamily: family,
+      templateCandidates: uniqueBy([family, ...templateCandidates], (item) => item).slice(0, 6),
+    });
+  }
+
+  return output;
 }
 
 function buildStep4Slots(payload, input) {
@@ -1608,6 +2026,7 @@ function buildStep4Slots(payload, input) {
           transitionToNext: safeString(item?.transitionToNext),
           dataPoints: Array.isArray(item?.dataPoints) ? item.dataPoints : [],
           keywords: Array.isArray(item?.keywords) ? item.keywords : [],
+          mechanismDepth: item?.mechanismDepth || null,
         }))
         .filter((item) => safeString(item.narration)),
       {
@@ -1751,6 +2170,33 @@ function buildStep4Slots(payload, input) {
         evidenceAnchor,
         dataPoints,
       }, scriptExcerpt);
+    const items = Array.isArray(source?.items) && source.items.length > 0
+      ? source.items
+      : buildShotItemsForFamily(family, segment, narration, keywords, dataPoints);
+    const features = Array.isArray(source?.features) && source.features.length > 0
+      ? source.features
+      : buildShotFeaturesForFamily(family, segment, narration, keywords, dataPoints);
+    const visualProps = buildShotVisualProps(
+      family,
+      {...segment, ...source},
+      narration,
+      sceneIntent,
+      storyboardCueZh,
+      scriptBlockLabel,
+      dataPoints,
+      keywords,
+    );
+    const director = buildShotDirectorContract(
+      family,
+      index,
+      total,
+      level,
+      sceneType,
+      sceneIntent,
+      storyboardCueZh,
+      scriptBlockLabel,
+      dataPoints,
+    );
 
     return {
       ...source,
@@ -1768,7 +2214,15 @@ function buildStep4Slots(payload, input) {
         description: safeString(source?.visual?.description)
           || `16:9 横版场景，围绕口播重点「${compactText(scriptExcerpt, 30)}」用 ${family} 模板呈现 ${compactText(sceneIntent || narration, 48)}`,
         focus,
+        props: {
+          ...visualProps,
+          accent: pickShotAccent(family),
+          revealDirection: director.revealDirection,
+        },
       },
+      director,
+      items,
+      features,
       dataPoints,
       comparisons,
       keywords,
@@ -1785,13 +2239,14 @@ function buildStep4Slots(payload, input) {
       scriptSplitCount: Number.isFinite(Number(source?.scriptSplitCount ?? segment?.scriptSplitCount))
         ? Number(source?.scriptSplitCount ?? segment?.scriptSplitCount)
         : 1,
+      mechanismDepth: source?.mechanismDepth || segment?.mechanismDepth || null,
       storyboardCueZh,
     };
   });
 }
 
 function normalizeStep4Payload(payload, input) {
-  const shots = buildStep4Slots(payload, input);
+  const shots = diversifySceneFamilies(buildStep4Slots(payload, input));
   return {
     shots,
     scenePlan: buildStep4ScenePlanMetadata(shots, input),
@@ -2008,34 +2463,15 @@ function normalizeStep6Payload(payload, input) {
 }
 
 function resolveStylePreset(input) {
-  const promptStyle = safeString(input?.pipelineState?.prompts?.byShotId?.['shot-01']?.style);
-  const renderTemplate = safeString(input?.pipelineState?.render?.template);
-  const renderWidth = toNumber(input?.pipelineState?.render?.width, 0);
-  const renderHeight = toNumber(input?.pipelineState?.render?.height, 0);
-  if (renderTemplate === 'ultimate' || (renderWidth >= renderHeight && renderWidth >= 1600)) {
-    return 'ultimate-1080p';
-  }
-  if (/科技|tech|hud/i.test(promptStyle)) {
-    return 'tech-dark';
-  }
-  if (/real|真实|minimal/i.test(promptStyle)) {
-    return 'minimal-light';
-  }
-  if (renderTemplate === 'split') {
-    return 'minimal-light';
-  }
-  if (renderTemplate === 'fullscreen') {
-    return 'neon';
-  }
-  return 'tech-dark';
+  const explicitVisualSystem = safeString(input?.pipelineState?.visualSystem)
+    || safeString(input?.pipelineState?.scenePlan?.visualSystem);
+  return explicitVisualSystem || 'ultimate-1080p';
 }
 
 function buildProjectBuildPayload(input) {
   const projectId = safeString(input?.projectState?.id) || 'default';
-  const template = safeString(input?.pipelineState?.render?.template) || 'ultimate';
-  const quality = safeString(input?.pipelineState?.render?.quality) || 'high';
   const stylePreset = resolveStylePreset(input);
-  const compositionId = template === 'ultimate' ? 'UltimateSceneTemplate' : 'OpenClawVideo';
+  const compositionId = 'UltimateSceneTemplate';
   const files = REMOTION_BUILD_FILES
     .filter((relativePath) => fs.existsSync(path.join(REMOTION_PROJECT_ROOT, relativePath)))
     .map((relativePath) => path.join(REMOTION_PROJECT_ROOT, relativePath));
@@ -2073,24 +2509,20 @@ function normalizeStep8Payload(payload, input) {
     : {};
   const shotDuration = (Array.isArray(input?.shotsState) ? input.shotsState : [])
     .reduce((sum, shot) => sum + toNumber(shot?.durationSeconds, 0), 0);
-  const template = safeString(render.template) || 'ultimate';
-  const isUltimate = template === 'ultimate';
+  const requestedWidth = round(render.width);
+  const requestedHeight = round(render.height);
 
-  render.template = template;
+  render.template = 'ultimate';
   render.quality = safeString(render.quality) || 'high';
   render.fps = round(render.fps || 30);
-  render.width = round(render.width || (isUltimate ? 1920 : 1080));
-  render.height = round(render.height || (isUltimate ? 1080 : 1920));
+  render.width = requestedWidth > 0 ? requestedWidth : 1920;
+  render.height = requestedHeight > 0 ? requestedHeight : 1080;
   render.format = safeString(render.format) || 'mp4';
   render.codec = safeString(render.codec) || 'h264';
-  render.bitrate = round(render.bitrate || (isUltimate ? 12000 : 8000));
+  render.bitrate = round(render.bitrate || 12000);
   render.estimatedDuration = round(render.estimatedDuration || shotDuration || 45);
   render.estimatedSize = safeString(render.estimatedSize) || `~${Math.max(8, round((render.bitrate * render.estimatedDuration / 8) / 1024))}MB`;
-  render.notes = safeString(render.notes) || (
-    isUltimate
-      ? 'Step 8 采用 Ultimate 1920x1080 横版模板，适合结构化讲解、卡片拆解和章节化内容。'
-      : 'Step 8 只保留最终渲染语义：参数、预览、导出。'
-  );
+  render.notes = safeString(render.notes) || 'Step 8 采用 Ultimate 1920x1080 横版模板，适合结构化讲解、卡片拆解和章节化内容。';
   nextPayload.render = render;
   return nextPayload;
 }

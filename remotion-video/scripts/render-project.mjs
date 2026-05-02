@@ -84,11 +84,62 @@ const resolveRemotionLaunch = (cwd) => {
   };
 };
 
+const DEFAULT_TRANSITION_DURATION = 12;
+
+const resolveSceneTransition = (projectTransition, sceneTransition) => {
+  if (sceneTransition === false) {
+    return false;
+  }
+
+  if (projectTransition === false && !sceneTransition) {
+    return false;
+  }
+
+  return {
+    durationInFrames: DEFAULT_TRANSITION_DURATION,
+    ...(projectTransition === false ? {} : projectTransition ?? {}),
+    ...(sceneTransition ?? {}),
+  };
+};
+
+const getIncomingTransitionDurationInFrames = (previousScene, scene) => {
+  if (!previousScene || !scene?.transition) {
+    return 0;
+  }
+
+  const requestedDuration = Number(
+    scene.transition.durationInFrames ?? DEFAULT_TRANSITION_DURATION,
+  );
+
+  if (!Number.isFinite(requestedDuration) || requestedDuration <= 0) {
+    return 0;
+  }
+
+  const previousDuration = Math.max(1, Math.round(Number(previousScene.durationInFrames) || 1));
+  const currentDuration = Math.max(1, Math.round(Number(scene.durationInFrames) || 1));
+  const maxOverlap = Math.max(0, Math.min(previousDuration, currentDuration) - 1);
+
+  return Math.min(Math.round(requestedDuration), maxOverlap);
+};
+
 const getUltimateDurationInFrames = (config) => {
   const scenes = Array.isArray(config?.scenes) ? config.scenes : [];
-  return scenes.reduce((sum, scene) => {
-    return sum + Math.max(1, Math.round(Number(scene?.durationInFrames) || 1));
+  const normalizedScenes = scenes.map((scene) => ({
+    ...scene,
+    durationInFrames: Math.max(1, Math.round(Number(scene?.durationInFrames) || 1)),
+    transition: resolveSceneTransition(config?.defaultTransition, scene?.transition),
+  }));
+
+  const summedDuration = normalizedScenes.reduce((sum, scene) => {
+    return sum + scene.durationInFrames;
   }, 0);
+
+  const overlapDuration = normalizedScenes.reduce((sum, scene, index) => {
+    const previousScene = index > 0 ? normalizedScenes[index - 1] : null;
+    return sum + getIncomingTransitionDurationInFrames(previousScene, scene);
+  }, 0);
+
+  return Math.max(1, summedDuration - overlapDuration);
 };
 
 const stageRenderPropsFile = async (projectRoot, projectId, renderProps, compositionId) => {
@@ -98,16 +149,14 @@ const stageRenderPropsFile = async (projectRoot, projectId, renderProps, composi
   const absolutePath = path.join(projectRoot, 'public', relativePath.replace(/^\//, ''));
   await writeJson(absolutePath, renderProps);
 
-  const defaultDuration = compositionId === 'UltimateSceneTemplate'
-    ? getUltimateDurationInFrames(renderProps?.config)
-    : Number(renderProps?.durationInFrames) || 0;
+  const defaultDuration = getUltimateDurationInFrames(renderProps?.config);
 
   return {
     propsFile: relativePath,
     durationInFrames: Math.max(1, Math.round(defaultDuration || 1)),
     renderFps: Number(renderProps?.renderFps) || 30,
-    renderWidth: Number(renderProps?.renderWidth) || (compositionId === 'UltimateSceneTemplate' ? 1920 : 1080),
-    renderHeight: Number(renderProps?.renderHeight) || (compositionId === 'UltimateSceneTemplate' ? 1080 : 1920),
+    renderWidth: Number(renderProps?.renderWidth) || 1920,
+    renderHeight: Number(renderProps?.renderHeight) || 1080,
     template: renderProps?.template,
     packageVersion: typeof renderProps?.packageVersion === 'string' ? renderProps.packageVersion : null,
     projectId,
@@ -136,33 +185,31 @@ async function main() {
   const projectId = String(props.projectId || 'project-render').trim() || 'project-render';
   const packageVersion = typeof props.packageVersion === 'string' ? props.packageVersion.trim() : '';
   const versionSuffix = sanitizeVersionForFileName(packageVersion);
-  const shouldUseUltimate = (
-    String(props.compositionId || '').trim() === 'UltimateSceneTemplate'
-      || props.renderTemplate === 'ultimate'
-      || props.template === 'ultimate'
-      || (props.config && Array.isArray(props.config.scenes))
-  );
-  const compositionId = shouldUseUltimate ? 'UltimateSceneTemplate' : 'OpenClawVideo';
+  const compositionId = 'UltimateSceneTemplate';
   const outputPath = outputArg
     ? path.resolve(process.cwd(), outputArg)
     : path.resolve(process.cwd(), 'out', `${projectId}${versionSuffix ? `-v${versionSuffix}` : ''}.mp4`);
   const hasCustomPort = hasCliFlag(cleanedPassthroughArgs, '--port');
+  const envRenderPort = String(process.env.REMOTION_RENDER_PORT || '').trim();
   const renderPort = hasCustomPort
     ? null
-    : String(process.env.REMOTION_RENDER_PORT || '3010').trim() || '3010';
+    : (envRenderPort || null);
 
   await fs.mkdir(path.dirname(outputPath), {recursive: true});
 
-  const renderProps = compositionId === 'UltimateSceneTemplate'
-    ? {
-        config: props.config,
-        packageVersion: packageVersion || null,
-        voiceFile: typeof props.voiceFile === 'string' ? props.voiceFile : null,
-        audioSegments: Array.isArray(props.audioSegments) ? props.audioSegments : null,
-      }
-    : props;
+  const renderProps = {
+    config: props.config,
+    packageVersion: packageVersion || null,
+    voiceFile: typeof props.voiceFile === 'string' ? props.voiceFile : null,
+    audioSegments: Array.isArray(props.audioSegments) ? props.audioSegments : null,
+    subtitleData: Array.isArray(props.subtitleData) ? props.subtitleData : null,
+    renderFps: Number(props.renderFps) || 30,
+    renderWidth: Number(props.renderWidth) || 1920,
+    renderHeight: Number(props.renderHeight) || 1080,
+    template: 'ultimate',
+  };
 
-  if (compositionId === 'UltimateSceneTemplate' && (!props.config || !Array.isArray(props.config.scenes))) {
+  if (!props.config || !Array.isArray(props.config.scenes)) {
     console.error('[render-project] Missing Ultimate config.scenes in render props.');
     process.exit(1);
   }
@@ -171,12 +218,10 @@ async function main() {
     ? {
         propsJson: renderProps,
         propsFile: null,
-        durationInFrames: compositionId === 'UltimateSceneTemplate'
-          ? Math.max(1, getUltimateDurationInFrames(renderProps?.config))
-          : Math.max(1, Number(renderProps?.durationInFrames) || 1),
+        durationInFrames: Math.max(1, getUltimateDurationInFrames(renderProps?.config)),
         renderFps: Number(renderProps?.renderFps) || 30,
-        renderWidth: Number(renderProps?.renderWidth) || (compositionId === 'UltimateSceneTemplate' ? 1920 : 1080),
-        renderHeight: Number(renderProps?.renderHeight) || (compositionId === 'UltimateSceneTemplate' ? 1080 : 1920),
+        renderWidth: Number(renderProps?.renderWidth) || 1920,
+        renderHeight: Number(renderProps?.renderHeight) || 1080,
         template: renderProps?.template,
         packageVersion: typeof renderProps?.packageVersion === 'string' ? renderProps.packageVersion : null,
         projectId,
@@ -206,8 +251,8 @@ async function main() {
 
   remotionArgs.push(...cleanedPassthroughArgs);
 
-    process.stdout.write(
-      [
+  process.stdout.write(
+    [
       `[render-project] projectId=${projectId}`,
       packageVersion ? `[render-project] package-version=${packageVersion}` : '',
       `[render-project] composition=${compositionId}`,

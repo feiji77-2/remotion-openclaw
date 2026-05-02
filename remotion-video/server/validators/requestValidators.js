@@ -5,6 +5,8 @@ const MAX_SCRIPT_LENGTH = 8_000;
 const MAX_PROJECT_ID_LENGTH = 32;
 const MAX_SHOTS = 24;
 const STRICT_PROJECT_ID_PATTERN = /^[a-z0-9](?:[a-z0-9_-]{0,30}[a-z0-9])?$/;
+const SUPPORTED_RENDER_TEMPLATE = 'ultimate';
+const LEGACY_RENDER_TEMPLATE_ALIASES = new Set(['caption', 'split', 'fullscreen', 'card-draw']);
 
 function badRequest(message) {
   const error = new Error(message);
@@ -70,6 +72,17 @@ function normalizePositiveInt(value, {min = 1, max = Number.MAX_SAFE_INTEGER} = 
     return null;
   }
   return rounded;
+}
+
+function normalizeRenderTemplate(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  if (!normalized) {
+    return SUPPORTED_RENDER_TEMPLATE;
+  }
+  if (normalized === SUPPORTED_RENDER_TEMPLATE || LEGACY_RENDER_TEMPLATE_ALIASES.has(normalized)) {
+    return SUPPORTED_RENDER_TEMPLATE;
+  }
+  throw badRequest(`template must be "${SUPPORTED_RENDER_TEMPLATE}"`);
 }
 
 function normalizePublicAssetPath(value, {allowRemote = false} = {}) {
@@ -207,7 +220,7 @@ async function normalizeRenderRequest(body, securityConfig = getSecurityConfig()
 
   return {
     script: script || null,
-    template: normalizeString(body.template) || 'caption',
+    template: normalizeRenderTemplate(body.template),
     voice: normalizeString(body.voice) || 'qwen-tts',
     webhook: await assertWebhookAllowed(body.webhook, securityConfig),
     projectId,
@@ -220,6 +233,7 @@ async function normalizeRenderRequest(body, securityConfig = getSecurityConfig()
     typewriter: Boolean(body.typewriter),
     designJson: body.designJson && typeof body.designJson === 'object' ? body.designJson : null,
     shots: normalizeShots(body.shots),
+    voiceSettings: normalizeVoiceSettings(body.voiceSettings),
     durationInFrames: normalizePositiveInt(body.durationInFrames, {min: 1, max: 500_000}),
     renderFps: normalizePositiveInt(body.renderFps, {min: 1, max: 240}),
     renderWidth: normalizePositiveInt(body.renderWidth, {min: 16, max: 7_680}),

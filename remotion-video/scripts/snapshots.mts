@@ -14,9 +14,10 @@
  * Uses the native HTML Canvas API to compute a DCT-based hash.
  *
  * Usage:
- *   npx tsx scripts/snapshots.ts render    # render & store snapshots
- *   npx tsx scripts/snapshots.ts diff     # compare current vs stored
- *   npx tsx scripts/snapshots.ts clean    # remove all snapshots
+ *   npx tsx scripts/snapshots.ts render                      # render & store snapshots
+ *   npx tsx scripts/snapshots.ts render hero terminal code   # render selected families
+ *   npx tsx scripts/snapshots.ts diff                       # compare current vs stored
+ *   npx tsx scripts/snapshots.ts clean                      # remove all snapshots
  */
 
 import {createHash} from 'crypto';
@@ -75,14 +76,15 @@ function hammingDistance(a: string, b: string): number {
 // ─── Remotion still rendering ────────────────────────────────────────────────
 
 /**
- * DEMO_SHOTS — one minimal fixture per family in REGISTRY.
+ * DEMO_SHOTS — one built-in snapshot fixture per family in REGISTRY.
  * Keys must match REGISTRY keys exactly (see src/data/registry.ts).
- * Families with full fixtures (hero through timeline = 8): real render data.
- * Remaining 12 families: stub fixtures sufficient to exercise Remotion bundling
- * without crashing; replace with real QA fixtures as each family is validated.
+ * Historical variable name is kept to avoid noisy refactors.
+ * Coverage now spans all 20 families, and each fixture is paired with director
+ * overrides so still renders exercise cameraMotion / revealDirection /
+ * archetype / dataEvent / memoryObject contracts.
  */
 const DEMO_SHOTS: Record<string, object> = {
-  // ── Full fixtures (8/20) ─────────────────────────────────────────────────
+  // ── Family fixtures: group A ────────────────────────────────────────────
   hero: {
     id: 'snap-hero',
     family: 'hero',
@@ -109,9 +111,9 @@ const DEMO_SHOTS: Record<string, object> = {
       heading: 'Feature Cards',
     },
     features: [
-      {title: 'Snapshot A', desc: 'Visual regression check A', icon: 'spark'},
-      {title: 'Snapshot B', desc: 'Visual regression check B', icon: 'grid'},
-      {title: 'Snapshot C', desc: 'Visual regression check C', icon: 'pulse'},
+      {title: 'Snapshot A', desc: 'Visual regression check A', icon: 'sparkles'},
+      {title: 'Snapshot B', desc: 'Visual regression check B', icon: 'layers'},
+      {title: 'Snapshot C', desc: 'Visual regression check C', icon: 'zap'},
     ],
   },
   code: {
@@ -197,10 +199,10 @@ const DEMO_SHOTS: Record<string, object> = {
       summary: 'Source to deploy in four stages',
     },
     items: [
-      {label: 'Source', detail: 'git push'},
-      {label: 'Build', detail: 'compile'},
-      {label: 'Test', detail: 'pass'},
-      {label: 'Deploy', detail: 'live'},
+      {label: 'Source', detail: 'git push', icon: 'gitBranch'},
+      {label: 'Build', detail: 'compile', icon: 'code'},
+      {label: 'Test', detail: 'pass', icon: 'checkCircle'},
+      {label: 'Deploy', detail: 'live', icon: 'arrowRight'},
     ],
   },
   timeline: {
@@ -215,13 +217,13 @@ const DEMO_SHOTS: Record<string, object> = {
       heading: 'Event Timeline',
     },
     items: [
-      {label: 'Start', detail: 'T+0:00', accent: 'cyan'},
-      {label: 'Peak', detail: 'T+0:30', accent: 'orange'},
-      {label: 'End', detail: 'T+1:00', accent: 'purple'},
+      {label: 'Start', detail: 'T+0:00', accent: 'cyan', icon: 'play'},
+      {label: 'Peak', detail: 'T+0:30', accent: 'orange', icon: 'zap'},
+      {label: 'End', detail: 'T+1:00', accent: 'purple', icon: 'checkCircle'},
     ],
   },
 
-  // ── Stub fixtures (12/20) — replace with real QA fixtures ───────────────
+  // ── Family fixtures: group B ────────────────────────────────────────────
   focus: {
     id: 'snap-focus', family: 'focus', title: 'Focus Diagram', narration: 'Snapshot test — focus',
     frames: 90, level: 'chapter', visualProps: {
@@ -237,18 +239,18 @@ const DEMO_SHOTS: Record<string, object> = {
     id: 'snap-sf', family: 'step-flow', title: 'Step Flow', narration: 'Snapshot test — step flow',
     frames: 110, level: 'chapter', visualProps: {kicker: 'SNAPSHOT TEST', heading: 'Steps'},
     items: [
-      {label: 'Plan', detail: 'Map the task'},
-      {label: 'Build', detail: 'Implement safely'},
-      {label: 'Verify', detail: 'Check output'},
+      {label: 'Plan', detail: 'Map the task', icon: 'list'},
+      {label: 'Build', detail: 'Implement safely', icon: 'wrench'},
+      {label: 'Verify', detail: 'Check output', icon: 'checkCircle'},
     ],
   },
   'evidence-wall': {
     id: 'snap-ew', family: 'evidence-wall', title: 'Evidence Wall', narration: 'Snapshot test — evidence',
     frames: 100, level: 'chapter', visualProps: {kicker: 'SNAPSHOT TEST', heading: 'Evidence'},
     comparisons: [
-      {label: 'Docs', text: 'Contract updated', accent: 'cyan'},
-      {label: 'Tests', text: 'Still snapshots available', accent: 'orange'},
-      {label: 'Render', text: 'Scene output verified', accent: 'purple'},
+      {label: 'Docs', text: 'Contract updated', accent: 'cyan', icon: 'fileText'},
+      {label: 'Tests', text: 'Still snapshots available', accent: 'orange', icon: 'checkCircle'},
+      {label: 'Render', text: 'Scene output verified', accent: 'purple', icon: 'play'},
     ],
   },
   'architecture-map': {
@@ -260,10 +262,10 @@ const DEMO_SHOTS: Record<string, object> = {
       centerDetail: 'Registry-driven render',
     },
     items: [
-      {label: 'Workflow', detail: 'server/workflow'},
-      {label: 'Storyboard', detail: 'storyboardLoader'},
-      {label: 'Render', detail: 'UltimateSceneTemplate'},
-      {label: 'QA', detail: 'verify-render-output'},
+      {label: 'Workflow', detail: 'server/workflow', icon: 'gitBranch'},
+      {label: 'Storyboard', detail: 'storyboardLoader', icon: 'layers'},
+      {label: 'Render', detail: 'UltimateSceneTemplate', icon: 'play'},
+      {label: 'QA', detail: 'verify-render-output', icon: 'checkCircle'},
     ],
   },
   'tag-matrix': {
@@ -285,6 +287,11 @@ const DEMO_SHOTS: Record<string, object> = {
     id: 'snap-ds', family: 'data-stream', title: 'Data Stream', narration: 'Snapshot test — data stream',
     frames: 100, level: 'chapter', visualProps: {kicker: 'SNAPSHOT TEST', heading: 'Stream', summary: 'Realtime metrics'},
     dataPoints: ['tokens/s:182', 'jobs:12', 'success:98.7%'],
+    items: [
+      {label: 'tokens/s', detail: '182', icon: 'zap'},
+      {label: 'jobs', detail: '12', icon: 'server'},
+      {label: 'success', detail: '98.7%', icon: 'checkCircle'},
+    ],
   },
   'memory-graph': {
     id: 'snap-mg', family: 'memory-graph', title: 'Memory Graph', narration: 'Snapshot test — memory graph',
@@ -295,10 +302,10 @@ const DEMO_SHOTS: Record<string, object> = {
       centerDetail: 'Project knowledge graph',
     },
     items: [
-      {label: 'Docs', detail: 'Obsidian vault'},
-      {label: 'Steps', detail: 'Step-04 contract'},
-      {label: 'Assets', detail: 'Snapshots and voice'},
-      {label: 'QA', detail: 'Verification rules'},
+      {label: 'Docs', detail: 'Obsidian vault', icon: 'database'},
+      {label: 'Steps', detail: 'Step-04 contract', icon: 'list'},
+      {label: 'Assets', detail: 'Snapshots and voice', icon: 'folder'},
+      {label: 'QA', detail: 'Verification rules', icon: 'checkCircle'},
     ],
   },
   'benchmark-chart': {
@@ -323,6 +330,11 @@ const DEMO_SHOTS: Record<string, object> = {
     id: 'snap-mx', family: 'metrics', title: 'Metric Bars', narration: 'Snapshot test — metrics',
     frames: 90, level: 'chapter', visualProps: {kicker: 'SNAPSHOT TEST', heading: 'Metrics'},
     dataPoints: ['Time:42s:0.72', 'Rework:2x:0.35', 'Success:98%:0.88'],
+    items: [
+      {label: 'Time', detail: '42s', icon: 'clock'},
+      {label: 'Rework', detail: '2x', icon: 'repeat'},
+      {label: 'Success', detail: '98%', icon: 'checkCircle'},
+    ],
   },
   cta: {
     id: 'snap-cta', family: 'cta', title: 'Call to Action', narration: 'Snapshot test — CTA',
@@ -330,10 +342,297 @@ const DEMO_SHOTS: Record<string, object> = {
   },
 };
 
-/** Families to snapshot. Expand this list as families are QA'd. */
-const SNAPSHOT_FAMILIES = Object.keys(DEMO_SHOTS);
+const buildSnapshotDirector = (config: {
+  archetype: string;
+  cameraIntent: string;
+  cameraMotion: string;
+  dataEvent: string;
+  revealDirection?: string;
+  staggerGap?: number;
+  enterFrames?: number;
+  emphasisFrames?: number;
+  memoryType?: string;
+  memoryRole?: string;
+  memoryColor?: string;
+}) => ({
+  archetype: config.archetype,
+  cameraIntent: config.cameraIntent,
+  cameraMotion: config.cameraMotion,
+  dataEvent: config.dataEvent,
+  enterFrames: config.enterFrames ?? 18,
+  emphasisFrames: config.emphasisFrames ?? 52,
+  staggerGap: config.staggerGap ?? 8,
+  revealDirection: config.revealDirection ?? 'left',
+  memoryObject: {
+    type: config.memoryType ?? 'word',
+    role: config.memoryRole ?? 'snapshot anchor',
+    enterFrame: 12,
+    color: config.memoryColor ?? '#00d4ff',
+  },
+  directorNote: `[snapshot] ${config.archetype} | ${config.cameraMotion} | ${config.revealDirection ?? 'left'}`,
+});
+
+const SNAPSHOT_DIRECTOR_OVERRIDES: Record<string, ReturnType<typeof buildSnapshotDirector>> = {
+  hero: buildSnapshotDirector({
+    archetype: 'lock-on reveal',
+    cameraIntent: 'pin',
+    cameraMotion: 'push-in',
+    dataEvent: 'pin',
+    revealDirection: 'right',
+    memoryType: 'word',
+    memoryRole: 'hero title',
+    memoryColor: '#cdff3d',
+  }),
+  'feature-rail': buildSnapshotDirector({
+    archetype: 'burst spread',
+    cameraIntent: 'reveal',
+    cameraMotion: 'pan-x',
+    dataEvent: 'burst-spread',
+    revealDirection: 'left',
+    staggerGap: 2,
+    memoryType: 'cluster',
+    memoryRole: 'feature spread',
+    memoryColor: '#00d4ff',
+  }),
+  focus: buildSnapshotDirector({
+    archetype: 'follow focus',
+    cameraIntent: 'chase',
+    cameraMotion: 'push-in',
+    dataEvent: 'trace-flow',
+    revealDirection: 'down',
+    memoryType: 'reticle',
+    memoryRole: 'focus target',
+    memoryColor: '#00d4ff',
+  }),
+  'number-strip': buildSnapshotDirector({
+    archetype: 'pressure countdown',
+    cameraIntent: 'pin',
+    cameraMotion: 'zoom-pulse',
+    dataEvent: 'count-up',
+    revealDirection: 'center',
+    staggerGap: 6,
+    memoryType: 'number',
+    memoryRole: 'headline metric',
+    memoryColor: '#ff8a3d',
+  }),
+  'step-flow': buildSnapshotDirector({
+    archetype: 'trace flow',
+    cameraIntent: 'chase',
+    cameraMotion: 'pan-y',
+    dataEvent: 'trace-flow',
+    revealDirection: 'left',
+    staggerGap: 6,
+    memoryType: 'line',
+    memoryRole: 'step path',
+    memoryColor: '#00d4ff',
+  }),
+  timeline: buildSnapshotDirector({
+    archetype: 'drift reveal',
+    cameraIntent: 'drift',
+    cameraMotion: 'pan-y',
+    dataEvent: 'trace-flow',
+    revealDirection: 'down',
+    staggerGap: 12,
+    memoryType: 'line',
+    memoryRole: 'timeline axis',
+    memoryColor: '#ff8a3d',
+  }),
+  'compare-board': buildSnapshotDirector({
+    archetype: 'compress compare',
+    cameraIntent: 'compress',
+    cameraMotion: 'pan-x',
+    dataEvent: 'delta-hit',
+    revealDirection: 'up',
+    staggerGap: 6,
+    memoryType: 'split',
+    memoryRole: 'comparison seam',
+    memoryColor: '#00d4ff',
+  }),
+  terminal: buildSnapshotDirector({
+    archetype: 'trace flow',
+    cameraIntent: 'chase',
+    cameraMotion: 'pan-y',
+    dataEvent: 'trace-flow',
+    revealDirection: 'down',
+    memoryType: 'line',
+    memoryRole: 'terminal stream',
+    memoryColor: '#45ff9a',
+  }),
+  'evidence-wall': buildSnapshotDirector({
+    archetype: 'compress compare',
+    cameraIntent: 'compress',
+    cameraMotion: 'pan-y',
+    dataEvent: 'delta-hit',
+    revealDirection: 'left',
+    staggerGap: 8,
+    memoryType: 'split',
+    memoryRole: 'evidence anchor',
+    memoryColor: '#ffd84d',
+  }),
+  'architecture-map': buildSnapshotDirector({
+    archetype: 'burst spread',
+    cameraIntent: 'reveal',
+    cameraMotion: 'drift',
+    dataEvent: 'burst-spread',
+    revealDirection: 'center',
+    staggerGap: 10,
+    memoryType: 'node',
+    memoryRole: 'system hub',
+    memoryColor: '#9d7bff',
+  }),
+  'tag-matrix': buildSnapshotDirector({
+    archetype: 'burst spread',
+    cameraIntent: 'reveal',
+    cameraMotion: 'pan-x',
+    dataEvent: 'burst-spread',
+    revealDirection: 'right',
+    staggerGap: 4,
+    memoryType: 'cluster',
+    memoryRole: 'tag orbit',
+    memoryColor: '#00d4ff',
+  }),
+  code: buildSnapshotDirector({
+    archetype: 'trace flow',
+    cameraIntent: 'chase',
+    cameraMotion: 'pan-x',
+    dataEvent: 'trace-flow',
+    revealDirection: 'up',
+    memoryType: 'line',
+    memoryRole: 'code path',
+    memoryColor: '#00d4ff',
+  }),
+  metrics: buildSnapshotDirector({
+    archetype: 'threshold breach',
+    cameraIntent: 'reveal',
+    cameraMotion: 'zoom-pulse',
+    dataEvent: 'threshold-cross',
+    revealDirection: 'down',
+    staggerGap: 6,
+    memoryType: 'ring',
+    memoryRole: 'metric gauge',
+    memoryColor: '#00d4ff',
+  }),
+  'data-stream': buildSnapshotDirector({
+    archetype: 'follow focus',
+    cameraIntent: 'chase',
+    cameraMotion: 'zoom-pulse',
+    dataEvent: 'trace-flow',
+    revealDirection: 'left',
+    staggerGap: 4,
+    memoryType: 'line',
+    memoryRole: 'stream pulse',
+    memoryColor: '#00d4ff',
+  }),
+  'memory-graph': buildSnapshotDirector({
+    archetype: 'drift reveal',
+    cameraIntent: 'drift',
+    cameraMotion: 'drift',
+    dataEvent: 'trace-flow',
+    revealDirection: 'center',
+    staggerGap: 10,
+    memoryType: 'node',
+    memoryRole: 'memory nucleus',
+    memoryColor: '#9d7bff',
+  }),
+  'pipeline-flow': buildSnapshotDirector({
+    archetype: 'trace flow',
+    cameraIntent: 'chase',
+    cameraMotion: 'pan-y',
+    dataEvent: 'trace-flow',
+    revealDirection: 'left',
+    staggerGap: 6,
+    memoryType: 'line',
+    memoryRole: 'pipeline path',
+    memoryColor: '#00d4ff',
+  }),
+  'benchmark-chart': buildSnapshotDirector({
+    archetype: 'overtake race',
+    cameraIntent: 'chase',
+    cameraMotion: 'push-in',
+    dataEvent: 'overtake',
+    revealDirection: 'down',
+    staggerGap: 6,
+    memoryType: 'curve',
+    memoryRole: 'benchmark curve',
+    memoryColor: '#00d4ff',
+  }),
+  'quote-highlight': buildSnapshotDirector({
+    archetype: 'aftershock hold',
+    cameraIntent: 'linger',
+    cameraMotion: 'push-in',
+    dataEvent: 'settle',
+    revealDirection: 'down',
+    staggerGap: 0,
+    memoryType: 'word',
+    memoryRole: 'quote fragment',
+    memoryColor: '#ff8a3d',
+  }),
+  'glossary-term': buildSnapshotDirector({
+    archetype: 'lock-on reveal',
+    cameraIntent: 'pin',
+    cameraMotion: 'push-in',
+    dataEvent: 'pin',
+    revealDirection: 'left',
+    staggerGap: 0,
+    memoryType: 'word',
+    memoryRole: 'term label',
+    memoryColor: '#00d4ff',
+  }),
+  cta: buildSnapshotDirector({
+    archetype: 'aftershock hold',
+    cameraIntent: 'linger',
+    cameraMotion: 'push-in',
+    dataEvent: 'settle',
+    revealDirection: 'right',
+    staggerGap: 0,
+    memoryType: 'word',
+    memoryRole: 'cta lockup',
+    memoryColor: '#cdff3d',
+  }),
+};
+
+/** Families to snapshot. Full 20-family coverage by default. */
+const ALL_SNAPSHOT_FAMILIES = Object.keys(DEMO_SHOTS);
+
+const parseRequestedFamilies = () => {
+  const rawFamilies = process.argv
+    .slice(3)
+    .flatMap((arg) => arg.split(','))
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (rawFamilies.length === 0) {
+    return ALL_SNAPSHOT_FAMILIES;
+  }
+
+  const unknownFamilies = rawFamilies.filter((family) => !ALL_SNAPSHOT_FAMILIES.includes(family));
+  if (unknownFamilies.length > 0) {
+    throw new Error(`Unknown snapshot families: ${unknownFamilies.join(', ')}`);
+  }
+
+  return Array.from(new Set(rawFamilies));
+};
+
+const SNAPSHOT_FAMILIES = parseRequestedFamilies();
+
+const SNAPSHOT_FRAME_OVERRIDES: Record<string, number> = {
+  'feature-rail': 72,
+  'pipeline-flow': 102,
+  timeline: 96,
+  'step-flow': 106,
+  'evidence-wall': 62,
+  'architecture-map': 82,
+  'data-stream': 72,
+  'memory-graph': 82,
+  metrics: 54,
+};
 
 const DEFAULT_FRAME = (family: string): number => {
+  const override = SNAPSHOT_FRAME_OVERRIDES[family];
+  if (typeof override === 'number') {
+    return override;
+  }
+
   // Keys must match DEMO_SHOTS keys (== REGISTRY family names)
   const durations: Record<string, number> = {
     hero: 90, 'feature-rail': 120, code: 80, 'compare-board': 90,
@@ -352,12 +651,13 @@ async function renderFamilyStill(
   outDir: string,
 ): Promise<{pngPath: string; hash: string; frame: number}> {
   const rawShot = DEMO_SHOTS[family] as Record<string, unknown>;
-  if (!rawShot) throw new Error(`No demo shot for family: ${family}`);
+  if (!rawShot) throw new Error(`No snapshot fixture for family: ${family}`);
 
   const shot = {
     ...rawShot,
     level: typeof rawShot.level === 'string' ? rawShot.level : 'chapter',
     visualProps: (rawShot.visualProps ?? {}) as Record<string, unknown>,
+    director: SNAPSHOT_DIRECTOR_OVERRIDES[family] ?? rawShot.director,
   };
 
   const frame = DEFAULT_FRAME(family);
@@ -397,6 +697,7 @@ async function renderFamilyStill(
 async function cmdRender() {
   console.log('🎬  Visual regression snapshot — render mode\n');
   console.log(`Output: ${SNAPSHOT_DIR}\n`);
+  console.log(`Families: ${SNAPSHOT_FAMILIES.join(', ')}\n`);
 
   if (!existsSync(SNAPSHOT_DIR)) {
     mkdirSync(SNAPSHOT_DIR, {recursive: true});
@@ -407,6 +708,11 @@ async function cmdRender() {
   for (const family of SNAPSHOT_FAMILIES) {
     const outDir = join(SNAPSHOT_DIR, family);
     if (!existsSync(outDir)) mkdirSync(outDir, {recursive: true});
+    for (const name of readdirSync(outDir)) {
+      if (/^frame-\d+\.(png|hash)$/.test(name)) {
+        unlinkSync(join(outDir, name));
+      }
+    }
 
     process.stdout.write(`  ${family.padEnd(24)} → `);
 
@@ -454,15 +760,19 @@ async function cmdRender() {
   }
 
   // Write manifest
+  const existingManifest: Manifest | null = existsSync(MANIFEST_PATH)
+    ? JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'))
+    : null;
+  const untouchedFamilies = (existingManifest?.families ?? []).filter((entry) => !SNAPSHOT_FAMILIES.includes(entry.family));
   const manifest: Manifest = {
     version: 1,
     updatedAt: new Date().toISOString(),
-    families: results,
+    families: [...untouchedFamilies, ...results].sort((a, b) => a.family.localeCompare(b.family)),
   };
   writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2));
 
   console.log(`\n📋  Manifest written to ${MANIFEST_PATH}`);
-  console.log(`   ${results.length}/${SNAPSHOT_FAMILIES.length} families snapshotted.\n`);
+  console.log(`   ${results.length}/${SNAPSHOT_FAMILIES.length} selected family snapshots written.\n`);
 
   // QA checklist（借鉴 shellbot-video-generator Quality Tests）
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -479,6 +789,7 @@ async function cmdRender() {
 
 async function cmdDiff() {
   console.log('🔍  Visual regression snapshot — diff mode\n');
+  console.log(`Families: ${SNAPSHOT_FAMILIES.join(', ')}\n`);
 
   if (!existsSync(MANIFEST_PATH)) {
     console.log('❌  No snapshots found. Run `snapshots.ts render` first.\n');
@@ -563,6 +874,7 @@ async function cmdCalibrate() {
   console.log('Rendering each family TWICE with identical props...\n');
   console.log('A non-zero hamming distance = rendering non-determinism.\n');
   console.log('Recommendation: set THRESHOLD = max_observed_dist + 1\n');
+  console.log(`Families: ${SNAPSHOT_FAMILIES.join(', ')}\n`);
 
   if (!existsSync(SNAPSHOT_DIR)) mkdirSync(SNAPSHOT_DIR, {recursive: true});
 

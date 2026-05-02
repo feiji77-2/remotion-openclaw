@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {compileUltimateOutline, validateUltimateOutline} from './lib/ultimate-outline-compiler.mjs';
 import {
   normalizeUltimateConfig,
   summarizeUltimateConfig,
@@ -19,31 +18,17 @@ const readFlag = (name) => {
 };
 
 const configArg = readFlag('--config');
-const outlineArg = readFlag('--outline');
 
-if (!configArg && !outlineArg) {
-  console.error('Usage: node scripts/check-ultimate-scene.mjs --config <json-file> | --outline <outline-json>');
+if (!configArg) {
+  console.error('Usage: node scripts/check-ultimate-scene.mjs --config <json-file>');
   process.exit(1);
 }
 
-const inputPath = path.resolve(process.cwd(), configArg ?? outlineArg);
+const inputPath = path.resolve(process.cwd(), configArg);
 const raw = fs.readFileSync(inputPath, 'utf8');
 const parsed = JSON.parse(raw);
-const inputLabel = outlineArg ? 'outline' : 'config';
-
-if (outlineArg) {
-  const outlineErrors = validateUltimateOutline(parsed);
-
-  if (outlineErrors.length > 0) {
-    console.error('Outline check failed:');
-    for (const error of outlineErrors) {
-      console.error(`- ${error}`);
-    }
-    process.exit(1);
-  }
-}
-
-const config = outlineArg ? compileUltimateOutline(parsed) : parsed;
+const inputLabel = 'config';
+const config = parsed;
 const errors = validateUltimateConfig(config);
 
 if (errors.length > 0) {

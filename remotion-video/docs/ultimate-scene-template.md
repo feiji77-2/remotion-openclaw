@@ -25,19 +25,16 @@
 5. Run `npm run ultimate:check`
 6. Run `node scripts/render-ultimate-scene.mjs --config <your-json> --out out/<your-name>.mp4`
 
-## Faster Outline Flow
+## Faster Config Flow
 
-If you do not want to author scene JSON by hand, start from:
+If you do not want to author a config from scratch, start from:
 
-1. Copy [`examples/ultimate-outline-template.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-outline-template.json)
-2. Fill `sections` using `kind` values like `cover`, `cards`, `definition`, `steps`, `command`, `tags`, `schema`, `metrics`, `close`
-3. Run `npm run ultimate:outline:check`
-4. Optionally run `npm run ultimate:outline:compile`
-5. Run `npm run ultimate:outline:render`
+1. Copy [`examples/ultimate-scene-demo.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-scene-demo.json)
+2. Edit `scenes[]` and keep each scene on a valid family contract
+3. Run `npm run ultimate:check`
+4. Run `npm run ultimate:render`
 
-Reference outline example:
-
-- [`examples/ultimate-outline-demo.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-outline-demo.json)
+The old outline compiler flow has been retired from the main runtime.
 
 ## Project-Level Fields
 
@@ -245,11 +242,6 @@ Every scene supports:
 ```bash
 npm run ultimate:check
 npm run ultimate:render
-npm run ultimate:outline:check
-npm run ultimate:outline:compile
-npm run ultimate:outline:render
 node scripts/render-ultimate-scene.mjs --config ./my-video.json --out out/my-video.mp4
-node scripts/render-ultimate-scene.mjs --outline ./my-outline.json --out out/my-video.mp4
-node scripts/compile-ultimate-outline.mjs --outline ./my-outline.json --out out/my-video.compiled.json
 node scripts/render-ultimate-scene.mjs --config ./my-video.json --dry-run --write-normalized out/my-video.normalized.json
 ```

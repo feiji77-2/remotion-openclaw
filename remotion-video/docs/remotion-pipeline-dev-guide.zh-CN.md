@@ -156,7 +156,7 @@ terminal → data-stream → benchmark-chart → timeline → compare-board
 | 文件 | 用途 |
 |------|------|
 | `scripts/lib/ultimate-project-adapter.js` | 自动命中规则 |
-| `scripts/lib/ultimate-outline-compiler.mjs` | Outline 编译 |
+| `scripts/lib/ultimate-outline-compiler.mjs` | 旧 Outline 编译兼容库（非主链） |
 | `src/components/ultimate-kit/project.ts` | 类型定义 |
 
 ---
@@ -214,8 +214,8 @@ remotion-video/server/
 
 ```
 remotion-video/src/
-├── Root.tsx                              # 根入口
-├── OpenClawVideo.tsx                     # 主合成
+├── Root.tsx                              # 根入口（默认 UltimateSceneTemplate）
+├── OpenClawVideo.tsx                     # 旧兼容合成（非主链）
 ├── compositions/                         # 合成组件
 │   ├── FileBackedUltimateSceneTemplate.tsx  # 文件回放型
 │   └── UltimateElementsLibrary.tsx
@@ -250,7 +250,7 @@ remotion-video/
 ├── scripts/
 │   ├── lib/
 │   │   ├── ultimate-project-adapter.js        # 核心适配器
-│   │   ├── ultimate-outline-compiler.mjs      # Outline 编译
+│   │   ├── ultimate-outline-compiler.mjs      # 旧 Outline 编译兼容库
 │   │   ├── ultimate-scene-config.mjs
 │   │   └── workflow-voice-defaults.mjs
 │   ├── run-search-to-ultimate.mjs             # 主入口脚本
@@ -277,7 +277,7 @@ remotion-video/
 | 日志 | `server/utils/logger.js` |
 | 渲染 Worker | `server/workers/renderWorker.js` |
 | Ultimate 适配器 | `scripts/lib/ultimate-project-adapter.js` |
-| Outline 编译 | `scripts/lib/ultimate-outline-compiler.mjs` |
+| Outline 编译兼容库 | `scripts/lib/ultimate-outline-compiler.mjs` |
 
 ---
 

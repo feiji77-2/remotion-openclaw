@@ -369,6 +369,15 @@ export interface ResolvedShotGrammar {
  * 5. ShotArchetypeMeta 决定 enterFrames / emphasisFrames / staggerGap
  */
 export function resolveShotGrammar(ctx: ShotContext): ResolvedShotGrammar {
+  const multiNucleusFamilyArchetype = resolveMultiNucleusFamilyArchetype(ctx.family);
+  if (multiNucleusFamilyArchetype) {
+    return buildFromArchetype(
+      multiNucleusFamilyArchetype,
+      ctx,
+      multiNucleusFamilyArchetype === 'compress compare' ? 'delta-hit' : 'burst-spread',
+    );
+  }
+
   // ── 优先级 1：中文 storyboard cue → 直接映射到 archetype ──────────────
   const cue = ctx.storyboardCueZh ?? '';
   const INTENT_CUE_MAP: Array<{keywords: string[]; archetype: ShotArchetype; dataEvent: DataEventVerb}> = [
@@ -501,6 +510,18 @@ export function resolveFamilyShotContract(
       options.numericFields
       ?? (NUMERIC_DATA_FAMILIES.has(family) ? [{field: 'sample', value: 1, label: 'sample'}] : []),
   });
+}
+
+function resolveMultiNucleusFamilyArchetype(family?: string): ShotArchetype | null {
+  switch (family) {
+    case 'feature-rail':
+    case 'evidence-wall':
+      return 'burst spread';
+    case 'compare-board':
+      return 'compress compare';
+    default:
+      return null;
+  }
 }
 
 // 辅助函数：从 archetype 构建 ResolvedShotGrammar

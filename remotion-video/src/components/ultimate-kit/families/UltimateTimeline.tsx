@@ -631,264 +631,172 @@ export const UltimateTimeline: React.FC<UltimateTimelineProps & {grammar?: {stag
 }) => {
   const frame = useCurrentFrame();
   const gap = Math.max(6, grammar?.staggerGap ?? 6);
-  const baseDelay = 6;
   const accentColor = toneToColor(accent);
   const visibleItems = items.slice(0, 5);
-  const points = [
-    {x: 236, y: 596, labelX: -8, labelY: -136, align: 'left' as const},
-    {x: 600, y: 458, labelX: -18, labelY: -154, align: 'left' as const},
-    {x: 966, y: 616, labelX: -110, labelY: 34, align: 'center' as const},
-    {x: 1326, y: 444, labelX: -246, labelY: -150, align: 'right' as const},
-    {x: 1674, y: 586, labelX: -250, labelY: 30, align: 'right' as const},
+  const path = 'M 120 640 C 420 370, 780 760, 1080 488 S 1560 370, 1790 572';
+  const nodes = [
+    {x: 180, y: 616, align: 'left' as const},
+    {x: 510, y: 430, align: 'left' as const},
+    {x: 930, y: 648, align: 'center' as const},
+    {x: 1320, y: 438, align: 'right' as const},
+    {x: 1710, y: 566, align: 'right' as const},
   ];
-  const sampleCubic = (
-    t: number,
-    p0: {x: number; y: number},
-    p1: {x: number; y: number},
-    p2: {x: number; y: number},
-    p3: {x: number; y: number},
-  ) => {
-    const inverse = 1 - t;
-    return {
-      x: (inverse ** 3) * p0.x
-        + 3 * (inverse ** 2) * t * p1.x
-        + 3 * inverse * (t ** 2) * p2.x
-        + (t ** 3) * p3.x,
-      y: (inverse ** 3) * p0.y
-        + 3 * (inverse ** 2) * t * p1.y
-        + 3 * inverse * (t ** 2) * p2.y
-        + (t ** 3) * p3.y,
-    };
-  };
-  const segments = visibleItems.slice(0, -1).map((item, index) => {
-    const from = points[index];
-    const to = points[index + 1];
-    const p0 = {x: from.x, y: from.y};
-    const p1 = {x: from.x + 132, y: from.y + (index % 2 === 0 ? -22 : 26)};
-    const p2 = {x: to.x - 132, y: to.y + (index % 2 === 0 ? -26 : 22)};
-    const p3 = {x: to.x, y: to.y};
-    return {
-      key: `${item.label}-${index}`,
-      color: toneToColor(item.accent ?? accent),
-      p0,
-      p1,
-      p2,
-      p3,
-      d: `M ${p0.x} ${p0.y} C ${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${p3.x} ${p3.y}`,
-    };
-  });
 
   return (
-    <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
-      <div style={{position: 'absolute', top: 94, left: 160, right: 160}}>
-        <div style={eyebrowStyle(accentColor)}>时间线</div>
-        <div
-          style={{
-            marginTop: 22,
-            ...sectionHeadingStyle(relaxedTypeScale.title.lg),
-          }}
-        >
+    <div style={{position: 'absolute', inset: 0}}>
+      <div
+        style={{
+          position: 'absolute',
+          left: 88,
+          top: 86,
+          maxWidth: 940,
+          zIndex: 2,
+        }}
+      >
+        <div style={{...eyebrowStyle(accentColor, false), fontSize: 15, letterSpacing: 5}}>timeline arc</div>
+        <div style={{marginTop: 20, fontSize: 82, lineHeight: 0.92, fontWeight: 900, letterSpacing: -4.8}}>
           {heading}
         </div>
         {summary ? (
-          <div
-            style={{
-              margin: '22px auto 0',
-              maxWidth: 1040,
-              ...bodyTextStyle(18, kit.colors.textMuted, true),
-            }}
-          >
+          <div style={{marginTop: 18, maxWidth: 760, ...bodyTextStyle(24, 'rgba(255,255,255,0.66)', false)}}>
             {summary}
           </div>
         ) : null}
       </div>
+
       <div
         style={{
           position: 'absolute',
-          left: 110,
-          right: 110,
-          top: 316,
-          bottom: 118,
-          borderRadius: 44,
-          overflow: 'hidden',
-          background: 'linear-gradient(180deg, rgba(6, 9, 18, 0.7), rgba(6, 9, 18, 0.52))',
-          border: '1px solid rgba(255,255,255,0.05)',
+          right: 84,
+          top: 94,
+          fontSize: 210,
+          lineHeight: 0.8,
+          fontWeight: 900,
+          letterSpacing: -12,
+          color: `${accentColor}18`,
+          transform: 'rotate(-90deg)',
+          transformOrigin: 'top right',
+          pointerEvents: 'none',
         }}
       >
-        <GeometryAccent
-          variant="slanted-panel"
+        ARC
+      </div>
+
+      <GeometryAccent
+        variant="ring"
+        color={accentColor}
+        opacity={0.12}
+        style={{left: 1220, top: 130, width: 420, height: 420}}
+      />
+
+      <svg viewBox="0 0 1920 1080" style={{position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible'}}>
+        <PathDrawLink
+          d={path}
           color={accentColor}
-          opacity={0.14}
-          style={{
-            left: 92,
-            top: 68,
-            width: 420,
-            height: 106,
-          }}
+          progress={1}
+          frame={frame}
+          baseColor="rgba(255,255,255,0.03)"
+          baseStrokeWidth={3}
+          flowStrokeWidth={7}
+          drawStrokeWidth={0}
+          drawOpacity={0}
+          dashPattern="18 22"
+          flowOpacity={0.2}
         />
-        <GeometryAccent
-          variant="ring"
-          color={resolveUltimateAccent('purple')}
-          opacity={0.24}
-          style={{
-            right: 118,
-            bottom: 96,
-            width: 186,
-            height: 186,
-          }}
-        />
-        <svg viewBox="0 0 1720 720" style={{position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible'}}>
-          {segments.map((segment, index) => {
-            const delay = 10 + index * gap * 5;
-            const progress = interpolate(frame, [delay, delay + 26], [0, 1], {
-              extrapolateLeft: 'clamp',
-              extrapolateRight: 'clamp',
-            });
-            const point = sampleCubic(Math.max(0.01, progress), segment.p0, segment.p1, segment.p2, segment.p3);
-
-            return (
-              <PathDrawLink
-                key={segment.key}
-                d={segment.d}
-                color={segment.color}
-                progress={progress}
-                frame={frame}
-                marker={{
-                  x: point.x,
-                  y: point.y,
-                  size: 6,
-                  shape: 'diamond',
-                }}
-                baseStrokeWidth={4}
-                flowStrokeWidth={7}
-                drawStrokeWidth={2}
-                dashPattern="12 14"
-                flowOpacity={0.7}
-              />
-            );
-          })}
-        </svg>
-        {visibleItems.map((item, index) => {
-          const delay = baseDelay + index * gap * 5;
-          const reveal = buildReveal(frame, delay);
-          const itemColor = toneToColor(item.accent ?? accent);
-          const point = points[index];
-          const labelLines = splitDisplayLinesBalanced(item.title, 12, 2);
-          const detailLines = item.detail ? splitDisplayLinesBalanced(item.detail, 18, 2) : [];
-
+        {visibleItems.slice(0, -1).map((item, index) => {
+          const from = nodes[index];
+          const to = nodes[index + 1];
+          const delay = 8 + index * gap * 5;
+          const segmentPath = `M ${from.x} ${from.y} C ${from.x + 100} ${from.y - 80}, ${to.x - 120} ${to.y + 90}, ${to.x} ${to.y}`;
+          const progress = interpolate(frame, [delay, delay + 28], [0, 1], {
+            extrapolateLeft: 'clamp',
+            extrapolateRight: 'clamp',
+          });
           return (
-            <div key={`${item.label}-${index}`}>
-              <div
-                style={{
-                  position: 'absolute',
-                  left: point.x - 16,
-                  top: point.y - 16,
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  background: 'rgba(8,10,18,0.92)',
-                  border: `2px solid ${itemColor}`,
-                  boxShadow: ultimateGlow(itemColor, 0.38),
-                  opacity: reveal,
-                }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  left: point.x - 42,
-                  top: point.y - 42,
-                  width: 84,
-                  height: 84,
-                  borderRadius: '50%',
-                  border: `1px solid ${itemColor}22`,
-                  opacity: 0.24 + Math.sin(frame * 0.06 + index) * 0.08,
-                }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  left: point.x + point.labelX,
-                  top: point.y + point.labelY,
-                  width: 252,
-                  textAlign: point.align,
-                  opacity: reveal,
-                  transform: withMicroJitter(
-                    frame,
-                    `translateY(${interpolate(reveal, [0, 1], [18, 0])}px)`,
-                    resolveUltimateMicroJitterConfig('steady', {
-                      delay,
-                      seed: 70 + index,
-                    }),
-                  ),
-                }}
-              >
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    flexDirection: point.align === 'right' ? 'row-reverse' : 'row',
-                    padding: '8px 14px',
-                    borderRadius: kit.radius.pill,
-                    border: `1px solid ${itemColor}30`,
-                    background: `${itemColor}10`,
-                    color: itemColor,
-                    fontSize: 15,
-                    lineHeight: 1.2,
-                    letterSpacing: 1.6,
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  <SemanticIconBadge
-                    iconValue={item.icon}
-                    semanticText={`${item.label} ${item.title} ${item.detail || ''}`}
-                    color={itemColor}
-                    badgeSize={32}
-                    size={14}
-                    fallbackIndex={index}
-                    family="timeline"
-                    rounded={12}
-                    motionDelay={delay}
-                    motionSeed={70 + index}
-                  />
-                  <span>{item.label}</span>
-                </div>
-                <div style={{marginTop: 16}}>
-                  {labelLines.map((line, lineIndex) => (
-                    <div
-                      key={`${line}-${lineIndex}`}
-                      style={{
-                        marginTop: lineIndex === 0 ? 0 : 3,
-                        fontSize: 30,
-                        fontWeight: 820,
-                        lineHeight: 1.1,
-                        color: kit.colors.text,
-                      }}
-                    >
-                      {line}
-                    </div>
-                  ))}
-                </div>
-                {detailLines.length > 0 ? (
-                  <div
-                    style={{
-                      marginTop: 12,
-                      ...bodyTextStyle(16, 'rgba(255,255,255,0.66)', point.align === 'center'),
-                      ...(point.align === 'right' ? {textAlign: 'right' as const} : point.align === 'center' ? {textAlign: 'center' as const} : {textAlign: 'left' as const}),
-                    }}
-                  >
-                    {detailLines.map((line, lineIndex) => (
-                      <div key={`${line}-${lineIndex}`} style={{marginTop: lineIndex === 0 ? 0 : 3}}>
-                        {line}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            </div>
+            <PathDrawLink
+              key={`${item.label}-${index}`}
+              d={segmentPath}
+              color={toneToColor(item.accent ?? accent)}
+              progress={progress}
+              frame={frame}
+              marker={{x: to.x, y: to.y, size: 7, shape: 'diamond'}}
+              baseColor="rgba(255,255,255,0.03)"
+              baseStrokeWidth={2}
+              flowStrokeWidth={5}
+              drawStrokeWidth={1.4}
+              dashPattern="14 16"
+              flowOpacity={0.72}
+            />
           );
         })}
-      </div>
+      </svg>
+
+      {visibleItems.map((item, index) => {
+        const delay = 6 + index * gap * 5;
+        const reveal = buildReveal(frame, delay);
+        const itemColor = toneToColor(item.accent ?? accent);
+        const point = nodes[index];
+        const width = index === 2 ? 340 : 270;
+        const offsetY = index % 2 === 0 ? -150 : 34;
+        const offsetX = point.align === 'right' ? -width + 16 : point.align === 'center' ? -(width / 2) : -10;
+
+        return (
+          <div key={`${item.label}-${index}`}>
+            <div
+              style={{
+                position: 'absolute',
+                left: point.x - 16,
+                top: point.y - 16,
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: itemColor,
+                boxShadow: ultimateGlow(itemColor, 0.44),
+                opacity: reveal,
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                left: point.x - 54,
+                top: point.y - 54,
+                width: 108,
+                height: 108,
+                borderRadius: '50%',
+                border: `1px solid ${itemColor}24`,
+                opacity: 0.18 + Math.sin(frame * 0.06 + index) * 0.06,
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                left: point.x + offsetX,
+                top: point.y + offsetY,
+                width,
+                opacity: reveal,
+                transform: withMicroJitter(
+                  frame,
+                  `translateY(${interpolate(reveal, [0, 1], [26, 0])}px) rotate(${index % 2 === 0 ? -2.2 : 2.2}deg)`,
+                  resolveUltimateMicroJitterConfig('steady', {delay, seed: 700 + index}),
+                ),
+                textAlign: point.align,
+              }}
+            >
+              <div style={{fontSize: 13, letterSpacing: 2.6, textTransform: 'uppercase', color: itemColor, opacity: 0.9}}>
+                {item.label}
+              </div>
+              <div style={{marginTop: 8, fontSize: index === 2 ? 38 : 32, lineHeight: 1.04, fontWeight: 860}}>
+                {item.title}
+              </div>
+              {item.detail ? (
+                <div style={{marginTop: 12, fontSize: 18, lineHeight: 1.34, color: 'rgba(255,255,255,0.64)'}}>
+                  {item.detail}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };

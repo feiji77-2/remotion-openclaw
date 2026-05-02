@@ -152,12 +152,19 @@ export const UltimateDirectorEffects: React.FC<{scene: ResolvedUltimateSceneConf
   const accent = resolveAccentColor(scene);
   const motionFunction = getMotionFunctionName(grammar.dataEvent as DataEventVerb);
   const ghostTitle = resolveDisplayTitle(scene);
-  const enterDuration = Math.max(18, grammar.enterFrames);
+  const enterDuration = Math.max(18, grammar.enterFrames ?? 18);
   const sceneDuration = Math.max(40, scene.durationInFrames);
   const progress = Math.min(1, frame / Math.max(1, sceneDuration - 1));
+  const memoryObject = grammar.memoryObject ?? {
+    type: 'word',
+    role: '显式导演记忆物',
+    enterFrame: 12,
+    color: accent,
+  };
+  const emphasisFrames = grammar.emphasisFrames ?? 48;
   const burstFragments = burstSpread(
     frame,
-    grammar.memoryObject.enterFrame,
+    memoryObject.enterFrame ?? 12,
     Math.max(24, enterDuration + 10),
     960,
     540,
@@ -167,14 +174,14 @@ export const UltimateDirectorEffects: React.FC<{scene: ResolvedUltimateSceneConf
   const tracePoints = buildTracePoints(scene);
   const traceDot = tracePosition(
     frame,
-    grammar.memoryObject.enterFrame,
-    Math.max(36, enterDuration + grammar.emphasisFrames),
+    memoryObject.enterFrame ?? 12,
+    Math.max(36, enterDuration + emphasisFrames),
     tracePoints,
   );
   const traceReveal = traceProgress(
     frame,
-    grammar.memoryObject.enterFrame,
-    Math.max(36, enterDuration + grammar.emphasisFrames),
+    memoryObject.enterFrame ?? 12,
+    Math.max(36, enterDuration + emphasisFrames),
   );
   const benchmark = useBenchmarkRace({
     items: resolveRaceItems(scene),
@@ -238,7 +245,7 @@ export const UltimateDirectorEffects: React.FC<{scene: ResolvedUltimateSceneConf
     && (grammar.archetype === 'lock-on reveal' || grammar.archetype === 'evidence pin');
   const showRace = motionFunction === 'countUp' || motionFunction === 'settle' || grammar.archetype === 'bullet train' || grammar.archetype === 'overtake race';
   const showMorph = scene.family === 'architecture-map' || scene.family === 'memory-graph' || scene.family === 'pipeline-flow';
-  const showGhostTitle = grammar.memoryObject.type === 'word' || scene.family === 'hero' || scene.family === 'focus' || scene.family === 'quote-highlight';
+  const showGhostTitle = memoryObject.type === 'word' || scene.family === 'hero' || scene.family === 'focus' || scene.family === 'quote-highlight';
   const isDataScene =
     scene.family === 'benchmark-chart'
     || scene.family === 'metrics'

@@ -30,16 +30,12 @@
 
 ## 02. 输入层
 
-你现在有两种输入方式：
+你现在只保留一种主线输入方式：
 
 1. 直接写最终场景 JSON  
 文件示例：[`examples/ultimate-scene-demo.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-scene-demo.json)
 
-2. 写更轻量的大纲 JSON  
-模板：[`examples/ultimate-outline-template.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-outline-template.json)  
-示例：[`examples/ultimate-outline-demo.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-outline-demo.json)
-
-推荐你优先用大纲 JSON。你只要写每一屏的目标和文案结构，不用手填所有底层 scene data。
+旧的 outline 大纲 JSON 已退出主链，不再建议继续维护。
 
 ## 03. 编译层
 
@@ -57,8 +53,7 @@
 
 核心文件：
 
-- [`scripts/lib/ultimate-outline-compiler.mjs`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/lib/ultimate-outline-compiler.mjs)
-- [`scripts/compile-ultimate-outline.mjs`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/compile-ultimate-outline.mjs)
+- 旧 `outline -> compile -> render` 链路已退役，当前只保留 `config / step-04 shots -> UltimateSceneTemplate` 主线
 
 它会自动补这些内容：
 
@@ -71,18 +66,16 @@
 
 ## 04. 检查层
 
-检查命令已经支持两种输入：
+检查命令现在只保留主线输入：
 
 ```bash
 npm run ultimate:check
-npm run ultimate:outline:check
 ```
 
 也支持直接命令行指定：
 
 ```bash
 node scripts/check-ultimate-scene.mjs --config ./my-video.json
-node scripts/check-ultimate-scene.mjs --outline ./my-outline.json
 ```
 
 检查时会输出：
@@ -98,20 +91,12 @@ node scripts/check-ultimate-scene.mjs --outline ./my-outline.json
 
 ```bash
 npm run ultimate:render
-npm run ultimate:outline:render
 ```
 
 或者自定义文件：
 
 ```bash
 node scripts/render-ultimate-scene.mjs --config ./my-video.json --out out/my-video.mp4
-node scripts/render-ultimate-scene.mjs --outline ./my-outline.json --out out/my-video.mp4
-```
-
-如果你想先只看编译结果，不渲染视频：
-
-```bash
-node scripts/compile-ultimate-outline.mjs --outline ./my-outline.json --out out/my-video.compiled.json
 ```
 
 ## 接回原工作流
@@ -233,11 +218,10 @@ npm run workflow:ultimate -- "AI 行业日报" --voice-engine qwen-tts --referen
 
 ## 推荐实战顺序
 
-1. 复制 [`examples/ultimate-outline-template.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-outline-template.json)
-2. 把你的标题、结构、要点、命令、指标替换进去
-3. 运行 `npm run ultimate:outline:check`
-4. 如果要看底层 scene config，运行 `npm run ultimate:outline:compile`
-5. 运行 `npm run ultimate:outline:render`
+1. 复制 [`examples/ultimate-scene-demo.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-scene-demo.json)
+2. 直接改 `scenes[]`、字幕和数据块
+3. 运行 `npm run ultimate:check`
+4. 运行 `npm run ultimate:render`
 
 ## 现在这套东西解决了什么
 

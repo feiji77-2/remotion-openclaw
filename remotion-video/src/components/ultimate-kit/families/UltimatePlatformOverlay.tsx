@@ -24,15 +24,15 @@ export const UltimatePlatformOverlay: React.FC<UltimatePlatformOverlayProps> = (
         <div
           style={{
             position: 'absolute',
-            top: 38,
-            left: 48,
-            padding: '10px 18px',
+            top: 28,
+            left: 34,
+            padding: '8px 12px',
             borderRadius: 999,
-            border: `1px solid ${accentColor}44`,
-            background: 'rgba(6,10,18,0.62)',
-            color: '#f5f7ff',
-            fontSize: 18,
-            letterSpacing: 2,
+            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(6,10,18,0.34)',
+            color: 'rgba(245,247,255,0.72)',
+            fontSize: 13,
+            letterSpacing: 1.8,
             textTransform: 'uppercase',
             backdropFilter: 'blur(12px)',
           }}
@@ -43,11 +43,11 @@ export const UltimatePlatformOverlay: React.FC<UltimatePlatformOverlayProps> = (
           <div
             style={{
               position: 'absolute',
-              top: 42,
-              right: 54,
-              color: 'rgba(255,255,255,0.36)',
-              fontSize: 17,
-              letterSpacing: 3,
+              top: 30,
+              right: 38,
+              color: 'rgba(255,255,255,0.2)',
+              fontSize: 12,
+              letterSpacing: 2.4,
             }}
           >
             {watermark}
@@ -62,56 +62,39 @@ export const UltimatePlatformOverlay: React.FC<UltimatePlatformOverlayProps> = (
       <div
         style={{
           position: 'absolute',
-          top: 28,
-          left: 32,
-          right: 32,
-          height: 58,
-          borderRadius: 20,
-          border: `1px solid ${accentColor}33`,
-          background: 'rgba(7,10,18,0.72)',
+          top: 26,
+          left: 34,
+          right: 34,
+          height: 44,
+          borderRadius: 999,
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(7,10,18,0.28)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 22px',
+          padding: '0 16px',
           backdropFilter: 'blur(14px)',
-          boxShadow: `0 12px 44px ${accentColor}14`,
+          boxShadow: `0 12px 44px ${accentColor}08`,
         }}
       >
         <div style={{display: 'flex', alignItems: 'center', gap: 14}}>
-          <div style={{width: 10, height: 10, borderRadius: 999, background: accentColor, boxShadow: `0 0 18px ${accentColor}`}} />
-          <div style={{fontSize: 18, letterSpacing: 2.2, color: '#f5f7ff'}}>{brand}</div>
-          <div style={{fontSize: 15, letterSpacing: 1.6, color: 'rgba(255,255,255,0.52)'}}>{account}</div>
+          <div style={{width: 8, height: 8, borderRadius: 999, background: accentColor, boxShadow: `0 0 18px ${accentColor}`}} />
+          <div style={{fontSize: 13, letterSpacing: 1.8, color: 'rgba(245,247,255,0.74)', textTransform: 'uppercase'}}>{brand}</div>
+          <div style={{fontSize: 12, letterSpacing: 1.2, color: 'rgba(255,255,255,0.34)'}}>{account}</div>
         </div>
-        <div style={{fontSize: 16, letterSpacing: 1.4, color: 'rgba(255,255,255,0.64)'}}>
+        <div style={{fontSize: 12, letterSpacing: 1.2, color: 'rgba(255,255,255,0.34)'}}>
           {searchLabel ?? 'live system trace'}
         </div>
-      </div>
-      <div
-        style={{
-          position: 'absolute',
-          left: 34,
-          bottom: 28,
-          padding: '10px 16px',
-          borderRadius: 18,
-          border: '1px solid rgba(255,255,255,0.1)',
-          background: 'rgba(4,8,14,0.76)',
-          color: 'rgba(255,255,255,0.58)',
-          fontSize: 15,
-          letterSpacing: 1.6,
-          fontFamily: ultimateKitTokens.fonts.mono,
-        }}
-      >
-        {family ?? 'scene'}::grammar // {searchLabel ?? 'semantic dispatch'}
       </div>
       {watermark ? (
         <div
           style={{
             position: 'absolute',
             right: 40,
-            bottom: 34,
-            color: 'rgba(255,255,255,0.34)',
-            fontSize: 15,
-            letterSpacing: 2,
+            bottom: 28,
+            color: 'rgba(255,255,255,0.18)',
+            fontSize: 11,
+            letterSpacing: 2.2,
           }}
         >
           {watermark}

@@ -22,6 +22,7 @@ import type {
   UltimateTagMatrixProps,
   UltimateTerminalPanelProps,
   UltimateTimelineProps,
+  UltimateSceneGrammar,
 } from './types';
 
 export type UltimateSceneFamily =
@@ -85,16 +86,7 @@ type UltimateSceneBase = {
    * 包含：archetype, cameraIntent, dataEvent, enterFrames, emphasisFrames,
    *       staggerGap, memoryObject, directorNote
    */
-  grammar?: {
-    archetype: string;
-    cameraIntent: string;
-    dataEvent: string;
-    enterFrames: number;
-    emphasisFrames: number;
-    staggerGap: number;
-    memoryObject: {type: string; role: string; enterFrame: number; color: string};
-    directorNote: string;
-  };
+  grammar?: UltimateSceneGrammar;
 };
 
 export type UltimateHeroScene = UltimateSceneBase & {

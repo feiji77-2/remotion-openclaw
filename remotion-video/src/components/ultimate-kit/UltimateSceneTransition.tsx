@@ -3,6 +3,7 @@ import {AbsoluteFill, interpolate, useCurrentFrame} from 'remotion';
 import type {ResolvedUltimateSceneConfig} from './project';
 import {CameraDirector} from '../camera/CameraDirector';
 import {getCameraMotion, getPreferredCameraMotion} from '../../data/registry';
+import type {CameraMotionPreset} from '../../data/registry';
 import {CAMERA_INTENT_TO_MOTION, type CameraIntent} from '../../data/shotGrammar';
 
 interface UltimateSceneTransitionProps {
@@ -14,9 +15,13 @@ export const UltimateSceneTransition: React.FC<UltimateSceneTransitionProps> = (
   const frame = useCurrentFrame();
   const grammar = scene.grammar;
   const cameraIntent = (grammar?.cameraIntent ?? 'none') as CameraIntent;
-  const cameraPreset = grammar
-    ? CAMERA_INTENT_TO_MOTION[cameraIntent] ?? getPreferredCameraMotion(scene.family) ?? getCameraMotion(scene.family)
-    : getPreferredCameraMotion(scene.family) ?? getCameraMotion(scene.family);
+  const explicitCameraMotion = grammar?.cameraMotion as CameraMotionPreset | undefined;
+  const cameraPreset = explicitCameraMotion
+    ?? (
+      grammar
+        ? CAMERA_INTENT_TO_MOTION[cameraIntent] ?? getPreferredCameraMotion(scene.family) ?? getCameraMotion(scene.family)
+        : getPreferredCameraMotion(scene.family) ?? getCameraMotion(scene.family)
+    );
   const transition = scene.transition === false ? undefined : scene.transition;
   const enterFrames = grammar?.enterFrames ?? transition?.durationInFrames ?? 16;
   const reveal = interpolate(frame, [0, enterFrames], [0, 1], {

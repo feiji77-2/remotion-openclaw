@@ -1,13 +1,11 @@
 import {registerRoot} from 'remotion';
 import {Composition} from 'remotion';
-import {FPS, TOTAL_DURATION_SEC, VIDEO_HEIGHT, VIDEO_WIDTH} from './data/storyboard';
 import type {SRTSubtitle} from './components/SRTParser';
-import FileBackedOpenClawVideo from './compositions/FileBackedOpenClawVideo';
 import FileBackedUltimateSceneTemplate from './compositions/FileBackedUltimateSceneTemplate';
 import UltimateElementsLibrary, {ULTIMATE_ELEMENTS_LIBRARY_DURATION} from './compositions/UltimateElementsLibrary';
 import IconEmojiCapabilityPreview from './compositions/IconEmojiCapabilityPreview';
 import MorfeoStylePreview from './compositions/MorfeoStylePreview';
-import {type UltimateProjectConfig, getUltimateProjectDuration, normalizeUltimateProjectConfig} from './components/ultimate-kit';
+import {type UltimateProjectConfig, getUltimateProjectDuration} from './components/ultimate-kit';
 import {ULTIMATE_SCENE_DEMO} from './data/ultimateSceneDemo';
 import {
   shotsToScenes,
@@ -105,8 +103,8 @@ export type CaptionStyleSegmentProps = {
 };
 
 /**
- * 视频组件接收的外部 props
- * 通过 `npx remotion render ... --props='{"template":"caption"}'` 传入
+ * 视频组件接收的外部 props。
+ * 旧模板类型仅为兼容静态组件定义保留；Root 只注册 Ultimate 主线 composition。
  */
 export type VideoTheme = 'tech-dark' | 'minimal-light' | 'neon';
 
@@ -149,20 +147,6 @@ export type UltimateSceneCompositionProps = {
   renderHeight?: number;
 };
 
-type OpenClawCompositionProps = VideoProps & {
-  propsFile?: string | null;
-};
-
-const DEFAULT_PROPS: OpenClawCompositionProps = {
-  propsFile: null,
-  template: 'caption',
-  subtitleStyle: 'caption',
-  theme: 'tech-dark',
-  typewriter: true,
-  projectId: 'default',
-  quality: 'high',
-};
-
 const DEFAULT_ULTIMATE_PROPS: UltimateSceneCompositionProps = {
   propsFile: null,
   config: ULTIMATE_SCENE_DEMO,
@@ -171,38 +155,9 @@ const DEFAULT_ULTIMATE_PROPS: UltimateSceneCompositionProps = {
   subtitleData: null,
 };
 
-const resolvePositiveInt = (value: number | undefined, fallback: number) => {
-  return Number.isFinite(value) && Number(value) > 0 ? Math.round(Number(value)) : fallback;
-};
-
-const ROOT_DURATION_IN_FRAMES = resolvePositiveInt(TOTAL_DURATION_SEC * FPS, FPS);
-
 export const RemotionRoot: React.FC = () => {
   return (
     <>
-      {/* OpenClaw 通用模板 */}
-      <Composition
-        id="OpenClawVideo"
-        component={FileBackedOpenClawVideo}
-        durationInFrames={ROOT_DURATION_IN_FRAMES}
-        fps={FPS}
-        width={VIDEO_WIDTH}
-        height={VIDEO_HEIGHT}
-        calculateMetadata={({props: metadataProps}: {props: OpenClawCompositionProps}) => {
-          const resolvedProps: OpenClawCompositionProps = {
-            ...DEFAULT_PROPS,
-            ...(metadataProps ?? {}),
-          };
-
-          return {
-            durationInFrames: resolvePositiveInt(resolvedProps.durationInFrames, ROOT_DURATION_IN_FRAMES),
-            fps: resolvePositiveInt(resolvedProps.renderFps, FPS),
-            width: resolvePositiveInt(resolvedProps.renderWidth, VIDEO_WIDTH),
-            height: resolvePositiveInt(resolvedProps.renderHeight, VIDEO_HEIGHT),
-          };
-        }}
-        defaultProps={DEFAULT_PROPS}
-      />
       <Composition
         id="UltimateElementsLibrary"
         component={UltimateElementsLibrary}

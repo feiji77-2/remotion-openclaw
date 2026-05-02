@@ -116,6 +116,29 @@ const splitTextUnits = (value) => {
   ));
 };
 
+const PLANNER_LIKE_TITLE_RE = /^(?:让(?:观众|用户|程序员|开发者|团队|行业观察者|决策者)|本shot|本段|收尾互动(?:\s*·\s*\d+)?|中段|开场|结尾|镜头\s*\d+|场景\s*\d+|Scene\s*\d+)/iu;
+
+const isPlannerLikeTitle = (value) => {
+  const text = safeString(value);
+
+  if (!text) {
+    return false;
+  }
+
+  return PLANNER_LIKE_TITLE_RE.test(text) || /本shot围绕/u.test(text);
+};
+
+const buildDisplayTitle = (narration, fallbackTitle, index) => {
+  const rawTitle = safeString(fallbackTitle);
+
+  if (rawTitle && !isPlannerLikeTitle(rawTitle)) {
+    return rawTitle;
+  }
+
+  const units = splitTextUnits(narration);
+  return units[0] || safeString(narration) || rawTitle || `场景 ${index + 1}`;
+};
+
 const resolveNarrationTailPaddingSeconds = (value) => {
   const text = safeString(value);
 
@@ -898,14 +921,27 @@ const buildProjectShots = (shotsState, pipelineState) => {
       : shot.dataPoints;
     const semanticDataPoints = normalizeList(rawDataPoints, 10)
       .filter((item) => !isPlaceholderText(item));
-    const narrationDataPoints = extractNarrationDataPoints(voice.text || shot.narration, 6);
+    const narration = safeString(voice.text || shot.narration);
+    const narrationDataPoints = extractNarrationDataPoints(narration, 6);
+    const plannerTitle = safeString(shot.title);
+    const displayTitle = buildDisplayTitle(narration, plannerTitle, index);
+    const displaySummary = narration || safeString(prompt.visualSummaryZh || visual?.description);
+    const displayPoints = normalizeList([...narrationDataPoints, ...semanticDataPoints], 10)
+      .filter((item) => !isPlaceholderText(item));
+    const resolvedTitle = plannerTitle && !isPlannerLikeTitle(plannerTitle)
+      ? plannerTitle
+      : displayTitle;
 
     return {
       id: safeString(shot.id) || `shot-${String(index + 1).padStart(2, '0')}`,
       level: safeString(shot.level),
       type: safeString(shot.type),
-      title: safeString(shot.title) || `场景 ${index + 1}`,
-      narration: safeString(voice.text || shot.narration),
+      plannerTitle,
+      title: resolvedTitle || `场景 ${index + 1}`,
+      displayTitle,
+      displaySummary,
+      displayPoints,
+      narration,
       durationSeconds: roundTo(Math.max(1.8, toNumber(shot.durationSeconds, 6))),
       family: safeString(prompt.family || prompt.sceneFamily || shot.family || shot.sceneFamily),
       sceneFamily: safeString(prompt.sceneFamily || prompt.family || shot.sceneFamily || shot.family),
@@ -928,7 +964,7 @@ const buildProjectShots = (shotsState, pipelineState) => {
         Array.isArray(prompt.keywords) && prompt.keywords.length > 0 ? prompt.keywords : shot.keywords,
         10,
       ),
-      dataPoints: normalizeList([...narrationDataPoints, ...semanticDataPoints], 10),
+      dataPoints: displayPoints,
       visual,
       comparisons,
       imageUrl: safeString(prompt.imageUrl) || null,
@@ -945,6 +981,7 @@ const applyVoiceDurations = (shotsState, voiceQueue, fps) => {
   let cursorFrame = 0;
   const nextShots = [];
   const audioSegments = [];
+  const subtitleData = [];
 
   for (const shot of Array.isArray(shotsState) ? shotsState : []) {
     const voiceItem = shotQueue.get(safeString(shot.id));
@@ -961,11 +998,24 @@ const applyVoiceDurations = (shotsState, voiceQueue, fps) => {
     });
 
     if (voiceItem && safeString(voiceItem.voiceFile)) {
+      const segmentDurationInFrames = Math.max(1, Math.round(Math.max(audioDurationSeconds, 0.1) * fps));
+      const subtitleText = safeString(shot?.narration || shot?.scriptExcerpt || shot?.displaySummary || shot?.title);
       audioSegments.push({
         src: safeString(voiceItem.voiceFile),
         startFrame: cursorFrame,
-        durationInFrames: Math.max(1, Math.round(Math.max(audioDurationSeconds, 0.1) * fps)),
+        durationInFrames: segmentDurationInFrames,
       });
+      if (subtitleText) {
+        subtitleData.push({
+          index: subtitleData.length + 1,
+          text: subtitleText,
+          startFrame: cursorFrame,
+          endFrame: cursorFrame + segmentDurationInFrames,
+          startMs: Math.round((cursorFrame / Math.max(1, fps)) * 1000),
+          endMs: Math.round(((cursorFrame + segmentDurationInFrames) / Math.max(1, fps)) * 1000),
+          words: null,
+        });
+      }
     }
 
     cursorFrame += shotFrames;
@@ -974,6 +1024,7 @@ const applyVoiceDurations = (shotsState, voiceQueue, fps) => {
   return {
     shots: nextShots,
     audioSegments,
+    subtitleData,
   };
 };
 
@@ -2210,6 +2261,7 @@ async function main() {
         estimatedDuration: sumShotDurations(shotsState),
       };
       pipelineState.audioSegments = adjusted.audioSegments;
+      pipelineState.subtitleData = adjusted.subtitleData;
       const mergedVoiceTrack = await buildMergedVoiceTrack({
         projectId,
         audioSegments: adjusted.audioSegments,
@@ -2276,6 +2328,9 @@ async function main() {
     },
     audioSegments: Array.isArray(pipelineState.audioSegments) && pipelineState.audioSegments.length > 0
       ? pipelineState.audioSegments
+      : null,
+    subtitleData: Array.isArray(pipelineState.subtitleData) && pipelineState.subtitleData.length > 0
+      ? pipelineState.subtitleData
       : null,
     shots: projectShots,
   };

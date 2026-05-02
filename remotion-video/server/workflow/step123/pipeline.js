@@ -1051,6 +1051,26 @@ async function runStage(stepId, stageKey, context, buildPrompt, validator, optio
   };
 }
 
+async function rerunStageWithFeedback(stepId, stageKey, context, buildPrompt, validator, options = {}) {
+  const feedbackLines = Array.isArray(options.feedback) ? options.feedback.filter(Boolean) : [];
+  const buildPromptWithFeedback = (stageContext, previousStage) => {
+    const basePrompt = buildPrompt(stageContext, previousStage);
+    if (feedbackLines.length === 0) {
+      return basePrompt;
+    }
+
+    return [
+      basePrompt,
+      '',
+      '【上一版失败原因，必须逐条修正】',
+      ...feedbackLines.map((item, index) => `${index + 1}. ${item}`),
+      '不要解释原因，直接按这些失败项重写 JSON。',
+    ].join('\n');
+  };
+
+  return runStage(stepId, stageKey, context, buildPromptWithFeedback, validator, options);
+}
+
 function enrichInputWithTopicResearch(stepId, input, topicResearch) {
   const topicQuery = getInputTopic(input);
   return {
@@ -1314,8 +1334,27 @@ async function generateStep123Workflow(input) {
             regenerateTemperature: 0.78,
           },
         );
-        const normalizedSkillPayload = normalizeStep3Payload(briefStage.payload, copyStage.payload, enrichedInput);
-        const alignment = validateStep3SkillAlignment(context, normalizedSkillPayload, skillSpec);
+        let finalCopyStage = copyStage;
+        let normalizedSkillPayload = normalizeStep3Payload(briefStage.payload, finalCopyStage.payload, enrichedInput);
+        let alignment = validateStep3SkillAlignment(context, normalizedSkillPayload, skillSpec);
+        if (!alignment.ok) {
+          console.warn(`[Step3] LLM alignment warning: ${alignment.reasons.join('; ')}`);
+          finalCopyStage = await rerunStageWithFeedback(
+            stepId,
+            'copy',
+            context,
+            (stageContext, previousStage) => buildStep3CopyPrompt(stageContext, previousStage),
+            validateStep3Copy,
+            {
+              previousStage: briefStage.payload,
+              temperature: 0.44,
+              regenerateTemperature: 0.7,
+              feedback: alignment.reasons,
+            },
+          );
+          normalizedSkillPayload = normalizeStep3Payload(briefStage.payload, finalCopyStage.payload, enrichedInput);
+          alignment = validateStep3SkillAlignment(context, normalizedSkillPayload, skillSpec);
+        }
         if (!alignment.ok) {
           console.warn(`[Step3] LLM alignment warning: ${alignment.reasons.join('; ')}`);
         }
@@ -1333,7 +1372,7 @@ async function generateStep123Workflow(input) {
         return {
           stepId,
           source: 'skill-llm',
-          model: copyStage.model,
+          model: finalCopyStage.model,
           generatedAt: new Date().toISOString(),
           payload: enriched.payload,
           resolvedSkill: enriched.resolvedSkill,

@@ -11,7 +11,13 @@ require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
-const { processVoiceJob } = require('../voice/voiceJob');
+const {
+  processVoiceJob,
+  prepareVoiceSynthesisPlan,
+  probeDurationSeconds,
+  resolveShotSpeechPlan,
+  sanitizeFileSegment,
+} = require('../voice/voiceJob');
 const {
   resolveQwenSynthesisModel,
   resolveQwenTtsDefaultVoice,
@@ -28,7 +34,6 @@ const {
 const {getSecurityConfig, assertQueueModeAllowed} = require('../security/apiSecurity');
 const {
   buildUltimateRenderProps,
-  isUltimateProject,
 } = require('../../scripts/lib/ultimate-project-adapter.js');
 
 const OUTPUT_DIR = OUTPUT_ASSETS_DIR;
@@ -173,10 +178,15 @@ async function stageVoiceSynthesis(job, update) {
   update(5, '🎤 合成语音...');
   const { projectId = 'default' } = job.data;
   const designRenderData = getDesignRenderData(job.data.designJson);
+  const renderFps = getPositiveInt(job.data.renderFps) ?? getPositiveInt(designRenderData.renderFps) ?? 30;
   const script =
     typeof job.data.script === 'string' && job.data.script.trim()
       ? job.data.script.trim()
       : 'OpenClaw video';
+  const inputShots = Array.isArray(job.data.shots) ? job.data.shots : [];
+  const voiceSettings = job.data.voiceSettings && typeof job.data.voiceSettings === 'object'
+    ? job.data.voiceSettings
+    : {};
 
   const projectVoiceDir = path.join(VOICE_DIR, projectId);
   if (!fs.existsSync(projectVoiceDir)) fs.mkdirSync(projectVoiceDir, { recursive: true });
@@ -195,7 +205,28 @@ async function stageVoiceSynthesis(job, update) {
   );
   if (preparedAudioSegments.length > 0) {
     update(20, '✅ 复用已有分镜音轨');
-    return { voiceFile: null, scriptFile, audioSegments: preparedAudioSegments };
+    return { voiceFile: null, scriptFile, audioSegments: preparedAudioSegments, generatedSubtitleData: null, syncedShots: null };
+  }
+
+  const preparedSegmentSynthesis = await synthesizeShotAudioSegments({
+    job,
+    projectId,
+    projectVoiceDir,
+    renderFps,
+    voiceSettings,
+    shots: inputShots,
+    update,
+  });
+
+  if (preparedSegmentSynthesis) {
+    update(20, '✅ 分镜语音就绪');
+    return {
+      voiceFile: null,
+      scriptFile,
+      audioSegments: preparedSegmentSynthesis.audioSegments,
+      generatedSubtitleData: preparedSegmentSynthesis.subtitleData,
+      syncedShots: preparedSegmentSynthesis.syncedShots,
+    };
   }
 
   // 已有现成音频则复制
@@ -237,11 +268,11 @@ async function stageVoiceSynthesis(job, update) {
   }
 
   update(20, '✅ 语音就绪');
-  return { voiceFile, scriptFile, audioSegments: [] };
+  return { voiceFile, scriptFile, audioSegments: [], generatedSubtitleData: null, syncedShots: null };
 }
 
 // ─── Stage 2: 字幕生成 ─────────────────────────────────
-async function stageSubtitleGeneration(job, voiceFile, update) {
+async function stageSubtitleGeneration(job, voiceFile, generatedSubtitleData, syncedShots, update) {
   update(25, '📝 生成字幕...');
   const { projectId = 'default' } = job.data;
   const designRenderData = getDesignRenderData(job.data.designJson);
@@ -270,11 +301,20 @@ async function stageSubtitleGeneration(job, voiceFile, update) {
     return { subtitleFile };
   }
 
-  const shotSubtitleSrt = generateShotAlignedSRT(job.data.shots);
+  const stagedSubtitleData = normalizeSubtitlePayload(generatedSubtitleData);
+  if (stagedSubtitleData.length > 0) {
+    fs.writeFileSync(subtitleFile, serializeSubtitlesToSrt(stagedSubtitleData));
+    update(35, process.env.DEEPGRAM_API_KEY || process.env.OPENAI_WHISPER_API_KEY || process.env.OPENAI_API_KEY
+      ? '✅ 字幕就绪（分镜转写对齐）'
+      : '✅ 字幕就绪（分镜时长对齐）');
+    return { subtitleFile, subtitleData: stagedSubtitleData, syncedShots: Array.isArray(syncedShots) ? syncedShots : null };
+  }
+
+  const shotSubtitleSrt = generateShotAlignedSRT(Array.isArray(syncedShots) && syncedShots.length > 0 ? syncedShots : job.data.shots);
   if (shotSubtitleSrt) {
     fs.writeFileSync(subtitleFile, shotSubtitleSrt);
     update(35, '✅ 字幕就绪（按镜头时长对齐）');
-    return { subtitleFile };
+    return { subtitleFile, subtitleData: null, syncedShots: Array.isArray(syncedShots) ? syncedShots : null };
   }
 
   // 优先用 Deepgram
@@ -283,7 +323,7 @@ async function stageSubtitleGeneration(job, voiceFile, update) {
       const { generateSubtitles } = require('../subtitles/deepgramSubtitles');
       await generateSubtitles(voiceFile, subtitleFile);
       update(35, '✅ 字幕生成完成');
-      return { subtitleFile };
+      return { subtitleFile, subtitleData: null, syncedShots: Array.isArray(syncedShots) ? syncedShots : null };
     } catch (e) {
       logger.warn('subtitle-provider-failed', {
         jobId: job.id,
@@ -304,7 +344,7 @@ async function stageSubtitleGeneration(job, voiceFile, update) {
   if (fallbackScript) {
     fs.writeFileSync(subtitleFile, generateFallbackSRT(fallbackScript));
     update(35, '✅ 字幕就绪（文本回退）');
-    return { subtitleFile };
+    return { subtitleFile, subtitleData: null, syncedShots: Array.isArray(syncedShots) ? syncedShots : null };
   }
 
   // 回退：复制现有字幕
@@ -318,7 +358,7 @@ async function stageSubtitleGeneration(job, voiceFile, update) {
   }
 
   update(35, '✅ 字幕就绪（回退模式）');
-  return { subtitleFile };
+  return { subtitleFile, subtitleData: null, syncedShots: Array.isArray(syncedShots) ? syncedShots : null };
 }
 
 // ─── Stage 3: Remotion 真实渲染 ────────────────────────
@@ -326,18 +366,18 @@ async function stageRemotionRender(job, files, update) {
   update(40, '🎬 开始 Remotion 渲染...');
   const designRenderData = getDesignRenderData(job.data.designJson);
   const {
-    template = 'caption',
+    template = 'ultimate',
     subtitleData = null,
-    subtitleStyle = 'caption',
     subtitleText = null,
     projectId = 'default',
-    typewriter = true,
   } = job.data;
   const { subtitleFile, voiceFile, audioSegments = [] } = files;
   const resolvedSubtitleData = normalizeSubtitlePayload(
     Array.isArray(subtitleData) && subtitleData.length > 0
       ? subtitleData
-      : designRenderData.subtitleData,
+      : Array.isArray(files.subtitleData) && files.subtitleData.length > 0
+        ? files.subtitleData
+        : designRenderData.subtitleData,
   );
   const resolvedSubtitleText =
     typeof subtitleText === 'string' && subtitleText.trim()
@@ -345,74 +385,76 @@ async function stageRemotionRender(job, files, update) {
       : designRenderData.subtitleText;
   const resolvedDurationInFrames = getPositiveInt(designRenderData.durationInFrames);
   const resolvedFrameRange = resolveRenderFrameRange(job.data.options, resolvedDurationInFrames);
-  const resolvedCaptionStyleSegments = Array.isArray(designRenderData.captionStyleSegments) &&
-    designRenderData.captionStyleSegments.length > 0
-      ? designRenderData.captionStyleSegments
-      : null;
-  const resolvedShots = Array.isArray(job.data.shots) && job.data.shots.length > 0
-    ? job.data.shots
-    : null;
+  const resolvedShots = Array.isArray(files.syncedShots) && files.syncedShots.length > 0
+    ? files.syncedShots
+    : Array.isArray(job.data.shots) && job.data.shots.length > 0
+      ? job.data.shots
+      : [];
   const directDurationInFrames = getPositiveInt(job.data.durationInFrames);
   const directRenderFps = getPositiveInt(job.data.renderFps);
   const directRenderWidth = getPositiveInt(job.data.renderWidth);
   const directRenderHeight = getPositiveInt(job.data.renderHeight);
   const resolvedRenderFps = directRenderFps || getPositiveInt(designRenderData.renderFps) || 30;
-  const resolvedRenderWidth = directRenderWidth || getPositiveInt(designRenderData.renderWidth);
-  const resolvedRenderHeight = directRenderHeight || getPositiveInt(designRenderData.renderHeight);
+  const resolvedRenderWidth = directRenderWidth || getPositiveInt(designRenderData.renderWidth) || 1920;
+  const resolvedRenderHeight = directRenderHeight || getPositiveInt(designRenderData.renderHeight) || 1080;
   const publicVoiceFile = voiceFile ? `/assets/voice/${projectId}/${path.basename(voiceFile)}` : null;
   const resolvedUltimateSubtitleData = resolvedSubtitleData.length > 0
     ? resolvedSubtitleData
     : subtitleFile
       ? parseSrtFileToSubtitleData(subtitleFile, resolvedRenderFps)
       : [];
-  const canUseUltimate = Array.isArray(resolvedShots) && resolvedShots.length > 0;
-  const useUltimate = canUseUltimate && isUltimateProject({
-    template,
-    visualSystem: job.data.visualSystem || designRenderData.visualSystem,
-    render: {
-      width: resolvedRenderWidth,
-      height: resolvedRenderHeight,
-    },
-  });
+  const compatibilityShots = resolvedShots.length > 0
+    ? []
+    : buildUltimateCompatibilityShots({
+        script: job.data.script,
+        subtitleText: resolvedSubtitleText,
+        durationInFrames: directDurationInFrames || resolvedDurationInFrames,
+        fps: resolvedRenderFps,
+        title: designRenderData.title || job.data.title || projectId,
+      });
+  const activeShots = resolvedShots.length > 0 ? resolvedShots : compatibilityShots;
 
   const outputDir = path.join(OUTPUT_DIR, projectId);
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const outputFile = path.join(outputDir, `${job.id}.mp4`);
 
-  const compositionId = useUltimate ? 'UltimateSceneTemplate' : 'OpenClawVideo';
-  const remotionProps = useUltimate
-    ? buildUltimateRenderProps({
-        projectId,
-        title: designRenderData.title || job.data.title || resolvedShots?.[0]?.title || projectId,
-        visualSystem: job.data.visualSystem || designRenderData.visualSystem || 'ultimate-1080p',
-        render: {
-          fps: resolvedRenderFps,
-          width: resolvedRenderWidth || 1920,
-          height: resolvedRenderHeight || 1080,
-        },
-        shots: resolvedShots,
-        voiceFile: publicVoiceFile,
-        audioSegments: Array.isArray(audioSegments) && audioSegments.length > 0 ? audioSegments : null,
-        subtitleData: resolvedUltimateSubtitleData.length > 0 ? resolvedUltimateSubtitleData : null,
-      })
-    : {
-        template,
-        subtitleStyle,
-        subtitleData: resolvedSubtitleData.length > 0 ? resolvedSubtitleData : null,
-        subtitleFile: subtitleFile ? `/assets/subtitles/${projectId}/${path.basename(subtitleFile)}` : null,
-        subtitleText: resolvedSubtitleText || null,
-        voiceFile: publicVoiceFile,
-        audioSegments: Array.isArray(audioSegments) && audioSegments.length > 0 ? audioSegments : null,
-        captionStyleSegments: resolvedCaptionStyleSegments,
-        durationInFrames: directDurationInFrames || resolvedDurationInFrames,
-        renderFps: resolvedRenderFps,
-        renderWidth: resolvedRenderWidth,
-        renderHeight: resolvedRenderHeight,
-        projectId,
-        shots: resolvedShots,
-        typewriter: Boolean(typewriter),
-      };
+  if (activeShots.length === 0) {
+    throw new Error('Ultimate render requires payload.shots, syncedShots, or enough script/subtitle text to derive compatibility scenes.');
+  }
+
+  if (template !== 'ultimate') {
+    logger.warn('legacy-render-template-aliased', {
+      jobId: job.id,
+      projectId,
+      requestedTemplate: template,
+      effectiveTemplate: 'ultimate',
+    });
+  }
+
+  if (resolvedShots.length === 0 && compatibilityShots.length > 0) {
+    logger.warn('ultimate-compat-shots-derived', {
+      jobId: job.id,
+      projectId,
+      compatShotCount: compatibilityShots.length,
+    });
+  }
+
+  const compositionId = 'UltimateSceneTemplate';
+  const remotionProps = buildUltimateRenderProps({
+    projectId,
+    title: designRenderData.title || job.data.title || activeShots[0]?.title || projectId,
+    visualSystem: job.data.visualSystem || designRenderData.visualSystem || 'ultimate-1080p',
+    render: {
+      fps: resolvedRenderFps,
+      width: resolvedRenderWidth,
+      height: resolvedRenderHeight,
+    },
+    shots: activeShots,
+    voiceFile: publicVoiceFile,
+    audioSegments: Array.isArray(audioSegments) && audioSegments.length > 0 ? audioSegments : null,
+    subtitleData: resolvedUltimateSubtitleData.length > 0 ? resolvedUltimateSubtitleData : null,
+  });
 
   const propsJson = JSON.stringify(remotionProps);
 
@@ -435,7 +477,7 @@ async function stageRemotionRender(job, files, update) {
   logger.info('remotion-render-started', {
     jobId: job.id,
     projectId,
-    template,
+    template: 'ultimate',
     compositionId,
     outputFile,
     command: launch.displayCommand,
@@ -729,6 +771,101 @@ function chunkFallbackSubtitles(text) {
   }
 
   return chunks.length > 0 ? chunks : ['视频旁白'];
+}
+
+function buildCompatibilityShotTitle(text, index, fallbackTitle = '') {
+  if (index === 0 && typeof fallbackTitle === 'string' && fallbackTitle.trim()) {
+    return fallbackTitle.trim();
+  }
+
+  const firstClause = String(text || '')
+    .split(/[，。！？；：,.!?;:\n]/)
+    .map((item) => item.trim())
+    .find(Boolean);
+
+  return firstClause ? firstClause.slice(0, 24) : `段落 ${index + 1}`;
+}
+
+function groupCompatibilityUnits(units, groupCount) {
+  const groups = Array.from({length: groupCount}, () => []);
+
+  units.forEach((unit, index) => {
+    const targetIndex = Math.min(
+      groupCount - 1,
+      Math.floor((index * groupCount) / Math.max(1, units.length)),
+    );
+    groups[targetIndex].push(unit);
+  });
+
+  return groups.filter((group) => group.length > 0);
+}
+
+function buildUltimateCompatibilityShots({
+  script,
+  subtitleText,
+  durationInFrames,
+  fps,
+  title,
+}) {
+  const sourceText = [script, subtitleText]
+    .find((value) => typeof value === 'string' && value.trim())
+    ?.trim();
+
+  if (!sourceText) {
+    return [];
+  }
+
+  const units = chunkFallbackSubtitles(sourceText)
+    .map((item) => String(item || '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  if (units.length === 0) {
+    return [];
+  }
+
+  const targetFrameCount = Math.max(
+    getPositiveInt(durationInFrames) ?? 0,
+    Math.round(fps * 6),
+    units.length * Math.max(24, Math.round(fps * 1.8)),
+  );
+  const preferredGroupCount = targetFrameCount >= fps * 18 ? 3 : targetFrameCount >= fps * 10 ? 2 : 1;
+  const groups = groupCompatibilityUnits(units, Math.min(preferredGroupCount, units.length));
+  const totalChars = Math.max(
+    1,
+    groups.reduce((sum, group) => sum + group.join('').replace(/\s+/g, '').length, 0),
+  );
+
+  let assignedFrames = 0;
+
+  return groups.map((group, index) => {
+    const narration = group.join(' ');
+    const contentChars = Math.max(1, narration.replace(/\s+/g, '').length);
+    const remainingGroups = groups.length - index;
+    const remainingFrames = Math.max(1, targetFrameCount - assignedFrames);
+    const estimatedFrames = index === groups.length - 1
+      ? remainingFrames
+      : Math.max(
+          Math.round(fps * 3),
+          Math.min(
+            Math.round((contentChars / totalChars) * targetFrameCount),
+            remainingFrames - Math.max(0, remainingGroups - 1) * Math.round(fps * 3),
+          ),
+        );
+    assignedFrames += estimatedFrames;
+
+    return {
+      id: `compat-${String(index + 1).padStart(2, '0')}`,
+      title: buildCompatibilityShotTitle(narration, index, title),
+      narration,
+      durationSeconds: Number((estimatedFrames / fps).toFixed(2)),
+      visualSummaryZh: narration,
+      visualFocusZh: buildCompatibilityShotTitle(narration, index),
+      storyboardCueZh: narration.slice(0, 48),
+      sceneIntent: '兼容旧输入并映射到 Ultimate 分镜',
+      keywords: [],
+      dataPoints: [],
+    };
+  });
 }
 
 function normalizeSubtitlePayload(subtitleData) {
@@ -1266,12 +1403,310 @@ function formatSrtTimestamp(ms) {
   ].join(':') + `,${String(milliseconds).padStart(3, '0')}`;
 }
 
+async function synthesizeShotAudioSegments({
+  job,
+  projectId,
+  projectVoiceDir,
+  renderFps,
+  voiceSettings,
+  shots,
+  update,
+}) {
+  if (!Array.isArray(shots) || shots.length === 0) {
+    return null;
+  }
+
+  const validShots = shots.filter((shot) => {
+    const speech = resolveShotSpeechPlan(shot, voiceSettings);
+    return Boolean(speech.rawText);
+  });
+
+  if (validShots.length === 0) {
+    return null;
+  }
+
+  const {
+    voiceRequest,
+    referenceUrl,
+    requestLanguage,
+    requestSpeed,
+    requestModel,
+  } = await prepareVoiceSynthesisPlan(voiceSettings, update);
+
+  const jobVoiceDir = path.join(projectVoiceDir, job.id);
+  if (!fs.existsSync(jobVoiceDir)) fs.mkdirSync(jobVoiceDir, { recursive: true });
+
+  const audioSegments = [];
+  const shotRuntime = [];
+
+  for (let index = 0; index < validShots.length; index += 1) {
+    const shot = validShots[index];
+    const speech = resolveShotSpeechPlan(shot, voiceSettings);
+    const fileName = `${String(index + 1).padStart(2, '0')}-${sanitizeFileSegment(shot.id)}.wav`;
+    const outputPath = path.join(jobVoiceDir, fileName);
+
+    update(
+      Math.min(18, 8 + Math.round(((index + 1) / validShots.length) * 10)),
+      `🎤 分镜配音 ${index + 1}/${validShots.length}: ${shot.title || shot.id}`,
+    );
+
+    await synthesizeQwenTtsToFile({
+      text: speech.spokenText,
+      voice: voiceRequest || resolveQwenTtsDefaultVoice(process.env),
+      language: speech.language || requestLanguage,
+      outputPath,
+      model: requestModel || resolveQwenSynthesisModel({env: process.env}),
+      speed: requestSpeed,
+      env: process.env,
+    });
+
+    const durationSeconds = probeDurationSeconds(outputPath);
+    shotRuntime.push({
+      shot,
+      speech,
+      outputPath,
+      publicSrc: `/assets/voice/${projectId}/${job.id}/${fileName}`,
+      durationSeconds,
+      durationInFrames: Math.max(1, Math.round(durationSeconds * renderFps)),
+    });
+  }
+
+  const syncedShots = applyAudioDurationsToShots(shots, shotRuntime, renderFps);
+  const sceneTimeline = buildShotTimelineFrames(syncedShots, renderFps);
+
+  for (let index = 0; index < shotRuntime.length; index += 1) {
+    const runtime = shotRuntime[index];
+    const timelineEntry = sceneTimeline.find((entry) => entry.id === runtime.shot.id);
+    if (!timelineEntry) {
+      continue;
+    }
+
+    audioSegments.push({
+      src: runtime.publicSrc,
+      startFrame: timelineEntry.audioStartFrame,
+      durationInFrames: runtime.durationInFrames,
+    });
+  }
+
+  let subtitleData = buildSubtitleDataFromShotRuntime(shotRuntime, sceneTimeline, renderFps);
+
+  if ((process.env.DEEPGRAM_API_KEY || process.env.OPENAI_WHISPER_API_KEY || process.env.OPENAI_API_KEY) && subtitleData.length > 0) {
+    try {
+      subtitleData = await enrichSubtitleDataWithWordTimings(shotRuntime, sceneTimeline, renderFps, subtitleData);
+    } catch (error) {
+      logger.warn('segment-subtitle-enrichment-failed', {
+        jobId: job.id,
+        projectId,
+        error,
+      });
+    }
+  }
+
+  return {
+    audioSegments,
+    subtitleData,
+    syncedShots,
+  };
+}
+
+function applyAudioDurationsToShots(shots, shotRuntime, renderFps) {
+  const runtimeById = new Map(shotRuntime.map((item) => [item.shot.id, item]));
+
+  return shots.map((shot) => {
+    const runtime = runtimeById.get(shot.id);
+    if (!runtime) {
+      const fallbackFrames = Math.max(
+        1,
+        getPositiveInt(shot.frames)
+          ?? Math.round((Math.max(0.2, Number(shot.durationSeconds) || 0) || 0.2) * renderFps),
+      );
+      return {
+        ...shot,
+        frames: fallbackFrames,
+        durationSeconds: Number((fallbackFrames / renderFps).toFixed(3)),
+      };
+    }
+
+    const scenePaddingFrames = estimateScenePaddingFrames(runtime.durationInFrames, renderFps);
+    const sceneFrames = Math.max(runtime.durationInFrames + scenePaddingFrames, runtime.durationInFrames);
+    return {
+      ...shot,
+      frames: sceneFrames,
+      durationSeconds: Number((sceneFrames / renderFps).toFixed(3)),
+      audioDurationSeconds: runtime.durationSeconds,
+      audioDurationInFrames: runtime.durationInFrames,
+    };
+  });
+}
+
+function estimateScenePaddingFrames(durationInFrames, fps) {
+  const fadePadding = Math.min(Math.round(fps * 0.22), Math.max(4, Math.round(durationInFrames * 0.08)));
+  return Math.max(4, fadePadding);
+}
+
+function buildShotTimelineFrames(shots, fps) {
+  const timeline = [];
+  let visualCursor = 0;
+
+  for (let index = 0; index < shots.length; index += 1) {
+    const shot = shots[index];
+    const durationInFrames = Math.max(
+      1,
+      getPositiveInt(shot.frames)
+        ?? Math.round((Math.max(0.2, Number(shot.durationSeconds) || 0) || 0.2) * fps),
+    );
+    const audioDurationInFrames = Math.max(
+      1,
+      getPositiveInt(shot.audioDurationInFrames)
+        ?? Math.round((Math.max(0.2, Number(shot.audioDurationSeconds) || 0) || 0.2) * fps),
+    );
+    const overlap = index === 0
+      ? 0
+      : Math.min(12, Math.max(0, Math.min(durationInFrames, timeline[index - 1].durationInFrames) - 1));
+    const visualStartFrame = Math.max(0, visualCursor - overlap);
+    const audioStartFrame = index === 0
+      ? 0
+      : timeline[index - 1].audioStartFrame + timeline[index - 1].audioDurationInFrames;
+
+    timeline.push({
+      id: shot.id,
+      visualStartFrame,
+      audioStartFrame,
+      durationInFrames,
+      audioDurationInFrames,
+      overlap,
+    });
+
+    visualCursor = visualStartFrame + durationInFrames;
+  }
+
+  return timeline;
+}
+
+function buildSubtitleDataFromShotRuntime(shotRuntime, sceneTimeline, fps) {
+  const subtitleData = [];
+
+  for (let index = 0; index < shotRuntime.length; index += 1) {
+    const runtime = shotRuntime[index];
+    const timelineEntry = sceneTimeline.find((entry) => entry.id === runtime.shot.id);
+    if (!timelineEntry) {
+      continue;
+    }
+
+    const cueStartFrame = timelineEntry.audioStartFrame;
+    const cueEndFrame = cueStartFrame + runtime.durationInFrames;
+    const cueText = runtime.speech.rawText;
+    if (!cueText) {
+      continue;
+    }
+
+    subtitleData.push({
+      index: subtitleData.length + 1,
+      startFrame: cueStartFrame,
+      endFrame: cueEndFrame,
+      startMs: Math.round((cueStartFrame / fps) * 1000),
+      endMs: Math.round((cueEndFrame / fps) * 1000),
+      text: cueText,
+      words: buildSyntheticWordsForCue(cueText, cueStartFrame, cueEndFrame, fps),
+    });
+  }
+
+  return subtitleData;
+}
+
+function buildSyntheticWordsForCue(text, startFrame, endFrame, fps) {
+  const tokens = splitSubtitleTokens(text);
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  const totalWeight = tokens.reduce((sum, token) => sum + Math.max(1, token.replace(/\s+/g, '').length), 0);
+  const totalFrames = Math.max(1, endFrame - startFrame);
+  let cursorFrame = startFrame;
+
+  return tokens.map((token, index) => {
+    const weight = Math.max(1, token.replace(/\s+/g, '').length);
+    const nextFrame = index === tokens.length - 1
+      ? endFrame
+      : Math.min(
+          endFrame,
+          cursorFrame + Math.max(1, Math.round((weight / totalWeight) * totalFrames)),
+        );
+    const word = {
+      text: token,
+      startFrame: cursorFrame,
+      endFrame: Math.max(cursorFrame + 1, nextFrame),
+      startMs: Math.round((cursorFrame / fps) * 1000),
+      endMs: Math.round((Math.max(cursorFrame + 1, nextFrame) / fps) * 1000),
+    };
+    cursorFrame = word.endFrame;
+    return word;
+  });
+}
+
+function splitSubtitleTokens(text) {
+  const normalized = String(text || '').replace(/\n+/g, ' ').trim();
+  if (!normalized) {
+    return [];
+  }
+
+  return normalized
+    .split(/([，。！？；：、“”‘’（）《》〈〉【】〔〕…,.!?;:()[\]"'`~\-]+)/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .flatMap((part) => {
+      if (/^[，。！？；：、“”‘’（）《》〈〉【】〔〕…,.!?;:()[\]"'`~\-]+$/.test(part)) {
+        return [part];
+      }
+      if (/[\u3400-\u9fff]/.test(part)) {
+        return part.match(/.{1,4}/g) ?? [part];
+      }
+      return part.split(/\s+/).filter(Boolean);
+    });
+}
+
+async function enrichSubtitleDataWithWordTimings(shotRuntime, sceneTimeline, fps, fallbackSubtitleData) {
+  const {transcribeAudioToWordTimings} = require('../subtitles/deepgramSubtitles');
+  const subtitleById = new Map(fallbackSubtitleData.map((item, index) => [shotRuntime[index]?.shot.id, item]));
+
+  for (let index = 0; index < shotRuntime.length; index += 1) {
+    const runtime = shotRuntime[index];
+    const timelineEntry = sceneTimeline.find((entry) => entry.id === runtime.shot.id);
+    const subtitleCue = subtitleById.get(runtime.shot.id);
+    if (!timelineEntry || !subtitleCue) {
+      continue;
+    }
+
+    const words = await transcribeAudioToWordTimings(runtime.outputPath);
+    if (!Array.isArray(words) || words.length === 0) {
+      continue;
+    }
+
+    subtitleCue.words = words.map((word) => {
+      const startMs = Math.round((word.start || 0) * 1000) + Math.round((timelineEntry.audioStartFrame / fps) * 1000);
+      const endMs = Math.round((word.end || 0) * 1000) + Math.round((timelineEntry.audioStartFrame / fps) * 1000);
+      const startFrame = Math.round((startMs / 1000) * fps);
+      const endFrame = Math.max(startFrame + 1, Math.round((endMs / 1000) * fps));
+      return {
+        text: String(word.word || word.text || '').trim(),
+        startFrame,
+        endFrame,
+        startMs,
+        endMs,
+        confidence: typeof word.confidence === 'number' ? word.confidence : undefined,
+      };
+    }).filter((word) => word.text);
+  }
+
+  return fallbackSubtitleData;
+}
+
 // ─── 主处理函数 ─────────────────────────────────────────
 async function processRenderJob(job, update) {
   logger.info('job-started', {
     jobId: job.id,
     jobType: job.name || job.type || 'render',
-    template: job.data.template || 'caption',
+    template: job.data.template || 'ultimate',
     projectId: job.data.projectId || 'default',
   });
 
@@ -1451,6 +1886,10 @@ module.exports = {
   processVoiceJob,
   startFileBasedWorker,
   startRedisWorker,
+  buildShotTimelineFrames,
+  buildSubtitleDataFromShotRuntime,
   generateFallbackSRT,
   parseSrtContentToSubtitleData,
+  splitSubtitleTokens,
+  synthesizeShotAudioSegments,
 };

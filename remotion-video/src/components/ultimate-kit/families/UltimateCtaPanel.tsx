@@ -1,43 +1,107 @@
 import React from 'react';
-import {GeometryAccent, ReticleLockOn, TextMaskWipe} from '../../visual-atoms';
+import {GeometryAccent, ReticleLockOn} from '../../visual-atoms';
 import {resolveUltimateAccent} from '../tokens';
-import type {UltimateCtaPanelProps} from '../types';
+import type {UltimateCtaPanelProps, UltimateSceneGrammar} from '../types';
 
-export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps> = ({heading, subtitle, searchLabel, badge, highlights = []}) => {
+const normalizeText = (value?: string) => {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+};
+
+const trimText = (value: string, maxLength: number) => {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, Math.max(1, maxLength - 1)).trim()}…`;
+};
+
+const distinctHighlights = (items: string[]) => {
+  const seen = new Set();
+  return items
+    .map((item) => normalizeText(item))
+    .filter((item) => {
+      if (!item || seen.has(item)) {
+        return false;
+      }
+      seen.add(item);
+      return true;
+    });
+};
+
+export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps & {grammar?: UltimateSceneGrammar}> = ({
+  heading,
+  subtitle,
+  searchLabel,
+  badge,
+  highlights = [],
+}) => {
   const color = resolveUltimateAccent('lime');
+  const title = normalizeText(heading);
+  const subline = normalizeText(subtitle);
+  const chips = distinctHighlights(highlights).filter((item) => item !== title && item !== subline).slice(0, 2);
+  const kicker = chips[0] || trimText(subline || '告诉我你的真实场景', 16);
+  const footer = chips[1] || trimText(searchLabel || subline || title, 18);
+
   return (
-    <div style={{display: 'grid', gridTemplateRows: 'auto 1fr auto', gap: 22, height: '100%'}}>
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-        {badge ? <div style={{paddingBottom: 6, borderBottom: `1px solid ${color}88`, color: '#f7fbff', fontSize: 19, letterSpacing: 2.4, textTransform: 'uppercase'}}>{badge}</div> : <div />}
-        {searchLabel ? <div style={{fontSize: 18, letterSpacing: 2, color: 'rgba(229,236,255,0.5)'}}>{searchLabel}</div> : null}
-      </div>
-      <div style={{position: 'relative', minHeight: 560, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-        <GeometryAccent variant="ring" color={color} opacity={0.18} style={{left: '50%', top: '50%', width: 620, height: 620, transform: 'translate(-50%, -50%)'}} />
-        <GeometryAccent variant="slanted-panel" color={color} opacity={0.12} style={{left: 210, top: 64, width: 260, height: 130, transform: 'rotate(-7deg)'}} />
-        <ReticleLockOn target={heading} caption={subtitle ?? highlights.join(' · ')} color={color} size={620} showBeam />
-      </div>
-      <div style={{display: 'grid', gap: 16, justifyItems: 'center'}}>
-        <div style={{position: 'relative', minHeight: 72, minWidth: 860}}>
-          <TextMaskWipe
-            text={heading}
-            direction="center"
-            accent={color}
-            fontSize={64}
-            color="#f7fbff"
-            fontWeight={900}
-            textStyle={{width: '100%', textAlign: 'center', whiteSpace: 'normal', lineHeight: 0.94, letterSpacing: -2}}
-          />
+    <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
+      <GeometryAccent variant="ring" color={color} opacity={0.16} style={{left: '50%', top: '48%', width: 680, height: 680, transform: 'translate(-50%, -50%)'}} />
+      <GeometryAccent variant="slanted-panel" color={color} opacity={0.12} style={{left: 298, top: 108, width: 412, height: 168, transform: 'rotate(-12deg)'}} />
+
+      <div style={{position: 'absolute', top: 92, left: 106, right: 106, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <div style={{fontSize: 16, letterSpacing: 4, textTransform: 'uppercase', color: 'rgba(229,236,255,0.5)'}}>
+          {badge ? trimText(normalizeText(badge), 18) : 'final call'}
         </div>
-        {subtitle ? <div style={{fontSize: 30, lineHeight: 1.4, color: 'rgba(229,236,255,0.82)', textAlign: 'center', maxWidth: 920}}>{subtitle}</div> : null}
-        {highlights.length > 0 ? (
-          <div style={{display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center'}}>
-            {highlights.slice(0, 4).map((item) => (
-              <div key={item} style={{paddingBottom: 6, borderBottom: `1px solid ${color}66`, color: '#f7fbff', fontSize: 18}}>
-                {item}
-              </div>
-            ))}
+        <div style={{fontSize: 18, color: color, letterSpacing: 1.8}}>
+          {trimText(kicker, 18)}
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: '46%',
+          width: 720,
+          height: 520,
+          transform: 'translate(-50%, -50%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <ReticleLockOn target={trimText(title, 16)} caption={trimText(subline || kicker, 20)} color={color} size={620} showBeam />
+      </div>
+
+      <div
+        style={{
+          position: 'absolute',
+          left: 210,
+          right: 210,
+          bottom: 116,
+          display: 'grid',
+          gap: 14,
+          justifyItems: 'center',
+        }}
+      >
+        <div style={{fontSize: 78, lineHeight: 0.92, fontWeight: 900, color: '#f7fbff', textAlign: 'center', letterSpacing: -3}}>
+          {title}
+        </div>
+        <div style={{display: 'flex', alignItems: 'center', gap: 14}}>
+          <div
+            style={{
+              padding: '12px 18px',
+              borderRadius: 18,
+              background: `${color}22`,
+              color: '#f7fbff',
+              fontSize: 24,
+              fontWeight: 800,
+            }}
+          >
+            {trimText(kicker, 10)}
           </div>
-        ) : null}
+          <div style={{fontSize: 28, lineHeight: 1.3, color: 'rgba(229,236,255,0.8)'}}>
+            {trimText(footer, 22)}
+          </div>
+        </div>
       </div>
     </div>
   );

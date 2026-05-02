@@ -1,9 +1,53 @@
 import React from 'react';
-import {GeometryAccent, SplitAxisClash, TextMaskWipe} from '../../visual-atoms';
+import {GeometryAccent, TextMaskWipe} from '../../visual-atoms';
+import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
-import type {UltimateCompareBoardProps} from '../types';
+import type {UltimateCompareBoardProps, UltimateSceneGrammar} from '../types';
 
-export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps> = ({
+const normalizeText = (value?: string) => {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+};
+
+const trimText = (value: string, maxLength: number) => {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, Math.max(1, maxLength - 1)).trim()}…`;
+};
+
+const isGenericSideLabel = (value: string) => {
+  return /^(对照\s*[AB]|left case|right case)$/i.test(normalizeText(value));
+};
+
+const splitComparisonSummary = (value?: string) => {
+  const text = normalizeText(value);
+  if (!text) {
+    return [];
+  }
+  return text
+    .split(/[，,；;]/)
+    .map((item) => normalizeText(item))
+    .filter(Boolean)
+    .slice(0, 2);
+};
+
+const splitHeadline = (value: string, maxChars = 8) => {
+  const text = normalizeText(value);
+  if (!text) {
+    return [];
+  }
+
+  if (text.length <= maxChars) {
+    return [text];
+  }
+
+  return [
+    text.slice(0, maxChars),
+    trimText(text.slice(maxChars), maxChars + 2),
+  ];
+};
+
+export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps & {grammar?: UltimateSceneGrammar}> = ({
   heading,
   summary,
   leftTitle,
@@ -13,70 +57,137 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps> = ({
   rows,
   leftAccent = 'orange',
   rightAccent = 'cyan',
+  grammar,
 }) => {
   const leftColor = resolveUltimateAccent(leftAccent);
   const rightColor = resolveUltimateAccent(rightAccent);
+  const revealDirection = resolveTextRevealDirection(grammar, 'center');
+  const firstRow = rows[0];
+  const summaryParts = splitComparisonSummary(summary);
+  const preferSummarySplit = summaryParts.length === 2 && isGenericSideLabel(leftTitle) && isGenericSideLabel(rightTitle);
+  const leftLead = normalizeText(preferSummarySplit ? summaryParts[0] : (firstRow?.left || leftTitle || heading));
+  const rightLead = normalizeText(preferSummarySplit ? summaryParts[1] : (firstRow?.right || rightTitle || summary));
+  const bottomLabel = trimText(normalizeText(firstRow?.label || summary || heading), 22);
+  const leftHeadline = splitHeadline(leftLead, 5);
+  const rightHeadline = splitHeadline(rightLead, 12);
+  const leftMeta = trimText(normalizeText(leftEyebrow || leftTitle), 18);
+  const rightMeta = trimText(normalizeText(rightEyebrow || rightTitle), 18);
 
   return (
-    <div style={{display: 'grid', gridTemplateRows: 'auto 1fr auto', height: '100%', gap: 24}}>
-      <div style={{display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 0.46fr)', gap: 24, alignItems: 'end'}}>
-        <div style={{display: 'grid', gap: 12}}>
-          <div style={{fontSize: 20, letterSpacing: 4, textTransform: 'uppercase', color: 'rgba(229,236,255,0.56)'}}>compress compare</div>
-          <div style={{position: 'relative', minHeight: 124}}>
-            <TextMaskWipe
-              text={heading}
-              direction="center"
-              accent={rightColor}
-              fontSize={84}
-              color="#f7fbff"
-              fontWeight={900}
-              textStyle={{width: '100%', textAlign: 'left', whiteSpace: 'normal', lineHeight: 0.94, letterSpacing: -2}}
-            />
-          </div>
+    <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: `linear-gradient(98deg, ${leftColor}12 0 46%, rgba(7,10,18,0) 46% 54%, ${rightColor}12 54% 100%)`,
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          left: 956,
+          top: -32,
+          width: 164,
+          height: 1190,
+          transform: 'rotate(11deg)',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01))',
+          boxShadow: `0 0 48px ${rightColor}12`,
+        }}
+      />
+
+      <GeometryAccent variant="slanted-panel" color={leftColor} opacity={0.18} style={{left: 86, top: 174, width: 412, height: 120, transform: 'rotate(-11deg)'}} />
+      <GeometryAccent variant="slanted-panel" color={rightColor} opacity={0.18} style={{right: 104, bottom: 172, width: 430, height: 136, transform: 'rotate(9deg)'}} />
+      <GeometryAccent variant="arc" color={rightColor} opacity={0.2} style={{left: 764, top: 156, width: 420, height: 160}} />
+
+      <div style={{position: 'absolute', left: 110, top: 82, width: 740}}>
+        <div style={{fontSize: 15, letterSpacing: 4.2, textTransform: 'uppercase', color: 'rgba(229,236,255,0.5)'}}>
+          split decision
+        </div>
+        <div style={{position: 'relative', minHeight: 114, marginTop: 18}}>
+          <TextMaskWipe
+            text={heading}
+            direction={revealDirection}
+            accent={rightColor}
+            fontSize={82}
+            color="#f7fbff"
+            fontWeight={900}
+            textStyle={{width: '100%', textAlign: 'left', whiteSpace: 'normal', lineHeight: 0.9, letterSpacing: -3}}
+          />
         </div>
         {summary ? (
-          <div style={{display: 'grid', gap: 10, paddingBottom: 8}}>
-            <div style={{width: 92, height: 1, background: `linear-gradient(90deg, ${leftColor}, ${rightColor})`}} />
-            <div style={{fontSize: 22, lineHeight: 1.46, color: 'rgba(229,236,255,0.72)'}}>{summary}</div>
+          <div style={{marginTop: 14, maxWidth: 640, fontSize: 24, lineHeight: 1.4, color: 'rgba(229,236,255,0.7)'}}>
+            {summary}
           </div>
         ) : null}
       </div>
-      <div style={{position: 'relative', minHeight: 540}}>
-        <GeometryAccent variant="slanted-panel" color={leftColor} opacity={0.12} style={{left: 40, top: 72, width: 260, height: 140, transform: 'rotate(-6deg)'}} />
-        <GeometryAccent variant="slanted-panel" color={rightColor} opacity={0.12} style={{right: 42, bottom: 56, width: 260, height: 150, transform: 'rotate(6deg)'}} />
-        <GeometryAccent variant="arc" color={rightColor} opacity={0.2} style={{left: 760, top: 20, width: 300, height: 150}} />
-        <SplitAxisClash
-          leftTitle={leftTitle}
-          rightTitle={rightTitle}
-          leftColor={leftColor}
-          rightColor={rightColor}
-          collisionLabel={heading}
-          thresholdLabel={summary}
-          leftNodes={rows.map((row) => ({label: row.label, value: row.left}))}
-          rightNodes={rows.map((row) => ({label: row.label, value: row.right}))}
-        />
-        {leftEyebrow ? <div style={{position: 'absolute', left: 90, top: 44, color: leftColor, fontSize: 18, letterSpacing: 2.8, textTransform: 'uppercase'}}>{leftEyebrow}</div> : null}
-        {rightEyebrow ? <div style={{position: 'absolute', right: 90, top: 44, color: rightColor, fontSize: 18, letterSpacing: 2.8, textTransform: 'uppercase'}}>{rightEyebrow}</div> : null}
+
+      <div style={{position: 'absolute', left: 110, top: 296, width: 610}}>
+        <div style={{fontSize: 17, letterSpacing: 3, textTransform: 'uppercase', color: leftColor}}>
+          {leftMeta || 'short context'}
+        </div>
+        <div style={{marginTop: 24, fontSize: 126, lineHeight: 0.82, fontWeight: 900, letterSpacing: -8, color: `${leftColor}18`}}>
+          {leftTitle}
+        </div>
+        <div style={{marginTop: -6, display: 'grid', gap: 4}}>
+          {leftHeadline.map((line, index) => (
+            <div key={`${line}-${index}`} style={{fontSize: index === 0 ? 82 : 76, lineHeight: 0.92, fontWeight: 900, color: '#f7fbff', letterSpacing: -4}}>
+              {line}
+            </div>
+          ))}
+        </div>
       </div>
-      <div style={{display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, Math.min(4, rows.length))}, minmax(0, 1fr))`, gap: 16}}>
-        {rows.slice(0, 4).map((row, index) => (
+
+      <div style={{position: 'absolute', right: 108, bottom: 190, width: 650, textAlign: 'right'}}>
+        <div style={{fontSize: 17, letterSpacing: 3, textTransform: 'uppercase', color: rightColor}}>
+          {rightMeta || 'long context'}
+        </div>
+        <div style={{marginTop: 22, fontSize: 122, lineHeight: 0.82, fontWeight: 900, letterSpacing: -8, color: `${rightColor}18`}}>
+          {rightTitle}
+        </div>
+        <div style={{marginTop: -2, marginLeft: 'auto', display: 'grid', gap: 6, maxWidth: 630}}>
+          {rightHeadline.map((line, index) => (
+            <div key={`${line}-${index}`} style={{fontSize: index === 0 ? 72 : 66, lineHeight: 0.94, fontWeight: 900, color: '#f7fbff', letterSpacing: -3}}>
+              {line}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: 'absolute',
+          left: 648,
+          right: 646,
+          bottom: 92,
+          padding: '24px 28px 28px',
+          borderRadius: 28,
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(5,8,15,0.72)',
+          boxShadow: '0 20px 58px rgba(0,0,0,0.3)',
+          backdropFilter: 'blur(14px)',
+        }}
+      >
+        <div style={{fontSize: 14, letterSpacing: 3, textTransform: 'uppercase', color: 'rgba(229,236,255,0.4)'}}>
+          conflict
+        </div>
+        <div style={{marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 18}}>
+          <div style={{fontSize: 60, lineHeight: 0.94, fontWeight: 900, color: '#f7fbff', letterSpacing: -3}}>
+            {bottomLabel}
+          </div>
           <div
-            key={row.label}
             style={{
-              padding: '18px 20px',
-              clipPath: 'polygon(0% 16%, 93% 0%, 100% 84%, 7% 100%)',
-              background: `linear-gradient(135deg, ${index % 2 === 0 ? `${leftColor}18` : `${rightColor}18`} 0%, rgba(8,12,20,0.26) 72%)`,
-              border: '1px solid rgba(255,255,255,0.08)',
-              transform: `rotate(${index % 2 === 0 ? -1.25 : 1.25}deg)`,
+              padding: '12px 18px',
+              borderRadius: 18,
+              background: `${rightColor}18`,
+              color: '#f7fbff',
+              fontSize: 22,
+              fontWeight: 800,
+              whiteSpace: 'nowrap',
             }}
           >
-            <div style={{fontSize: 15, letterSpacing: 2, textTransform: 'uppercase', color: 'rgba(229,236,255,0.46)', marginBottom: 8}}>{row.label}</div>
-            <div style={{display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 20}}>
-              <span style={{color: leftColor}}>{row.left}</span>
-              <span style={{color: rightColor}}>{row.right}</span>
-            </div>
+            {trimText(rightLead, 10)}
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );

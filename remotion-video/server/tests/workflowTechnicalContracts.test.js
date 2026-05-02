@@ -6,6 +6,9 @@ const {
   validateStep1Research,
   validateStep3Copy,
 } = require('../workflow/step123/quality');
+const {
+  validateStep3SkillAlignment,
+} = require('../workflow/step123/step3SkillDriver');
 
 function buildContext() {
   return {
@@ -169,4 +172,69 @@ test('step3 copy accepts AI release narration with hard technical detail', () =>
   }, buildContext());
 
   assert.equal(result.copy.body.length, 3);
+});
+
+test('step3 skill alignment rejects short generic copy without mechanism depth', () => {
+  const payload = {
+    copy: {
+      hook: '我试了下 deepseek v4，感觉它确实更会干活了。',
+      body: [
+        {
+          label: 'fact-hammer',
+          type: 'fact-hammer',
+          text: '我给了它一个需求，它很快就回了我一个结果，所以这次升级值得看。',
+          sceneIntent: '让用户知道它升级了',
+          evidenceAnchor: '需求到结果',
+          transitionToNext: '下一块讲原因',
+          keywords: ['deepseek v4', '升级'],
+          dataPoints: ['很快'],
+        },
+        {
+          label: 'tech-mechanism',
+          type: 'tech-mechanism',
+          text: '它用了更强的技术，所以现在更会做事，整体表现和以前不同。',
+          sceneIntent: '让程序员理解技术变化',
+          evidenceAnchor: '技术变化',
+          transitionToNext: '下一块讲能力',
+          keywords: ['技术', '能力'],
+          dataPoints: ['更强'],
+          mechanismDepth: {
+            level: 'shallow',
+            explains: 'WHAT',
+            technicalTerms: [],
+            analogy: '',
+            visualHint: '',
+          },
+        },
+        {
+          label: 'capability',
+          type: 'capability',
+          text: '代码能力更强，处理任务也更稳，很多人都能直接拿来用。',
+          sceneIntent: '让用户知道它能做什么',
+          evidenceAnchor: '代码能力',
+          transitionToNext: '下一块讲对比',
+          keywords: ['代码能力', '任务'],
+          dataPoints: ['更稳'],
+        },
+        {
+          label: 'comparison',
+          type: 'comparison',
+          text: '跟别的模型比，它整体更有性价比，也更适合放进工作流。',
+          sceneIntent: '让用户做选择',
+          evidenceAnchor: '性价比',
+          transitionToNext: '',
+          keywords: ['对比', '性价比'],
+          dataPoints: ['更适合'],
+        },
+      ],
+      cta: '评论区告诉我你怎么看。',
+    },
+  };
+
+  const alignment = validateStep3SkillAlignment(buildContext(), payload, {
+    sourcePath: '/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/workflow-skills/video-pipeline-content.SKILL.md',
+  });
+
+  assert.equal(alignment.ok, false);
+  assert.match(alignment.reasons.join(' | '), /偏短|机制|套话|场景|硬信息密度/);
 });

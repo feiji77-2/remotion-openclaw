@@ -102,6 +102,26 @@ function ensureStringArray(value, fallback = [], max = 8) {
   return normalized.slice(0, max);
 }
 
+function normalizeMechanismDepth(value) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const normalized = {
+    level: String(value.level || '').trim(),
+    explains: String(value.explains || '').trim(),
+    technicalTerms: ensureStringArray(value.technicalTerms, [], 6),
+    analogy: String(value.analogy || '').trim(),
+    visualHint: String(value.visualHint || '').trim(),
+  };
+
+  return Object.values(normalized).some((item) => (
+    Array.isArray(item) ? item.length > 0 : Boolean(item)
+  ))
+    ? normalized
+    : null;
+}
+
 function buildTechnicalTopicState(context, extra = {}) {
   return detectTechnicalTopic({
     topic: context?.topic?.query,
@@ -344,6 +364,7 @@ function validateStep3Brief(candidate, context) {
     .slice(0, 4)
     .map((item, index) => ({
       label: ensureString(item?.label || `节拍 ${index + 1}`, '大纲标签', 'STEP3_BRIEF_INVALID'),
+      type: ensureString(item?.type || item?.label || `节拍 ${index + 1}`, '大纲类型', 'STEP3_BRIEF_INVALID'),
       beat: ensureString(item?.beat, '大纲节拍', 'STEP3_BRIEF_INVALID'),
       goal: ensureString(item?.goal, '大纲目标', 'STEP3_BRIEF_INVALID'),
       evidenceAnchor: ensureString(item?.evidenceAnchor, '大纲证据锚点', 'STEP3_BRIEF_INVALID'),
@@ -370,12 +391,14 @@ function validateStep3Copy(candidate, context) {
     .slice(0, 4)
     .map((item, index) => ({
       label: ensureString(item?.label || `段落 ${index + 1}`, '段落标签', 'STEP3_COPY_INVALID'),
+      type: ensureString(item?.type || item?.label || `段落 ${index + 1}`, '段落类型', 'STEP3_COPY_INVALID'),
       text: ensureString(item?.text, '段落文案', 'STEP3_COPY_INVALID'),
       sceneIntent: ensureString(item?.sceneIntent || item?.label, '段落场景意图', 'STEP3_COPY_INVALID'),
       evidenceAnchor: ensureString(item?.evidenceAnchor || item?.label, '段落证据锚点', 'STEP3_COPY_INVALID'),
       transitionToNext: String(item?.transitionToNext || '').trim(),
       keywords: ensureStringArray(item?.keywords, tokenize(`${item?.label || ''} ${item?.text || ''}`), 6),
       dataPoints: ensureStringArray(item?.dataPoints, tokenize(item?.text), 5),
+      mechanismDepth: normalizeMechanismDepth(item?.mechanismDepth),
     }));
 
   const result = {

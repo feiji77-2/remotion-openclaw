@@ -653,7 +653,7 @@ const ShotFrame: React.FC<{
 export const PipelineStoryboardVideo: React.FC<{
   shots: RenderShotProps[];
   template?: VideoProps['template'];
-}> = ({shots, template = 'caption'}) => {
+}> = ({shots, template = 'ultimate'}) => {
   const {fps} = useVideoConfig();
   const offsets = useMemo(() => {
     let cursor = 0;

@@ -295,7 +295,7 @@ async function main() {
       body: {
         projectId,
         script,
-        template: 'caption',
+        template: 'ultimate',
         quality: 'high',
         voice: 'qwen-tts',
         shots,

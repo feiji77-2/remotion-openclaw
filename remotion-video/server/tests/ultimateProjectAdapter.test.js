@@ -2,6 +2,7 @@ process.env.NODE_ENV = 'development';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
 const {buildUltimateProjectConfig} = require('../../scripts/lib/ultimate-project-adapter.js');
 
 const buildProject = (middleShot) => ({
@@ -215,6 +216,35 @@ test('architecture-map scenes can be forced and build node structures', () => {
   assert.equal(scene.family, 'architecture-map');
   assert.equal(scene.data.centerTitle, '多 Agent 系统');
   assert.ok(scene.data.nodes.length >= 4);
+});
+
+test('scene copy stays grounded in narration when planner titles and visual summaries drift', () => {
+  const config = buildUltimateProjectConfig(
+    buildProject({
+      id: 'shot-02',
+      family: 'architecture-map',
+      title: '让观众意识到gpt5不是性能提升的版本号，而是…',
+      displayTitle: 'gpt5不是性能迭代，而是工作模式变了',
+      narration:
+        'gpt5的核心变化不是参数规模，而是AI从被动回答升级为主动规划、调用工具、执行多步骤任务。',
+      displaySummary:
+        'gpt5的核心变化不是参数规模，而是AI从被动回答升级为主动规划、调用工具、执行多步骤任务。',
+      visualSummaryZh:
+        '本shot围绕「架构质变」展开。采用 architecture-map 风格，以 GPT-5 为核心节点辐射四个能力点。',
+      dataPoints: ['Agent规划', '工具调用', '多步骤执行', '结果验证'],
+      displayPoints: ['主动规划', '调用工具', '多步骤任务', '结果验证'],
+      durationSeconds: 9,
+    }),
+  );
+
+  const scene = config.scenes[1];
+
+  assert.equal(scene.family, 'architecture-map');
+  assert.equal(scene.data.heading, 'gpt5的核心变化不是参数规模');
+  assert.equal(scene.data.centerTitle, 'gpt5不是性能迭代，而是工作模式变了');
+  assert.match(scene.subtitle, /主动规划/);
+  assert.doesNotMatch(scene.data.heading, /让观众意识到|本shot围绕/);
+  assert.ok(scene.data.nodes.some((node) => /主动规划|调用工具|多步骤任务/.test(node.label)));
 });
 
 test('benchmark-chart scenes are inferred for benchmark-heavy numeric comparisons', () => {
@@ -462,4 +492,63 @@ test('global family planning maximizes middle-scene template diversity', () => {
     ['hero', 'timeline', 'feature-rail', 'compare-board'],
   );
   assert.ok(['metrics', 'tag-matrix'].includes(config.scenes[4].family));
+});
+
+test('family planner avoids three consecutive structure-layer families', () => {
+  const config = buildUltimateProjectConfig({
+    projectId: 'rhythm-guard',
+    title: 'Rhythm Guard',
+    template: 'ultimate',
+    visualSystem: 'ultimate-1080p',
+    render: {
+      fps: 30,
+      width: 1920,
+      height: 1080,
+    },
+    shots: [
+      {id: 'shot-01', title: '开场', narration: '开场。', durationSeconds: 4},
+      {
+        id: 'shot-02',
+        title: '流程变化',
+        narration: '从单轮回答到多步骤任务执行，这是流程变化。',
+        durationSeconds: 7,
+        dataPoints: ['单轮回答', '多步骤任务执行', '流程变化'],
+      },
+      {
+        id: 'shot-03',
+        title: '系统架构',
+        narration: '系统分成 Agent、router、memory、toolchain 四层。',
+        durationSeconds: 7,
+        dataPoints: ['Agent', 'router', 'memory', 'toolchain'],
+      },
+      {
+        id: 'shot-04',
+        title: '记忆连接',
+        narration: '记忆图谱把上下文、知识库、召回链路串起来。',
+        durationSeconds: 7,
+        dataPoints: ['上下文', '知识库', '召回链路', 'graph'],
+      },
+      {id: 'shot-05', title: '结尾', narration: '结尾。', durationSeconds: 4},
+    ],
+  });
+
+  const middleFamilies = config.scenes.slice(1, -1).map((scene) => scene.family);
+  assert.notDeepEqual(middleFamilies, ['step-flow', 'architecture-map', 'memory-graph']);
+});
+
+test('feature-rail grammar stays on burst spread even with flow wording', async () => {
+  const {resolveShotGrammar} = await import(path.resolve(__dirname, '../../src/data/shotGrammar.ts'));
+  const grammar = resolveShotGrammar({
+    family: 'feature-rail',
+    shotIndex: 2,
+    totalShots: 6,
+    numericFields: [],
+    sceneIntent: '代码能力和Agent集群才是关键',
+    storyboardCueZh: '代码能力和Agent集群才是关键。想象一下：写代码、跑测试、修复bug，全流程闭环。',
+    scriptBlockLabel: 'shot-03',
+    type: 'feature-rail',
+  });
+
+  assert.equal(grammar.archetype, 'burst spread');
+  assert.equal(grammar.dataEvent, 'burst-spread');
 });

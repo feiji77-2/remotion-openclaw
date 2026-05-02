@@ -4,6 +4,24 @@ import type {BrandIconName} from '../BrandIcon';
 export type UltimateStagePreset = 'opening' | 'data' | 'evidence' | 'climax' | 'cta';
 export type UltimateHudMode = 'auto' | 'minimal' | 'terminal';
 
+export interface UltimateSceneGrammar {
+  archetype?: string;
+  cameraIntent?: string;
+  cameraMotion?: string;
+  dataEvent?: string;
+  enterFrames?: number;
+  emphasisFrames?: number;
+  staggerGap?: number;
+  revealDirection?: string;
+  memoryObject?: {
+    type?: string;
+    role?: string;
+    enterFrame?: number;
+    color?: string;
+  };
+  directorNote?: string;
+}
+
 export interface UltimateStageProps {
   children: React.ReactNode;
   warm?: boolean;
@@ -273,11 +291,7 @@ export interface UltimateBenchmarkChartProps {
   /** 强调色 */
   accent?: UltimateAccentTone;
   /** 导演层 grammar（staggerGap / dataEvent / enterFrames）*/
-  grammar?: {
-    staggerGap?: number;
-    dataEvent?: string;
-    enterFrames?: number;
-  };
+  grammar?: UltimateSceneGrammar;
 }
 
 export interface UltimateQuoteHighlightProps {

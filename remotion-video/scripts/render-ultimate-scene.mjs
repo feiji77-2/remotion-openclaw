@@ -3,10 +3,10 @@
  *
  * Unified render entry for Step-4 driven pipeline.
  *
- * Supports three input合同:
+ * Supports two input合同:
  *   --config <step-04.json>         (segments_meta[] | payload.shots[])
  *   --config <workflow_*.json>       (result.payload.shots[])
- *   --outline <outline.json>         (legacy Ultimate outline format — kept for compat)
+ *   --config <ultimate-config.json>  (direct Ultimate config.scenes[])
  *
  * Output:
  *   Shots are normalized via storyboardLoader (single source of truth)
@@ -34,12 +34,12 @@ const hasFlag = (name) => args.includes(name);
 const printUsage = () => {
   console.log(`Usage:
   node scripts/render-ultimate-scene.mjs --config <file> [--out <output.mp4>] [--dry-run]
-  node scripts/render-ultimate-scene.mjs --outline <outline.json> [--out <output.mp4>] [--dry-run]
 
 Supported --config formats:
   - step-04.json (segments_meta[])
   - step-04.json (payload.shots[])
   - workflow_*.json (result.payload.shots[])
+  - ultimate-config.json (direct scenes[])
 
 Examples:
   node scripts/render-ultimate-scene.mjs --config projects/gpt55-final-cut/steps/step-04.json --out out/gpt55-v23.mp4
@@ -53,9 +53,7 @@ if (hasFlag('--help') || hasFlag('-h')) {
 }
 
 const configArg = readFlag('--config');
-const outlineArg = readFlag('--outline');
-
-if (!configArg && !outlineArg) {
+if (!configArg) {
   printUsage();
   process.exit(1);
 }
@@ -70,31 +68,6 @@ import {
   calcTotalFrames,
   hydrateUltimateProjectConfigWithDirectorGrammar,
 } from '../src/data/storyboardLoader.node.ts';
-
-if (outlineArg) {
-  // Legacy outline format — read directly, no transformation
-  const resolvedOutlinePath = path.resolve(process.cwd(), outlineArg);
-  if (!fs.existsSync(resolvedOutlinePath)) {
-    console.error(`Outline file not found: ${resolvedOutlinePath}`);
-    process.exit(1);
-  }
-  const outline = JSON.parse(fs.readFileSync(resolvedOutlinePath, 'utf8'));
-  // Legacy path: compile + render with outline flag
-  console.log('[render] Legacy outline mode — falling back to direct Ultimate config');
-  const remotionArgs = [
-    'npx', 'remotion', 'render',
-    'src/Root.tsx',
-    'UltimateSceneTemplate',
-    '--props', JSON.stringify({outline}),
-    ...(readFlag('--out') ? [readFlag('--out')] : ['out/ultimate-outline-demo.mp4']),
-  ];
-  if (hasFlag('--dry-run')) {
-    console.log(`Command: ${remotionArgs.join(' ')}`);
-    process.exit(0);
-  }
-  const result = spawnSync('npx', remotionArgs.slice(1), {stdio: 'inherit', cwd: process.cwd()});
-  process.exit(result.status ?? 1);
-}
 
 // Config mode
 const resolvedInputPath = path.resolve(process.cwd(), configArg);

@@ -47,7 +47,7 @@ export interface RenderOptions {
 
 // ── 提交渲染任务 ──
 export async function submitRender(opts: RenderOptions): Promise<{ jobId: string }> {
-  const { design, template = 'caption', quality = 'high' } = opts;
+  const { design, template = 'ultimate', quality = 'high' } = opts;
 
   // 提取配音数据
   const voiceTrack = design.tracks.find((t) => t.type === 'voiceover');
