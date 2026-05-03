@@ -131,6 +131,7 @@ interface ShotItem {
   id: string;
   /** step-04: family; workflow: sceneFamily */
   family?: string;
+  /** step-04 output uses 'family'; workflow step-03 output uses 'sceneFamily'. Normalized to 'family'. */
   sceneFamily?: string;
   frames?: number;
   durationSeconds?: number;
@@ -416,6 +417,7 @@ function mergeItems(shot: AnyJson): NormalizedShotItem[] {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeShot(shot: AnyJson, fps: number): NormalizedShot {
+  // 'family' from step-04 output, 'sceneFamily' from workflow step-03 output
   const family = shot.family ?? shot.sceneFamily ?? 'hero';
   const visualProps = shot.visual?.props ?? {};
 

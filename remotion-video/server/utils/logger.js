@@ -13,7 +13,8 @@ function normalizeLogLevel(value) {
 }
 
 function shouldLog(level) {
-  const threshold = LEVEL_WEIGHT[normalizeLogLevel(process.env.LOG_LEVEL)];
+  // TODO: Deprecate LOG_LEVEL in favor of PIPELINE_LOG_LEVEL
+  const threshold = LEVEL_WEIGHT[normalizeLogLevel(process.env.PIPELINE_LOG_LEVEL || process.env.LOG_LEVEL)];
   return LEVEL_WEIGHT[level] >= threshold;
 }
 

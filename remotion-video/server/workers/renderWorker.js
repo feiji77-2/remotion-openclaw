@@ -175,7 +175,7 @@ function resolveRemotionLaunch(cwd) {
 
 // ─── Stage 1: 配音合成 ─────────────────────────────────
 async function stageVoiceSynthesis(job, update, sharedDesignData) {
-  update(5, '🎤 合成语音...');
+  update(5, '合成语音...');
   const { projectId = 'default' } = job.data;
   const designRenderData = sharedDesignData;
   const renderFps = getPositiveInt(job.data.renderFps) ?? getPositiveInt(designRenderData.renderFps) ?? 30;
@@ -273,7 +273,7 @@ async function stageVoiceSynthesis(job, update, sharedDesignData) {
 
 // ─── Stage 2: 字幕生成 ─────────────────────────────────
 async function stageSubtitleGeneration(job, voiceFile, generatedSubtitleData, syncedShots, update, sharedDesignData) {
-  update(25, '📝 生成字幕...');
+  update(25, '生成字幕...');
   const { projectId = 'default' } = job.data;
   const designRenderData = sharedDesignData;
 
@@ -363,7 +363,7 @@ async function stageSubtitleGeneration(job, voiceFile, generatedSubtitleData, sy
 
 // ─── Stage 3: Remotion 真实渲染 ────────────────────────
 async function stageRemotionRender(job, files, update, sharedDesignData) {
-  update(40, '🎬 开始 Remotion 渲染...');
+  update(40, '开始 Remotion 渲染...');
   const designRenderData = sharedDesignData;
   const {
     template = 'ultimate',
@@ -483,7 +483,7 @@ async function stageRemotionRender(job, files, update, sharedDesignData) {
     command: launch.displayCommand,
     frameRange: resolvedFrameRange ?? null,
   });
-  update(45, '🎬 Remotion 渲染中（请稍候）...');
+  update(45, 'Remotion 渲染中（请稍候）...');
 
   let stdout = '';
   let stderr = '';
@@ -527,7 +527,7 @@ async function stageRemotionRender(job, files, update, sharedDesignData) {
         const pctMatch = line.match(/(\d+)%/);
         if (pctMatch) {
           const pct = 45 + Math.round(parseInt(pctMatch[1]) * 0.5);
-          update(Math.min(pct, 94), `🎬 渲染中 ${pctMatch[1]}%`);
+          update(Math.min(pct, 94), `渲染中 ${pctMatch[1]}%`);
         }
 
         // 渲染完成
@@ -603,7 +603,7 @@ async function stageRemotionRender(job, files, update, sharedDesignData) {
 
 // ─── Stage 4: Webhook ───────────────────────────────────
 async function stageWebhook(job, result, update) {
-  update(98, '📡 发送回调...');
+  update(98, '发送回调...');
   const { webhook } = job.data;
   if (!webhook) {
     update(100, '✅ 全部完成');
@@ -1452,7 +1452,7 @@ async function synthesizeShotAudioSegments({
 
       update(
         Math.min(18, 8 + Math.round(((index + 1) / validShots.length) * 10)),
-        `🎤 分镜配音 ${index + 1}/${validShots.length}: ${shot.title || shot.id}`,
+        `分镜配音 ${index + 1}/${validShots.length}: ${shot.title || shot.id}`,
       );
 
       return synthesizeQwenTtsToFile({
