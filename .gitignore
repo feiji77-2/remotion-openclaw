@@ -38,6 +38,9 @@ remotion-video/scripts/public/
 !remotion-video/public/runtime/.gitkeep
 !remotion-video/public/voice/.gitkeep
 
+# Worktrees
+.worktrees/
+
 # Python
 __pycache__/
 *.pyc
