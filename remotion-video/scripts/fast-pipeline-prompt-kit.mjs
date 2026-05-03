@@ -29,6 +29,18 @@ export const TITLE_TECHNIQUES = `爆款标题手法（至少用一种）：
 5. 疑问法 — 抛出观众最想问的问题（如"GPT-5.5到底强在哪？"）
 6. 对话法 — 口语化制造对话感（如"凭什么卖这么贵？看完我沉默了"）
 
+爆款标题公式（科技AI类主攻）：
+- [具体数字/事件] + [核心变化] + [悬念/价值]
+  → 例：1/89的价格，100万token上下文，DeepSeek V4怎么做到的
+- [身份] + [反差行为/结果]
+  → 例：程序员开始用DeepSeek V4抢产品经理的活了
+- [否定/颠覆] + [常识] + [新结论]
+  → 例：别再说开源模型不如闭源了，DeepSeek V4把GPT拉下神坛
+- [时间/事件] + [悬念] + [具体动作]
+  → 例：DeepSeek V4发布后，第一批用的团队都在用它做这件事
+- [极端数据] + [反差说明]
+  → 例：定价只有OpenAI的1/89，不是bug是架构创新
+
 每个标题必须：
 - 至少包含一种爆款手法
 - 有具体数据或场景（不能泛泛而谈）
@@ -99,6 +111,13 @@ export function validateStep1Payload(payload) {
   };
 }
 
+// ─── Script Length (spoken at 1.2x speed) ──────────────────────────────────────
+// Chinese speaking rate: ~200 chars/min normal, ~240 chars/min at 1.2x
+// 2-3 min video → 480-720 chars, 3-4 min → 720-960 chars
+export const TARGET_CHARS_MIN = 720;
+export const TARGET_CHARS_MAX = 1100;
+export const TARGET_PARAGRAPHS = '5-7';
+
 // ─── Step 2: Viral Title + Script ─────────────────────────────────────────────
 
 export function buildStep2Prompt(analysis) {
@@ -116,24 +135,46 @@ export function buildStep2Prompt(analysis) {
     '',
     DEAI_RULES,
     '',
-    '口播稿要求：',
-    '- 总字数 600-900 字',
-    '- 像真人当面讲重点，短句+硬信息',
-    '- 每段先给判断→再补事实→推进下一段',
-    '- 技术类主题必须有机制解释（HOW型），不能只说"很强"',
+    '口播稿硬规则：',
+    `1. 总字数 ${TARGET_CHARS_MIN}-${TARGET_CHARS_MAX} 字（语速1.2倍播放，对应${Math.round(TARGET_CHARS_MIN / 240)}-${Math.round(TARGET_CHARS_MAX / 240)}分钟），像真人当面讲重点，短句+硬信息`,
+    '',
+    '2. Hook（开场句）要求：',
+    '   - 必须包含具体数字 或 反常识信息（如"1/89价格"、"2.8倍速度"）',
+    '   - 制造"信息差"——说出观众不知道但瞬间感兴趣的事',
+    '   - 18-40字，1-2句，不准用"大家好""今天我们来""你知道吗"',
+    '',
+    '3. Body（正文段落）要求：',
+    `   - ${TARGET_PARAGRAPHS} 段，每段类型不能重复，按以下结构轮换：`,
+    '     A. 事实锤（fact-hammer）：用搜索事实中的具体数字做冲击',
+    '     B. 技术机制（tech-mechanism）：解释HOW，必须附带生活化类比',
+    '     C. 对比冲击（comparison）：新旧对比/竞品对比/成本对比',
+    '     D. 场景应用（scenario）：说清楚谁能用、怎么用、什么效果',
+    '     E. 数据延伸（data-extension）：从已有数字推导出更深层的结论或趋势',
+    '     F. 行业影响（industry-impact）：这件事对整个行业意味着什么',
+    '   - 每段结构：先给判断句（一句话结论）→ 再补具体事实 → 最后推进到下一段',
+    '   - 段与段之间必须有递进关系：后一段要么是前一段的"反转"要么是"深化"',
+    '   - 技术类主题必须有机制解释（HOW型）段，附生活化类比，不能只说"很强"',
+    '   - 每段至少埋一个具体数据点（来自搜索事实）',
+    '',
+    '4. CTA要求：',
+    '   - 必须是互动型，引导评论区讨论',
+    '   - 要结合视频内容做具体提问（如"你现在用XX模型跑什么任务？"），不能空泛',
+    '   - 不准用"感谢观看""点赞关注"这类通用CTA',
     '',
     '返回以下 JSON 结构：',
     JSON.stringify({
       title: '爆款标题（25字以内）',
       titleAngle: '标题角度：结论先行/问题追问/反差拆解/解释型',
       script: {
-        hook: '开场句（1-2句，抓注意力，18-40字）',
+        hook: '开场句（满足规则2，含数字或反常识）',
         body: [
-          { label: '段落1名称', text: '段落文案' },
-          { label: '段落2名称', text: '段落文案' },
-          { label: '段落3名称', text: '段落文案' },
+          { label: '段落1-事实锤', text: '段落文案' },
+          { label: '段落2-技术机制', text: '段落文案' },
+          { label: '段落3-对比冲击', text: '段落文案' },
+          { label: '段落4-场景应用', text: '段落文案' },
+          { label: '段落5-行业影响', text: '段落文案' },
         ],
-        cta: '结尾号召/互动',
+        cta: '互动型CTA（结合内容做具体提问）',
       },
     }, null, 2),
   ].join('\n');
@@ -178,7 +219,7 @@ export function buildStep3Prompt(title, script) {
     `口播稿：\nHook: ${script.hook}\n${bodyTextSummary}\nCTA: ${script.cta}`,
     '',
     '分镜原则：',
-    '- 将口播稿按叙事动作拆成 6-10 个场景',
+    '- 将口播稿按叙事动作拆成 8-14 个场景',
     '- 每个场景绑定到具体口播原句',
     '- 一段正文如果同时包含机制、数据、对比，可拆成多个场景',
     '- 每个场景的 visualPrompt 必须是16:9横版，适合 AI 绘图',

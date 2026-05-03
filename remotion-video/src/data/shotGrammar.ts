@@ -24,6 +24,38 @@
 
 import type {CameraMotionPreset} from './registry';
 
+// ─── DirectorBeatOutput — JSON-serializable form for skill output ─────────────
+
+/**
+ * JSON-serializable DirectorBeat for skill/Step 4 output.
+ * All enum-like values are plain strings (not union literals) for JSON compatibility.
+ * Linked to shots via beatId.
+ */
+export interface DirectorBeatOutput {
+  id: string;
+  /** beatId links this beat to a shot.id — one beat per shot is typical but not required */
+  beatId: string;
+  /** Narrative subject: who or what is the focus of this paragraph */
+  subject: string;
+  /** Action: reveal / compare / overtake / compress / burst / follow / hold */
+  action: string;
+  /** Conflict/suspense: what tension this beat builds */
+  tension: string;
+  /** What to reveal at the end of this beat */
+  revelation: string;
+  memoryObject: {
+    type: string;       // MemoryObjectType as plain string: 'line'|'block'|'word'|'node'|'beam'|'card'|'ring'|'axis'
+    role: string;       // Role description in the frame
+    enterFrame: number;
+    color: string;      // hex color
+  };
+  cameraIntent: string; // CameraIntent as plain string: 'pin'|'compress'|'chase'|'drift'|'confront'|'linger'|'reveal'|'none'
+  dataEvent: string;    // DataEventVerb as plain string: 'count-up'|'delta-hit'|'overtake'|'threshold-cross'|'burst-spread'|'trace-flow'|'pin'|'settle'|'flash'|'none'
+  archetype: string;    // ShotArchetype as plain string: 'lock-on reveal'|'pressure countdown'|...
+  suggestedEnterFrames: number;
+  suggestedEmphasisFrames: number;
+}
+
 // ─── ShotArchetype：镜头原型 ──────────────────────────────────────────────────
 
 export type ShotArchetype =
@@ -328,6 +360,10 @@ export interface ShotContext {
   storyboardCueZh?: string;
   /** script block 标签：来自分镜脚本的段落标注 */
   scriptBlockLabel?: string;
+  /** This shot's beatId — used to look up the corresponding DirectorBeat in directorBeats */
+  beatId?: string;
+  /** Top-level DirectorBeat array from Step 4 output — matched by beatId */
+  directorBeats?: DirectorBeatOutput[];
 }
 
 const NUMERIC_DATA_FAMILIES = new Set([
@@ -362,6 +398,7 @@ export interface ResolvedShotGrammar {
  * 这是 storyboardLoader → UltimateSceneTemplate 之间的"翻译层"。
  *
  * 规则（v2 — 语义优先于 family）：
+ * 0. DirectorBeat：若 ctx.directorBeats 中有匹配 beatId 的 beat，直接使用
  * 1. storyboardCueZh / sceneIntent 优先：动作词直接决定 archetype/dataEvent
  * 2. level 其次：opening/closing 有专属 archetype
  * 3. type 辅助：补充 family 无法覆盖的细粒度
@@ -369,6 +406,14 @@ export interface ResolvedShotGrammar {
  * 5. ShotArchetypeMeta 决定 enterFrames / emphasisFrames / staggerGap
  */
 export function resolveShotGrammar(ctx: ShotContext): ResolvedShotGrammar {
+  // ── 优先级 0：DirectorBeat lookup via beatId（最高优先级）─────────────
+  if (ctx.directorBeats && ctx.directorBeats.length > 0 && ctx.beatId) {
+    const beat = ctx.directorBeats.find((b) => b.beatId === ctx.beatId);
+    if (beat?.archetype) {
+      return resolveFromDirectorBeat(beat, ctx);
+    }
+  }
+
   const multiNucleusFamilyArchetype = resolveMultiNucleusFamilyArchetype(ctx.family);
   if (multiNucleusFamilyArchetype) {
     return buildFromArchetype(
@@ -379,22 +424,24 @@ export function resolveShotGrammar(ctx: ShotContext): ResolvedShotGrammar {
   }
 
   // ── 优先级 1：中文 storyboard cue → 直接映射到 archetype ──────────────
-  const cue = ctx.storyboardCueZh ?? '';
-  const INTENT_CUE_MAP: Array<{keywords: string[]; archetype: ShotArchetype; dataEvent: DataEventVerb}> = [
-    {keywords: ['追', '超', '赶', '赛', '赢', '领先'], archetype: 'overtake race', dataEvent: 'overtake'},
-    {keywords: ['爆发', '炸', '爆', '扩散', '展开'], archetype: 'burst spread', dataEvent: 'burst-spread'},
-    {keywords: ['揭示', '出现', '曝光', '曝光'], archetype: 'lock-on reveal', dataEvent: 'pin'},
-    {keywords: ['对比', '压缩', '碰撞', '对峙'], archetype: 'compress compare', dataEvent: 'delta-hit'},
-    {keywords: ['追踪', '追随', '跟随', '流动', '流'], archetype: 'follow focus', dataEvent: 'trace-flow'},
-    {keywords: ['穿透', '突破', '越线', '穿过'], archetype: 'threshold breach', dataEvent: 'threshold-cross'},
-    {keywords: ['子弹', '高速', '连续', '轰', '一连串'], archetype: 'bullet train', dataEvent: 'count-up'},
-    {keywords: ['钉', '定', '按'], archetype: 'evidence pin', dataEvent: 'pin'},
-    {keywords: ['漂', '浮', '慢慢'], archetype: 'drift reveal', dataEvent: 'trace-flow'},
-    {keywords: ['停留', '凝固', '定格', '后'], archetype: 'aftershock hold', dataEvent: 'settle'},
-  ];
+  // Intent cue map — keyword triggers for Chinese storyboard cues
+// Defined at module level to avoid recreating on every resolveShotGrammar call
+const INTENT_CUE_MAP = [
+  {keywords: ['追', '超', '赶', '赛', '赢', '领先'], archetype: 'overtake race', dataEvent: 'overtake'},
+  {keywords: ['爆发', '炸', '爆', '扩散', '展开'], archetype: 'burst spread', dataEvent: 'burst-spread'},
+  {keywords: ['揭示', '出现', '曝光', '曝光'], archetype: 'lock-on reveal', dataEvent: 'pin'},
+  {keywords: ['对比', '压缩', '碰撞', '对峙'], archetype: 'compress compare', dataEvent: 'delta-hit'},
+  {keywords: ['追踪', '追随', '跟随', '流动', '流'], archetype: 'follow focus', dataEvent: 'trace-flow'},
+  {keywords: ['穿透', '突破', '越线', '穿过'], archetype: 'threshold breach', dataEvent: 'threshold-cross'},
+  {keywords: ['子弹', '高速', '连续', '轰', '一连串'], archetype: 'bullet train', dataEvent: 'count-up'},
+  {keywords: ['钉', '定', '按'], archetype: 'evidence pin', dataEvent: 'pin'},
+  {keywords: ['漂', '浮', '慢慢'], archetype: 'drift reveal', dataEvent: 'trace-flow'},
+  {keywords: ['停留', '凝固', '定格', '后'], archetype: 'aftershock hold', dataEvent: 'settle'},
+] as const;
 
   for (const entry of INTENT_CUE_MAP) {
-    if (entry.keywords.some((kw) => cue.includes(kw))) {
+    const cueText = ctx.storyboardCueZh || '';
+    if (cueText && entry.keywords.some((kw) => cueText.includes(kw))) {
       const meta = SHOT_ARCHETYPE_REGISTRY[entry.archetype];
       const memoryObject = deriveMemoryObject(entry.archetype, ctx.shotIndex, entry.dataEvent);
       const enterFrames = normalizeEnterFrames(meta.enterFramesRange[0]);
@@ -407,7 +454,7 @@ export function resolveShotGrammar(ctx: ShotContext): ResolvedShotGrammar {
         emphasisFrames,
         staggerGap: meta.typicalStaggerGap,
         memoryObject,
-        directorNote: `[cue命中] ${cue} → ${entry.archetype} | ${entry.dataEvent} | mem:${memoryObject.type}`,
+        directorNote: `[cue命中] ${cueText} → ${entry.archetype} | ${entry.dataEvent} | mem:${memoryObject.type}`,
       };
     }
   }
@@ -552,7 +599,6 @@ function buildFromArchetype(
   };
 }
 
-// 兜底：纯 family fallback
 function resolveFromFamilyFallback(ctx: ShotContext): ResolvedShotGrammar {
   const FAMILY_ARCHETYPE_MAP: Record<string, ShotArchetype> = {
     'benchmark-chart': 'overtake race',
@@ -603,6 +649,36 @@ function resolveFromFamilyFallback(ctx: ShotContext): ResolvedShotGrammar {
 
   const archetype = FAMILY_ARCHETYPE_MAP[ctx.family] ?? 'drift reveal';
   return buildFromArchetype(archetype, ctx, dataEvent);
+}
+
+export function resolveFromDirectorBeat(
+  beat: DirectorBeatOutput,
+  _ctx: ShotContext,
+): ResolvedShotGrammar {
+  const archetype = beat.archetype as ShotArchetype;
+  const cameraIntent = (beat.cameraIntent || 'none') as CameraIntent;
+  const dataEvent = (beat.dataEvent || 'none') as DataEventVerb;
+
+  const meta = SHOT_ARCHETYPE_REGISTRY[archetype];
+  const suggestedEnter = beat.suggestedEnterFrames ?? meta?.enterFramesRange[0] ?? 16;
+  const suggestedEmphasis = beat.suggestedEmphasisFrames ?? meta?.emphasisFramesRange[0] ?? 48;
+  const staggerGap = meta?.typicalStaggerGap ?? 0;
+
+  return {
+    archetype,
+    cameraIntent,
+    dataEvent,
+    enterFrames: normalizeEnterFrames(suggestedEnter),
+    emphasisFrames: suggestedEmphasis,
+    staggerGap,
+    memoryObject: {
+      type: (beat.memoryObject?.type as MemoryObjectType) ?? 'word',
+      role: beat.memoryObject?.role ?? '导演指定记忆物',
+      enterFrame: beat.memoryObject?.enterFrame ?? 12,
+      color: beat.memoryObject?.color ?? '#00d4ff',
+    },
+    directorNote: `[directorBeat] ${beat.action} | ${beat.subject} | ${beat.tension} → ${archetype}`,
+  };
 }
 
 function deriveMemoryObject(

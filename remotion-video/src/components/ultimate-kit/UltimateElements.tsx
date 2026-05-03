@@ -26,3 +26,10 @@ export {UltimateSubtitleBar} from './families/UltimateSubtitleBar';
 export {UltimateTagMatrix} from './families/UltimateTagMatrix';
 export {UltimateTerminalPanel} from './families/UltimateTerminalPanel';
 export {UltimateTimeline} from './families/UltimateTimeline';
+// ── Minimal (抖音风格) ──────────────────────────────────────
+export {MinimalHero} from './families/MinimalHero';
+export {MinimalStepFlow} from './families/MinimalStepFlow';
+export {MinimalTagMatrix} from './families/MinimalTagMatrix';
+export {MinimalNumberStrip} from './families/MinimalNumberStrip';
+export {MinimalTimeline} from './families/MinimalTimeline';
+export {MinimalCompareBoard} from './families/MinimalCompareBoard';

@@ -45,7 +45,14 @@ export type UltimateSceneFamily =
   | 'benchmark-chart'
   | 'quote-highlight'
   | 'glossary-term'
-  | 'cta';
+  | 'cta'
+  // ── Minimal (抖音风格) ──────────────────
+  | 'minimal-hero'
+  | 'minimal-step-flow'
+  | 'minimal-tag-matrix'
+  | 'minimal-number-strip'
+  | 'minimal-timeline'
+  | 'minimal-compare-board';
 
 export type UltimateTransitionPreset =
   | 'fade'
@@ -538,6 +545,13 @@ const sceneBaseDurations: Record<UltimateSceneFamily, {base: number; max: number
   'quote-highlight': {base: 68, max: 144},
   'glossary-term': {base: 74, max: 156},
   cta: {base: 72, max: 150},
+  // ── Minimal (抖音风格) ──────────────────
+  'minimal-hero': {base: 90, max: 180},
+  'minimal-step-flow': {base: 120, max: 300},
+  'minimal-tag-matrix': {base: 100, max: 240},
+  'minimal-number-strip': {base: 90, max: 180},
+  'minimal-timeline': {base: 120, max: 300},
+  'minimal-compare-board': {base: 100, max: 240},
 };
 
 export const deriveUltimateSceneSubtitle = (scene: UltimateSceneConfig) => {

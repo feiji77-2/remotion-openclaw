@@ -1283,12 +1283,25 @@ async function generateStep123Workflow(input) {
         };
       }
 
-      const enriched = enrichStepResult(
-        stepId,
-        normalizeStep2Payload(strategyStage.payload, titlesStage.payload, enrichedInput),
-        enrichedInput,
-        skillSpec,
-      );
+      let normalizedPayload;
+      try {
+        normalizedPayload = normalizeStep2Payload(strategyStage.payload, titlesStage.payload, enrichedInput);
+      } catch (normalizeErr) {
+        console.error(`[Step2] normalizeStep2Payload FAILED: ${normalizeErr.message}`);
+        console.error(`[Step2]   strategyStage.payload has strategies: ${Array.isArray(strategyStage.payload?.strategies)}`);
+        console.error(`[Step2]   titlesStage.payload has titles: ${!!(titlesStage.payload?.titles)}`);
+        console.error(`[Step2]   titlesStage.payload.titles options: ${Array.isArray(titlesStage.payload?.titles?.options)}`);
+        throw normalizeErr;
+      }
+      let enriched;
+      try {
+        enriched = enrichStepResult(stepId, normalizedPayload, enrichedInput, skillSpec);
+      } catch (enrichErr) {
+        console.error(`[Step2] enrichStepResult FAILED: ${enrichErr.message}`);
+        console.error(`[Step2]   normalizedPayload keys: ${Object.keys(normalizedPayload || {})}`);
+        console.error(`[Step2]   normalizedPayload.titles options: ${Array.isArray(normalizedPayload?.titles?.options)}`);
+        throw enrichErr;
+      }
 
       const step2Model = titlesStage.model || strategyStage.model || '';
       const isLlmSource = step2Model.length > 0 &&

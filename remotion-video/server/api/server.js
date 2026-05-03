@@ -9,6 +9,7 @@ const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const {
   buildCorsOptions,
   createApiAuthMiddleware,
@@ -24,7 +25,6 @@ const {
   normalizeRenderRequest,
   normalizeVoiceRequest,
   normalizeWorkflowRequest,
-  normalizeImageRequest,
   normalizeProjectSlugParam,
 } = require('../validators/requestValidators');
 const {createLogger} = require('../utils/logger');
@@ -57,6 +57,7 @@ const {
   IMAGE_JOBS_DIR,
   ensureRuntimePaths,
 } = require('../config/runtimePaths');
+const { runImageGenerationJob, readImageJob, normalizeImageRequest, createImageJob, runInlineImageGeneration, getImageJobPath } = require('./imageJob');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -178,14 +179,19 @@ function guessRenderOutputFile(jobData, jobId) {
     return null;
   }
 
-  for (const ext of ['mp4', 'webm', 'gif']) {
-    const candidate = path.join(outputDir, `${jobId}.${ext}`);
-    if (fs.existsSync(candidate)) {
-      return candidate;
+  let matchedFile = null;
+  try {
+    const files = fs.readdirSync(outputDir);
+    for (const ext of ['mp4', 'webm', 'gif']) {
+      const candidate = path.join(outputDir, `${jobId}.${ext}`);
+      if (files.includes(`${jobId}.${ext}`)) {
+        return candidate;
+      }
     }
+    matchedFile = files.find((file) => file.startsWith(`${jobId}.`));
+  } catch {
+    return null;
   }
-
-  const matchedFile = fs.readdirSync(outputDir).find((file) => file.startsWith(`${jobId}.`));
   return matchedFile ? path.join(outputDir, matchedFile) : null;
 }
 
@@ -220,10 +226,14 @@ function normalizeRenderArtifacts(rawResult, jobData, jobId) {
 
   let outputBytes = null;
   let outputSizeLabel = null;
-  if (localOutputFile && fs.existsSync(localOutputFile)) {
-    const stats = fs.statSync(localOutputFile);
-    outputBytes = stats.size;
-    outputSizeLabel = formatFileSize(stats.size);
+  if (localOutputFile) {
+    try {
+      const stats = fs.statSync(localOutputFile);
+      outputBytes = stats.size;
+      outputSizeLabel = formatFileSize(stats.size);
+    } catch {
+      // file may have been deleted between check and stat
+    }
   }
 
   return {
@@ -364,7 +374,7 @@ app.post('/api/render', async (req, res) => {
       projectId: jobPayload.projectId,
       template: jobPayload.template,
     });
-    res.json({
+    return res.json({
       jobId,
       status: 'pending',
       message: '渲染任务已提交，请使用 GET /api/render/:jobId 查询进度',
@@ -375,7 +385,7 @@ app.post('/api/render', async (req, res) => {
     });
   } catch (err) {
     logRouteError('POST /api/render', err);
-    res.status(err.status || 500).json({ error: err.message });
+    return res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -391,10 +401,10 @@ app.get('/api/render/:jobId', async (req, res) => {
       return res.json(response);
     }
 
-    res.status(404).json({ error: '任务不存在', jobId });
+    return res.status(404).json({ error: '任务不存在', jobId });
   } catch (err) {
     logRouteError('GET /api/render/:jobId', err, {jobId: req.params.jobId});
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -418,13 +428,17 @@ app.get('/api/render/:jobId/download', async (req, res) => {
     const renderArtifacts = normalizeRenderArtifacts(rawResult, rawJob.data, jobId);
     const localOutputFile = toLocalPublicFile(renderArtifacts.outputFile);
 
-    if (!localOutputFile || !fs.existsSync(localOutputFile) || !isInsideDir(localOutputFile, OUTPUT_ASSETS_DIR)) {
+    if (!localOutputFile || !isInsideDir(localOutputFile, OUTPUT_ASSETS_DIR)) {
       return res.status(404).json({ error: '渲染产物尚未生成', jobId });
     }
 
     const downloadName = renderArtifacts.outputFileName || path.basename(localOutputFile);
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(downloadName)}"`);
-    return res.sendFile(localOutputFile, { dotfiles: 'allow' });
+    try {
+      return res.sendFile(localOutputFile, { dotfiles: 'allow' });
+    } catch {
+      return res.status(404).json({ error: '渲染产物尚未生成', jobId });
+    }
   } catch (err) {
     logRouteError('GET /api/render/:jobId/download', err, {jobId: req.params.jobId});
     return res.status(500).json({ error: err.message });
@@ -467,10 +481,10 @@ app.delete('/api/render/:jobId', requireAdminAuth, adminWriteRateLimitMiddleware
       jobId,
       queueMode: 'file',
     });
-    res.json({ jobId, status: 'cancelled' });
+    return res.json({ jobId, status: 'cancelled' });
   } catch (err) {
     logRouteError('DELETE /api/render/:jobId', err, {jobId: req.params.jobId});
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -514,13 +528,13 @@ app.get('/api/render', requireAdminAuth, adminReadRateLimitMiddleware, async (re
       }));
     }
 
-    res.json({
+    return res.json({
       total: jobs.length,
       jobs: jobs.slice(normalizedOffset, normalizedOffset + normalizedLimit),
     });
   } catch (err) {
     logRouteError('GET /api/render', err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -542,10 +556,10 @@ app.post('/api/render/:jobId/retry', requireAdminAuth, adminWriteRateLimitMiddle
     if (!retryFileJob(jobId)) {
       return res.status(404).json({ error: '任务不存在' });
     }
-    res.json({ jobId, status: 'retry_scheduled' });
+    return res.json({ jobId, status: 'retry_scheduled' });
   } catch (err) {
     logRouteError('POST /api/render/:jobId/retry', err, {jobId: req.params.jobId});
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -553,13 +567,13 @@ app.post('/api/render/:jobId/retry', requireAdminAuth, adminWriteRateLimitMiddle
 
 app.get('/api/skills/catalog', (req, res) => {
   try {
-    res.json({
+    return res.json({
       skills: listSkillCatalog(),
       generatedAt: new Date().toISOString(),
     });
   } catch (err) {
     logRouteError('GET /api/skills/catalog', err);
-    res.status(500).json({
+    return res.status(500).json({
       code: 'SKILL_CATALOG_FAILED',
       error: err.message,
       details: null,
@@ -600,7 +614,7 @@ app.post('/api/workflow/generate', async (req, res) => {
       stepId: workflowInput.stepId,
     });
 
-    res.status(202).json({
+    return res.status(202).json({
       jobId: job.jobId,
       status: job.status,
       progress: job.progress,
@@ -611,7 +625,7 @@ app.post('/api/workflow/generate', async (req, res) => {
     });
   } catch (err) {
     logRouteError('POST /api/workflow/generate', err);
-    res.status(err.status || 500).json({
+    return res.status(err.status || 500).json({
       code: err.code || 'WORKFLOW_GENERATION_FAILED',
       error: err.message,
       details: err.details || null,
@@ -645,7 +659,7 @@ app.post('/api/voice', async (req, res) => {
       jobType: 'voice',
       projectId: jobPayload.projectId,
     });
-    res.json({
+    return res.json({
       jobId,
       status: 'pending',
       message: '语音任务已提交，请使用 GET /api/voice/:jobId 查询进度',
@@ -655,7 +669,7 @@ app.post('/api/voice', async (req, res) => {
     });
   } catch (err) {
     logRouteError('POST /api/voice', err);
-    res.status(err.status || 500).json({ error: err.message });
+    return res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -665,10 +679,10 @@ app.get('/api/voice/:jobId', async (req, res) => {
     if (!response) {
       return res.status(404).json({ error: '任务不存在', jobId: req.params.jobId });
     }
-    res.json(response);
+    return res.json(response);
   } catch (err) {
     logRouteError('GET /api/voice/:jobId', err, {jobId: req.params.jobId});
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -689,449 +703,20 @@ app.post('/api/voice/:jobId/retry', requireAdminAuth, adminWriteRateLimitMiddlew
     if (!retryFileJob(jobId)) {
       return res.status(404).json({ error: '任务不存在' });
     }
-    res.json({ jobId, status: 'retry_scheduled' });
+    return res.json({ jobId, status: 'retry_scheduled' });
   } catch (err) {
     logRouteError('POST /api/voice/:jobId/retry', err, {jobId: req.params.jobId});
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
-
-// ─── Storyboard Image API ─────────────────────────────────
-
-function sanitizeFileSegment(input, fallback) {
-  const value = String(input || fallback || 'item').trim();
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9-_]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '') || fallback;
-}
-
-function escapeXml(text) {
-  return String(text || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-function getImageJobPath(jobId) {
-  return path.join(IMAGE_JOBS_DIR, `${jobId}.json`);
-}
-
-function readImageJob(jobId) {
-  const jobPath = getImageJobPath(jobId);
-  if (!fs.existsSync(jobPath)) {
-    return null;
-  }
-  return JSON.parse(fs.readFileSync(jobPath, 'utf8'));
-}
-
-function writeImageJob(job) {
-  fs.mkdirSync(IMAGE_JOBS_DIR, {recursive: true});
-  fs.writeFileSync(getImageJobPath(job.jobId), JSON.stringify(job, null, 2));
-  return job;
-}
-
-function updateImageJob(jobId, updates) {
-  const job = readImageJob(jobId);
-  if (!job) {
-    return null;
-  }
-  const nextJob = {
-    ...job,
-    ...updates,
-  };
-  writeImageJob(nextJob);
-  return nextJob;
-}
-
-function createImageJob({ projectId, prompts, shots }) {
-  const byShotId = prompts?.byShotId && typeof prompts.byShotId === 'object'
-    ? prompts.byShotId
-    : (prompts && typeof prompts === 'object' ? prompts : {});
-  const shotIds = Object.keys(byShotId);
-  const jobId = `image_${Date.now()}_${uuidv4().slice(0, 8)}`;
-  const job = {
-    jobId,
-    id: jobId,
-    type: 'images',
-    status: 'pending',
-    progress: 0,
-    progressMsg: '等待生成分镜图',
-    createdAt: new Date().toISOString(),
-    startedAt: null,
-    completedAt: null,
-    error: null,
-    projectId,
-    total: shotIds.length,
-    completed: 0,
-    currentShotId: null,
-    currentShotTitle: null,
-    byShotStatus: shotIds.reduce((acc, shotId) => {
-      acc[shotId] = 'pending';
-      return acc;
-    }, {}),
-    images: [],
-    prompts,
-    shots: Array.isArray(shots) ? shots : [],
-  };
-  return writeImageJob(job);
-}
-
-function upsertImageEntry(imageList, image) {
-  const list = Array.isArray(imageList) ? imageList : [];
-  const targetShotId = image?.shotId;
-  if (!targetShotId) {
-    return list;
-  }
-  const next = list.filter((item) => item?.shotId !== targetShotId);
-  next.push(image);
-  return next;
-}
-
-function buildImageComparisonSummary(comparisons) {
-  if (!Array.isArray(comparisons) || comparisons.length === 0) {
-    return '';
-  }
-  const first = comparisons[0] || {};
-  if (!first.left && !first.right) {
-    return '';
-  }
-  return `对比关系：${String(first.left || '左侧方案').trim()} vs ${String(first.right || '右侧方案').trim()}`;
-}
-
-function resolveImageDisplayPayload(item, shotMeta, shotId) {
-  const title = String(item?.shotTitle || shotMeta?.title || shotId || '镜头').trim();
-  const summary = String(
-    item?.visualSummaryZh
-    || item?.promptZh
-    || item?.visual?.description
-    || shotMeta?.visual?.description
-    || shotMeta?.narration
-    || item?.prompt
-    || '围绕当前场景生成 16:9 横版视觉',
-  ).trim();
-  const focus = String(
-    item?.visualFocusZh
-    || item?.visualFocus
-    || item?.visual?.focus
-    || shotMeta?.visual?.focus
-    || '',
-  ).trim();
-  const dataHighlights = [
-    ...(Array.isArray(item?.dataHighlightsZh) ? item.dataHighlightsZh : []),
-    ...(Array.isArray(item?.dataPoints) ? item.dataPoints : []),
-  ].map((entry) => String(entry || '').trim()).filter(Boolean).slice(0, 3);
-  const comparison = String(item?.comparisonSummaryZh || buildImageComparisonSummary(item?.comparisons)).trim();
-
-  return {
-    title,
-    subtitle: focus || String(item?.mood || shotMeta?.level || '').trim(),
-    contentText: [
-      `画面内容：${summary}`,
-      focus ? `视觉重点：${focus}` : '',
-      dataHighlights.length > 0 ? `关键信息：${dataHighlights.join(' / ')}` : '',
-      comparison,
-    ].filter(Boolean).join('\n'),
-  };
-}
-
-function buildInlineFallbackImageSvg({ title, subtitle, contentText, shotId }) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080">
-<rect width="1920" height="1080" fill="#09070d"/>
-<rect x="96" y="72" width="1728" height="936" rx="36" fill="rgba(9,7,13,0.68)" stroke="#38bdf8" stroke-opacity="0.45"/>
-<text x="144" y="188" fill="#fff" font-size="58" font-weight="800" font-family="PingFang SC,Microsoft YaHei,Arial">${escapeXml(title || '场景')}</text>
-${subtitle ? `<text x="144" y="258" fill="#7dd3fc" font-size="30" font-weight="600" font-family="PingFang SC,Microsoft YaHei,Arial">${escapeXml(subtitle)}</text>` : ''}
-<foreignObject x="132" y="316" width="1656" height="548">
-<div xmlns="http://www.w3.org/1999/xhtml" style="color:#e0f2fe;font-size:30px;line-height:1.7;font-family:PingFang SC,Microsoft YaHei,Arial;white-space:pre-wrap;word-break:break-word;">${escapeXml(contentText || '等待场景内容')}</div>
-</foreignObject>
-<text x="144" y="944" fill="rgba(255,255,255,0.5)" font-size="24" font-family="PingFang SC,Microsoft YaHei,Arial">Scene ${escapeXml(shotId || '')}</text>
-</svg>`;
-}
-
-async function runInlineImageGeneration(jobId) {
-  const job = readImageJob(jobId);
-  if (!job) {
-    return;
-  }
-
-  const prompts = job.prompts?.byShotId && typeof job.prompts.byShotId === 'object'
-    ? job.prompts.byShotId
-    : (job.prompts && typeof job.prompts === 'object' ? job.prompts : {});
-  const shotMetaMap = Object.fromEntries(
-    (Array.isArray(job.shots) ? job.shots : [])
-      .filter((item) => item && item.id)
-      .map((item) => [item.id, item]),
-  );
-  const imageDir = path.join(ASSETS_DIR, job.projectId, 'images');
-  fs.mkdirSync(imageDir, { recursive: true });
-
-  let nextJob = updateImageJob(jobId, {
-    status: 'running',
-    startedAt: new Date().toISOString(),
-    progress: 2,
-    progressMsg: `开始生成，共 ${job.total} 张`,
-  });
-
-  const entries = Object.entries(prompts);
-  for (const [index, [shotId, item]] of entries.entries()) {
-    const display = resolveImageDisplayPayload(item, shotMetaMap[shotId], shotId);
-    const safeShotId = sanitizeFileSegment(shotId, `shot-${index + 1}`);
-    const fileName = `${safeShotId}.svg`;
-    const absPath = path.join(imageDir, fileName);
-    const publicPath = `/assets/${job.projectId}/images/${fileName}`;
-
-    nextJob = updateImageJob(jobId, {
-      currentShotId: shotId,
-      currentShotTitle: display.title,
-      progress: Math.max(4, Math.round((index / Math.max(1, job.total)) * 100)),
-      progressMsg: `正在生成 ${display.title || shotId}`,
-      byShotStatus: {
-        ...(nextJob?.byShotStatus || {}),
-        [shotId]: 'generating',
-      },
-    });
-
-    const svg = buildInlineFallbackImageSvg({
-      title: display.title,
-      subtitle: display.subtitle,
-      contentText: display.contentText,
-      shotId,
-    });
-    fs.writeFileSync(absPath, svg, 'utf8');
-
-    const image = { shotId, path: publicPath, format: 'svg', motif: 'fallback' };
-    nextJob = updateImageJob(jobId, {
-      completed: index + 1,
-      progress: Math.round(((index + 1) / Math.max(1, job.total)) * 100),
-      progressMsg: `已生成 ${index + 1}/${job.total}`,
-      images: upsertImageEntry(nextJob?.images, image),
-      byShotStatus: {
-        ...(nextJob?.byShotStatus || {}),
-        [shotId]: 'done',
-      },
-    });
-  }
-
-  updateImageJob(jobId, {
-    status: 'done',
-    completedAt: new Date().toISOString(),
-    progress: 100,
-    progressMsg: `分镜图生成完成，共 ${job.total} 张`,
-    currentShotId: null,
-    currentShotTitle: null,
-  });
-}
-
-async function runImageGenerationJob(jobId) {
-  const job = readImageJob(jobId);
-  if (!job) {
-    return;
-  }
-
-  const scriptPath = path.join(PROJECT_ROOT, 'scripts', 'generate-shot-images.mjs');
-  if (!fs.existsSync(scriptPath)) {
-    await runInlineImageGeneration(jobId);
-    return;
-  }
-
-  const { spawn } = require('child_process');
-  const tmpFile = path.join('/tmp', `img-gen-${job.projectId}-${Date.now()}.json`);
-  fs.writeFileSync(tmpFile, JSON.stringify({ prompts: job.prompts, shots: job.shots }), 'utf8');
-
-  updateImageJob(jobId, {
-    status: 'running',
-    startedAt: new Date().toISOString(),
-    progress: 2,
-    progressMsg: `开始生成，共 ${job.total} 张`,
-  });
-
-  const child = spawn('node', [scriptPath, job.projectId, tmpFile], {
-    cwd: PROJECT_ROOT,
-  });
-
-  let stdoutBuffer = '';
-  let stderr = '';
-  let finished = false;
-  let settled = false;
-
-  const handleEventLine = (line) => {
-    const raw = String(line || '').trim();
-    if (!raw) {
-      return;
-    }
-
-    let event;
-    try {
-      event = JSON.parse(raw);
-    } catch {
-      return;
-    }
-
-    const currentJob = readImageJob(jobId);
-    if (!currentJob) {
-      return;
-    }
-
-    if (event.type === 'start') {
-      updateImageJob(jobId, {
-        total: Number(event.total) || currentJob.total,
-        progress: 2,
-        progressMsg: `开始生成，共 ${Number(event.total) || currentJob.total} 张`,
-      });
-      return;
-    }
-
-    if (event.type === 'shot-start') {
-      updateImageJob(jobId, {
-        currentShotId: event.shotId || null,
-        currentShotTitle: event.shotTitle || null,
-        progress: Math.max(4, Math.round(((Math.max(0, Number(event.current) - 1)) / Math.max(1, Number(event.total) || currentJob.total)) * 100)),
-        progressMsg: `正在生成 ${event.shotTitle || event.shotId || '当前镜头'}`,
-        byShotStatus: {
-          ...(currentJob.byShotStatus || {}),
-          [event.shotId]: 'generating',
-        },
-      });
-      return;
-    }
-
-    if (event.type === 'progress') {
-      updateImageJob(jobId, {
-        completed: Number(event.current) || currentJob.completed,
-        currentShotId: event.shotId || null,
-        currentShotTitle: event.shotTitle || null,
-        progress: Math.round(((Number(event.current) || currentJob.completed || 0) / Math.max(1, Number(event.total) || currentJob.total)) * 100),
-        progressMsg: `已生成 ${Number(event.current) || currentJob.completed}/${Number(event.total) || currentJob.total}`,
-        images: upsertImageEntry(currentJob.images, event.image),
-        byShotStatus: {
-          ...(currentJob.byShotStatus || {}),
-          [event.shotId]: 'done',
-        },
-      });
-      return;
-    }
-
-    if (event.type === 'result') {
-      finished = true;
-      updateImageJob(jobId, {
-        status: 'done',
-        completedAt: new Date().toISOString(),
-        currentShotId: null,
-        currentShotTitle: null,
-        completed: Number(event.total) || currentJob.completed,
-        total: Number(event.total) || currentJob.total,
-        progress: 100,
-        progressMsg: `分镜图生成完成，共 ${Number(event.total) || currentJob.total} 张`,
-        images: Array.isArray(event.images) ? event.images : currentJob.images,
-      });
-    }
-  };
-
-  child.stdout.on('data', (chunk) => {
-    stdoutBuffer += chunk.toString();
-    const lines = stdoutBuffer.split('\n');
-    stdoutBuffer = lines.pop() || '';
-    lines.forEach(handleEventLine);
-  });
-
-  child.stderr.on('data', (chunk) => {
-    stderr += chunk.toString();
-  });
-
-  const timeout = setTimeout(() => {
-    child.kill('SIGTERM');
-  }, 30000);
-
-  child.on('close', async (code) => {
-    if (settled) {
-      return;
-    }
-    clearTimeout(timeout);
-    if (stdoutBuffer.trim()) {
-      handleEventLine(stdoutBuffer.trim());
-    }
-
-    try {
-      fs.unlinkSync(tmpFile);
-    } catch {
-      // ignore
-    }
-
-    if (finished) {
-      settled = true;
-      return;
-    }
-
-    if (code === 0) {
-      settled = true;
-      updateImageJob(jobId, {
-        status: 'done',
-        completedAt: new Date().toISOString(),
-        currentShotId: null,
-        currentShotTitle: null,
-        progress: 100,
-        progressMsg: `分镜图生成完成，共 ${readImageJob(jobId)?.completed || job.total} 张`,
-      });
-      return;
-    }
-
-    logger.warn('image-script-fallback', {
-      jobId,
-      reason: 'process-exit',
-      exitCode: code,
-      stderrSnippet: stderr.substring(0, 200),
-    });
-    try {
-      settled = true;
-      await runInlineImageGeneration(jobId);
-    } catch (error) {
-      updateImageJob(jobId, {
-        status: 'error',
-        completedAt: new Date().toISOString(),
-        error: error.message || stderr || `图片生成失败，退出码 ${code}`,
-        progressMsg: '分镜图生成失败',
-      });
-    }
-  });
-
-  child.on('error', async (error) => {
-    if (settled) {
-      return;
-    }
-    settled = true;
-    clearTimeout(timeout);
-    try {
-      fs.unlinkSync(tmpFile);
-    } catch {
-      // ignore
-    }
-
-    logger.warn('image-script-fallback', {
-      jobId,
-      reason: 'spawn-error',
-      error,
-    });
-    try {
-      await runInlineImageGeneration(jobId);
-    } catch (fallbackError) {
-      updateImageJob(jobId, {
-        status: 'error',
-        completedAt: new Date().toISOString(),
-        error: fallbackError.message || error.message,
-        progressMsg: '分镜图生成失败',
-      });
-    }
-  });
-}
 
 app.post('/api/images/generate', async (req, res) => {
   try {
     const {projectId, prompts, shots} = normalizeImageRequest(req.body);
     const job = createImageJob({ projectId, prompts, shots });
-    void runImageGenerationJob(job.jobId);
+    runImageGenerationJob(job.jobId).catch(err => {
+      logger.error('image-generation-failed', { jobId: job.jobId, error: err.message });
+    });
     logger.info('job-queued', {
       route: 'POST /api/images/generate',
       jobId: job.jobId,
@@ -1140,7 +725,7 @@ app.post('/api/images/generate', async (req, res) => {
       shotCount: Array.isArray(shots) ? shots.length : 0,
     });
 
-    res.json({
+    return res.json({
       jobId: job.jobId,
       status: job.status,
       progress: job.progress,
@@ -1153,7 +738,7 @@ app.post('/api/images/generate', async (req, res) => {
     });
   } catch (err) {
     logRouteError('POST /api/images/generate', err);
-    res.status(err.status || 500).json({ error: err.message });
+    return res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -1213,13 +798,13 @@ app.get('/api/jobs', requireAdminAuth, adminReadRateLimitMiddleware, async (req,
       }))
       .slice(0, normalizedLimit);
 
-    res.json({
+    return res.json({
       total: jobs.length,
       jobs,
     });
   } catch (err) {
     logRouteError('GET /api/jobs', err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -1236,7 +821,7 @@ app.get('/api/projects', requireAdminAuth, adminReadRateLimitMiddleware, (req, r
   const projects = fs.readdirSync(projectsDir).filter(
     f => fs.statSync(path.join(projectsDir, f)).isDirectory()
   );
-  res.json({ projects });
+  return res.json({ projects });
 });
 
 /**
@@ -1264,12 +849,12 @@ app.get('/api/projects/:project/assets', requireAdminAuth, adminReadRateLimitMid
     });
   };
 
-  res.json({ assets: walk(assetDir) });
+  return res.json({ assets: walk(assetDir) });
 });
 
 // ─── Health ────────────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.json({
+  return res.json({
     status: 'ok',
     mode: QUEUE_MODE,
     uptime: process.uptime(),
@@ -1299,7 +884,7 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.json({
+  return res.json({
     name: 'OpenClaw Video Pipeline API',
     version: '1.0.0',
     endpoints: [

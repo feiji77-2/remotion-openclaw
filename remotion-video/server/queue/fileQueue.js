@@ -17,6 +17,10 @@ const DEFAULT_POLL_INTERVAL_MS = 1000;
 const MAX_POLL_INTERVAL_MS = 5000;
 const IDLE_BACKOFF_FACTOR = 1.5;
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 30000;
+const MAX_RETRIES = 3;
+
+// CRUD operations use sync I/O (readFileSync/writeFileSync) which is atomic
+// in Node.js single-threaded event loop — no file locking needed.
 
 function sortJobsByCreatedAt(jobs, direction = 'desc') {
   const multiplier = direction === 'asc' ? 1 : -1;
@@ -46,11 +50,11 @@ function addJob(jobType, data) {
     progressMsg: '等待执行',
     result: null,
     error: null,
+    retryCount: 0,
     createdAt: new Date().toISOString(),
     startedAt: null,
     completedAt: null,
   };
-
   fs.writeFileSync(getJobPath(jobId), JSON.stringify(job, null, 2));
   logger.info('job-enqueued', {jobId, jobType});
   return jobId;
@@ -114,6 +118,11 @@ function retryJob(jobId) {
   if (!job) {
     return false;
   }
+  const currentRetries = job.retryCount || 0;
+  if (currentRetries >= MAX_RETRIES) {
+    return false;
+  }
+  job.retryCount = currentRetries + 1;
   job.status = 'pending';
   job.progress = 0;
   job.progressMsg = '等待重试';
@@ -331,6 +340,7 @@ module.exports = {
   DEFAULT_POLL_INTERVAL_MS,
   DEFAULT_SHUTDOWN_TIMEOUT_MS,
   MAX_POLL_INTERVAL_MS,
+  MAX_RETRIES,
   resolveNextIdlePollDelay,
   sortJobsByCreatedAt,
   addJob,

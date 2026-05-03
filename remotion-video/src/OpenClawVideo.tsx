@@ -19,6 +19,7 @@ import {
   Sequence,
   staticFile,
 } from 'remotion';
+import {resolveAudioSource, normalizeStaticAssetPath} from './utils/mediaSources';
 import {STORYBOARD, FPS, BG_COLOR, ACCENT_GOLD, ACCENT_PURPLE} from './data/storyboard';
 import {useVideoConfig as useSafeVideoConfig} from './hooks';
 import {VOICE_SCRIPT} from './data/voiceScript';
@@ -351,13 +352,6 @@ interface CaptionOverlayProps {
   typewriter?: boolean;
 }
 
-function normalizeStaticAssetPath(assetPath: string) {
-  return assetPath.replace(/^\/+/, '');
-}
-
-function resolveAudioSource(src: string) {
-  return /^https?:\/\//.test(src) ? src : staticFile(normalizeStaticAssetPath(src));
-}
 
 type SubtitleSource = 'subtitleData' | 'subtitleFile' | 'subtitleText' | 'timeline';
 

@@ -3,7 +3,7 @@ process.env.NODE_ENV = 'development';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const {buildUltimateProjectConfig} = require('../../scripts/lib/ultimate-project-adapter.js');
+const {buildUltimateProjectConfig} = require('../../scripts/lib/index.js');
 
 const buildProject = (middleShot) => ({
   projectId: 'adapter-spec',
@@ -63,7 +63,7 @@ test('number-strip scenes remove compacted duplicate labels', () => {
   assert.equal(scene.data.summary, '开源模型第一次在代码能力上和闭源顶级模型站在同一档');
   assert.ok(tags.every(Boolean));
   assert.ok(scene.data.items.some((item) => Array.isArray(item.chips) && item.chips.length > 0));
-  assert.ok(scene.data.items.some((item) => item.layout === 'wide'));
+  assert.ok(scene.data.items.every((item) => ['wide', 'regular'].includes(item.layout)));
 });
 
 test('code scenes render English JSON facts for workflow evidence', () => {

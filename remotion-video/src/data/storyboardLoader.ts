@@ -33,10 +33,12 @@ import {
 import {
   directorQA,
   resolveShotGrammar,
+  resolveFromDirectorBeat,
   type ShotArchetype,
   type CameraIntent,
   type DataEventVerb,
   type DirectorQAResult,
+  type DirectorBeatOutput,
   type ResolvedShotGrammar,
 } from './shotGrammar.ts';
 
@@ -212,6 +214,8 @@ export interface NormalizedShot {
     memoryObject?: {type?: string; role?: string; enterFrame?: number; color?: string};
     directorNote?: string;
   };
+  /** 指向对应的 DirectorBeat 的 ID（对应 directorBeats[].beatId） */
+  beatId?: string;
 }
 
 type StoryboardScene = Omit<UltimateProjectConfig['scenes'][number], 'data'> & {
@@ -231,6 +235,12 @@ type StoryboardScene = Omit<UltimateProjectConfig['scenes'][number], 'data'> & {
     directorNote: string;
   };
 };
+
+/** Step 4 输出（包含 shots 和可选的 directorBeats） */
+export interface Step4Payload {
+  shots: NormalizedShot[];
+  directorBeats?: DirectorBeatOutput[];
+}
 
 export type DirectorQAMode = 'off' | 'warn' | 'error';
 
@@ -372,6 +382,7 @@ export function normalizeShots(json: AnyJson, fps = DEFAULT_FPS): NormalizedShot
         dataPoints: shot.dataPoints,
         visualProps: (shot.visual?.props ?? {}) as ShotVisualProps,
         director: shot.director,
+        beatId: shot.beatId,
       };
     });
   }
@@ -432,6 +443,7 @@ function normalizeShot(shot: AnyJson, fps: number): NormalizedShot {
     dataPoints: shot.dataPoints,
     visualProps: visualProps as ShotVisualProps,
     director: shot.director,
+    beatId: shot.beatId,
   };
 }
 
@@ -456,7 +468,31 @@ export interface Step04Shot {
   dataPoints?: string[];
 }
 
-/** Parse from raw JSON string or object */
+/** Extract directorBeats[] from top-level JSON if present */
+export function extractDirectorBeats(json: AnyJson): DirectorBeatOutput[] | undefined {
+  if (!json) return undefined;
+  // directorBeats can be at top level or inside result.payload
+  const beats: AnyJson[] | undefined =
+    json.directorBeats ??
+    json.result?.payload?.directorBeats ??
+    json.payload?.directorBeats;
+  if (!Array.isArray(beats)) return undefined;
+  return beats as DirectorBeatOutput[];
+}
+
+/** Parse from raw JSON string or object — returns both shots and directorBeats */
+export function parseShotsWithDirectorBeats(
+  input: string | AnyJson,
+  fps = DEFAULT_FPS,
+): Step4Payload {
+  const json = typeof input === 'string' ? (JSON.parse(input) as AnyJson) : input;
+  return {
+    shots: normalizeShots(json, fps),
+    directorBeats: extractDirectorBeats(json),
+  };
+}
+
+/** Parse from raw JSON string or object — legacy, returns shots only */
 export function parseShots(
   input: string | Step04Json | WorkflowPayload,
   fps = DEFAULT_FPS,
@@ -598,13 +634,22 @@ export function hydrateUltimateProjectConfigWithDirectorGrammar(
 /** Convert NormalizedShot[] → UltimateProjectConfig.scenes */
 export function shotsToScenes(
   shots: NormalizedShot[],
-  options: {directorQA?: DirectorQAMode} = {},
+  options: {directorQA?: DirectorQAMode; directorBeats?: DirectorBeatOutput[]} = {},
 ): StoryboardScene[] {
+  // Build beatId → DirectorBeat lookup map
+  const beatMap = new Map<string, DirectorBeatOutput>();
+  if (options.directorBeats) {
+    for (const beat of options.directorBeats) {
+      beatMap.set(beat.beatId ?? beat.id, beat);
+    }
+  }
+
   const scenes = shots.map((shot, idx) => {
     // ── 导演层：shot grammar 推导 ─────────────────────────────────────────
     // 从 shot 数据里提取 numericFields，用于 DataEventVerb 选择
     const numericFields = extractNumericFields(shot);
 
+    // ── Priority 1: explicit director contract (backward compat) ──────────
     const grammar = shot.director?.archetype && shot.director?.cameraIntent && shot.director?.dataEvent
       ? {
           archetype: shot.director.archetype as ShotArchetype,
@@ -623,7 +668,27 @@ export function shotsToScenes(
           },
           directorNote: String(shot.director.directorNote || '').trim(),
         }
-      : resolveShotGrammar({
+      // ── Priority 2: DirectorBeat from Step 4 output ─────────────────────
+      : (() => {
+          const beat = shot.beatId ? beatMap.get(shot.beatId) : undefined;
+          return beat?.archetype
+            ? resolveFromDirectorBeat(beat, {
+                family: shot.family,
+                level: shot.level,
+                shotIndex: idx,
+                totalShots: shots.length,
+                numericFields,
+                sceneIntent: (shot.visualProps?.sceneIntent as string) ?? '',
+                storyboardCueZh: (shot.visualProps?.storyboardCueZh as string) ?? '',
+                scriptBlockLabel: (shot.visualProps?.scriptBlockLabel as string) ?? '',
+                type: (shot.visualProps?.type as string) ?? shot.family,
+                beatId: shot.beatId,
+                directorBeats: options.directorBeats,
+              })
+            : undefined;
+        })()
+      // ── Priority 3: semantic derivation (storyboardCueZh / sceneIntent / level / type / family)
+      ?? resolveShotGrammar({
           family: shot.family,
           level: shot.level,
           shotIndex: idx,
@@ -954,7 +1019,7 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
         eyebrow: shot.visualProps?.eyebrow ?? shot.visualProps?.kicker ?? '',
         keyword,
         question: shot.visualProps?.question ?? '',
-        description: shot.visualProps?.description ?? (shot.narration ?? '').slice(0, 100),
+        description: shot.visualProps?.description ?? (shot.narration ?? '').slice(0, 200),
         diagram: (shot.visualProps?.diagram as 'framing' | 'rings' | 'scale') ?? 'framing',
         accent: 'cyan',
       };
@@ -966,7 +1031,7 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
         ...base,
         count,
         heading,
-        summary: shot.visualProps?.summary ?? (shot.narration ?? '').slice(0, 80),
+        summary: shot.visualProps?.summary ?? (shot.narration ?? '').slice(0, 160),
         items: (shot.items ?? []).map((it) => ({
           label: it.label,
           detail: it.detail,
@@ -997,7 +1062,7 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
         ...base,
         heading,
         centerTitle,
-        centerDetail: shot.visualProps?.centerDetail ?? (shot.narration ?? '').slice(0, 80),
+        centerDetail: shot.visualProps?.centerDetail ?? (shot.narration ?? '').slice(0, 160),
         nodes: (shot.items ?? []).map((it) => ({
           label: it.label,
           detail: it.detail,
@@ -1045,7 +1110,7 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
                 ? {label: text.slice(0, colonIdx), value: text.slice(colonIdx + 1), trend: 'up' as const, accent: 'cyan' as const}
                 : {label: `数据${i + 1}`, value: text, trend: 'steady' as const, accent: 'cyan' as const};
             })
-          : [{label: shot.title, value: (shot.narration ?? '').slice(0, 40), trend: 'up' as const, accent: 'cyan' as const}],
+          : [{label: shot.title, value: (shot.narration ?? '').slice(0, 160), trend: 'up' as const, accent: 'cyan' as const}],
         accent: 'cyan',
       };
     }
@@ -1056,7 +1121,7 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
         ...base,
         heading,
         centerTitle,
-        centerDetail: shot.visualProps?.centerDetail ?? (shot.narration ?? '').slice(0, 80),
+        centerDetail: shot.visualProps?.centerDetail ?? (shot.narration ?? '').slice(0, 160),
         nodes: (shot.items ?? []).map((it) => ({
           label: it.label,
           detail: it.detail,

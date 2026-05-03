@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-30T18:51:48.279Z",
+  "generatedAt": "2026-05-02T19:12:21.798Z",
   "shots": [
     {
       "family": "hero",
@@ -931,6 +931,236 @@
         "color": "orange"
       },
       "directorNote": "[archetype命中] threshold breach | threshold-cross | mem:axis"
+    },
+    {
+      "family": "minimal-hero",
+      "label": "Minimal Hero",
+      "description": "极简大标题，纯黑背景 + 居中文字，无装饰。抖音风格开场。",
+      "semanticTags": [
+        "minimal",
+        "hero",
+        "title",
+        "抖音",
+        "开场",
+        "极简"
+      ],
+      "requiredFields": [
+        "title"
+      ],
+      "optionalFields": [
+        "subtitle",
+        "kicker",
+        "lines"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "context",
+        "staggerGap": 0,
+        "revealStiffness": 96,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "minimal-step-flow",
+      "label": "Minimal Step Flow",
+      "description": "极简步骤流，每步一行文字逐行淡入。抖音风格。",
+      "semanticTags": [
+        "minimal",
+        "step",
+        "flow",
+        "抖音",
+        "步骤",
+        "极简"
+      ],
+      "requiredFields": [
+        "steps"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 10,
+        "revealStiffness": 120,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "minimal-tag-matrix",
+      "label": "Minimal Tag Matrix",
+      "description": "极简标签矩阵，标签逐个弹入。抖音风格。",
+      "semanticTags": [
+        "minimal",
+        "tag",
+        "matrix",
+        "抖音",
+        "标签",
+        "极简"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 8,
+        "revealStiffness": 160,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "minimal-number-strip",
+      "label": "Minimal Number Strip",
+      "description": "极简大数字展示，数字递增动画。抖音风格。",
+      "semanticTags": [
+        "minimal",
+        "number",
+        "data",
+        "抖音",
+        "数字",
+        "极简"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 12,
+        "revealStiffness": 140,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "minimal-timeline",
+      "label": "Minimal Timeline",
+      "description": "极简时间线，时间节点逐个出现。抖音风格。",
+      "semanticTags": [
+        "minimal",
+        "timeline",
+        "time",
+        "抖音",
+        "时间线",
+        "极简"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 12,
+        "revealStiffness": 140,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "minimal-compare-board",
+      "label": "Minimal Compare Board",
+      "description": "极简对比，左右文字对比。抖音风格。",
+      "semanticTags": [
+        "minimal",
+        "compare",
+        "抖音",
+        "对比",
+        "极简"
+      ],
+      "requiredFields": [
+        "left",
+        "right"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 0,
+        "revealStiffness": 120,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
     }
   ]
 }

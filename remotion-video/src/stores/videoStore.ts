@@ -74,17 +74,27 @@ export const useVideoProjectStore = create<VideoProjectState>()(
     }),
     {
       name: 'video-project-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const delegate = localStorage;
+        return {
+          getItem: (name) => delegate.getItem(name),
+          setItem: (name, value) => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => delegate.setItem(name, value), 500);
+          },
+          removeItem: (name) => delegate.removeItem(name),
+        };
+      }),
       merge: (persistedState, currentState) => ({
         ...currentState,
         ...(persistedState as Partial<VideoProjectState>),
-        voice: 'qwen-tts' as VoiceType,
       }),
       partialize: (state) => ({
         projectId: state.projectId,
         template: state.template,
         script: state.script,
-        voice: 'qwen-tts' as VoiceType,
+        voice: state.voice,
       }),
     }
   )

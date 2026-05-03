@@ -34,7 +34,7 @@ const {
 const {getSecurityConfig, assertQueueModeAllowed} = require('../security/apiSecurity');
 const {
   buildUltimateRenderProps,
-} = require('../../scripts/lib/ultimate-project-adapter.js');
+} = require('../../scripts/lib/index.js');
 
 const OUTPUT_DIR = OUTPUT_ASSETS_DIR;
 const VOICE_DIR = VOICE_ASSETS_DIR;
@@ -174,10 +174,10 @@ function resolveRemotionLaunch(cwd) {
 }
 
 // ─── Stage 1: 配音合成 ─────────────────────────────────
-async function stageVoiceSynthesis(job, update) {
+async function stageVoiceSynthesis(job, update, sharedDesignData) {
   update(5, '🎤 合成语音...');
   const { projectId = 'default' } = job.data;
-  const designRenderData = getDesignRenderData(job.data.designJson);
+  const designRenderData = sharedDesignData;
   const renderFps = getPositiveInt(job.data.renderFps) ?? getPositiveInt(designRenderData.renderFps) ?? 30;
   const script =
     typeof job.data.script === 'string' && job.data.script.trim()
@@ -272,10 +272,10 @@ async function stageVoiceSynthesis(job, update) {
 }
 
 // ─── Stage 2: 字幕生成 ─────────────────────────────────
-async function stageSubtitleGeneration(job, voiceFile, generatedSubtitleData, syncedShots, update) {
+async function stageSubtitleGeneration(job, voiceFile, generatedSubtitleData, syncedShots, update, sharedDesignData) {
   update(25, '📝 生成字幕...');
   const { projectId = 'default' } = job.data;
-  const designRenderData = getDesignRenderData(job.data.designJson);
+  const designRenderData = sharedDesignData;
 
   const projectSubDir = path.join(SUBTITLE_DIR, projectId);
   if (!fs.existsSync(projectSubDir)) fs.mkdirSync(projectSubDir, { recursive: true });
@@ -362,9 +362,9 @@ async function stageSubtitleGeneration(job, voiceFile, generatedSubtitleData, sy
 }
 
 // ─── Stage 3: Remotion 真实渲染 ────────────────────────
-async function stageRemotionRender(job, files, update) {
+async function stageRemotionRender(job, files, update, sharedDesignData) {
   update(40, '🎬 开始 Remotion 渲染...');
-  const designRenderData = getDesignRenderData(job.data.designJson);
+  const designRenderData = sharedDesignData;
   const {
     template = 'ultimate',
     subtitleData = null,
@@ -497,6 +497,7 @@ async function stageRemotionRender(job, files, update) {
         env: {
           ...process.env,
           REMOTION_PUBLIC_DIR: path.join(remotionDir, 'public'),
+          REMOTION_GL: 'swiftshader',
         },
       });
       trackChildProcess(proc, {
@@ -1439,36 +1440,37 @@ async function synthesizeShotAudioSegments({
   const audioSegments = [];
   const shotRuntime = [];
 
-  for (let index = 0; index < validShots.length; index += 1) {
-    const shot = validShots[index];
-    const speech = resolveShotSpeechPlan(shot, voiceSettings);
-    const fileName = `${String(index + 1).padStart(2, '0')}-${sanitizeFileSegment(shot.id)}.wav`;
-    const outputPath = path.join(jobVoiceDir, fileName);
+  // Batch synthesize in groups of 3 for parallel I/O without overwhelming the TTS service
+  const BATCH_SIZE = 3;
+  for (let batchStart = 0; batchStart < validShots.length; batchStart += BATCH_SIZE) {
+    const batch = validShots.slice(batchStart, batchStart + BATCH_SIZE);
+    const batchPromises = batch.map((shot, batchIdx) => {
+      const index = batchStart + batchIdx;
+      const speech = resolveShotSpeechPlan(shot, voiceSettings);
+      const fileName = `${String(index + 1).padStart(2, '0')}-${sanitizeFileSegment(shot.id)}.wav`;
+      const outputPath = path.join(jobVoiceDir, fileName);
 
-    update(
-      Math.min(18, 8 + Math.round(((index + 1) / validShots.length) * 10)),
-      `🎤 分镜配音 ${index + 1}/${validShots.length}: ${shot.title || shot.id}`,
-    );
+      update(
+        Math.min(18, 8 + Math.round(((index + 1) / validShots.length) * 10)),
+        `🎤 分镜配音 ${index + 1}/${validShots.length}: ${shot.title || shot.id}`,
+      );
 
-    await synthesizeQwenTtsToFile({
-      text: speech.spokenText,
-      voice: voiceRequest || resolveQwenTtsDefaultVoice(process.env),
-      language: speech.language || requestLanguage,
-      outputPath,
-      model: requestModel || resolveQwenSynthesisModel({env: process.env}),
-      speed: requestSpeed,
-      env: process.env,
+      return synthesizeQwenTtsToFile({
+        text: speech.spokenText,
+        voice: voiceRequest || resolveQwenTtsDefaultVoice(process.env),
+        language: speech.language || requestLanguage,
+        outputPath,
+        model: requestModel || resolveQwenSynthesisModel({env: process.env}),
+        speed: requestSpeed,
+        env: process.env,
+      }).then(() => {
+        const durationSeconds = probeDurationSeconds(outputPath);
+        return { shot, speech, outputPath, publicSrc: `/assets/voice/${projectId}/${job.id}/${fileName}`, durationSeconds };
+      });
     });
 
-    const durationSeconds = probeDurationSeconds(outputPath);
-    shotRuntime.push({
-      shot,
-      speech,
-      outputPath,
-      publicSrc: `/assets/voice/${projectId}/${job.id}/${fileName}`,
-      durationSeconds,
-      durationInFrames: Math.max(1, Math.round(durationSeconds * renderFps)),
-    });
+    const batchResults = await Promise.all(batchPromises);
+    shotRuntime.push(...batchResults);
   }
 
   const syncedShots = applyAudioDurationsToShots(shots, shotRuntime, renderFps);
@@ -1711,14 +1713,17 @@ async function processRenderJob(job, update) {
   });
 
   try {
+    // Compute designRenderData once and pass to all stages (avoids 3 repeated calls)
+    const sharedDesignData = getDesignRenderData(job.data.designJson);
+
     // Stage 1
-    const stage1 = await stageVoiceSynthesis(job, update);
+    const stage1 = await stageVoiceSynthesis(job, update, sharedDesignData);
 
     // Stage 2
-    const stage2 = await stageSubtitleGeneration(job, stage1.voiceFile, update);
+    const stage2 = await stageSubtitleGeneration(job, stage1.voiceFile, update, sharedDesignData);
 
     // Stage 3
-    const stage3 = await stageRemotionRender(job, { ...stage1, ...stage2 }, update);
+    const stage3 = await stageRemotionRender(job, { ...stage1, ...stage2 }, update, sharedDesignData);
 
     // Stage 4
     await stageWebhook(job, {
@@ -1770,14 +1775,8 @@ function startFileBasedWorker() {
     },
   });
 
-  installWorkerSignalHandlers({
-    mode: 'file',
-    stop: async () => workerController.stop({
-      graceful: true,
-      timeoutMs: WORKER_SHUTDOWN_TIMEOUT_MS,
-    }),
-  });
-
+  // File-mode worker: stay alive indefinitely, skip graceful shutdown handlers
+  // that cause premature exit on shell backgrounding. Restart freely via supervisor.
   return workerController;
 }
 

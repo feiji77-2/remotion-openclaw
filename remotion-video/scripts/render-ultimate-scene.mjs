@@ -12,6 +12,11 @@
  *   Shots are normalized via storyboardLoader (single source of truth)
  *   --props {"shots": [...]} passed to Remotion
  *   calculateMetadata in Root.tsx reads props.shots and derives config
+ *
+ * PERFORMANCE OPTIMIZATION:
+ *   The build/ directory is reused across renders. If index.html exists,
+ *   we skip re-bundling and pass --serve build to the render command.
+ *   This avoids the ~1.3GB "Copying public dir" overhead on every render.
  */
 
 import fs from 'node:fs';
@@ -33,7 +38,7 @@ const hasFlag = (name) => args.includes(name);
 
 const printUsage = () => {
   console.log(`Usage:
-  node scripts/render-ultimate-scene.mjs --config <file> [--out <output.mp4>] [--dry-run]
+  node scripts/render-ultimate-scene.mjs --config <file> [--out <output.mp4>] [--dry-run] [--no-serve]
 
 Supported --config formats:
   - step-04.json (segments_meta[])
@@ -109,6 +114,7 @@ if (isUltimateConfigFormat) {
     'UltimateSceneTemplate',
     '--props', JSON.stringify({config: configData}),
     '--output', resolvedOutPath,
+    '--hardware-acceleration', 'if-possible',
   ];
   if (hasFlag('--dry-run')) {
     console.log('=== Render (Ultimate config format — legacy path) ===');
@@ -134,6 +140,14 @@ try {
 totalFrames = calcTotalFrames(scenes);
 totalSec = (totalFrames / 30).toFixed(1);
 
+// Performance: reuse build/ bundle if already bundled (avoids ~1.3GB copy overhead)
+const buildDir = path.resolve(process.cwd(), 'build');
+const hasExistingBundle = fs.existsSync(path.join(buildDir, 'index.html'));
+const serveArg = hasExistingBundle && !hasFlag('--no-serve') ? ['--serve', 'build'] : [];
+const bundlingNote = hasExistingBundle && !hasFlag('--no-serve')
+  ? '(using existing build/ bundle — skip with --no-serve to force re-bundle)'
+  : '(no existing build/ bundle found — will bundle)';
+
 // --props passes shots array. Root.tsx calculateMetadata calls shotsToScenes() to build scenes.
 const props = JSON.stringify({shots});
 
@@ -143,6 +157,8 @@ const remotionArgs = [
   'UltimateSceneTemplate',
   '--props', props,
   '--output', resolvedOutPath,
+  '--hardware-acceleration', 'if-possible',
+  ...serveArg,
 ];
 
 if (hasFlag('--dry-run')) {
@@ -152,6 +168,7 @@ if (hasFlag('--dry-run')) {
   console.log(`Shots:   ${shots.length}`);
   console.log(`Frames:  ${totalFrames} (from data, not code)`);
   console.log(`Duration: ${totalSec}s @ 30fps`);
+  console.log(`Bundle:  ${hasExistingBundle && !hasFlag('--no-serve') ? 'reusing build/ (skip --no-serve to force re-bundle)' : 'will bundle'}`);
   console.log();
   for (const shot of shots) {
     const sec = (shot.frames / 30).toFixed(1);
@@ -162,7 +179,7 @@ if (hasFlag('--dry-run')) {
   process.exit(0);
 }
 
-console.log(`[render] ${shots.length} shots / ${totalFrames}f / ${totalSec}s`);
+console.log(`[render] ${shots.length} shots / ${totalFrames}f / ${totalSec}s ${bundlingNote}`);
 console.log(`[render] Input: ${path.basename(resolvedInputPath)}`);
 
 const result = spawnSync('npx', remotionArgs.slice(1), {

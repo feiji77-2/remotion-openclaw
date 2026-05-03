@@ -2053,7 +2053,8 @@ async function main() {
   const workflowStart = Date.now();
   let legacyResumeOpen = allowResume;
 
-  for (let stepId = 1; stepId <= 8; stepId += 1) {
+  const maxStep = options.render ? 8 : 4;
+  for (let stepId = 1; stepId <= maxStep; stepId += 1) {
     const stepFilePath = path.join(stepsDir, `step-${String(stepId).padStart(2, '0')}.json`);
     const stepInputHash = hashValue(buildWorkflowStepCacheInput({
       stepId,
@@ -2092,7 +2093,7 @@ async function main() {
     if (reusedStep) {
       resumedStepCount += 1;
       reusedWorkflowStepIds.push(stepId);
-      process.stdout.write(`[workflow] step ${stepId}/8 reused (${reuseMode})\n`);
+      process.stdout.write(`[workflow] step ${stepId}/${maxStep} reused (${reuseMode})\n`);
       stepTimings.push({
         stepId,
         startedAt: null,
@@ -2104,7 +2105,7 @@ async function main() {
       });
     } else {
       legacyResumeOpen = false;
-      process.stdout.write(`[workflow] step ${stepId}/8\n`);
+      process.stdout.write(`[workflow] step ${stepId}/${maxStep}\n`);
       const startedAt = new Date().toISOString();
       const stepStart = Date.now();
       const generatedStep = await generateWorkflowStep({
@@ -2163,8 +2164,8 @@ async function main() {
     pipelineState = promptSync.pipelineState;
     process.stdout.write(
       promptSync.reused
-        ? '[workflow] step 5/8 prompt cache already matched latest narration\n'
-        : '[workflow] step 5/8 regenerated after narration update\n',
+        ? '[workflow] step 5 prompt cache already matched latest narration\n'
+        : '[workflow] step 5 regenerated after narration update\n',
     );
   }
 

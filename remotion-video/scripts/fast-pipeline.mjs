@@ -11,6 +11,12 @@ import {
 } from './fast-pipeline-prompt-kit.mjs';
 
 const require = createRequire(import.meta.url);
+
+// Load .env from project root
+const dotenv = require('dotenv');
+const envPath = path.resolve(fileURLToPath(import.meta.url), '../../.env');
+dotenv.config({ path: envPath });
+
 const { generateStructuredJson, hasWorkflowLLM, resolveWorkflowLLMConfig } = require('../server/workflow/step123/llm');
 
 const __filename = fileURLToPath(import.meta.url);
@@ -52,9 +58,21 @@ function printTiming(label, ms) {
 }
 
 async function searchTopic(topic, timeoutMs = 10000) {
+  // Try DuckDuckGo first
+  const ddgResults = await searchViaDDG(topic, timeoutMs);
+  if (ddgResults.length > 0) return ddgResults;
+
+  // Fallback: try Bing (accessible in China)
+  const bingResults = await searchViaBing(topic, timeoutMs);
+  if (bingResults.length > 0) return bingResults;
+
+  console.log('  [search] 搜索不可用，使用 LLM 知识库');
+  return [];
+}
+
+async function searchViaDDG(topic, timeoutMs) {
   try {
     const start = Date.now();
-    // Use execFileSync to avoid shell injection from topic string
     const { execFileSync } = await import('node:child_process');
     const stdout = execFileSync(
       'python3',
@@ -63,15 +81,60 @@ async function searchTopic(topic, timeoutMs = 10000) {
     );
     const parsed = JSON.parse(stdout);
     if (parsed.error || !Array.isArray(parsed.results)) return [];
-    console.log(`  [search] ${parsed.results.length} 条结果 (${((Date.now() - start) / 1000).toFixed(1)}s)`);
+    console.log(`  [search] DuckDuckGo ${parsed.results.length} 条结果 (${((Date.now() - start) / 1000).toFixed(1)}s)`);
     return parsed.results.slice(0, 5).map(r => ({
       title: safeString(r.title),
       snippet: safeString(r.snippet),
     }));
   } catch (err) {
-    console.log('  [search] 搜索不可用，使用 LLM 知识库');
     if (err instanceof Error && err.message) {
-      console.debug(`  [search] 错误详情: ${err.message.slice(0, 120)}`);
+      console.debug(`  [search] DDG 失败: ${err.message.slice(0, 100)}`);
+    }
+    return [];
+  }
+}
+
+async function searchViaBing(topic, timeoutMs) {
+  const start = Date.now();
+  try {
+    const url = `https://cn.bing.com/search?q=${encodeURIComponent(topic)}&count=5`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+    });
+    if (!res.ok) return [];
+    const html = await res.text();
+
+    // Find the results <ol> and extract within
+    const olMatch = html.match(/<ol id="b_results"[\s\S]*?<\/ol>/i);
+    if (!olMatch) return [];
+    const olHtml = olMatch[0];
+
+    // Extract each b_algo result item (with data-id attribute)
+    const results = [];
+    const itemRegex = /<li[^>]*class="b_algo"[^>]*data-id[^>]*>([\s\S]*?)<\/li>/gi;
+    let match;
+    while ((match = itemRegex.exec(olHtml)) !== null && results.length < 5) {
+      const item = match[1];
+      // Skip items that are just CSS links (no <h2>)
+      if (!item.includes('<h2')) continue;
+      const titleMatch = item.match(/<h2[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i);
+      const snippetMatch = item.match(/<p[^>]*class="b_lineclamp[^"]*"[^>]*>([\s\S]*?)<\/p>/i);
+      if (titleMatch) {
+        results.push({
+          title: titleMatch[2].replace(/<[^>]+>/g, '').trim(),
+          snippet: snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, '').trim() : '',
+          url: titleMatch[1],
+        });
+      }
+    }
+    if (results.length > 0) {
+      console.log(`  [search] Bing ${results.length} 条结果 (${((Date.now() - start) / 1000).toFixed(1)}s)`);
+    }
+    return results;
+  } catch (err) {
+    if (err instanceof Error && err.message) {
+      console.debug(`  [search] Bing 失败: ${err.message.slice(0, 100)}`);
     }
     return [];
   }
@@ -312,8 +375,19 @@ async function main() {
 
   if (!hasWorkflowLLM()) {
     const config = resolveWorkflowLLMConfig();
-    console.error('错误: 未配置 LLM。请设置 OPENAI_API_KEY 或安装 OpenClaw。');
+    const hasDotEnv = require('fs').existsSync(envPath);
+    console.error('错误: 未配置可用的 LLM。');
     console.error(`当前配置: provider=${config.provider}, transport=${config.transport}, model=${config.model || '未设置'}`);
+    console.error('');
+    console.error('解决方法:');
+    console.error('  1. 设置环境变量 MINIMAX_API_KEY（当前推荐方案）');
+    console.error('  2. 设置环境变量 OPENAI_API_KEY');
+    console.error('  3. 安装并配置 OpenClaw CLI');
+    if (!hasDotEnv) {
+      console.error('');
+      console.error(`  提示: .env 文件不存在于 ${envPath}`);
+      console.error('  可创建该文件并写入 MINIMAX_API_KEY=your_key_here');
+    }
     process.exit(1);
   }
 

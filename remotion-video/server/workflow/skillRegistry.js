@@ -3,6 +3,12 @@ const os = require('os');
 const path = require('path');
 const {resolveFamilyShotContract, CAMERA_INTENT_TO_MOTION} = require('../../src/data/shotGrammar.ts');
 const {getRhythmContract, getPreferredCameraMotion, getCameraMotion} = require('../../src/data/registry.ts');
+const {getPhaseForStep} = require('./phaseRegistry');
+const { safeString: libSafeString, toNumber: libToNumber, compactText: libCompactText } = require('../../scripts/lib/index.js');
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
 
 const HOME_DIR = os.homedir();
 const REMOTION_PROJECT_ROOT = path.resolve(__dirname, '../..');
@@ -25,16 +31,36 @@ const STEP_TO_SKILL_ID = {
   8: 'video-pipeline-video',
 };
 
-const STEP_TO_PHASE = {
-  1: { phaseId: 1, phaseLabel: '研究选题' },
-  2: { phaseId: 2, phaseLabel: '标题确认' },
-  3: { phaseId: 3, phaseLabel: '口播文案' },
-  4: { phaseId: 4, phaseLabel: '分镜与视觉' },
-  5: { phaseId: 4, phaseLabel: '分镜与视觉' },
-  6: { phaseId: 5, phaseLabel: '配音与时长' },
-  7: { phaseId: 6, phaseLabel: '出片' },
-  8: { phaseId: 6, phaseLabel: '出片' },
-};
+const VIRAL_TITLE_TECHNIQUES = [
+  { id: 'digital', label: '数字法', description: '具体数字制造记忆锚点', example: '82.7%编码能力' },
+  { id: 'contrast', label: '反差法', description: '认知/身份反差制造矛盾', example: '程序员开始抢产品经理的活' },
+  { id: 'suspense', label: '悬念法', description: '制造信息缺口让人想点开', example: 'OpenAI没告诉你的三个秘密' },
+  { id: 'identity', label: '身份标签法', description: '精准人群定位', example: '程序员必看' },
+  { id: 'question', label: '疑问法', description: '抛出观众最想问的问题', example: 'GPT-5.5到底强在哪？' },
+  { id: 'dialog', label: '对话/情绪法', description: '口语化制造对话感', example: '凭什么卖这么贵？看完我沉默了' },
+];
+
+const VIRAL_TITLE_FORMULAS = [
+  { template: '[具体数字/事件] + [核心变化] + [悬念/价值]', example: '82.7%编码能力背后，GPT-5.5真正改变的是这件事' },
+  { template: '[身份] + [反差行为/结果]', example: '程序员开始用GPT-5.5抢产品经理的活了' },
+  { template: '[否定/颠覆] + [常识] + [新结论]', example: '别再说AI只会聊天了，它现在能替你做决策' },
+  { template: '[时间/事件] + [悬念] + [具体动作]', example: 'GPT-5.5发布后，第一批用的程序员都在用它做这件事' },
+  { template: '[极端数据] + [反差说明]', example: '编码82.7%不是最重要的，GPT-5.5真正突破的是这个' },
+];
+
+const VIRAL_TITLE_NOTES = `爆款标题六大手法（必须至少用一种）：
+${VIRAL_TITLE_TECHNIQUES.map(t => `${t.id === 'dialog' ? '6' : VIRAL_TITLE_TECHNIQUES.indexOf(t) + 1}. ${t.label}：${t.description}（如"${t.example}"）`).join('\n')}
+
+爆款标题公式（科技AI类主攻）：
+${VIRAL_TITLE_FORMULAS.map((f, i) => `- ${f.example}`).join('\n')}
+
+每个标题必须：
+- 至少包含一种爆款手法
+- 有具体数据或场景（不能泛泛而谈）
+- 角度之间差异明显
+- 前3秒必须抓人（让人停下来想看）
+- 控制在25字以内
+- 口语化，符合抖音/视频号传播语气`;
 
 const SKILL_DEFINITIONS = [
   {
@@ -129,28 +155,7 @@ const SKILL_DEFINITIONS = [
         '重复句式：换汤不换药的近似表达',
         '"替你干活"这个表达要具象化，不能单独出现（如要改成"从工具变成实习生"）',
       ].join('。'),
-      notes: `爆款标题六大手法（必须至少用一种）：
-1. 数字法：具体数字制造记忆锚点（如"82.7%编码能力"）
-2. 反差法（最吸睛）：认知/身份反差制造矛盾（如"程序员开始抢产品经理的活"）
-3. 悬念法：制造信息缺口让人想点开（如"OpenAI没告诉你的三个秘密"）
-4. 身份标签法：精准人群定位（如"程序员必看"）
-5. 疑问法：抛出观众最想问的问题（如"GPT-5.5到底强在哪？"）
-6. 对话/情绪法：口语化制造对话感（如"凭什么卖这么贵？看完我沉默了"）
-
-爆款标题公式（科技AI类主攻）：
-- [具体数字/事件] + [核心变化] + [悬念/价值]："82.7%编码能力背后，GPT-5.5真正改变的是这件事"
-- [身份] + [反差行为/结果]："程序员开始用GPT-5.5抢产品经理的活了"
-- [否定/颠覆] + [常识] + [新结论]："别再说AI只会聊天了，它现在能替你做决策"
-- [时间/事件] + [悬念] + [具体动作]："GPT-5.5发布后，第一批用的程序员都在用它做这件事"
-- [极端数据] + [反差说明]："编码82.7%不是最重要的，GPT-5.5真正突破的是这个"
-
-每个标题必须：
-- 至少包含一种爆款手法
-- 有具体数据或场景（不能泛泛而谈）
-- 角度之间差异明显
-- 前3秒必须抓人（让人停下来想看）
-- 控制在25字以内
-- 口语化，符合抖音/视频号传播语气`,
+      notes: VIRAL_TITLE_NOTES,
     },
     constraints: [
       '必须依赖已确认的 Step 1 分析。',
@@ -281,6 +286,8 @@ const SKILL_DEFINITIONS = [
     ],
     evalRules: [
       'family 多样性、节奏分配、结构完整性、Ultimate 对齐度。',
+      '每个 shot 的 narration 必须有不同的核心信息点，不允许文案重复。',
+      '中段 shot 的 narration 必须包含至少一个具体数据点或硬证据，不能空洞。',
     ],
   },
   {
@@ -571,42 +578,12 @@ const ULTIMATE_MIDDLE_SCENE_ROTATION = [
   'number-strip',
 ];
 
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-function safeString(value) {
-  return String(value || '').trim();
-}
-
-function toNumber(value, fallback = 0) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function round(value) {
-  return Math.round(Number(value) || 0);
-}
-
-function average(values) {
-  const safe = values.filter((value) => Number.isFinite(value));
-  if (safe.length === 0) {
-    return 0;
-  }
-  return round(safe.reduce((sum, value) => sum + value, 0) / safe.length);
-}
-
-function compactText(value, max = 180) {
-  const safe = safeString(value).replace(/\s+/g, ' ');
-  if (!safe) {
-    return '';
-  }
-  return safe.length > max ? `${safe.slice(0, max - 1)}…` : safe;
-}
+function safeString(value) { return libSafeString(value); }
+function toNumber(value, fallback = 0) { return libToNumber(value, fallback); }
+function clamp(value, min, max) { return Math.min(max, Math.max(min, value)); }
+function round(value) { return Math.round(Number(value) || 0); }
+function average(values) { const safe = values.filter((value) => Number.isFinite(value)); if (safe.length === 0) { return 0; } return round(safe.reduce((sum, value) => sum + value, 0) / safe.length); }
+function compactText(value, max = 180) { return libCompactText(value, max); }
 
 function tokenizeKeywords(value) {
   const matches = String(value || '')
@@ -696,13 +673,13 @@ function buildSkillSpec(skillId) {
     version: safeString(frontmatter.version),
     status,
     statusMessage: source?.error || '',
-    inputs: clone(definition.inputs || []),
-    outputs: clone(definition.outputs || []),
-    defaults: clone(definition.defaults || {}),
-    constraints: clone(definition.constraints || []),
-    qualityRules: clone(definition.qualityRules || []),
-    uiHints: clone(definition.uiHints || []),
-    evalRules: clone(definition.evalRules || []),
+    inputs: JSON.parse(JSON.stringify(definition.inputs || [])),
+    outputs: JSON.parse(JSON.stringify(definition.outputs || [])),
+    defaults: JSON.parse(JSON.stringify(definition.defaults || {})),
+    constraints: JSON.parse(JSON.stringify(definition.constraints || [])),
+    qualityRules: JSON.parse(JSON.stringify(definition.qualityRules || [])),
+    uiHints: JSON.parse(JSON.stringify(definition.uiHints || [])),
+    evalRules: JSON.parse(JSON.stringify(definition.evalRules || [])),
   };
 }
 
@@ -2704,6 +2681,7 @@ function evaluateStep4(payload) {
       .filter((family) => family && family !== 'hero' && family !== 'cta'),
     (family) => family,
   );
+  const narrations = shots.map((shot) => safeString(shot?.narration || shot?.narrationText || shot?.narrationZh || ''));
   const issues = [];
   const suggestions = [];
   if (shots.length < 6) issues.push('场景数量不足，尚未形成完整的 Ultimate 章节化结构');
@@ -2717,6 +2695,31 @@ function evaluateStep4(payload) {
     suggestions.push('建议把场景时长继续压到 3-15 秒区间');
   }
 
+  // 检查 narration 文案重复
+  const narrationCounts = {};
+  for (const n of narrations) {
+    const key = n.trim().toLowerCase();
+    if (key.length > 0) {
+      narrationCounts[key] = (narrationCounts[key] || 0) + 1;
+    }
+  }
+  const duplicateNarrations = Object.entries(narrationCounts).filter(([, count]) => count > 1);
+  if (duplicateNarrations.length > 0) {
+    issues.push(`发现 ${duplicateNarrations.length} 组重复 narration 文案，每个 shot 必须有不同的核心信息点`);
+  }
+
+  // 检查 narration 是否空洞（缺少具体数据或证据）
+  const DATA_POINT_PATTERN = /\d+[亿万千百个美元%倍几分之]|分数|token|参数|版本|开源|闭源|GPT|DeepSeek|Codeforces| benchmark | accuracy | score/i;
+  const tooVagueShots = shots.filter((shot) => {
+    const narration = safeString(shot?.narration || shot?.narrationText || shot?.narrationZh || '');
+    if (narration.length < 15) return true;
+    if (!DATA_POINT_PATTERN.test(narration)) return true;
+    return false;
+  });
+  if (tooVagueShots.length > 0) {
+    issues.push(`有 ${tooVagueShots.length} 个中段 shot 的 narration 缺少具体数据点或硬证据，请补充具体数字、名称或结论`);
+  }
+
   return buildEvaluation(
     4,
     'video-pipeline-scene-planner',
@@ -2726,6 +2729,8 @@ function evaluateStep4(payload) {
       structure: shots.every((shot) => safeString(shot?.level) && safeString(shot?.type) && safeString(shot?.sceneFamily || shot?.family)) ? 92 : 64,
       completeness: shots.every((shot) => Array.isArray(shot?.keywords) && Array.isArray(shot?.templateCandidates)) ? 90 : 66,
       diversity: families.length >= 4 ? 88 : families.length >= 3 ? 74 : 58,
+      narrationUniqueness: duplicateNarrations.length === 0 ? 90 : 40,
+      narrationSpecificity: tooVagueShots.length === 0 ? 90 : 50,
     },
     issues,
     suggestions,
@@ -2856,12 +2861,11 @@ function enrichStepResult(stepId, payload, input, providedSkillSpec = null) {
 
 module.exports = {
   STEP_TO_SKILL_ID,
-  STEP_TO_PHASE,
   alignPayloadToSkill,
   ensureStepSkillReady,
   enrichStepResult,
   evaluateStepPayload,
-  getPhaseForStep: (stepId) => STEP_TO_PHASE[Number(stepId)] || null,
+  getPhaseForStep,
   getSkillSpec,
   getStepSkillId,
   getStepSkillSpec,

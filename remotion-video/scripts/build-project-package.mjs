@@ -2,7 +2,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import ultimateAdapter from './lib/ultimate-project-adapter.js';
+import ultimateAdapter from './lib/index.js';
 
 const DEFAULT_FPS = 30;
 const {
@@ -11,7 +11,7 @@ const {
   ULTIMATE_DEFAULT_HEIGHT,
   isUltimateProject,
   buildUltimateRenderProps,
-} = ultimateAdapter;
+} = ultimateAdapter.default;
 
 const loadJson = async (filePath) => {
   const content = await fs.readFile(filePath, 'utf8');
