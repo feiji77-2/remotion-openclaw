@@ -1,232 +1,225 @@
-# Ultimate 1920x1080 一次性工作流
+# Ultimate 视频生成工作流
 
-这套模板现在不是“先搭素材，再手改一堆配置”的半成品，而是完整的 5 步生产链。你可以直接按下面的框架走。
+## 系统架构
 
-## 01. 素材库层
-
-可复用场景已经注册到 Remotion：
-
-- `UltimateElementsLibrary`
-- `UltimateSceneTemplate`
-
-对应入口：
-
-- [`src/Root.tsx`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/src/Root.tsx)
-- [`src/compositions/UltimateElementsLibrary.tsx`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/src/compositions/UltimateElementsLibrary.tsx)
-- [`src/compositions/UltimateSceneTemplate.tsx`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/src/compositions/UltimateSceneTemplate.tsx)
-
-场景族已经覆盖：
-
-- `hero`
-- `feature-rail`
-- `focus`
-- `number-strip`
-- `step-flow`
-- `terminal`
-- `tag-matrix`
-- `code`
-- `metrics`
-- `cta`
-
-## 02. 输入层
-
-你现在只保留一种主线输入方式：
-
-1. 直接写最终场景 JSON  
-文件示例：[`examples/ultimate-scene-demo.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-scene-demo.json)
-
-旧的 outline 大纲 JSON 已退出主链，不再建议继续维护。
-
-## 03. 编译层
-
-新增了大纲编译器，会把 `kind` 自动映射成真正的 scene family：
-
-- `cover -> hero`
-- `cards -> feature-rail`
-- `definition -> focus`
-- `steps -> step-flow`
-- `command -> terminal`
-- `tags -> tag-matrix`
-- `schema -> code`
-- `metrics -> metrics`
-- `close -> cta`
-
-核心文件：
-
-- 旧 `outline -> compile -> render` 链路已退役，当前只保留 `config / step-04 shots -> UltimateSceneTemplate` 主线
-
-它会自动补这些内容：
-
-- scene `id`
-- 常用 `accent`
-- `step` 编号和图标
-- `metrics` 的默认比例
-- `code` 高亮行 tone
-- 统一平台 overlay 和默认转场
-
-## 04. 检查层
-
-检查命令现在只保留主线输入：
-
-```bash
-npm run ultimate:check
+```
+用户输入（主题/脚本）
+    │
+    ▼
+┌──────────────────────────────────────────────────────┐
+│  Fast Pipeline（3 步）                                │
+│  Step 1: LLM 搜索 + 话题分析                          │
+│  Step 2: 爆款标题 + 口播稿生成                        │
+│  Step 3: 分镜规划 + 视觉提示                          │
+└──────────────────────────────────────────────────────┘
+    │
+    ▼
+┌──────────────────────────────────────────────────────┐
+│  工作流引擎 (workflowGenerator.js)                    │
+│  拆分为 4 模块: searchUtils / stepSchema / normalizers │
+│  + step123/pipeline（Step 1-3 专用 LLM 管线）          │
+└──────────────────────────────────────────────────────┘
+    │
+    ▼
+┌──────────────────────────────────────────────────────┐
+│  API 服务 (server.js)                                  │
+│  ├─ POST /api/render — 提交渲染任务                     │
+│  ├─ POST /api/render/:jobId/retry — 重试失败任务        │
+│  ├─ GET /api/render/:jobId — 查询渲染状态               │
+│  ├─ DELETE /api/render/:jobId — 取消任务                │
+│  ├─ POST /api/workflow/generate — 启动工作流生成        │
+│  ├─ GET /api/workflow/:jobId — 查询工作流状态           │
+│  ├─ POST /api/images/generate — 分镜图生成              │
+│  ├─ GET /api/images/:jobId — 分镜图状态                │
+│  ├─ POST /api/voice — 语音合成任务                     │
+│  ├─ GET /api/voice/:jobId — 语音任务状态               │
+│  └─ GET /health — 健康检查                             │
+└──────────────────────────────────────────────────────┘
+    │
+    ▼
+┌──────────────────────────────────────────────────────┐
+│  任务队列 (fileQueue.js + renderQueue.js)              │
+│  文件版 (默认) / Redis (BullMQ) 双模式                 │
+│                                                        │
+│  Worker: renderWorker.js                               │
+│    Stage 1: Qwen TTS 配音合成                          │
+│    Stage 2: 字幕生成 (Deepgram/Whisper/SRT)            │
+│    Stage 3: Remotion 渲染 (spawn child process)        │
+│    Stage 4: Webhook 回调                               │
+│                                                        │
+│  内存限制器: memoryLimiter.js                          │
+│  请求取消: requestCancellation.js                       │
+└──────────────────────────────────────────────────────┘
+    │
+    ▼
+┌──────────────────────────────────────────────────────┐
+│  Remotion 渲染                                         │
+│  20 核心 Scene Families + 6 Minimal 抖音风格            │
+│  4 层动效系统 (camera/layout/foreground/micro)         │
+│  6 种动画原语 (slideIn/scaleEmphasis/pulseAttention/   │
+│    staggerSlide/staggerScale/floatMotion)              │
+│  26 种视觉模板                                        │
+└──────────────────────────────────────────────────────┘
 ```
 
-也支持直接命令行指定：
+## 项目目录结构
 
-```bash
-node scripts/check-ultimate-scene.mjs --config ./my-video.json
+```
+remotion-video/
+├── server/
+│   ├── api/                  # Express API 路由
+│   │   ├── server.js         # 主服务入口
+│   │   ├── imageJob.js       # 分镜图生成任务管理
+│   │   └── requestCancellation.js  # HTTP 请求取消
+│   ├── queue/
+│   │   ├── fileQueue.js      # 文件版队列（JSON 文件持久化）
+│   │   └── renderQueue.js    # Redis/BullMQ 队列
+│   ├── workers/
+│   │   ├── renderWorker.js   # 4 阶段渲染流水线
+│   │   └── memoryLimiter.js  # 进程内存监控与限制
+│   ├── workflow/
+│   │   ├── workflowGenerator.js  # 工作流生成入口 (Step 1-8)
+│   │   ├── stepSchema.js     # Step 上下文构建与 Schema
+│   │   ├── searchUtils.js    # DuckDuckGo 搜索
+│   │   ├── skillRegistry.js  # 技能注册表
+│   │   ├── normalizers.js    # 步骤负载规范化
+│   │   ├── phaseRegistry.js  # 阶段定义
+│   │   ├── workflowJobStore.js # 工作流任务持久化
+│   │   └── step123/          # Step 1-3 LLM 管线
+│   │       ├── pipeline.js   # 主管线
+│   │       ├── llm.js        # LLM 调用封装
+│   │       ├── context.js    # 上下文构建
+│   │       ├── normalizers.js # 步骤规范化
+│   │       ├── quality.js    # 质量控制
+│   │       ├── technicalTopic.js # 技术话题分析
+│   │       ├── step3SkillDriver.js # Step 3 技能驱动
+│   │       └── errors.js     # 错误类型
+│   ├── voice/                # TTS 引擎 (Qwen/Bailing)
+│   ├── subtitles/            # 字幕生成 (Deepgram/Whisper)
+│   ├── security/             # 鉴权与限流
+│   ├── validators/           # 请求校验
+│   ├── config/runtimePaths.js # 运行时路径配置
+│   └── utils/                # 工具 (logger 等)
+├── src/
+│   ├── Root.tsx              # Remotion 根注册
+│   ├── animations/           # 基础动画函数
+│   ├── components/ultimate-kit/
+│   │   ├── families/         # 26 个 Scene Family 组件
+│   │   ├── motionGrammar.ts  # 4 层动效编排
+│   │   └── shotArchetypes.ts # 6 种动画原语 + 镜头原型
+│   ├── data/
+│   │   ├── registry.ts       # Family 注册表 (规范数据源)
+│   │   ├── shotGrammar.ts    # 镜头语法系统
+│   │   └── storyboard.ts     # 故事板加载
+│   └── compositions/         # Remotion Composition 注册
+├── scripts/
+│   ├── lib/                  # 构建/渲染工具库
+│   ├── run-search-to-ultimate.mjs  # 一键工作流入口
+│   ├── fast-pipeline.mjs     # 快速流水线
+│   └── *.mjs                 # 各种工具脚本
+├── runtime/jobs/             # 文件队列任务数据
+└── public/assets/            # 输出产物
 ```
 
-检查时会输出：
+## 工作流步骤 (Step 1-8)
 
-- scene 数量
-- 总时长
-- 每个 scene 的 family / 帧数 / 字幕
-- 规范化后的 JSON 快照
+| Step | 阶段 | 说明 | 产物 |
+|------|------|------|------|
+| 1 | 逻辑分析 | 话题搜索 + 命题收敛 | analysis, topicResearch |
+| 2 | 标题生成 | 爆款标题池 + 角度策略 | titles, selectedTitle |
+| 3 | 内容生成 | 口播稿 + Hook/Body/CTA | copy |
+| 4 | 场景编排 | 分镜规划 + Family 命中 | shots |
+| 5 | 视觉提示词 | 分镜图 Prompt 生成 | prompts |
+| 6 | 配音脚本 | TTS 参数 + 情感标注 | voice |
+| 7 | Remotion 项目 | 构建脚本/项目文件 | projectBuild |
+| 8 | 渲染设置 | 视频输出参数 | render |
 
-## 05. 出片层
+## 队列系统
 
-正式渲染：
+支持两种模式（通过 `PIPELINE_QUEUE_MODE` 环境变量切换）：
 
-```bash
-npm run ultimate:render
-```
+### 文件版 (默认, `file`)
+- 任务以 JSON 文件持久化到 `runtime/jobs/`
+- Worker 使用自适应轮询 + fs.watch 监听
+- 空闲时退避轮询 (1s → 5s max)
+- 支持优雅关闭 (max 30s)
+- 适合本地开发与单进程部署
 
-或者自定义文件：
+### Redis 版 (`redis`)
+- 基于 BullMQ + ioredis
+- 支持并发 Worker (`WORKER_CONCURRENCY`)
+- 自动重试 (指数退避, max 3 次)
+- 适合生产环境多 Worker 部署
 
-```bash
-node scripts/render-ultimate-scene.mjs --config ./my-video.json --out out/my-video.mp4
-```
+## 渲染流水线 (4 Stage)
 
-## 接回原工作流
+renderWorker.js 将渲染分为 4 个阶段：
 
-现在 `Ultimate` 不再只是单独的大纲模板，它已经可以接回原来的搜索驱动流程。
+1. **Stage 1: 配音合成** — Qwen TTS 逐分镜合成，分批 (batch=3) 并行
+2. **Stage 2: 字幕生成** — Deepgram/Whisper 转写，降级为 SRT 对齐
+3. **Stage 3: Remotion 渲染** — spawn child process 执行 `npx remotion render`
+4. **Stage 4: Webhook 回调** — 结果通知 (可选)
 
-- 原工作流继续负责：`搜索标题/主题 -> 分析 -> 标题 -> 文案 -> 分镜 -> 配音`
-- 当 `render.template = "ultimate"` 时，构建和渲染会自动切到 `UltimateSceneTemplate`
-- 如果项目输出尺寸是 `1920x1080` 横版，构建脚本也会优先判定为 `Ultimate`
-- 原工作流里的 `shots / narration / keywords / dataPoints` 会自动编译成 `Ultimate` scenes
-- 配音文件也会直接挂进 `Ultimate` composition，不再丢失音轨
+## 内存管理
 
-对应入口：
+memoryLimiter.js 提供进程级内存监控：
+- 默认总上限 4096 MB (`PIPELINE_MEMORY_LIMIT_MB`)
+- 单进程上限 2048 MB (`PIPELINE_PROCESS_MEMORY_MB`)
+- 每 5s 检查一次 (`PIPELINE_MEMORY_CHECK_MS`)
+- 超限后先 SIGTERM，10s 后 SIGKILL
+- 通过 `GET /api/memory-stats` 查看进程内存
 
-- [`scripts/lib/ultimate-project-adapter.js`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/lib/ultimate-project-adapter.js)
-- [`scripts/build-project-package.mjs`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/build-project-package.mjs)
-- [`scripts/render-project.mjs`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/render-project.mjs)
-- [`server/workers/renderWorker.js`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/server/workers/renderWorker.js)
+## 请求取消
 
-## 一条命令跑完整原工作流
+requestCancellation.js 追踪所有活跃 HTTP 请求：
+- 请求关闭时自动取消关联的渲染任务
+- 管理员可手动取消 (`DELETE /api/render/:jobId`)
+- 通过 `GET /api/requests` 查看活跃请求
 
-现在已经补了真正的一键入口：
+## 安全机制
 
-- [`scripts/run-search-to-ultimate.mjs`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/scripts/run-search-to-ultimate.mjs)
+- API Key 认证 (`PIPELINE_API_KEY`)
+- Admin Key 认证 (`PIPELINE_ADMIN_KEY`)
+- 读写分离限流 (非 Admin 或 Admin 分别配置)
+- CORS 配置
+- 队列模式校验 (可限制仅允许 file/redis)
 
-你在仓库根目录直接运行：
-
-```bash
-npm run workflow:ultimate -- "Claude Code 和 Codex 区别"
-```
-
-如果你在 `remotion-video` 目录里运行：
-
-```bash
-npm run workflow:ultimate -- "Claude Code 和 Codex 区别"
-```
-
-这条命令会一次性完成：
-
-- `Step 1-8 workflow`
-- 自动锁定 `Ultimate + 1920x1080`
-- 生成 `projects/<projectId>/project.json`
-- 生成 `projects/<projectId>/workflow-state.json`
-- 自动调用 `build-project-package.mjs`
-- 默认尝试生成分镜配音
-- 默认直接调用 `render-project.mjs` 出最终 mp4
-
-默认语音规则现在是：
-
-- 默认统一走 `qwen-tts`
-- 如果你传了 `--speaker`，会优先使用已存在的阿里千问克隆音色
-- 如果你传了 `--reference`，会先创建 / 复用阿里千问克隆音色，再继续配音
-- 你一旦显式传了 `--voice-engine` / `--speaker` / `--reference` / `--voice-language`，就以你的参数为准
-
-常用变体：
+## 一键运行
 
 ```bash
-# 只生成 workflow / project / render props，不立刻渲染
-npm run workflow:ultimate -- "AI agent 工作流" --no-render
+# 完整工作流（搜索 → 渲染）
+npm run workflow:ultimate -- "你的主题"
 
-# 跳过配音，只先看视觉工程产物
-npm run workflow:ultimate -- "Remotion 自动视频" --no-voice --no-render
+# 仅工作流，不渲染
+npm run workflow:ultimate -- "主题" --no-render
+
+# 跳过配音
+npm run workflow:ultimate -- "主题" --no-voice --no-render
 
 # 指定输出文件
-npm run workflow:ultimate -- "OpenAI 最新 Agent 能力" --output out/openai-agent.mp4
-
-# 使用阿里千问克隆语音
-npm run workflow:ultimate -- "AI 行业日报" --voice-engine qwen-tts --reference runtime/voices/qwen/daman-business-001.wav --speaker daman-business-001 --voice-language zh-cn
+npm run workflow:ultimate -- "主题" --output out/video.mp4
 ```
 
-说明：
+## 主要产物路径
 
-- 这条链路不会再回退到其他旧语音模型
-- 如果 `speaker` 不存在但给了 `reference`，脚本会先创建 / 复用千问音色
-- 如果 `DASHSCOPE_API_KEY` 没配，语音步骤会直接报错
+- `projects/<projectId>/project.json` — 项目配置
+- `projects/<projectId>/workflow-state.json` — 工作流状态
+- `projects/<projectId>/render-props.json` — 渲染属性
+- `projects/<projectId>/ultimate-config.json` — Ultimate 配置
+- `public/assets/outputs/<projectId>/<jobId>.mp4` — 最终视频
 
-主要产物路径：
+## 环境变量
 
-- `remotion-video/projects/<projectId>/project.json`
-- `remotion-video/projects/<projectId>/workflow-state.json`
-- `remotion-video/projects/<projectId>/render-props.json`
-- `remotion-video/projects/<projectId>/ultimate-config.json`
-- `remotion-video/public/assets/outputs/<projectId>/<projectId>.mp4`
-
-这意味着你原来那条“根据搜索标题/主题生成内容，再制作视频和音频”的链路，现在已经不是概念说明，而是可直接执行的命令入口。
-
-## 风格命中手册
-
-如果你现在最关心的是：
-
-- 为什么某个风格没有出来
-- 为什么 `feature-rail` 被别的风格抢走
-- 怎么强制命中 `terminal / metrics / code / focus`
-- `metrics bars` 和 `focus diagram` 这些子变体怎么控
-
-直接看这份文档：
-
-- [`docs/ultimate-style-hit-guide.zh-CN.md`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/ultimate-style-hit-guide.zh-CN.md)
-
-如果你更关心的是：
-
-- 怎么把这套命中系统升级成 2-3 分钟技术型节目
-- 怎么支持“每天根据全球搜索信息自动出片”
-- 怎么从短视频规则命中升级成节目编排系统
-
-直接看这份升级蓝图：
-
-- [`docs/ultimate-daily-tech-upgrade.zh-CN.md`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/ultimate-daily-tech-upgrade.zh-CN.md)
-
-如果你现在要处理的是：
-
-- 阿里云百炼 Qwen TTS 怎么接
-- 怎么创建 / 复用克隆音色
-- 怎么把 `qwen-tts` 接进原工作流
-
-直接看这份文档：
-
-- [`docs/qwen-tts-bailian.zh-CN.md`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/docs/qwen-tts-bailian.zh-CN.md)
-
-## 推荐实战顺序
-
-1. 复制 [`examples/ultimate-scene-demo.json`](/Users/macos/OpenClaw/remotion-generated-video-project/remotion-video/examples/ultimate-scene-demo.json)
-2. 直接改 `scenes[]`、字幕和数据块
-3. 运行 `npm run ultimate:check`
-4. 运行 `npm run ultimate:render`
-
-## 现在这套东西解决了什么
-
-- 你不需要重新做镜头语言
-- 你不需要重新排 1920×1080 安全区
-- 你不需要手动计算每屏时长
-- 你不需要每次都从零拼视觉元素
-- 你可以先写自己的文案，再让模板复用这两个参考视频的视觉节奏和模块结构
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| PORT | 3001 | 服务端口 |
+| PIPELINE_QUEUE_MODE | file | 队列模式 (file/redis) |
+| PIPELINE_LOG_LEVEL | info | 日志级别 |
+| PIPELINE_API_KEY | — | API 认证密钥 |
+| PIPELINE_ADMIN_KEY | — | Admin 认证密钥 |
+| PIPELINE_MEMORY_LIMIT_MB | 4096 | 总内存上限 |
+| PIPELINE_PROCESS_MEMORY_MB | 2048 | 单进程内存上限 |
+| MINIMAX_API_KEY | — | MiniMax LLM API 密钥 |
+| OPENAI_API_KEY | — | OpenAI API 密钥 |
+| DASHSCOPE_API_KEY | — | 阿里千问 TTS API 密钥 |
+| DEEPGRAM_API_KEY | — | Deepgram 字幕 API 密钥 |

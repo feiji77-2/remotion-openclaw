@@ -6,6 +6,7 @@
 import React from 'react';
 import {interpolate, spring, useCurrentFrame} from 'remotion';
 import {resolveUltimateAccent} from '../tokens';
+import {useStaggerScale} from '../motionGrammar';
 import type {UltimateSceneGrammar} from '../types';
 
 interface MinimalTagItem {
@@ -76,6 +77,7 @@ export const MinimalTagMatrix: React.FC<MinimalTagMatrixProps> = ({
           const opacity = interpolate(reveal, [0, 1], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
           const scale = interpolate(reveal, [0, 1], [0.8, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
           const itemColor = resolveUltimateAccent((item.accent as 'purple') ?? accent as 'purple');
+          const stagger = useStaggerScale(frame, i, 4);
 
           return (
             <div key={i} style={{
@@ -86,8 +88,8 @@ export const MinimalTagMatrix: React.FC<MinimalTagMatrixProps> = ({
               border: `1.5px solid ${itemColor}40`,
               borderRadius: 12,
               padding: '14px 28px',
-              opacity,
-              transform: `scale(${scale})`,
+              opacity: opacity * stagger.opacity,
+              transform: `${stagger.transform} scale(${scale})`,
             }}>
               {item.label}
             </div>

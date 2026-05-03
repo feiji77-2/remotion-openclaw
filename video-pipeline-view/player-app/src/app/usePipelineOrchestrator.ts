@@ -139,6 +139,7 @@ export function usePipelineOrchestrator() {
     previewRatio,
     busyAll,
     errorMsg,
+    skillError,
     toast,
     selectedAnalysis,
     selectedTitleId,
@@ -170,6 +171,7 @@ export function usePipelineOrchestrator() {
     setPreviewRatio,
     setBusyAll,
     setErrorMsg,
+    setSkillError,
     setToast,
     setSelectedAnalysis,
     setSelectedTitleId,
@@ -767,16 +769,28 @@ export function usePipelineOrchestrator() {
     setBusyAll(true);
     setErrorMsg(null);
     try {
-      await generateStep(1);
-      await generateStoryboardImages();
-      await submitVoice();
+      for (let i = 1; i <= 8; i++) {
+        const stepId = i as WorkflowStepId;
+        await generateStep(stepId);
+        setActiveStep(stepId);
+
+        if (stepId === 5) {
+          await generateStoryboardImages();
+        }
+        if (stepId === 6) {
+          await submitVoice();
+        }
+        if (stepId === 8) {
+          await submitRender();
+        }
+      }
       showToast('流水线已全部提交');
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : String(err));
     } finally {
       setBusyAll(false);
     }
-  }, [generateStep, generateStoryboardImages, setBusyAll, setErrorMsg, showToast, submitVoice]);
+  }, [generateStep, generateStoryboardImages, setActiveStep, setBusyAll, setErrorMsg, showToast, submitRender, submitVoice]);
 
   // ── Navigation ─────────────────────────────────────────────────────────────
 
@@ -868,14 +882,14 @@ export function usePipelineOrchestrator() {
 
   const goNextStep = useCallback(async () => {
     if (!nextStepId) return;
-    await handleStepSelect(nextStepId);
     const currentStepMeta = STEP_LIST.find((s) => s.id === activeStep);
     if (!stepConfirmed[activeStep]) {
       showToast(`请先确认当前步骤 ${currentStepMeta?.label || activeStep}`);
       return;
     }
+    await handleStepSelect(nextStepId);
     await generateStep(nextStepId);
-  }, [activeStep, generateStep, handleStepSelect, nextStepId, setStepConfirmed, showToast, stepConfirmed]);
+  }, [activeStep, generateStep, handleStepSelect, nextStepId, showToast, stepConfirmed]);
 
   // ── Skill / eval derived values ────────────────────────────────────────────
 
@@ -892,7 +906,10 @@ export function usePipelineOrchestrator() {
     [pipelineState.titles?.options, selectedTitleId],
   );
   const renderMediaReady = Boolean(
-    renderJobStatus === 'done' && (renderJobResult?.outputUrl || renderJobResult?.outputFile),
+    renderJobStatus === 'done' && (
+      renderJobResult?.outputUrl ||
+      (typeof renderJobResult?.outputFile === 'string' && renderJobResult.outputFile.length > 0)
+    ),
   );
 
   const skillCatalog = pipelineState.skillCatalog ?? [];
@@ -936,6 +953,7 @@ export function usePipelineOrchestrator() {
     busyAll,
     confirmCurrentStep,
     errorMsg,
+    skillError,
     generateStep,
     generateStoryboardImages,
     getStepPreview,
@@ -970,8 +988,10 @@ export function usePipelineOrchestrator() {
     selectedTitleId,
     setApiBase,
     setApiKey,
+    setErrorMsg,
     setPreviewRatio,
     setSelectedShotId,
+    setSkillError,
     setTitleKeywords,
     shotsState,
     skillCatalog,

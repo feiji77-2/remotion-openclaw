@@ -7,6 +7,7 @@
 import React from 'react';
 import {interpolate, spring, useCurrentFrame} from 'remotion';
 import {resolveUltimateAccent} from '../tokens';
+import {useTextSlideIn} from '../motionGrammar';
 import type {UltimateSceneGrammar} from '../types';
 
 interface MinimalHeroProps {
@@ -28,6 +29,9 @@ export const MinimalHero: React.FC<MinimalHeroProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const color = resolveUltimateAccent(accent as 'purple');
+
+  // Text slide-in enhancement
+  const titleMotion = useTextSlideIn(frame, 'up', 6);
 
   // 标题淡入
   const titleReveal = spring({
@@ -95,8 +99,8 @@ export const MinimalHero: React.FC<MinimalHeroProps> = ({
         textAlign: 'center',
         lineHeight: 1.3,
         letterSpacing: -2,
-        opacity: titleOpacity,
-        transform: `translateY(${titleY}px)`,
+        opacity: titleOpacity * titleMotion.opacity,
+        transform: `${titleMotion.transform} translateY(${titleY}px)`,
       }}>
         {title}
       </div>

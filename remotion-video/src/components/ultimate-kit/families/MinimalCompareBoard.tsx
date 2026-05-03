@@ -6,6 +6,7 @@
 import React from 'react';
 import {interpolate, spring, useCurrentFrame} from 'remotion';
 import {resolveUltimateAccent} from '../tokens';
+import {useTextSlideIn} from '../motionGrammar';
 import type {UltimateSceneGrammar} from '../types';
 
 interface MinimalCompareSide {
@@ -67,6 +68,8 @@ export const MinimalCompareBoard: React.FC<MinimalCompareBoardProps> = ({
 
   const leftColor = resolveUltimateAccent((left.accent as 'purple') ?? 'purple');
   const rightColor = resolveUltimateAccent((right.accent as 'cyan') ?? 'cyan');
+  const leftMotion = useTextSlideIn(frame, 'left', 0);
+  const rightMotion = useTextSlideIn(frame, 'right', 3);
 
   return (
     <div style={{
@@ -102,8 +105,8 @@ export const MinimalCompareBoard: React.FC<MinimalCompareBoardProps> = ({
         <div style={{
           flex: 1,
           textAlign: 'center',
-          opacity: leftOpacity,
-          transform: `translateX(${leftX}px)`,
+          opacity: leftOpacity * leftMotion.opacity,
+          transform: `${leftMotion.transform} translateX(${leftX}px)`,
         }}>
           <div style={{fontSize: 48, fontWeight: 900, color: leftColor, marginBottom: 20}}>
             {left.title}
@@ -128,8 +131,8 @@ export const MinimalCompareBoard: React.FC<MinimalCompareBoardProps> = ({
         <div style={{
           flex: 1,
           textAlign: 'center',
-          opacity: rightOpacity,
-          transform: `translateX(${rightX}px)`,
+          opacity: rightOpacity * rightMotion.opacity,
+          transform: `${rightMotion.transform} translateX(${rightX}px)`,
         }}>
           <div style={{fontSize: 48, fontWeight: 900, color: rightColor, marginBottom: 20}}>
             {right.title}

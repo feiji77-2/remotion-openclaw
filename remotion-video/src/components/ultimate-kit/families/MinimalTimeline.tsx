@@ -6,6 +6,7 @@
 import React from 'react';
 import {interpolate, spring, useCurrentFrame} from 'remotion';
 import {resolveUltimateAccent} from '../tokens';
+import {useStaggerSlide} from '../motionGrammar';
 import type {UltimateSceneGrammar} from '../types';
 
 interface MinimalTimelineItem {
@@ -78,14 +79,15 @@ export const MinimalTimeline: React.FC<MinimalTimelineProps> = ({
           const opacity = interpolate(reveal, [0, 1], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
           const x = interpolate(reveal, [0, 1], [-30, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
           const itemColor = resolveUltimateAccent((item.accent as 'cyan') ?? (i % 2 === 0 ? 'cyan' : 'green'));
+          const stagger = useStaggerSlide(frame, i, 6, 'up', 16);
 
           return (
             <div key={i} style={{
               display: 'flex',
               alignItems: 'flex-start',
               gap: 24,
-              opacity,
-              transform: `translateX(${x}px)`,
+              opacity: opacity * stagger.opacity,
+              transform: `${stagger.transform} translateX(${x}px)`,
             }}>
               {/* 时间标签 */}
               <div style={{

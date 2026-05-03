@@ -15,6 +15,7 @@ export function useSkillCatalogLoader() {
   const apiKey = usePipelineSessionStore((s) => s.apiKey);
   const hasHydrated = usePipelineSessionStore((s) => s.hasHydrated);
   const setPipelineState = usePipelineSessionStore((s) => s.setPipelineState);
+  const setSkillError = usePipelineSessionStore((s) => s.setSkillError);
 
   const loadSkillCatalog = useCallback(async () => {
     try {
@@ -24,11 +25,13 @@ export function useSkillCatalogLoader() {
         ...prev,
         skillCatalog: catalog,
       }));
+      setSkillError(null);
       return catalog;
-    } catch {
+    } catch (err) {
+      setSkillError('技能目录加载失败: ' + (err instanceof Error ? err.message : String(err)));
       return null;
     }
-  }, [apiBase, apiKey, setPipelineState]);
+  }, [apiBase, apiKey, setPipelineState, setSkillError]);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -44,6 +47,7 @@ export function useSkillSpecLoader(activeStep: WorkflowStepId) {
   const apiKey = usePipelineSessionStore((s) => s.apiKey);
   const hasHydrated = usePipelineSessionStore((s) => s.hasHydrated);
   const setPipelineState = usePipelineSessionStore((s) => s.setPipelineState);
+  const setSkillError = usePipelineSessionStore((s) => s.setSkillError);
 
   const loadSkillSpec = useCallback(async (stepId: WorkflowStepId) => {
     const skillId = getSkillIdForStep(stepId);
@@ -63,11 +67,13 @@ export function useSkillSpecLoader(activeStep: WorkflowStepId) {
           [skillId]: skillSpec,
         },
       }));
+      setSkillError(null);
       return skillSpec;
-    } catch {
+    } catch (err) {
+      setSkillError('技能配置加载失败: ' + (err instanceof Error ? err.message : String(err)));
       return null;
     }
-  }, [apiBase, apiKey, setPipelineState]);
+  }, [apiBase, apiKey, setPipelineState, setSkillError]);
 
   useEffect(() => {
     if (!hasHydrated) return;

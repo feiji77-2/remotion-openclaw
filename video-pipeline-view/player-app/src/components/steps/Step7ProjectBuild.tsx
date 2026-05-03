@@ -9,6 +9,7 @@ interface Step7ProjectBuildProps {
   confirmed: boolean;
   onGenerate: () => void;
   onConfirm: () => void;
+  workbenchMode?: boolean;
 }
 
 function getBuildTone(buildStatus: string | null | undefined) {

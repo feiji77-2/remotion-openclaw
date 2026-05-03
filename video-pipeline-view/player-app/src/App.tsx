@@ -3,7 +3,7 @@ import {usePipelineOrchestrator} from './app/usePipelineOrchestrator';
 import {usePreviewPlayback} from './app/usePreviewPlayback';
 import {computeStepBadgeClass, computeStepBadgeLabel, useBuildStatus, useStepStatus} from './app/useStepStatus';
 import {STEP_LIST} from './workflow/steps';
-import {StepWorkspace} from './components/steps/StepWorkspace';
+import {StepWorkspace} from './components/steps';
 
 const App: React.FC = () => {
   const {
@@ -53,10 +53,12 @@ const App: React.FC = () => {
     setApiKey,
     setPreviewRatio,
     setSelectedShotId,
+    setSkillError,
     setTitleKeywords,
     skillCatalog,
     shotsState,
     showToast,
+    skillError,
     stepConfirmed,
     stepDone,
     stepSkillDirty,
@@ -755,6 +757,12 @@ const App: React.FC = () => {
       </div>
 
       {errorMsg ? <div className="mac-alert">错误：{errorMsg}</div> : null}
+      {skillError ? (
+        <div className="mac-alert" style={{background: '#fff3e0', color: '#b54708', border: '1px solid #ffd6a5'}}>
+          <span>{skillError}</span>
+          <button onClick={() => setSkillError(null)} style={{marginLeft: 12, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#b54708'}}>×</button>
+        </div>
+      ) : null}
       {toast ? <div className="mac-toast">{toast}</div> : null}
     </div>
   );

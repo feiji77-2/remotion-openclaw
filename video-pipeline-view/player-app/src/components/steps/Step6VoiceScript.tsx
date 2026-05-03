@@ -74,6 +74,7 @@ interface Step6VoiceScriptProps {
   loading: boolean;
   confirmed: boolean;
   onConfirm: () => void;
+  workbenchMode?: boolean;
 }
 
 // ── Draft builder ────────────────────────────────────────────────────────────
@@ -164,102 +165,105 @@ export const Step6VoiceScript: React.FC<Step6VoiceScriptProps> = ({
   const hasVoiceResult = voiceStatus === 'done' && voiceResult;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="wf-form-stack">
       {/* Stats bar */}
-      <div className="flex items-center gap-3 text-sm text-gray-400">
+      <div className="wf-inline-actions" style={{fontSize: 12, color: 'var(--muted)'}}>
         <span>
           {narrationList.length}/{shots.length} 场景已填写
         </span>
         <span>约 {durationLabel}</span>
         <span>约 {totalChars} 字</span>
         {hasVoiceResult && (
-          <span className="text-green-400">
+          <span style={{color: '#34c759'}}>
             已生成 {voiceResult.queue?.length ?? 0} 条配音
           </span>
         )}
       </div>
 
       {/* Engine selector */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="wf-inline-actions">
         {ENGINE_OPTIONS.map((opt) => (
           <button
             key={opt.value}
             onClick={() => onUpdate({...current, engine: opt.value})}
-            className={`px-3 py-1.5 rounded text-sm border ${
-              current.engine === opt.value
-                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                : 'border-gray-200 text-gray-600 hover:border-blue-300'
-            }`}
+            className="wf-btn"
+            style={{
+              border: `1px solid ${current.engine === opt.value ? 'var(--blue)' : 'var(--line)'}`,
+              background: current.engine === opt.value ? 'var(--blue-soft)' : undefined,
+              color: current.engine === opt.value ? 'var(--blue)' : 'var(--muted)',
+            }}
           >
             {opt.label}
           </button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <label className="flex flex-col gap-1 text-sm text-gray-600">
+      <div className="wf-voice-parameter-grid">
+        <label className="wf-control-field">
           <span>系统音色 / 克隆音色 ID</span>
           <input
             value={current.voice || ''}
             onChange={(e) => onUpdate({...current, voice: e.target.value})}
             placeholder="留空则使用默认系统音色"
-            className="border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+            className="mac-input"
             autoComplete="off"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm text-gray-600">
+        <label className="wf-control-field">
           <span>参考音频路径或 URL</span>
           <input
             value={current.referenceUrl || current.reference_url || ''}
             onChange={(e) => onUpdate({...current, referenceUrl: e.target.value, reference_url: e.target.value})}
             placeholder="留空则不走克隆"
-            className="border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+            className="mac-input"
             autoComplete="off"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm text-gray-600">
+        <label className="wf-control-field">
           <span>千问模型</span>
           <input
             value={current.model || ''}
             onChange={(e) => onUpdate({...current, model: e.target.value})}
             placeholder="例如 qwen3-tts-flash"
-            className="border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+            className="mac-input"
             autoComplete="off"
           />
         </label>
       </div>
 
-      <div className="text-xs text-gray-500">
+      <div style={{fontSize: 12, color: 'var(--muted)'}}>
         当前只保留阿里千问 TTS 链路。填写参考音频且不填音色 ID 时，后端会自动创建或复用克隆音色。
       </div>
 
       {/* Style + Speed */}
-      <div className="flex gap-4">
-        <div className="flex gap-2">
+      <div className="wf-inline-actions" style={{gap: 16}}>
+        <div className="wf-inline-actions">
           {VOICE_STYLE_OPTIONS.map((opt) => (
             <button
               key={opt.id}
               onClick={() => onUpdate({...current, stylePresetId: opt.id, preset: opt.preset, speed: opt.speed})}
-              className={`px-3 py-1.5 rounded text-sm border ${
-                resolveVoiceStyleId(current) === opt.id
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 text-gray-600'
-              }`}
+              className="wf-btn"
+              style={{
+                border: `1px solid ${resolveVoiceStyleId(current) === opt.id ? 'var(--blue)' : 'var(--line)'}`,
+                background: resolveVoiceStyleId(current) === opt.id ? 'var(--blue-soft)' : undefined,
+                color: resolveVoiceStyleId(current) === opt.id ? 'var(--blue)' : 'var(--muted)',
+              }}
             >
               {opt.label}
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="wf-inline-actions">
           {SPEED_OPTIONS.map((opt) => (
             <button
               key={opt.id}
               onClick={() => onUpdate({...current, speedPresetId: opt.id, speed: opt.value})}
-              className={`px-3 py-1.5 rounded text-sm border ${
-                resolveSpeedPresetId(current, currentStyleOption.speed) === opt.id
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 text-gray-600'
-              }`}
+              className="wf-btn"
+              style={{
+                border: `1px solid ${resolveSpeedPresetId(current, currentStyleOption.speed) === opt.id ? 'var(--blue)' : 'var(--line)'}`,
+                background: resolveSpeedPresetId(current, currentStyleOption.speed) === opt.id ? 'var(--blue-soft)' : undefined,
+                color: resolveSpeedPresetId(current, currentStyleOption.speed) === opt.id ? 'var(--blue)' : 'var(--muted)',
+              }}
             >
               {opt.label}
             </button>
@@ -268,14 +272,16 @@ export const Step6VoiceScript: React.FC<Step6VoiceScriptProps> = ({
       </div>
 
       {/* Narration list */}
-      <div className="flex flex-col gap-3">
+      <div className="wf-voice-script-list">
         {shots.map((shot) => {
           const item = currentScript.find((s) => s.shotId === shot.id);
           const asset = voiceAssets.find((a) => a.shotId === shot.id);
           return (
-            <div key={shot.id} className="flex gap-3 items-start border border-gray-100 rounded p-3">
-              <div className="flex-1">
-                <div className="text-xs font-medium text-gray-500 mb-1">{shot.title}</div>
+            <div key={shot.id} className="wf-voice-shot-item">
+              <div style={{flex: 1}}>
+                <div className="wf-copy-subtitle" style={{marginBottom: 4, fontWeight: 500}}>
+                  {shot.title}
+                </div>
                 <textarea
                   value={item?.text || ''}
                   onChange={(e) => {
@@ -285,11 +291,11 @@ export const Step6VoiceScript: React.FC<Step6VoiceScriptProps> = ({
                     onUpdate({...current, script: next});
                   }}
                   rows={2}
-                  className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:border-blue-400"
+                  className="wf-edit-textarea"
                   placeholder="输入旁白文案..."
                 />
                 {asset && (
-                  <div className="text-xs text-green-600 mt-1">
+                  <div style={{fontSize: 12, color: '#34c759', marginTop: 4}}>
                     配音 {asset.durationSeconds.toFixed(1)}s 已生成
                   </div>
                 )}
@@ -300,12 +306,12 @@ export const Step6VoiceScript: React.FC<Step6VoiceScriptProps> = ({
       </div>
 
       {/* Submit / regenerate */}
-      <div className="flex gap-3">
+      <div className="wf-inline-actions">
         {!hasVoiceResult ? (
           <button
             onClick={() => onSubmitVoice(current)}
             disabled={loading || !canAutoSubmit}
-            className="px-4 py-2 bg-blue-600 text-white rounded text-sm disabled:opacity-40"
+            className="wf-btn wf-btn-primary"
           >
             {loading ? '提交中…' : '提交配音'}
           </button>
@@ -313,7 +319,8 @@ export const Step6VoiceScript: React.FC<Step6VoiceScriptProps> = ({
           <button
             onClick={() => onSubmitVoice(current)}
             disabled={loading}
-            className="px-4 py-2 border border-blue-400 text-blue-600 rounded text-sm"
+            className="wf-btn"
+            style={{border: '1px solid var(--blue)', color: 'var(--blue)'}}
           >
             重新生成配音
           </button>
@@ -321,15 +328,20 @@ export const Step6VoiceScript: React.FC<Step6VoiceScriptProps> = ({
         {hasVoiceResult && (
           <button
             onClick={onBackfillDurations}
-            className="px-4 py-2 border border-gray-300 text-gray-600 rounded text-sm"
+            className="wf-btn"
+            style={{border: '1px solid var(--line)'}}
           >
             用配音更新镜头时长
           </button>
         )}
-        <button onClick={clearEditor} className="px-4 py-2 border border-gray-200 text-gray-500 rounded text-sm">
+        <button onClick={clearEditor} className="wf-btn" style={{border: '1px solid var(--line)'}}>
           重置
         </button>
-        <button onClick={onConfirm} disabled={confirmed} className="px-4 py-2 border border-green-400 text-green-600 rounded text-sm disabled:opacity-40">
+        <button
+          onClick={onConfirm}
+          disabled={confirmed}
+          className={`wf-btn wf-btn-confirm ${confirmed ? 'active' : ''}`}
+        >
           {confirmed ? '已确认' : '确认'}
         </button>
       </div>

@@ -7,6 +7,7 @@
 import React from 'react';
 import {interpolate, spring, useCurrentFrame} from 'remotion';
 import {resolveUltimateAccent} from '../tokens';
+import {useStaggerSlide} from '../motionGrammar';
 import type {UltimateSceneGrammar} from '../types';
 
 interface MinimalStepItem {
@@ -84,14 +85,15 @@ export const MinimalStepFlow: React.FC<MinimalStepFlowProps> = ({
           const opacity = interpolate(reveal, [0, 1], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
           const y = interpolate(reveal, [0, 1], [20, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
           const stepColor = resolveUltimateAccent((step.accent as 'purple') ?? (i % 2 === 0 ? 'cyan' : 'green'));
+          const stagger = useStaggerSlide(frame, i, 6, 'right', 20);
 
           return (
             <div key={i} style={{
               display: 'flex',
               alignItems: 'center',
               gap: 20,
-              opacity,
-              transform: `translateY(${y}px)`,
+              opacity: opacity * stagger.opacity,
+              transform: `${stagger.transform} translateY(${y}px)`,
               width: '100%',
             }}>
               {/* 序号/图标 */}

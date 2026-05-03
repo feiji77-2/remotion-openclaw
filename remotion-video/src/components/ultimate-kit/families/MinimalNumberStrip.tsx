@@ -6,6 +6,7 @@
 import React from 'react';
 import {interpolate, spring, useCurrentFrame} from 'remotion';
 import {resolveUltimateAccent} from '../tokens';
+import {useScaleEmphasis} from '../motionGrammar';
 import type {UltimateSceneGrammar} from '../types';
 
 interface MinimalNumberItem {
@@ -76,6 +77,7 @@ export const MinimalNumberStrip: React.FC<MinimalNumberStripProps> = ({
           const opacity = interpolate(reveal, [0, 1], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
           const y = interpolate(reveal, [0, 1], [30, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
           const itemColor = resolveUltimateAccent((item.accent as 'cyan') ?? accent as 'cyan');
+          const scaleMotion = useScaleEmphasis(frame, 6);
 
           // 数字递增动画
           const numMatch = item.value.match(/^([\d,.]+)(.*)/);
@@ -101,6 +103,8 @@ export const MinimalNumberStrip: React.FC<MinimalNumberStripProps> = ({
                 fontWeight: 900,
                 color: itemColor,
                 letterSpacing: -3,
+                opacity: scaleMotion.opacity,
+                transform: scaleMotion.transform,
               }}>
                 {displayValue}
               </div>

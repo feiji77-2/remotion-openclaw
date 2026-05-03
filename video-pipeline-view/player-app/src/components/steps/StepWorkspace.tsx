@@ -118,7 +118,12 @@ export const StepWorkspace: React.FC<StepWorkspaceProps> = ({
 
   const workspaceStatus = useMemo(() => {
     if (stepId === 8) {
-      const mediaReady = Boolean(renderResult?.mediaReady && (renderResult.outputUrl || renderResult.downloadUrl));
+      const mediaReady = Boolean(
+        renderResult?.mediaReady === true && (
+          typeof renderResult.outputUrl === 'string' ||
+          typeof renderResult.downloadUrl === 'string'
+        )
+      );
 
       if (loading || renderStatus === 'running' || renderStatus === 'pending') {
         return {label: '渲染中', className: 'is-running'};
@@ -288,6 +293,20 @@ export const StepWorkspace: React.FC<StepWorkspaceProps> = ({
           loading={loading}
           confirmed={confirmed}
           onConfirm={onConfirmStep}
+          workbenchMode
+        />
+      ) : null}
+
+      {stepId === 7 ? (
+        <Step7ProjectBuild
+          stepId={stepId}
+          data={pipelineState.projectBuild || null}
+          evaluation={stepEvaluation}
+          loading={loading}
+          confirmed={confirmed}
+          onGenerate={onGenerateStep}
+          onConfirm={onConfirmStep}
+          workbenchMode
         />
       ) : null}
 
@@ -303,18 +322,7 @@ export const StepWorkspace: React.FC<StepWorkspaceProps> = ({
           renderProgress={renderProgress}
           renderResult={renderResult}
           loading={loading}
-        />
-      ) : null}
-
-      {stepId === 7 ? (
-        <Step7ProjectBuild
-          stepId={stepId}
-          data={pipelineState.projectBuild || null}
-          evaluation={stepEvaluation}
-          loading={loading}
-          confirmed={confirmed}
-          onGenerate={onGenerateStep}
-          onConfirm={onConfirmStep}
+          workbenchMode
         />
       ) : null}
 

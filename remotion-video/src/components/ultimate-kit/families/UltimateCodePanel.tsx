@@ -1,7 +1,9 @@
 import React from 'react';
+import {useCurrentFrame} from 'remotion';
 import {CodeTraceSweep, GeometryAccent, TextMaskWipe} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
+import {useStaggerSlide} from '../motionGrammar';
 import type {UltimateCodePanelProps, UltimateSceneGrammar} from '../types';
 
 export const UltimateCodePanel: React.FC<UltimateCodePanelProps & {grammar?: UltimateSceneGrammar}> = ({
@@ -14,6 +16,7 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps & {grammar?: Ult
   grammar,
 }) => {
   const color = resolveUltimateAccent(accent);
+  const frame = useCurrentFrame();
   const revealDirection = resolveTextRevealDirection(grammar, 'left');
   const focusToken = lines[highlightLine ? highlightLine - 1 : 0]?.text?.trim().split(/\s+/)[0] || heading;
 
@@ -96,14 +99,17 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps & {grammar?: Ult
           gap: 12,
         }}
       >
-        {lines.slice(0, 4).map((line, index) => (
-          <div key={`${line.text}-${index}`} style={{display: 'flex', gap: 12, alignItems: 'center'}}>
-            <div style={{width: 36, height: 1, background: `linear-gradient(90deg, ${color}, transparent)`}} />
-            <div style={{fontSize: 20, lineHeight: 1.28, color: line.tone === 'accent' ? color : 'rgba(229,236,255,0.7)'}}>
-              {line.text}
+        {lines.slice(0, 4).map((line, index) => {
+          const lineMotion = useStaggerSlide(frame, index, 4, 'right', 20);
+          return (
+            <div key={`${line.text}-${index}`} style={{display: 'flex', gap: 12, alignItems: 'center', opacity: lineMotion.opacity, transform: lineMotion.transform}}>
+              <div style={{width: 36, height: 1, background: `linear-gradient(90deg, ${color}, transparent)`}} />
+              <div style={{fontSize: 20, lineHeight: 1.28, color: line.tone === 'accent' ? color : 'rgba(229,236,255,0.7)'}}>
+                {line.text}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

@@ -664,6 +664,7 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
   };
   return (
     <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
+      <ParticleBackground color={`${accentColor}14`} particleCount={18} speed={0.3} seed={3} />
       <div style={{position: 'absolute', top: 118, left: 150, right: 540}}>
         <div style={eyebrowStyle(accentColor, false)}>realtime pulse</div>
         <div style={{marginTop: 22, maxWidth: 820}}>

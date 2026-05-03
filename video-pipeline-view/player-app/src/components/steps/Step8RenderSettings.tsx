@@ -31,6 +31,7 @@ interface Step8RenderSettingsProps {
   renderProgress: number;
   renderResult: RenderJobResult | null;
   loading: boolean;
+  workbenchMode?: boolean;
 }
 
 const TEMPLATE_OPTIONS: Array<{

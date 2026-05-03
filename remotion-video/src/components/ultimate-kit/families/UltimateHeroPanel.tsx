@@ -1,6 +1,6 @@
 import React from 'react';
 import {interpolate, spring, useCurrentFrame} from 'remotion';
-import {GeometryAccent, ShockwaveWord, TextMaskWipe} from '../../visual-atoms';
+import {GeometryAccent, ShockwaveWord, TextMaskWipe, ParticleBackground} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent, ultimateKitTokens} from '../tokens';
 import type {UltimateHeroPanelProps, UltimateSceneGrammar} from '../types';
@@ -44,6 +44,7 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: Ult
 
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
+      <ParticleBackground color={`${color}22`} particleCount={24} speed={0.4} seed={1} />
       <div
         style={{
           position: 'absolute',

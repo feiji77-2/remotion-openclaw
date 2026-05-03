@@ -21,3 +21,6 @@ export {SplitAxisClash, type SplitAxisClashProps, type SplitAxisNode} from './Sp
 export {OrbitLabels, type OrbitLabelsProps, type OrbitLabelItem} from './OrbitLabels';
 export {CodeTraceSweep, type CodeTraceSweepProps} from './CodeTraceSweep';
 export {ShockwaveWord, type ShockwaveWordProps} from './ShockwaveWord';
+export {ParticleBackground, type ParticleBackgroundProps} from './ParticleBackground';
+export {ProgressRing, type ProgressRingProps} from './ProgressRing';
+export {MiniChart, type MiniChartProps} from './MiniChart';

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {Suspense} from 'react';
 import {Audio, Img, Sequence, interpolate, spring, useCurrentFrame, AbsoluteFill} from 'remotion';
 import {resolveAudioSource, resolveMediaSource} from '../utils/mediaSources';
 import {TransitionSeries, linearTiming, springTiming, type TransitionPresentation} from '@remotion/transitions';
@@ -9,29 +9,11 @@ import {flip} from '@remotion/transitions/flip';
 import {clockWipe} from '@remotion/transitions/clock-wipe';
 import {SpeedLines, PulseRing, Orbit} from '../components/MotionFX';
 import {
-  UltimateArchitectureMap,
-  UltimateBenchmarkChart,
   UltimateCaptionOverlay,
-  UltimateCodePanel,
-  UltimateCompareBoard,
-  UltimateCtaPanel,
   UltimateDirectorEffects,
-  UltimateDataStream,
-  UltimateEvidenceWall,
-  UltimateFeatureCardRail,
-  UltimateFocusDiagram,
-  UltimateGlossaryTerm,
-  UltimateHeroPanel,
-  UltimateMetricBars,
-  UltimateNumberStrip,
   UltimatePlatformOverlay,
-  UltimateQuoteHighlight,
   UltimateSceneTransition,
   UltimateStage,
-  UltimateStepFlow,
-  UltimateTagMatrix,
-  UltimateTerminalPanel,
-  UltimateTimeline,
   type UltimatePlatformOverlayProps,
   getUltimateIncomingTransitionDurationInFrames,
   normalizeUltimateProjectConfig,
@@ -48,55 +30,65 @@ import {
 } from '../components/ultimate-kit/iconography';
 import {sceneMediaLayout, sceneIconOrbitLayout} from '../components/ultimate-kit/layouts';
 import {appendUltimateMicroJitter, createUltimateMicroJitter} from '../components/ultimate-kit/motion';
-import {getFamily} from '../data/registry';
 import {hydrateUltimateProjectConfigWithDirectorGrammar} from '../data/storyboardLoader';
 
-// ── Minimal (抖音风格) 组件 ──────────────────────────────
-import {MinimalHero} from '../components/ultimate-kit/families/MinimalHero';
-import {MinimalStepFlow} from '../components/ultimate-kit/families/MinimalStepFlow';
-import {MinimalTagMatrix} from '../components/ultimate-kit/families/MinimalTagMatrix';
-import {MinimalNumberStrip} from '../components/ultimate-kit/families/MinimalNumberStrip';
-import {MinimalTimeline} from '../components/ultimate-kit/families/MinimalTimeline';
-import {MinimalCompareBoard} from '../components/ultimate-kit/families/MinimalCompareBoard';
+// ── Lazy-loaded family components (code-split, loaded on demand) ──
+import {
+  LazyHeroPanel,
+  LazyFeatureCardRail,
+  LazyFocusDiagram,
+  LazyNumberStrip,
+  LazyStepFlow,
+  LazyTimeline,
+  LazyCompareBoard,
+  LazyTerminalPanel,
+  LazyEvidenceWall,
+  LazyArchitectureMap,
+  LazyTagMatrix,
+  LazyCodePanel,
+  LazyMetricBars,
+  LazyDataStream,
+  LazyBenchmarkChart,
+  LazyQuoteHighlight,
+  LazyGlossaryTerm,
+  LazyCtaPanel,
+  LazyMinimalHero,
+  LazyMinimalStepFlow,
+  LazyMinimalTagMatrix,
+  LazyMinimalNumberStrip,
+  LazyMinimalTimeline,
+  LazyMinimalCompareBoard,
+} from '../components/ultimate-kit/lazyFamilies';
 
-const renderSceneContent = (scene: ResolvedUltimateSceneConfig) => {
-  const entry = getFamily(scene.family);
-  if (!entry) return null;
-
-  const componentMap: Record<string, React.ComponentType<any> | undefined> = {
-    hero: UltimateHeroPanel,
-    'feature-rail': UltimateFeatureCardRail,
-    focus: UltimateFocusDiagram,
-    'number-strip': UltimateNumberStrip,
-    'step-flow': UltimateStepFlow,
-    timeline: UltimateTimeline,
-    'compare-board': UltimateCompareBoard,
-    terminal: UltimateTerminalPanel,
-    'evidence-wall': UltimateEvidenceWall,
-    'architecture-map': UltimateArchitectureMap,
-    'tag-matrix': UltimateTagMatrix,
-    code: UltimateCodePanel,
-    metrics: UltimateMetricBars,
-    'data-stream': UltimateDataStream,
-    'memory-graph': UltimateArchitectureMap,
-    'pipeline-flow': UltimateStepFlow,
-    'benchmark-chart': UltimateBenchmarkChart,
-    'quote-highlight': UltimateQuoteHighlight,
-    'glossary-term': UltimateGlossaryTerm,
-    cta: UltimateCtaPanel,
-    // ── Minimal (抖音风格) ──────────────────────
-    'minimal-hero': MinimalHero,
-    'minimal-step-flow': MinimalStepFlow,
-    'minimal-tag-matrix': MinimalTagMatrix,
-    'minimal-number-strip': MinimalNumberStrip,
-    'minimal-timeline': MinimalTimeline,
-    'minimal-compare-board': MinimalCompareBoard,
-  };
-
-  const Component = componentMap[scene.family];
-  if (!Component) return null;
-
-  return <Component {...scene.data} grammar={scene.grammar} />;
+// Module-level component map (defined once, not recreated every frame)
+const COMPONENT_MAP: Record<string, React.ComponentType<any> | undefined> = {
+  hero: LazyHeroPanel,
+  'feature-rail': LazyFeatureCardRail,
+  focus: LazyFocusDiagram,
+  'number-strip': LazyNumberStrip,
+  'step-flow': LazyStepFlow,
+  timeline: LazyTimeline,
+  'compare-board': LazyCompareBoard,
+  terminal: LazyTerminalPanel,
+  'evidence-wall': LazyEvidenceWall,
+  'architecture-map': LazyArchitectureMap,
+  'tag-matrix': LazyTagMatrix,
+  code: LazyCodePanel,
+  metrics: LazyMetricBars,
+  'data-stream': LazyDataStream,
+  'memory-graph': LazyArchitectureMap,
+  'pipeline-flow': LazyStepFlow,
+  'benchmark-chart': LazyBenchmarkChart,
+  'quote-highlight': LazyQuoteHighlight,
+  'glossary-term': LazyGlossaryTerm,
+  cta: LazyCtaPanel,
+  // ── Minimal (抖音风格) ──────────────────────
+  'minimal-hero': LazyMinimalHero,
+  'minimal-step-flow': LazyMinimalStepFlow,
+  'minimal-tag-matrix': LazyMinimalTagMatrix,
+  'minimal-number-strip': LazyMinimalNumberStrip,
+  'minimal-timeline': LazyMinimalTimeline,
+  'minimal-compare-board': LazyMinimalCompareBoard,
 };
 
 const resolveSceneOverlay = (
@@ -507,6 +499,19 @@ export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
     return normalizeUltimateProjectConfig(hydratedConfig);
   }, [config]);
   const hasSegmentAudio = Array.isArray(audioSegments) && audioSegments.length > 0;
+
+  const renderSceneContent = React.useCallback(
+    (scene: ResolvedUltimateSceneConfig) => {
+      const Component = COMPONENT_MAP[scene.family];
+      if (!Component) return null;
+      return (
+        <Suspense fallback={null}>
+          <Component key={scene.id} {...scene.data} grammar={scene.grammar} />
+        </Suspense>
+      );
+    },
+    [],
+  );
 
   return (
     <>

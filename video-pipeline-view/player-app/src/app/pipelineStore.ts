@@ -63,6 +63,7 @@ interface PipelineSessionState {
   // ── UI ─────────────────────────────────────────────────────────────────
   busyAll: boolean;
   errorMsg: string | null;
+  skillError: string | null;
   toast: string | null;
   playbackResetKey: number;
   hasHydrated: boolean;
@@ -124,6 +125,7 @@ interface PipelineSessionActions {
   // ── UI ─────────────────────────────────────────────────────────────────
   setBusyAll: (next: Updater<boolean>) => void;
   setErrorMsg: (next: Updater<string | null>) => void;
+  setSkillError: (next: Updater<string | null>) => void;
   setToast: (next: Updater<string | null>) => void;
   setPlaybackResetKey: (next: Updater<number>) => void;
   setHasHydrated: (next: Updater<boolean>) => void;
@@ -165,6 +167,7 @@ function createInitialPipelineSessionState(): PipelineSessionState {
     regenerateAttempts: {},
     busyAll: false,
     errorMsg: null,
+    skillError: null,
     toast: null,
     playbackResetKey: 0,
     hasHydrated: false,
@@ -247,6 +250,7 @@ export const usePipelineSessionStore = create<PipelineSessionStore>((set) => {
     // ── UI ─────────────────────────────────────────────────────────────────
     setBusyAll: makeSetter('busyAll')(set),
     setErrorMsg: makeSetter('errorMsg')(set),
+    setSkillError: makeSetter('skillError')(set),
     setToast: makeSetter('toast')(set),
     setPlaybackResetKey: makeSetter('playbackResetKey')(set),
     setHasHydrated: makeSetter('hasHydrated')(set),

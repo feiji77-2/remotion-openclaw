@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef} from 'react';
+import {useEffect, useRef} from 'react';
 import {callJson} from './pipelineApi';
 import {startPollingLoop} from './jobPolling';
 import {usePipelineSessionStore} from './pipelineStore';
@@ -104,46 +104,4 @@ export function useRenderJobPolling(renderJobId: string | null) {
       cleanupRef.current = null;
     };
   }, [apiBase, apiKey, renderJobId, setRenderJobResult, setRenderJobStatus, setRenderProgress, setPlaybackResetKey, setErrorMsg]);
-}
-
-/** Polls image generation job, updates imageStatus / imageCount. */
-export function useImageJobPolling() {
-  const apiBase = usePipelineSessionStore((s) => s.apiBase);
-  const apiKey = usePipelineSessionStore((s) => s.apiKey);
-  const imageJobId = usePipelineSessionStore((s) => s.pipelineState.images?.jobId);
-  const setImageStatus = usePipelineSessionStore((s) => s.setImageStatus);
-  const setImageCount = usePipelineSessionStore((s) => s.setImageCount);
-
-  const cleanupRef = useRef<(() => void) | null>(null);
-
-  const load = useCallback(async () => {
-    if (!imageJobId) throw new Error('No image job id');
-    return await callJson(`${apiBase}/api/images/${imageJobId}`, {method: 'GET'}, apiKey);
-  }, [apiBase, apiKey, imageJobId]);
-
-  useEffect(() => {
-    if (!imageJobId) return;
-
-    cleanupRef.current = startPollingLoop<{
-      status?: string;
-      completed?: number;
-      error?: string | null;
-    }>({
-      load,
-      onData: (data) => {
-        const status = resolveJobStatus(data.status);
-        setImageStatus(status);
-        setImageCount(Number(data.completed ?? 0));
-      },
-      shouldStop: (data) =>
-        data.status === 'done' || data.status === 'error',
-      intervalMs: 2000,
-      maxIntervalMs: 6000,
-    });
-
-    return () => {
-      cleanupRef.current?.();
-      cleanupRef.current = null;
-    };
-  }, [load, imageJobId, setImageStatus, setImageCount]);
 }

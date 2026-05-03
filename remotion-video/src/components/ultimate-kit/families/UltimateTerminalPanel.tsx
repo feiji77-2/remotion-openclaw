@@ -1,7 +1,9 @@
 import React from 'react';
+import {useCurrentFrame} from 'remotion';
 import {CodeTraceSweep, GeometryAccent, TextMaskWipe} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
+import {useStaggerSlide} from '../motionGrammar';
 import type {UltimateSceneGrammar, UltimateTerminalPanelProps} from '../types';
 
 export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {grammar?: UltimateSceneGrammar}> = ({
@@ -14,6 +16,7 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
   grammar,
 }) => {
   const color = resolveUltimateAccent(accent);
+  const frame = useCurrentFrame();
   const visibleOutputs = outputs.slice(0, 5);
   const revealDirection = resolveTextRevealDirection(grammar, 'up');
   const statusRows = [
@@ -172,12 +175,15 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
               }}
             >
               <div style={{fontSize: 14, letterSpacing: 2, textTransform: 'uppercase', color}}>stdout preview</div>
-              {visibleOutputs.slice(0, 3).map((line, index) => (
-                <div key={`${line}-${index}`} style={{display: 'flex', gap: 10, alignItems: 'flex-start'}}>
-                  <div style={{width: 8, height: 8, borderRadius: '50%', background: color, marginTop: 8, flexShrink: 0}} />
-                  <div style={{fontSize: 17, lineHeight: 1.42, color: 'rgba(229,236,255,0.78)'}}>{line}</div>
-                </div>
-              ))}
+              {visibleOutputs.slice(0, 3).map((line, index) => {
+                const lineMotion = useStaggerSlide(frame, index, 3, 'left', 30);
+                return (
+                  <div key={`${line}-${index}`} style={{display: 'flex', gap: 10, alignItems: 'flex-start', opacity: lineMotion.opacity, transform: lineMotion.transform}}>
+                    <div style={{width: 8, height: 8, borderRadius: '50%', background: color, marginTop: 8, flexShrink: 0}} />
+                    <div style={{fontSize: 17, lineHeight: 1.42, color: 'rgba(229,236,255,0.78)'}}>{line}</div>
+                  </div>
+                );
+              })}
             </div>
 
             {note ? (
@@ -206,35 +212,40 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
               }}
             >
               <div style={{fontSize: 14, letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`}}>stream map</div>
-              {visibleOutputs.slice(0, 5).map((line, index) => (
-                <div
-                  key={`${line}-stream-${index}`}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '20px minmax(0, 1fr)',
-                    gap: 10,
-                    alignItems: 'start',
-                  }}
-                >
+              {visibleOutputs.slice(0, 5).map((line, index) => {
+                const lineMotion = useStaggerSlide(frame, index, 3, 'left', 30);
+                return (
                   <div
+                    key={`${line}-stream-${index}`}
                     style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: '50%',
-                      border: `1px solid ${color}36`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 10,
-                      color: `${color}cc`,
-                      fontFamily: 'JetBrains Mono, Menlo, monospace',
+                      display: 'grid',
+                      gridTemplateColumns: '20px minmax(0, 1fr)',
+                      gap: 10,
+                      alignItems: 'start',
+                      opacity: lineMotion.opacity,
+                      transform: lineMotion.transform,
                     }}
                   >
-                    {index + 1}
+                    <div
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        border: `1px solid ${color}36`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 10,
+                        color: `${color}cc`,
+                        fontFamily: 'JetBrains Mono, Menlo, monospace',
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+                    <div style={{fontSize: 15, lineHeight: 1.36, color: 'rgba(229,236,255,0.62)'}}>{line}</div>
                   </div>
-                  <div style={{fontSize: 15, lineHeight: 1.36, color: 'rgba(229,236,255,0.62)'}}>{line}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

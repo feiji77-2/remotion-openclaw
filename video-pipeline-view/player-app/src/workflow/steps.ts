@@ -11,7 +11,9 @@ export const STEP_LIST: StepMeta[] = [
   {id: 8, label: '渲染设置', hint: '模板与质量建议'},
 ];
 
-export const DEFAULT_SHOTS: Shot[] = [];
+export const DEFAULT_SHOTS: Shot[] = [
+  {id: 'default-1', title: '默认场景', narration: '', durationSeconds: 0, prompt: '', imageUrl: ''},
+];
 
 export function getStepOutputPreview(stepId: WorkflowStepId, pipelineState: Record<string, any>, shotsState: Shot[]) {
   if (stepId === 1) return pipelineState.analysis?.thesis || '还没有分析内容';
