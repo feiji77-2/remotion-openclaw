@@ -208,3 +208,160 @@ export function useDepthParallax(params: {
     panProgress: t,
   };
 }
+
+// ─── Text Movement Effects ──────────────────────────
+
+/**
+ * useTextSlideIn - Slides text from a direction with spring easing.
+ * @param frame - useCurrentFrame() value
+ * @param direction - 'left' | 'right' | 'up' | 'down'
+ * @param delay - frames to delay
+ * @param distance - pixels to slide (default 30)
+ * @returns transform style string
+ */
+export function useTextSlideIn(
+  frame: number,
+  direction: 'left' | 'right' | 'up' | 'down' = 'up',
+  delay = 0,
+  distance = 30,
+): { opacity: number; transform: string } {
+  const progress = spring({
+    fps: 30,
+    frame: Math.max(0, frame - delay),
+    config: { damping: 200, stiffness: 280 },
+  });
+
+  const opacity = interpolate(progress, [0, 0.3, 1], [0, 0.8, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  const directions: Record<string, [number, number]> = {
+    left: [-distance, 0],
+    right: [distance, 0],
+    up: [0, -distance],
+    down: [0, distance],
+  };
+  const [dx, dy] = directions[direction];
+
+  return {
+    opacity,
+    transform: `translateX(${interpolate(progress, [0, 1], [dx, 0])}px) translateY(${interpolate(progress, [0, 1], [dy, 0])}px)`,
+  };
+}
+
+// ─── Size Scaling Effects ──────────────────────────
+
+/**
+ * useScaleEmphasis - Element scales up on enter with bounce.
+ * @param frame - useCurrentFrame() value
+ * @param delay - frames to delay
+ * @param fromScale - starting scale (default 0.8)
+ * @param overshoot - overshoot scale (default 1.06)
+ * @returns transform style string
+ */
+export function useScaleEmphasis(
+  frame: number,
+  delay = 0,
+  fromScale = 0.8,
+  overshoot = 1.06,
+): { opacity: number; transform: string } {
+  const progress = spring({
+    fps: 30,
+    frame: Math.max(0, frame - delay),
+    config: { damping: 150, stiffness: 260 },
+  });
+
+  const scale = interpolate(
+    progress,
+    [0, 0.6, 0.8, 1],
+    [fromScale, overshoot, overshoot * 0.97, 1],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  );
+
+  return {
+    opacity: interpolate(progress, [0, 0.3, 1], [0, 0.9, 1], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    }),
+    transform: `scale(${scale})`,
+  };
+}
+
+/**
+ * usePulseAttention - Gentle pulsing scale oscillation for emphasis.
+ * @param frame - useCurrentFrame() value
+ * @param startDelay - frames before pulsing starts
+ * @param amplitude - pulse scale amplitude (default 0.04)
+ * @param period - frames per pulse cycle (default 60)
+ * @returns transform style string
+ */
+export function usePulseAttention(
+  frame: number,
+  startDelay = 30,
+  amplitude = 0.04,
+  period = 60,
+): { transform: string } {
+  const elapsed = Math.max(0, frame - startDelay);
+  const pulse = Math.sin((elapsed / period) * Math.PI * 2) * amplitude;
+  return {
+    transform: `scale(${1 + pulse})`,
+  };
+}
+
+// ─── Component Movement Effects ─────────────────────
+
+/**
+ * useStaggerSlide - Staggered slide-in for arrays of items.
+ * @param frame - useCurrentFrame() value
+ * @param index - item index in the array
+ * @param staggerDelay - frames between each item (default 6)
+ * @param direction - slide direction
+ * @param distance - slide distance in px
+ * @returns transform style string
+ */
+export function useStaggerSlide(
+  frame: number,
+  index: number,
+  staggerDelay = 6,
+  direction: 'left' | 'right' | 'up' | 'down' = 'down',
+  distance = 24,
+): { opacity: number; transform: string } {
+  return useTextSlideIn(frame, direction, index * staggerDelay, distance);
+}
+
+/**
+ * useStaggerScale - Staggered scale-in for arrays of items.
+ * @param frame - useCurrentFrame() value
+ * @param index - item index
+ * @param staggerDelay - frames between items (default 6)
+ * @returns transform style string
+ */
+export function useStaggerScale(
+  frame: number,
+  index: number,
+  staggerDelay = 6,
+): { opacity: number; transform: string } {
+  return useScaleEmphasis(frame, index * staggerDelay);
+}
+
+/**
+ * useFloatMotion - Continuous gentle floating for a component.
+ * @param frame - useCurrentFrame() value
+ * @param delay - start delay
+ * @param amplitude - float amplitude in px (default 6)
+ * @param period - oscillation period in frames (default 90)
+ * @returns transform style string
+ */
+export function useFloatMotion(
+  frame: number,
+  delay = 0,
+  amplitude = 6,
+  period = 90,
+): { transform: string } {
+  const elapsed = Math.max(0, frame - delay);
+  const floatY = Math.sin((elapsed / period) * Math.PI * 2) * amplitude;
+  return {
+    transform: `translateY(${floatY}px)`,
+  };
+}

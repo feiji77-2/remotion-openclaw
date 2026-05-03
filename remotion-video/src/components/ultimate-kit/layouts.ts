@@ -21,7 +21,9 @@ export const sceneMediaLayout: Partial<Record<ResolvedUltimateSceneConfig['famil
   'number-strip': {top: 198, left: 116, width: 1688, height: 560, opacity: 0.28, tiltDeg: 0, mode: 'ambient'},
   code: {top: 188, left: 778, width: 980, height: 608, opacity: 0.24, tiltDeg: -2, mode: 'ambient'},
   'data-stream': {top: 236, left: 210, width: 1500, height: 560, opacity: 0.16, tiltDeg: 0, mode: 'ambient'},
+  // Alias: resolved from memory-graph -> architecture-map
   'memory-graph': {top: 196, left: 160, width: 1600, height: 660, opacity: 0.14, tiltDeg: 0, mode: 'ambient'},
+  // Alias: resolved from pipeline-flow -> step-flow
   'pipeline-flow': {top: 268, left: 140, width: 1640, height: 520, opacity: 0.16, tiltDeg: 0, mode: 'ambient'},
   'benchmark-chart': {top: 230, left: 180, width: 1560, height: 620, opacity: 0.16, tiltDeg: 0, mode: 'ambient'},
   'quote-highlight': {top: 180, left: 280, width: 1360, height: 640, opacity: 0.14, tiltDeg: 0, mode: 'ambient'},
@@ -90,11 +92,13 @@ export const sceneIconOrbitLayout: Partial<Record<ResolvedUltimateSceneConfig['f
     {top: 220, right: 152, badgeSize: 70, size: 28, rotate: 6, delay: 6, opacity: 0.82},
     {bottom: 162, right: 262, badgeSize: 58, size: 22, rotate: -4, delay: 11, opacity: 0.74},
   ],
+  // Alias: resolved from memory-graph -> architecture-map
   'memory-graph': [
     {top: 210, left: 144, badgeSize: 72, size: 28, rotate: -7, delay: 0, opacity: 0.82},
     {top: 170, right: 144, badgeSize: 72, size: 28, rotate: 6, delay: 6, opacity: 0.82},
     {bottom: 156, left: 920, badgeSize: 60, size: 22, rotate: -2, delay: 12, opacity: 0.74},
   ],
+  // Alias: resolved from pipeline-flow -> step-flow
   'pipeline-flow': [
     {top: 246, left: 132, badgeSize: 70, size: 28, rotate: -6, delay: 0, opacity: 0.82},
     {top: 246, right: 132, badgeSize: 70, size: 28, rotate: 6, delay: 6, opacity: 0.82},

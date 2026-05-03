@@ -35,6 +35,7 @@ const {getSecurityConfig, assertQueueModeAllowed} = require('../security/apiSecu
 const {
   buildUltimateRenderProps,
 } = require('../../scripts/lib/index.js');
+const { trackProcess, startMonitoring } = require('./memoryLimiter');
 
 const OUTPUT_DIR = OUTPUT_ASSETS_DIR;
 const VOICE_DIR = VOICE_ASSETS_DIR;
@@ -505,6 +506,7 @@ async function stageRemotionRender(job, files, update, sharedDesignData) {
         jobId: job.id,
         projectId,
       });
+      trackProcess(proc, `render-${job.id}`);
 
       const renderTimeout = setTimeout(() => {
         proc.kill('SIGTERM');
@@ -1775,6 +1777,8 @@ function startFileBasedWorker() {
     },
   });
 
+  startMonitoring();
+
   // File-mode worker: stay alive indefinitely, skip graceful shutdown handlers
   // that cause premature exit on shell backgrounding. Restart freely via supervisor.
   return workerController;
@@ -1837,6 +1841,8 @@ function startRedisWorker() {
       };
     },
   });
+
+  startMonitoring();
 
   return worker;
 }

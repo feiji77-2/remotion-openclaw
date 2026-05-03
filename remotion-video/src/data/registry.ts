@@ -537,13 +537,14 @@ const REGISTRY: Record<UltimateSceneFamily, FamilyEntry> = {
     stageConfig: null,
   },
 
+  // Alias: resolved from memory-graph -> architecture-map
   'memory-graph': {
     family: 'memory-graph',
     label: 'Memory / Knowledge Graph',
-    description: 'Node-graph with a central concept and surrounding related nodes.',
+    description: 'Node-graph with a central concept and surrounding related nodes. (Alias for architecture-map)',
     semanticTags: ['graph', 'nodes', 'memory', 'knowledge', 'network', '关系图', '知识图', '节点'],
     requiredFields: ['centerTitle', 'nodes'],
-    optionalFields: ['centerDetail', 'items', 'heading'],
+    optionalFields: ['centerDetail', 'layout', 'items', 'heading'],
     defaultAccent: 'purple',
     timing: {
       baseDurationFrames: 82,
@@ -559,18 +560,20 @@ const REGISTRY: Record<UltimateSceneFamily, FamilyEntry> = {
     stageConfig: null,
   },
 
+  // Alias: resolved from pipeline-flow -> step-flow
   'pipeline-flow': {
     family: 'pipeline-flow',
     label: 'Pipeline Flow',
-    description: 'Horizontal or vertical pipeline with labelled stages. Used for process illustration.',
+    description: 'Horizontal or vertical pipeline with labelled stages. Used for process illustration. (Alias for step-flow)',
     semanticTags: ['pipeline', 'flow', 'stage', 'process', 'pipeline', '流程', '管道', '阶段'],
-    requiredFields: ['stages'],
-    optionalFields: ['heading', 'summary', 'items'],
+    requiredFields: ['steps'],
+    optionalFields: ['items', 'variant', 'stepVariants', 'heading', 'summary'],
     defaultAccent: 'cyan',
+    // Uses step-flow's timing config
     timing: {
-      baseDurationFrames: 80,
+      baseDurationFrames: 84,
       enterFrames: 16,
-      emphasisFrames: 48,
+      emphasisFrames: 52,
       exitFrames: 16,
       staggerFrames: 10,
       easing: 'ease-out',
@@ -894,16 +897,18 @@ const RHYTHM_CONTRACTS: Record<UltimateSceneFamily, FamilyRhythmContract> = {
     preferredCameraMotion: 'zoom-pulse',
     backdropCycle: ['particle-grid', 'dot-grid', 'god-rays'],
   },
+  // Alias: resolved from memory-graph -> architecture-map
   'memory-graph': {
     layer: 'structure',
     staggerGap: 10,
-    revealStiffness: 120,
-    backdropCycle: ['dot-grid', 'god-rays', 'particle-grid'],
+    revealStiffness: 110,
+    backdropCycle: ['dot-grid', 'particle-grid', 'god-rays'],
   },
+  // Alias: resolved from pipeline-flow -> step-flow
   'pipeline-flow': {
     layer: 'structure',
     staggerGap: 6,
-    revealStiffness: 110,
+    revealStiffness: 150,
     preferredCameraMotion: 'pan-y',
     backdropCycle: ['dot-grid', 'particle-grid', 'god-rays'],
   },

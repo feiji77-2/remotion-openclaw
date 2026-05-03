@@ -58,6 +58,8 @@ const {
   ensureRuntimePaths,
 } = require('../config/runtimePaths');
 const { runImageGenerationJob, readImageJob, normalizeImageRequest, createImageJob, runInlineImageGeneration, getImageJobPath } = require('./imageJob');
+const { cancellationMiddleware, linkJobId, cancelByJobId, getCancellationStats } = require('./requestCancellation');
+const { getMemoryStats } = require('../workers/memoryLimiter');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -78,6 +80,7 @@ const writeRateLimitMiddleware = createWriteRateLimitMiddleware(SECURITY_CONFIG)
 app.use(cors(buildCorsOptions(SECURITY_CONFIG)));
 app.use(express.static(PUBLIC_DIR));  // serve public/assets for images etc.
 app.use(express.json({ limit: '10mb' }));
+app.use(cancellationMiddleware);
 app.use(createApiAuthMiddleware(SECURITY_CONFIG));
 app.use(readRateLimitMiddleware);
 app.use(writeRateLimitMiddleware);
@@ -367,6 +370,8 @@ app.post('/api/render', async (req, res) => {
       jobId = addFileJob('render', jobPayload);
     }
 
+    if (req.requestId) linkJobId(req.requestId, jobId);
+
     logger.info('job-queued', {
       route: 'POST /api/render',
       jobId,
@@ -463,6 +468,7 @@ app.delete('/api/render/:jobId', requireAdminAuth, adminWriteRateLimitMiddleware
           return res.status(400).json({ error: '任务已完成，无法取消' });
         }
         await job.remove();
+        cancelByJobId(jobId);
         logger.info('job-cancelled', {
           route: 'DELETE /api/render/:jobId',
           jobId,
@@ -476,6 +482,7 @@ app.delete('/api/render/:jobId', requireAdminAuth, adminWriteRateLimitMiddleware
     if (!removeFileJob(jobId)) {
       return res.status(404).json({ error: '任务不存在' });
     }
+    cancelByJobId(jobId);
     logger.info('job-cancelled', {
       route: 'DELETE /api/render/:jobId',
       jobId,
@@ -714,6 +721,7 @@ app.post('/api/images/generate', async (req, res) => {
   try {
     const {projectId, prompts, shots} = normalizeImageRequest(req.body);
     const job = createImageJob({ projectId, prompts, shots });
+    if (req.requestId) linkJobId(req.requestId, job.jobId);
     runImageGenerationJob(job.jobId).catch(err => {
       logger.error('image-generation-failed', { jobId: job.jobId, error: err.message });
     });
@@ -852,6 +860,11 @@ app.get('/api/projects/:project/assets', requireAdminAuth, adminReadRateLimitMid
   return res.json({ assets: walk(assetDir) });
 });
 
+// ─── Memory Stats API ──────────────────────────────────────
+app.get('/api/memory-stats', requireAdminAuth, (req, res) => {
+  res.json(getMemoryStats());
+});
+
 // ─── Health ────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   return res.json({
@@ -881,6 +894,10 @@ app.get('/health', (req, res) => {
           },
         },
   });
+});
+
+app.get('/api/requests', requireAdminAuth, (req, res) => {
+  res.json(getCancellationStats());
 });
 
 app.get('/', (req, res) => {

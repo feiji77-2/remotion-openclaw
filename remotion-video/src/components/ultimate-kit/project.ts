@@ -40,7 +40,9 @@ export type UltimateSceneFamily =
   | 'code'
   | 'metrics'
   | 'data-stream'
+  /** @deprecated Use 'architecture-map' instead */
   | 'memory-graph'
+  /** @deprecated Use 'step-flow' instead */
   | 'pipeline-flow'
   | 'benchmark-chart'
   | 'quote-highlight'

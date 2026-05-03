@@ -175,6 +175,14 @@ export function calcForegroundFx(
 // ── Layer 4: Micro motion ───────────────────────────────────────────────────
 
 export {createUltimateMicroJitter, appendUltimateMicroJitter};
+export {
+  useTextSlideIn,
+  useScaleEmphasis,
+  usePulseAttention,
+  useStaggerSlide,
+  useStaggerScale,
+  useFloatMotion,
+} from './shotArchetypes';
 
 // ── Composed motion orchestrator ─────────────────────────────────────────────
 

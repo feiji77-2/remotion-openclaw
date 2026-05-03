@@ -329,6 +329,18 @@ const toStringArray = (value: unknown): string[] => {
 /** FPS 默认值 */
 const DEFAULT_FPS = 30;
 
+// ─── Family alias resolution ──────────────────────────────────────────────────
+
+/**
+ * Normalize deprecated family names to their canonical equivalents.
+ * memory-graph -> architecture-map, pipeline-flow -> step-flow.
+ */
+export function resolveFamilyAlias(family: string): string {
+  if (family === 'memory-graph') return 'architecture-map';
+  if (family === 'pipeline-flow') return 'step-flow';
+  return family;
+}
+
 /**
  * 从任意合法 JSON 结构中提取 NormalizedShot[]
  * 优先顺序：segments_meta > shots
@@ -372,7 +384,7 @@ export function normalizeShots(json: AnyJson, fps = DEFAULT_FPS): NormalizedShot
       const frames = s.frames ?? (s.dur ? Math.round(s.dur * fps) : 0);
       return {
         id: s.id,
-        family: s.family,
+        family: resolveFamilyAlias(s.family),
         level: s.level, // opening/closing/chapter 转场覆盖依赖这个字段
         frames,
         title: s.title,
@@ -418,7 +430,7 @@ function mergeItems(shot: AnyJson): NormalizedShotItem[] {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeShot(shot: AnyJson, fps: number): NormalizedShot {
   // 'family' from step-04 output, 'sceneFamily' from workflow step-03 output
-  const family = shot.family ?? shot.sceneFamily ?? 'hero';
+  const family = resolveFamilyAlias(shot.family ?? shot.sceneFamily ?? 'hero');
   const visualProps = shot.visual?.props ?? {};
 
   // Derive frames: priority frames > durationSeconds > duration
@@ -1117,6 +1129,7 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
       };
     }
 
+    // Alias: resolved from memory-graph -> architecture-map (data normalized upstream)
     case 'memory-graph': {
       const centerTitle = shot.visualProps?.centerTitle ?? shot.title;
       return {
@@ -1134,6 +1147,7 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
       };
     }
 
+    // Alias: resolved from pipeline-flow -> step-flow (data normalized upstream)
     case 'pipeline-flow': {
       return {
         ...base,
