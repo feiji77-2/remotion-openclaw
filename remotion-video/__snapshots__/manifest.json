@@ -1,145 +1,145 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-01T07:05:34.405Z",
+  "updatedAt": "2026-05-03T20:26:16.797Z",
   "families": [
     {
       "family": "architecture-map",
       "frame": 82,
       "durationFrames": 120,
-      "renderedAt": "2026-05-01T06:16:42.160Z",
-      "hash": "cd63d99568c38e89aa786f3d66355c82a5a1e62f"
+      "renderedAt": "2026-05-03T20:25:25.494Z",
+      "hash": "e1b6d52aaec3efa7ab077b6ec7df402d8dad5273"
     },
     {
       "family": "benchmark-chart",
       "frame": 50,
       "durationFrames": 100,
-      "renderedAt": "2026-05-01T06:16:35.397Z",
-      "hash": "f4023573ed9a16d2d60837754ae8caad7ea284f2"
+      "renderedAt": "2026-05-03T20:25:52.147Z",
+      "hash": "d81ad76683088e6e08a9ee017962c2500515d6a2"
     },
     {
       "family": "code",
       "frame": 40,
       "durationFrames": 80,
-      "renderedAt": "2026-05-01T07:05:16.160Z",
-      "hash": "09b099e8db6698e3fa73d89ea9a0ccee240fc42f"
+      "renderedAt": "2026-05-03T20:24:21.516Z",
+      "hash": "a84f52f3c2655f7052cc8b9aaa303c369487ecb0"
     },
     {
       "family": "compare-board",
       "frame": 45,
       "durationFrames": 90,
-      "renderedAt": "2026-05-01T07:05:07.057Z",
-      "hash": "e84f25c04513bcb099a8f7fe92801e514aea9606"
+      "renderedAt": "2026-05-03T20:24:28.334Z",
+      "hash": "1068c287d05d8ae9116231522781f6f93dd62997"
     },
     {
       "family": "cta",
       "frame": 45,
       "durationFrames": 90,
-      "renderedAt": "2026-05-01T07:05:34.403Z",
-      "hash": "34a3bcdaf24137a7607a0808a7cc91ca0546a7ea"
+      "renderedAt": "2026-05-03T20:26:16.796Z",
+      "hash": "c910e09143026890d88fc158f9940de8a318b10d"
     },
     {
       "family": "data-stream",
       "frame": 72,
       "durationFrames": 100,
-      "renderedAt": "2026-04-30T19:09:13.369Z",
-      "hash": "b1aab8325a0e9d251a23d6174298ae8de927dc1a"
+      "renderedAt": "2026-05-03T20:25:38.576Z",
+      "hash": "534cf9a053f98cb80f01537f176e43307130478c"
     },
     {
       "family": "evidence-wall",
       "frame": 62,
       "durationFrames": 100,
-      "renderedAt": "2026-05-01T06:14:43.733Z",
-      "hash": "9eff9b2f5df7101300f77fc71c99c9e59e0b9399"
+      "renderedAt": "2026-05-03T20:25:18.787Z",
+      "hash": "43d7ac1b83029ae1741eb19e72fb89aede81873a"
     },
     {
       "family": "feature-rail",
       "frame": 72,
       "durationFrames": 120,
-      "renderedAt": "2026-04-30T11:39:22.853Z",
-      "hash": "86cb34512bdfc34e3c1e8ac8b36d959786c5f8ca"
+      "renderedAt": "2026-05-03T20:24:15.217Z",
+      "hash": "d1cebbb27dab7dd183e51117009a79f934b73b25"
     },
     {
       "family": "focus",
       "frame": 45,
       "durationFrames": 90,
-      "renderedAt": "2026-04-30T18:58:56.785Z",
-      "hash": "cd815a015f637ceb7c0afe411255b4579886d098"
+      "renderedAt": "2026-05-03T20:25:04.442Z",
+      "hash": "732b5306a674e22e56681928e5b33b1bf4d6a287"
     },
     {
       "family": "glossary-term",
       "frame": 40,
       "durationFrames": 80,
-      "renderedAt": "2026-04-30T18:59:16.867Z",
-      "hash": "80022f16527aae91bac2f17f8a4f8d8d8171cea9"
+      "renderedAt": "2026-05-03T20:26:05.250Z",
+      "hash": "b4dca8b7c03297276f29350959f7f1c81b387d6c"
     },
     {
       "family": "hero",
       "frame": 45,
       "durationFrames": 90,
-      "renderedAt": "2026-05-01T06:14:26.408Z",
-      "hash": "1921edcd45de65328230aa0b2fc144759bb71216"
+      "renderedAt": "2026-05-03T20:24:08.494Z",
+      "hash": "fbb24ac98129455c89becbbcfc7dcdd9941df6d8"
     },
     {
       "family": "memory-graph",
       "frame": 82,
       "durationFrames": 110,
-      "renderedAt": "2026-05-01T06:14:54.976Z",
-      "hash": "5640850e441458071f32f30495d69d4f7f73b341"
+      "renderedAt": "2026-05-03T20:25:45.517Z",
+      "hash": "ce88ce05518163673ca47a5a57ffbbc4d8295da3"
     },
     {
       "family": "metrics",
       "frame": 54,
       "durationFrames": 90,
-      "renderedAt": "2026-04-30T18:58:20.532Z",
-      "hash": "63411764673403445492dc52a6da4ec0ad12fb06"
+      "renderedAt": "2026-05-03T20:26:11.131Z",
+      "hash": "3d70be23337254add57d189b7e303084bb59f846"
     },
     {
       "family": "number-strip",
       "frame": 50,
       "durationFrames": 100,
-      "renderedAt": "2026-04-30T11:39:41.367Z",
-      "hash": "bbc9aa253e1ac4b87680fde671edb8d391c961ac"
+      "renderedAt": "2026-05-03T20:24:35.033Z",
+      "hash": "0c1f18e67591db672717efc7f2e1ed6171a9f926"
     },
     {
       "family": "pipeline-flow",
       "frame": 102,
       "durationFrames": 110,
-      "renderedAt": "2026-05-01T07:04:57.726Z",
-      "hash": "4ff24177acaf2ff705879ac000a1d2b8bd76bb93"
+      "renderedAt": "2026-05-03T20:24:49.118Z",
+      "hash": "2cd53b8b12108c513da5f3941be5e0132f8fd415"
     },
     {
       "family": "quote-highlight",
       "frame": 45,
       "durationFrames": 90,
-      "renderedAt": "2026-05-01T07:05:25.349Z",
-      "hash": "6f6b9b993e2e5c260988835c1dd88e755bda72c6"
+      "renderedAt": "2026-05-03T20:25:59.466Z",
+      "hash": "f372e7056fef0fcc0127f2bfc9a2299b9dd3da8c"
     },
     {
       "family": "step-flow",
       "frame": 106,
       "durationFrames": 110,
-      "renderedAt": "2026-05-01T07:04:49.457Z",
-      "hash": "34f5eea9989d56f2bcbd52c30b6e74a9b91d8fbf"
+      "renderedAt": "2026-05-03T20:25:11.515Z",
+      "hash": "c9e8e00586a9d6e81f035788bf47f19492ebd756"
     },
     {
       "family": "tag-matrix",
       "frame": 45,
       "durationFrames": 90,
-      "renderedAt": "2026-04-30T18:59:27.300Z",
-      "hash": "184cba849b1d1d07ac60cfc0339a5f33c203da30"
+      "renderedAt": "2026-05-03T20:25:31.810Z",
+      "hash": "39a36423f0f093c6af8305d1f0483191abff749a"
     },
     {
       "family": "terminal",
       "frame": 45,
       "durationFrames": 90,
-      "renderedAt": "2026-04-30T18:57:44.500Z",
-      "hash": "7863fefa3771e7e1f456c20ba21dbd2093f78c03"
+      "renderedAt": "2026-05-03T20:24:41.263Z",
+      "hash": "61af11b00953a65c0593afab290709eb7cdc1b3a"
     },
     {
       "family": "timeline",
       "frame": 96,
       "durationFrames": 100,
-      "renderedAt": "2026-05-01T06:14:32.294Z",
+      "renderedAt": "2026-05-03T20:24:57.719Z",
       "hash": "cc3c20acd252d911c109d530787a3a694e2c2164"
     }
   ]

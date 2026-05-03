@@ -1,7 +1,7 @@
 import React from 'react';
 import { interpolate, useCurrentFrame, spring } from 'remotion';
 
-interface ProgressRingProps {
+export interface ProgressRingProps {
   progress: number; // 0-1
   size?: number;
   strokeWidth?: number;

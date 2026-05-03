@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <defs>
+        <linearGradient id="cpu1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ef4444"/><stop offset="100%" stop-color="#f97316"/></linearGradient>
+        <linearGradient id="cpu2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#fb923c"/></linearGradient>
+      </defs>
+      <rect x="4" y="4" width="16" height="16" rx="2" stroke="url(#cpu1)" stroke-width="2"/>
+      <rect x="9" y="9" width="6" height="6" rx="1" fill="url(#cpu2)" opacity="0.35"/>
+      <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" stroke="url(#cpu1)" stroke-width="2" stroke-linecap="round"/>
+    </svg>

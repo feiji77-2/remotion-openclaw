@@ -1,16 +1,13 @@
 import React from 'react';
 import type {ActBlock} from '../../data/directorScore';
-import {getTimelineCues, type TimelineCue} from '../data';
+import type {TimelineCue} from '../data';
 import {ActTrack} from './ActTrack';
 
 interface TimelinePanelProps {
   acts: ActBlock[];
   totalFrames: number;
-  fps: number;
   selectedCueId: string | null;
   onSelectCue: (cue: TimelineCue) => void;
-  expandedShotId: string | null;
-  onToggleShotCamera: (shotId: string | null) => void;
 }
 
 const containerStyle: React.CSSProperties = {
@@ -40,7 +37,6 @@ const tickStyle: React.CSSProperties = {
 export const TimelinePanel: React.FC<TimelinePanelProps> = ({
   acts,
   totalFrames,
-  fps,
   selectedCueId,
   onSelectCue,
 }) => {

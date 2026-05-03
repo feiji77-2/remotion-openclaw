@@ -1,0 +1,54 @@
+<h2>DirectorScore 预览工具 — 布局方案</h2>
+<p class="subtitle">三种信息组织方式，核心数据全部展示</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>时间线主导 + 侧边详情</h3>
+      <p>左侧主区域为全宽时间线轨道（acts → shots → cues 分层），点击任一元素右侧面板显示完整属性。</p>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="pros" style="font-size: 0.85em;"><h4>优势</h4><ul><li>时间维度一目了然</li><li>cue 重叠/间隙肉眼可辨</li><li>适合浏览整体节奏</li></ul></div>
+        <div class="cons" style="font-size: 0.85em;"><h4>代价</h4><ul><li>需要交互才能看细节</li><li>所有 cue 同时显示可能拥挤</li></ul></div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <span class="label" style="background:#dbeafe;color:#1e40af;">交互式</span>
+        <span class="label" style="background:#dbeafe;color:#1e40af;">轨道视图</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>仪表盘网格</h3>
+      <p>四象限布局：左上时间线 + 右上摄像机路径/能量图 + 左下 cue 数据表格 + 右下属性面板。一屏尽览。</p>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="pros" style="font-size: 0.85em;"><h4>优势</h4><ul><li>所有信息同时可见</li><li>无需点击切换</li><li>适合调试排查</li></ul></div>
+        <div class="cons" style="font-size: 0.85em;"><h4>代价</h4><ul><li>每块面板空间有限</li><li>小屏/窄窗口显示困难</li></ul></div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <span class="label" style="background:#fef3c7;color:#92400e;">高密度</span>
+        <span class="label" style="background:#fef3c7;color:#92400e;">调试向</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>垂直滚动叙事</h3>
+      <p>从上到下分段：总览条 → 能量曲线 → 每幕独立时间线（可折叠） → 摄像机路径画廊 → 底部 cue 明细表。</p>
+      <div class="pros-cons" style="margin-top: 8px;">
+        <div class="pros" style="font-size: 0.85em;"><h4>优势</h4><ul><li>每块都有充足空间</li><li>按幕分组自然</li><li>导出/截图友好</li></ul></div>
+        <div class="cons" style="font-size: 0.85em;"><h4>代价</h4><ul><li>跨幕对比困难</li><li>长视频需要滚动很多</li></ul></div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <span class="label" style="background:#ede9fe;color:#5b21b6;">可滚动</span>
+        <span class="label" style="background:#ede9fe;color:#5b21b6;">按幕分组</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top: 24px;">点击选中你偏好的方案（可多选），或者直接在终端告诉我你的想法。</p>

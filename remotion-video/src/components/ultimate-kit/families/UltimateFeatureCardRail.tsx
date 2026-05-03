@@ -3,23 +3,13 @@ import {AbsoluteFill, Easing, interpolate, spring, useCurrentFrame} from 'remoti
 import {ParticleBackground} from '../ParticleBackground';
 import {GeometryAccent, PathDrawLink} from '../../visual-atoms';
 import {
-  getUltimateManualGlyph,
-  ULTIMATE_ICON_URLS,
-  isUltimateManualGlyph,
-  resolveUltimateIconPack,
-  type UltimateIconName,
-} from '../iconography';
-import {
   resolveUltimateAccent,
   ultimateGlow,
   ultimateKitTokens,
   ultimateKitVideo,
 } from '../tokens';
-import {
-  appendUltimateMicroJitter,
-  createUltimateMicroJitter,
-  resolveUltimateMicroJitterConfig,
-} from '../motion';
+import {resolveUltimateMicroJitterConfig} from '../motion';
+import {cleanDisplayText, iconMaskStyle, resolveSemanticIcon, withMicroJitter, SemanticIconGlyph, SemanticIconBadge} from '../SemanticIcon';
 import {useStaggerSlide, useFloatMotion} from '../motionGrammar';
 import type {
   UltimateArchitectureMapProps,
@@ -131,11 +121,6 @@ const buildReveal = (frame: number, delay = 0) => {
   });
 };
 
-const withMicroJitter = (
-  frame: number,
-  baseTransform: string,
-  config?: Parameters<typeof createUltimateMicroJitter>[1],
-) => appendUltimateMicroJitter(baseTransform, createUltimateMicroJitter(frame, config));
 
 const toneToColor = (tone?: Parameters<typeof resolveUltimateAccent>[0]) => {
   return resolveUltimateAccent(tone ?? 'cyan');
@@ -143,7 +128,6 @@ const toneToColor = (tone?: Parameters<typeof resolveUltimateAccent>[0]) => {
 
 const measureText = (value?: string) => Array.from(String(value || '').trim()).length;
 
-const cleanDisplayText = (value?: string) => String(value || '').replace(/\s+/g, ' ').trim();
 
 const trimLineBreakPunctuation = (value: string) => {
   return value.replace(/[，、：:]+$/u, '').trim();
@@ -339,154 +323,6 @@ const estimateArchitectureNodeCard = (label: string, detail?: string): Architect
   };
 };
 
-const iconMaskStyle = (icon: UltimateIconName): CSSProperties => ({
-  background: 'currentColor',
-  WebkitMaskImage: `url(${ULTIMATE_ICON_URLS[icon]})`,
-  WebkitMaskRepeat: 'no-repeat',
-  WebkitMaskPosition: 'center',
-  WebkitMaskSize: 'contain',
-  maskImage: `url(${ULTIMATE_ICON_URLS[icon]})`,
-  maskRepeat: 'no-repeat',
-  maskPosition: 'center',
-  maskSize: 'contain',
-});
-
-const semanticFallbackIcons: UltimateIconName[] = [
-  'sparkles',
-  'layers',
-  'code',
-  'messagesSquare',
-  'zap',
-  'arrowRight',
-];
-
-const resolveSemanticIcon = (
-  iconValue: string | undefined,
-  semanticText: string,
-  fallbackIndex = 0,
-  family?: string,
-) => {
-  const iconText = cleanDisplayText(iconValue);
-  if (iconText && isUltimateManualGlyph(iconText)) {
-    return null;
-  }
-
-  return resolveUltimateIconPack({
-    hints: [semanticText, iconText],
-    requested: iconText ? [iconText] : [],
-    count: 1,
-    family,
-    seed: fallbackIndex,
-  })[0] || semanticFallbackIcons[fallbackIndex % semanticFallbackIcons.length];
-};
-
-const SemanticIconGlyph: React.FC<{
-  iconValue?: string;
-  semanticText: string;
-  color: string;
-  size: number;
-  fallbackIndex?: number;
-  family?: string;
-}> = ({
-  iconValue,
-  semanticText,
-  color,
-  size,
-  fallbackIndex = 0,
-  family,
-}) => {
-  const manualGlyph = getUltimateManualGlyph(iconValue);
-
-  if (manualGlyph) {
-    return (
-      <span style={{color, fontSize: size * 0.72, fontWeight: 800, lineHeight: 1}}>
-        {manualGlyph}
-      </span>
-    );
-  }
-
-  const icon = resolveSemanticIcon(iconValue, semanticText, fallbackIndex, family);
-
-  if (!icon) {
-    const text = cleanDisplayText(iconValue);
-    return text ? (
-      <span style={{color, fontSize: size * 0.72, fontWeight: 800, lineHeight: 1}}>{text}</span>
-    ) : null;
-  }
-
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        color,
-        ...iconMaskStyle(icon),
-      }}
-    />
-  );
-};
-
-const SemanticIconBadge: React.FC<{
-  iconValue?: string;
-  semanticText: string;
-  color: string;
-  badgeSize?: number;
-  size?: number;
-  fallbackIndex?: number;
-  family?: string;
-  rounded?: number;
-  motionDelay?: number;
-  motionSeed?: number;
-}> = ({
-  iconValue,
-  semanticText,
-  color,
-  badgeSize = 46,
-  size = 20,
-  fallbackIndex = 0,
-  family,
-  rounded = 16,
-  motionDelay = 0,
-  motionSeed,
-}) => {
-  const frame = useCurrentFrame();
-  const transform = withMicroJitter(frame, '', {
-    delay: motionDelay,
-    seed: motionSeed ?? fallbackIndex,
-    amplitudeX: 0.9,
-    amplitudeY: 0.8,
-    rotateDeg: 0.32,
-    scaleDelta: 0.003,
-    settleFrames: 16,
-  });
-
-  return (
-    <div
-      style={{
-        width: badgeSize,
-        height: badgeSize,
-        borderRadius: rounded,
-        border: `1px solid ${color}33`,
-        background: `linear-gradient(180deg, ${color}16 0%, rgba(10, 13, 24, 0.88) 100%)`,
-        boxShadow: ultimateGlow(color, 0.2),
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        transform,
-      }}
-    >
-      <SemanticIconGlyph
-        iconValue={iconValue}
-        semanticText={semanticText}
-        color={color}
-        size={size}
-        fallbackIndex={fallbackIndex}
-        family={family}
-      />
-    </div>
-  );
-};
 
 const parseCodeFacts = (lines: UltimateCodeLine[]) => {
   return lines

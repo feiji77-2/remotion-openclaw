@@ -1722,7 +1722,7 @@ async function processRenderJob(job, update) {
     const stage1 = await stageVoiceSynthesis(job, update, sharedDesignData);
 
     // Stage 2
-    const stage2 = await stageSubtitleGeneration(job, stage1.voiceFile, update, sharedDesignData);
+    const stage2 = await stageSubtitleGeneration(job, stage1.voiceFile, stage1.generatedSubtitleData, stage1.syncedShots, update, sharedDesignData);
 
     // Stage 3
     const stage3 = await stageRemotionRender(job, { ...stage1, ...stage2 }, update, sharedDesignData);

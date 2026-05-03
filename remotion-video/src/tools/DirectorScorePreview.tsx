@@ -43,7 +43,6 @@ const tabItem = (active: boolean): React.CSSProperties => ({
 export const DirectorScorePreview: React.FC = () => {
   const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
   const [selectedCue, setSelectedCue] = useState<TimelineCue | null>(null);
-  const [expandedShotId, setExpandedShotId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('details');
   const [zoom, setZoom] = useState(1);
 
@@ -51,10 +50,6 @@ export const DirectorScorePreview: React.FC = () => {
     setSelectedCueId(cue.elementId);
     setSelectedCue(cue);
     setActiveTab('details');
-  }, []);
-
-  const handleExpandCamera = useCallback((shotId: string | null) => {
-    setExpandedShotId((prev) => (prev === shotId ? null : shotId));
   }, []);
 
   return (
@@ -74,11 +69,8 @@ export const DirectorScorePreview: React.FC = () => {
         <TimelinePanel
           acts={SCORE.acts}
           totalFrames={SCORE.totalFrames}
-          fps={SCORE.fps}
           selectedCueId={selectedCueId}
           onSelectCue={handleSelectCue}
-          expandedShotId={expandedShotId}
-          onToggleShotCamera={handleExpandCamera}
         />
 
         {activeTab === 'details' ? (

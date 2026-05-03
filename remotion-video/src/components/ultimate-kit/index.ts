@@ -9,11 +9,9 @@ export {
   UltimateFocusDiagram,
   UltimateGlossaryTerm,
   UltimateHeroPanel,
-  UltimateMemoryGraph,
   UltimateMetricBars,
   UltimateNumberStrip,
   UltimatePlatformOverlay,
-  UltimatePipelineFlow,
   UltimateQuoteHighlight,
   UltimateEvidenceWall,
   UltimateStage,
@@ -27,6 +25,7 @@ export {
 export {UltimateCaptionOverlay} from './UltimateCaptionOverlay';
 export {UltimateDirectorEffects} from './UltimateDirectorEffects';
 export {UltimateSceneTransition} from './UltimateSceneTransition';
+export {DirectorScoreOrchestrator} from './DirectorScoreOrchestrator';
 export type {
   UltimateArchitectureMapProps,
   UltimateBenchmarkChartProps,

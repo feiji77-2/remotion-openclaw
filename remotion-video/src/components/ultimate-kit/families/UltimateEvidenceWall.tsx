@@ -1,20 +1,16 @@
 import React, {type CSSProperties} from 'react';
 import {interpolate, spring, useCurrentFrame} from 'remotion';
 import {GeometryAccent, PathDrawLink} from '../../visual-atoms';
-import {getUltimateManualGlyph, isUltimateManualGlyph, resolveUltimateIconPack, ULTIMATE_ICON_URLS, type UltimateIconName} from '../iconography';
-import {appendUltimateMicroJitter, createUltimateMicroJitter, resolveUltimateMicroJitterConfig} from '../motion';
+import {resolveUltimateMicroJitterConfig} from '../motion';
 import {resolveUltimateAccent, ultimateGlow, ultimateKitTokens} from '../tokens';
 import type {UltimateEvidenceWallProps} from '../types';
 import {usePulseAttention, useStaggerScale} from '../motionGrammar';
+import {cleanDisplayText, iconMaskStyle, withMicroJitter, SemanticIconGlyph, SemanticIconBadge} from '../SemanticIcon';
 
 const kit = ultimateKitTokens;
 
 const toneToColor = (tone?: Parameters<typeof resolveUltimateAccent>[0]) => {
   return resolveUltimateAccent(tone ?? 'cyan');
-};
-
-const cleanDisplayText = (value?: string) => {
-  return String(value || '').replace(/\s+/g, ' ').trim();
 };
 
 const measureText = (value?: string) => {
@@ -112,102 +108,12 @@ const lineClampStyle = (lines: number): CSSProperties => ({
   overflow: 'hidden',
 });
 
-const withMicroJitter = (
-  frame: number,
-  baseTransform: string,
-  config?: Parameters<typeof createUltimateMicroJitter>[1],
-) => {
-  return appendUltimateMicroJitter(baseTransform, createUltimateMicroJitter(frame, config));
-};
-
 const buildReveal = (frame: number, delay = 0) => {
   return spring({
     fps: 30,
     frame: Math.max(0, frame - delay),
     config: {damping: 200, stiffness: 160},
   });
-};
-
-const iconMaskStyle = (icon: UltimateIconName): CSSProperties => ({
-  background: 'currentColor',
-  WebkitMaskImage: `url(${ULTIMATE_ICON_URLS[icon]})`,
-  WebkitMaskRepeat: 'no-repeat',
-  WebkitMaskPosition: 'center',
-  WebkitMaskSize: 'contain',
-  maskImage: `url(${ULTIMATE_ICON_URLS[icon]})`,
-  maskRepeat: 'no-repeat',
-  maskPosition: 'center',
-  maskSize: 'contain',
-});
-
-const SemanticIconGlyph: React.FC<{
-  iconValue?: string;
-  semanticText: string;
-  color: string;
-  size?: number;
-  fallbackIndex?: number;
-}> = ({iconValue, semanticText, color, size = 18, fallbackIndex = 0}) => {
-  const resolved = resolveUltimateIconPack({
-    hints: [semanticText],
-    requested: [iconValue],
-    count: 1,
-    family: 'evidence-wall',
-    seed: fallbackIndex,
-  })[0];
-
-  if (isUltimateManualGlyph(iconValue)) {
-    return (
-      <span style={{fontSize: size, lineHeight: 1, fontWeight: 800, color}}>
-        {getUltimateManualGlyph(iconValue)}
-      </span>
-    );
-  }
-
-  if (!resolved) {
-    return (
-      <span style={{fontSize: size, lineHeight: 1, fontWeight: 800, color}}>
-        {fallbackIndex + 1}
-      </span>
-    );
-  }
-
-  return <div style={{width: size, height: size, color, ...iconMaskStyle(resolved)}} />;
-};
-
-const SemanticIconBadge: React.FC<{
-  iconValue?: string;
-  semanticText: string;
-  color: string;
-  badgeSize?: number;
-  size?: number;
-  fallbackIndex?: number;
-  motionDelay?: number;
-}> = ({iconValue, semanticText, color, badgeSize = 34, size = 16, fallbackIndex = 0, motionDelay = 0}) => {
-  const frame = useCurrentFrame();
-  return (
-    <div
-      style={{
-        width: badgeSize,
-        height: badgeSize,
-        borderRadius: 12,
-        border: `1px solid ${color}33`,
-        background: `linear-gradient(180deg, ${color}16 0%, rgba(10, 13, 24, 0.88) 100%)`,
-        boxShadow: ultimateGlow(color, 0.16),
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        transform: withMicroJitter(frame, '', resolveUltimateMicroJitterConfig('steady', {delay: motionDelay, seed: fallbackIndex + 200})),
-      }}
-    >
-      <SemanticIconGlyph
-        iconValue={iconValue}
-        semanticText={semanticText}
-        color={color}
-        size={size}
-        fallbackIndex={fallbackIndex}
-      />
-    </div>
-  );
 };
 
 export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar?: {enterFrames?: number; emphasisFrames?: number}}> = ({
@@ -477,6 +383,7 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
                 size={15}
                 fallbackIndex={index}
                 motionDelay={delay}
+                family="evidence-wall"
               />
               <span>{card.source}</span>
             </div>

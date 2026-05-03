@@ -48,7 +48,7 @@ const barBase: React.CSSProperties = {
 };
 
 export const CueTrack: React.FC<CueTrackProps> = ({cue, totalFrames, selected, onClick, onHover}) => {
-  const pct = (frame: number) => (frame / totalFrames) * 100;
+  const pct = (frame: number) => (totalFrames > 0 ? (frame / totalFrames) * 100 : 0);
 
   return (
     <div

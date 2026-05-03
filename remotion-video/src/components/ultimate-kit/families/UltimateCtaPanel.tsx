@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCurrentFrame } from 'remotion';
-import {GeometryAccent, ReticleLockOn, ParticleBackground} from '../../visual-atoms';
+import {GeometryAccent, ReticleLockOn, ParticleBackground, DotGridParallax} from '../../visual-atoms';
 import {resolveUltimateAccent} from '../tokens';
 import type {UltimateCtaPanelProps, UltimateSceneGrammar} from '../types';
 import { useTextSlideIn, usePulseAttention } from '../motionGrammar';
@@ -48,7 +48,8 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps & {grammar?: Ultim
 
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
-      <ParticleBackground color={`${color}18`} particleCount={28} speed={0.6} seed={2} />
+      <DotGridParallax dotColor={`${color}18`} density={0.45} dotRadius={2} depth={3} />
+      <ParticleBackground color={`${color}14`} particleCount={18} speed={0.3} seed={3} />
       <GeometryAccent variant="ring" color={color} opacity={0.16} style={{left: '50%', top: '48%', width: 680, height: 680, transform: 'translate(-50%, -50%)'}} />
       <GeometryAccent variant="slanted-panel" color={color} opacity={0.12} style={{left: 298, top: 108, width: 412, height: 168, transform: 'rotate(-12deg)'}} />
 

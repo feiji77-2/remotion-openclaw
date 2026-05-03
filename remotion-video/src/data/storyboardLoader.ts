@@ -41,6 +41,11 @@ import {
   type DirectorBeatOutput,
   type ResolvedShotGrammar,
 } from './shotGrammar.ts';
+import {
+  shotScoreToGrammar,
+  type DirectorScore,
+  type ShotScore,
+} from './directorScore.ts';
 
 // -------------------------------------------------------------------------- //
 // Types
@@ -389,7 +394,7 @@ export function normalizeShots(json: AnyJson, fps = DEFAULT_FPS): NormalizedShot
         frames,
         title: s.title,
         narration: s.narration,
-        items: shot.items ?? shot.features ?? shot.comparisons ?? shot.dataPoints ? mergeItems(shot) : s.items,
+        items: (shot.items ?? shot.features ?? shot.comparisons ?? shot.dataPoints) ? mergeItems(shot) : s.items,
         features: shot.features,
         comparisons: shot.comparisons,
         dataPoints: shot.dataPoints,
@@ -645,6 +650,118 @@ export function hydrateUltimateProjectConfigWithDirectorGrammar(
   };
 }
 
+/**
+ * injectDirectorScore — 将 DirectorScore 注入到现有 UltimateProjectConfig。
+ *
+ * 通过 shotId 匹配场景，注入 grammar 和编排数据。
+ * 兼容两种模式：replace（覆盖 duration）和 compat（仅注入 grammar）。
+ */
+export function injectDirectorScore(
+  config: UltimateProjectConfig,
+  score: DirectorScore,
+  options?: {
+    matchBy?: 'shotId' | 'index';
+    mergeMode?: 'replace' | 'compat';
+  },
+): UltimateProjectConfig {
+  const mergeMode = options?.mergeMode ?? 'compat';
+  const matchBy = options?.matchBy ?? 'shotId';
+
+  // 展平所有 ShotScore 以便快速查找
+  const allShots: ShotScore[] = [];
+  for (const act of score.acts) {
+    for (const shot of act.shots) {
+      allShots.push(shot);
+    }
+  }
+
+  const hydratedScenes = config.scenes.map((scene, index) => {
+    // 匹配 ShotScore
+    let matchedShot: ShotScore | undefined;
+    if (matchBy === 'shotId') {
+      matchedShot = allShots.find(s => s.shotId === scene.id);
+    } else {
+      matchedShot = allShots[index];
+    }
+
+    if (!matchedShot) {
+      return scene; // 未匹配，保持原样
+    }
+
+    // 从 ShotScore 推导 grammar
+    const grammar = shotScoreToGrammar(matchedShot);
+
+    const sceneWithCues: UltimateSceneConfig & {directorCues?: unknown[]; cameraPath?: unknown[]} = {
+      ...scene,
+      grammar: {
+        archetype: grammar.archetype,
+        cameraIntent: grammar.cameraIntent,
+        cameraMotion: deriveCameraMotionFromIntent(grammar.cameraIntent),
+        dataEvent: grammar.dataEvent,
+        enterFrames: grammar.enterFrames,
+        emphasisFrames: grammar.emphasisFrames,
+        staggerGap: grammar.staggerGap,
+      },
+      // 附加原始编排数据（供 DirectorScoreOrchestrator 消费）
+      directorCues: matchedShot.cues,
+      cameraPath: matchedShot.cameraPath.length > 0 ? matchedShot.cameraPath : undefined,
+    };
+
+    // replace 模式下覆盖 duration
+    if (mergeMode === 'replace') {
+      sceneWithCues.durationInFrames = matchedShot.durationInFrames;
+    }
+
+    return sceneWithCues as UltimateSceneConfig;
+  });
+
+  // 附加 DirectorScore 到 config（供 UltimateSceneTemplate 提取）
+  const result = {
+    ...config,
+    scenes: hydratedScenes,
+  } as UltimateProjectConfig & {directorScore?: DirectorScore};
+
+  result.directorScore = score;
+
+  return result;
+}
+
+/** 从 cameraIntent 字符串推导 CameraMotionPreset */
+function deriveCameraMotionFromIntent(cameraIntent: string): string {
+  switch (cameraIntent) {
+    case 'pin': return 'push-in';
+    case 'compress': return 'pan-x';
+    case 'chase': return 'pan-x';
+    case 'drift': return 'drift';
+    case 'confront': return 'none';
+    case 'linger': return 'none';
+    case 'reveal': return 'push-in';
+    default: return 'none';
+  }
+}
+
+/** Collect icon references from all parts of a shot for the orbit icon pack. */
+function collectIcons(shot: NormalizedShot): string[] {
+  const icons: string[] = [];
+
+  // Items, features, comparisons all carry optional icon fields
+  for (const item of shot.items ?? []) {
+    if (item.icon) icons.push(item.icon);
+  }
+  for (const feature of shot.features ?? []) {
+    icons.push(feature.icon);
+  }
+  for (const comparison of shot.comparisons ?? []) {
+    if (comparison.icon) icons.push(comparison.icon);
+  }
+
+  // Brand icon from visual props
+  const brandIcon = shot.visualProps?.brandIcon as string | undefined;
+  if (brandIcon) icons.push(brandIcon);
+
+  return icons;
+}
+
 /** Convert NormalizedShot[] → UltimateProjectConfig.scenes */
 export function shotsToScenes(
   shots: NormalizedShot[],
@@ -725,6 +842,7 @@ export function shotsToScenes(
       transition: resolveTransition(shot, grammar),
       stageConfig: resolveStageConfig(shot.family),
       grammar, // ← 导演层元数据注入
+      iconPack: collectIcons(shot),
       data: buildSceneData(shot),
     };
 
@@ -1153,12 +1271,13 @@ function buildSceneData(shot: NormalizedShot): Record<string, unknown> {
         ...base,
         heading,
         summary: shot.visualProps?.summary ?? '',
-        stages: (shot.items ?? []).map((it) => ({
+        steps: (shot.items ?? []).map((it) => ({
           label: it.label,
           detail: it.detail,
           icon: it.icon ?? '',
           accent: (it.accent as 'cyan' | 'orange' | 'purple') ?? 'cyan',
         })),
+        stepVariants: (shot.items ?? []).map(() => 'default' as const),
         accent: 'cyan',
       };
     }

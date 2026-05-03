@@ -1,4 +1,4 @@
-import React, {Suspense} from 'react';
+import React, {Suspense, useMemo} from 'react';
 import {Audio, Img, Sequence, interpolate, spring, useCurrentFrame, AbsoluteFill} from 'remotion';
 import {resolveAudioSource, resolveMediaSource} from '../utils/mediaSources';
 import {TransitionSeries, linearTiming, springTiming, type TransitionPresentation} from '@remotion/transitions';
@@ -14,6 +14,7 @@ import {
   UltimatePlatformOverlay,
   UltimateSceneTransition,
   UltimateStage,
+  DirectorScoreOrchestrator,
   type UltimatePlatformOverlayProps,
   getUltimateIncomingTransitionDurationInFrames,
   normalizeUltimateProjectConfig,
@@ -24,10 +25,11 @@ import {
 } from '../components/ultimate-kit';
 import {
   ULTIMATE_ICON_URLS,
-  isUltimateManualGlyph,
-  resolveUltimateIconPack,
   type UltimateIconName,
 } from '../components/ultimate-kit/iconography';
+import {BRAND_ICON_COLORS, RenderIcon, RENDER_ICON_IDS_SET} from '../render/iconRegistry';
+import type {RenderIconId} from '../render/types';
+import {scoreToSequences, type DirectorScore, type SequenceConfig} from '../data/directorScore';
 import {sceneMediaLayout, sceneIconOrbitLayout} from '../components/ultimate-kit/layouts';
 import {appendUltimateMicroJitter, createUltimateMicroJitter} from '../components/ultimate-kit/motion';
 import {hydrateUltimateProjectConfigWithDirectorGrammar} from '../data/storyboardLoader';
@@ -167,107 +169,47 @@ const sceneIconMaskStyle = (icon: UltimateIconName) => ({
   maskSize: 'contain',
 });
 
-const collectSceneIconHints = (scene: ResolvedUltimateSceneConfig) => {
-  switch (scene.family) {
-    case 'hero':
-      return [scene.data.title, scene.data.subtitle, scene.subtitle];
-    case 'feature-rail':
-      return [scene.data.heading, ...scene.data.items.map((item) => `${item.title} ${item.caption || ''}`), scene.subtitle];
-    case 'focus':
-      return [scene.data.keyword, scene.data.question, scene.data.description, scene.subtitle];
-    case 'number-strip':
-      return [
-        scene.data.heading,
-        scene.data.summary,
-        ...scene.data.items.map((item) => `${item.tag || ''} ${item.label} ${item.detail || ''}`),
-        scene.subtitle,
-      ];
-    case 'step-flow':
-      return [scene.data.heading, ...scene.data.steps.map((step) => `${step.label} ${step.detail || ''}`), scene.subtitle];
-    case 'timeline':
-      return [scene.data.heading, scene.data.summary, ...scene.data.items.map((item) => `${item.label} ${item.title} ${item.detail || ''}`), scene.subtitle];
-    case 'compare-board':
-      return [
-        scene.data.heading,
-        scene.data.summary,
-        scene.data.leftTitle,
-        scene.data.rightTitle,
-        ...scene.data.rows.map((row) => `${row.label} ${row.left} ${row.right}`),
-        scene.subtitle,
-      ];
-    case 'terminal':
-      return [scene.data.heading, scene.data.command, ...scene.data.outputs, scene.subtitle];
-    case 'evidence-wall':
-      return [
-        scene.data.heading,
-        scene.data.summary,
-        ...scene.data.cards.map((card) => `${card.source} ${card.quote} ${card.detail || ''}`),
-        scene.subtitle,
-      ];
-    case 'architecture-map':
-      return [
-        scene.data.heading,
-        scene.data.centerTitle,
-        scene.data.centerDetail,
-        ...scene.data.nodes.map((node) => `${node.label} ${node.detail || ''}`),
-        scene.subtitle,
-      ];
-    case 'tag-matrix':
-      return [scene.data.heading, ...scene.data.items.map((item) => item.label), scene.subtitle];
-    case 'code':
-      return [scene.data.heading, scene.data.footer, ...scene.data.lines.map((line) => line.text), scene.subtitle];
-    case 'metrics':
-      return [scene.data.heading, scene.data.summary, ...scene.data.items.map((item) => `${item.label} ${item.value}`), scene.subtitle];
-    case 'data-stream':
-      return [scene.data.heading, scene.data.summary, ...scene.data.items.map((item) => `${item.label} ${item.value} ${item.detail || ''}`), scene.subtitle];
-    case 'memory-graph':
-      return [scene.data.heading, scene.data.summary, scene.data.centerTitle, scene.data.centerDetail, ...scene.data.nodes.map((node) => `${node.label} ${node.detail || ''}`), scene.subtitle];
-    case 'pipeline-flow':
-      return [scene.data.heading, scene.data.summary, ...scene.data.stages.map((stage) => `${stage.label} ${stage.detail || ''}`), scene.subtitle];
-    case 'benchmark-chart':
-      return [scene.data.heading, scene.data.summary, scene.data.primaryLabel, scene.data.secondaryLabel, ...scene.data.items.map((item) => `${item.label} ${item.primaryValue} ${item.secondaryValue}`), scene.subtitle];
-    case 'quote-highlight':
-      return [scene.data.heading, scene.data.quote, scene.data.attribution, ...(scene.data.tags ?? []).map((item) => item.label), scene.subtitle];
-    case 'glossary-term':
-      return [scene.data.heading, scene.data.term, scene.data.pronunciation, scene.data.definition, ...(scene.data.related ?? []).map((item) => item.label), scene.subtitle];
-    case 'cta':
-      return [scene.data.heading, scene.data.subtitle, ...(scene.data.highlights ?? []), scene.subtitle];
-  }
+// ── RenderIcon (彩色品牌图标) support ──
+
+// ── Per-family colorful brand icon assignments for orbit badges ──
+const FAMILY_ORBIT_RENDER_ICONS: Record<string, RenderIconId[]> = {
+  hero: ['github', 'vercel', 'apple'],
+  'feature-rail': ['figma', 'slack', 'notion'],
+  focus: ['google', 'linear', 'linkedin'],
+  'number-strip': ['aws', 'mongodb', 'redis'],
+  'step-flow': ['jira', 'gitlab', 'linear'],
+  timeline: ['vercel', 'x', 'linkedin'],
+  'compare-board': ['google', 'aws', 'graphql'],
+  terminal: ['x', 'docker', 'typescript'],
+  'evidence-wall': ['meta', 'stripe', 'cloudflare'],
+  'architecture-map': ['aws', 'docker', 'mongodb'],
+  'tag-matrix': ['notion', 'react', 'tailwind'],
+  code: ['github', 'typescript', 'gitlab'],
+  metrics: ['stripe', 'python', 'cloudflare'],
+  'data-stream': ['aws', 'graphql', 'docker'],
+  'memory-graph': ['notion', 'figma', 'postgres'],
+  'pipeline-flow': ['gitlab', 'jira', 'github'],
+  'benchmark-chart': ['google', 'graphql', 'vercel'],
+  'quote-highlight': ['linkedin', 'meta'],
+  'glossary-term': ['notion', 'python'],
+  cta: ['youtube', 'whatsapp', 'telegram'],
 };
 
-const collectSceneIconRequests = (scene: ResolvedUltimateSceneConfig) => {
-  const requested: Array<string | null | undefined> = [...(scene.iconPack ?? [])];
-
-  switch (scene.family) {
-    case 'feature-rail':
-      requested.push(...scene.data.items.map((item) => item.icon));
-      break;
-    case 'step-flow':
-      requested.push(...scene.data.steps.map((step) => step.icon));
-      break;
-    case 'timeline':
-      requested.push(...scene.data.items.map((item) => item.icon));
-      break;
-    case 'evidence-wall':
-      requested.push(...scene.data.cards.map((card) => card.icon));
-      break;
-    case 'architecture-map':
-      requested.push(...scene.data.nodes.map((node) => node.icon));
-      break;
-    case 'metrics':
-      requested.push(...scene.data.items.map((item) => item.icon));
-      break;
-    case 'memory-graph':
-      requested.push(...scene.data.nodes.map((node) => node.icon));
-      break;
-    case 'pipeline-flow':
-      requested.push(...scene.data.stages.map((stage) => stage.icon));
-      break;
-    default:
-      break;
+const resolveOrbitIcons = (scene: ResolvedUltimateSceneConfig, seed: number) => {
+  const count = sceneIconOrbitLayout[scene.family]?.length ?? 3;
+  const shotIcons = (scene.iconPack ?? []).filter((id) => RENDER_ICON_IDS_SET.has(id)) as RenderIconId[];
+  const familyIcons = FAMILY_ORBIT_RENDER_ICONS[scene.family] ?? ['github', 'vercel', 'typescript'];
+  const offset = seed % familyIcons.length;
+  const rotated = [...familyIcons.slice(offset), ...familyIcons.slice(0, offset)];
+  const result: RenderIconId[] = [];
+  const seen = new Set<string>();
+  for (const icon of [...shotIcons, ...rotated]) {
+    if (seen.has(icon)) continue;
+    seen.add(icon);
+    result.push(icon);
+    if (result.length >= count) return result;
   }
-
-  return requested.filter((value) => !!value && !isUltimateManualGlyph(value));
+  return result;
 };
 
 const resolveSceneOrbitAccent = (scene: ResolvedUltimateSceneConfig) => {
@@ -319,13 +261,7 @@ const UltimateSceneIconOrbit: React.FC<{scene: ResolvedUltimateSceneConfig; scen
     return null;
   }
 
-  const icons = resolveUltimateIconPack({
-    hints: collectSceneIconHints(scene),
-    requested: collectSceneIconRequests(scene),
-    count: layout.length,
-    family: scene.family,
-    seed: sceneIndex,
-  });
+  const icons = resolveOrbitIcons(scene, sceneIndex);
   const accentColor = resolveSceneOrbitAccent(scene);
 
   if (icons.length === 0) {
@@ -381,14 +317,18 @@ const UltimateSceneIconOrbit: React.FC<{scene: ResolvedUltimateSceneConfig; scen
               ),
             }}
           >
-            <div
-              style={{
-                width: node.size,
-                height: node.size,
-                color: accentColor,
-                ...sceneIconMaskStyle(icon),
-              }}
-            />
+            {RENDER_ICON_IDS_SET.has(icon) ? (
+              <RenderIcon id={icon as RenderIconId} size={node.size} color={BRAND_ICON_COLORS[icon] ?? accentColor} secondaryColor="#ffffff" />
+            ) : (
+              <div
+                style={{
+                  width: node.size,
+                  height: node.size,
+                  color: accentColor,
+                  ...sceneIconMaskStyle(icon as unknown as UltimateIconName),
+                }}
+              />
+            )}
           </div>
         );
       })}
@@ -500,6 +440,59 @@ export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
   }, [config]);
   const hasSegmentAudio = Array.isArray(audioSegments) && audioSegments.length > 0;
 
+  // ── DirectorScore 检测 ─────────────────────────────────────────
+  const directorScore: DirectorScore | undefined = (normalizedConfig as any).directorScore;
+  const hasDirectorScore = Boolean(directorScore);
+
+  // 编译 DirectorScore → SequenceConfig 树
+  const compiledSequences: SequenceConfig[] | null = useMemo(() => {
+    if (!directorScore) return null;
+    return scoreToSequences(directorScore, {resolveMode: 'compat', fps: 30});
+  }, [directorScore]);
+
+  // 构建 elementRenderMap（scene 内容 → elementId）
+  const elementRenderMap: Map<string, React.ReactNode> = useMemo(() => {
+    const map = new Map<string, React.ReactNode>();
+
+    if (!compiledSequences || !normalizedConfig.scenes) return map;
+
+    // 遍历所有 Sequence，为每个 elementId 查找对应场景组件
+    const collectElementIds = (seqs: SequenceConfig[], parentComponent?: React.ReactNode) => {
+      for (const seq of seqs) {
+        if (seq.elementId) {
+          // 尝试从 scene.data 的字段名匹配 elementId
+          // elementId 如 'main-title' → 查找场景数据中的 title 字段
+          // 先从已渲染的场景组件查找
+          if (parentComponent) {
+            map.set(seq.elementId, parentComponent);
+          }
+        }
+        if (seq.children) {
+          collectElementIds(seq.children, parentComponent);
+        }
+      }
+    };
+
+    // 对每个场景，将它的 renderSceneContent 注册到对应的 elementId
+    for (const scene of normalizedConfig.scenes) {
+      const content = renderSceneContent(scene);
+      // 注册 scene.id 作为 fallback（匹配 shotId）
+      map.set(scene.id, content);
+
+      // 如果有 directorCues，逐个注册 elementId
+      const sceneAny = scene as any;
+      if (sceneAny.directorCues) {
+        for (const cue of sceneAny.directorCues) {
+          if (cue.elementId) {
+            map.set(cue.elementId, content);
+          }
+        }
+      }
+    }
+
+    return map;
+  }, [compiledSequences, normalizedConfig.scenes]);
+
   const renderSceneContent = React.useCallback(
     (scene: ResolvedUltimateSceneConfig) => {
       const Component = COMPONENT_MAP[scene.family];
@@ -526,7 +519,7 @@ export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
               key={`${segment.src}-${segment.startFrame}`}
               from={segment.startFrame}
               durationInFrames={segment.durationInFrames}
-              premountFor={segment.durationInFrames}
+              premountFor={Math.min(24, segment.durationInFrames)}
             >
               <Audio
                 src={resolveAudioSource(segment.src)}
@@ -540,62 +533,72 @@ export const UltimateSceneTemplate: React.FC<UltimateSceneTemplateProps> = ({
           );
         })
         : null}
-      <TransitionSeries>
-        {normalizedConfig.scenes.map((scene, sceneIndex) => {
-          const overlay = resolveSceneOverlay(normalizedConfig, scene);
-          const previousScene = sceneIndex > 0 ? normalizedConfig.scenes[sceneIndex - 1] : null;
-          const transitionDuration = getUltimateIncomingTransitionDurationInFrames(previousScene, scene);
 
-          return (
-            <React.Fragment key={scene.id}>
-              {sceneIndex > 0 && scene.transition !== false && transitionDuration > 0 ? (
-                <TransitionSeries.Transition
-                  presentation={resolveTransitionPresentation(scene.transition)}
-                  timing={resolveTransitionTiming(scene.transition, transitionDuration)}
-                />
-              ) : null}
-              <TransitionSeries.Sequence durationInFrames={scene.durationInFrames} name={scene.id}>
-                <UltimateSceneTransition scene={scene}>
-                  <div
-                    data-grammar={
-                      scene.grammar
-                        ? `${scene.grammar.archetype} | ${scene.grammar.cameraIntent}→${scene.grammar.dataEvent} | mem:${scene.grammar.memoryObject?.type ?? 'word'}`
-                        : scene.family
-                    }
-                    data-director-note={scene.grammar?.directorNote ?? ''}
-                  >
-                    <UltimateStage
-                      warm={scene.warm}
-                      showGrid={scene.showGrid}
-                      family={scene.family}
-                      sceneIndex={sceneIndex}
-                      sceneDurationFrames={scene.durationInFrames}
-                      stagePreset={scene.stageConfig?.stagePreset}
-                      hudMode={scene.stageConfig?.hudMode}
+      {hasDirectorScore && compiledSequences ? (
+        <DirectorScoreOrchestrator
+          sequences={compiledSequences}
+          elementRenderMap={elementRenderMap}
+          fps={30}
+        />
+      ) : (
+        <TransitionSeries>
+          {normalizedConfig.scenes.map((scene, sceneIndex) => {
+            const overlay = resolveSceneOverlay(normalizedConfig, scene);
+            const previousScene = sceneIndex > 0 ? normalizedConfig.scenes[sceneIndex - 1] : null;
+            const transitionDuration = getUltimateIncomingTransitionDurationInFrames(previousScene, scene);
+
+            return (
+              <React.Fragment key={scene.id}>
+                {sceneIndex > 0 && scene.transition !== false && transitionDuration > 0 ? (
+                  <TransitionSeries.Transition
+                    presentation={resolveTransitionPresentation(scene.transition)}
+                    timing={resolveTransitionTiming(scene.transition, transitionDuration)}
+                  />
+                ) : null}
+                <TransitionSeries.Sequence durationInFrames={scene.durationInFrames} name={scene.id}>
+                  <UltimateSceneTransition scene={scene}>
+                    <div
+                      data-grammar={
+                        scene.grammar
+                          ? `${scene.grammar.archetype} | ${scene.grammar.cameraIntent}→${scene.grammar.dataEvent} | mem:${scene.grammar.memoryObject?.type ?? 'word'}`
+                          : scene.family
+                      }
+                      data-director-note={scene.grammar?.directorNote ?? ''}
                     >
-                      {(scene.stageConfig?.showOverlay !== false && overlay) ? (
-                        <UltimatePlatformOverlay
-                          {...overlay}
-                          family={scene.family}
-                          mode={scene.stageConfig?.hudMode}
-                        />
-                      ) : null}
-                      {(scene.stageConfig?.showMediaCard !== false) ? (
-                        <UltimateSceneMediaCard scene={scene} />
-                      ) : null}
-                      <UltimateDirectorEffects scene={scene} />
-                      {(scene.stageConfig?.showIconOrbit !== false) ? (
-                        <UltimateSceneIconOrbit scene={scene} sceneIndex={sceneIndex} />
-                      ) : null}
-                      {renderSceneContent(scene)}
-                    </UltimateStage>
-                  </div>
-                </UltimateSceneTransition>
-              </TransitionSeries.Sequence>
-            </React.Fragment>
-          );
-        })}
-      </TransitionSeries>
+                      <UltimateStage
+                        warm={scene.warm}
+                        showGrid={scene.showGrid}
+                        family={scene.family}
+                        sceneIndex={sceneIndex}
+                        sceneDurationFrames={scene.durationInFrames}
+                        stagePreset={scene.stageConfig?.stagePreset}
+                        hudMode={scene.stageConfig?.hudMode}
+                      >
+                        {(scene.stageConfig?.showOverlay !== false && overlay) ? (
+                          <UltimatePlatformOverlay
+                            {...overlay}
+                            family={scene.family}
+                            mode={scene.stageConfig?.hudMode}
+                          />
+                        ) : null}
+                        {(scene.stageConfig?.showMediaCard !== false) ? (
+                          <UltimateSceneMediaCard scene={scene} />
+                        ) : null}
+                        <UltimateDirectorEffects scene={scene} />
+                        {(scene.stageConfig?.showIconOrbit !== false) ? (
+                          <UltimateSceneIconOrbit scene={scene} sceneIndex={sceneIndex} />
+                        ) : null}
+                        {renderSceneContent(scene)}
+                      </UltimateStage>
+                    </div>
+                  </UltimateSceneTransition>
+                </TransitionSeries.Sequence>
+              </React.Fragment>
+            );
+          })}
+        </TransitionSeries>
+      )}
+
       <UltimateCaptionOverlay subtitleData={subtitleData} />
     </>
   );

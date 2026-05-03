@@ -46,12 +46,6 @@ export const LazyMetricBars = lazy(() =>
 export const LazyDataStream = lazy(() =>
   import('./families/UltimateDataStream').then((m) => ({default: m.UltimateDataStream})),
 );
-export const LazyMemoryGraph = lazy(() =>
-  import('./families/UltimateMemoryGraph').then((m) => ({default: m.UltimateMemoryGraph})),
-);
-export const LazyPipelineFlow = lazy(() =>
-  import('./families/UltimatePipelineFlow').then((m) => ({default: m.UltimatePipelineFlow})),
-);
 export const LazyBenchmarkChart = lazy(() =>
   import('./families/UltimateBenchmarkChart').then((m) => ({default: m.UltimateBenchmarkChart})),
 );

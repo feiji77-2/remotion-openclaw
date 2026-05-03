@@ -338,7 +338,8 @@ const DEMO_SHOTS: Record<string, object> = {
   },
   cta: {
     id: 'snap-cta', family: 'cta', title: 'Call to Action', narration: 'Snapshot test — CTA',
-    frames: 90, level: 'closing', visualProps: {kicker: 'SNAPSHOT TEST', heading: 'Get Started', badge: 'NEXT'},
+    frames: 90, level: 'closing',
+    visualProps: {kicker: 'SNAPSHOT TEST', heading: 'Get Started', badge: 'NEXT', highlights: ['SNAPSHOT TEST', 'Get Started', 'Visual Regression Check']},
   },
 };
 

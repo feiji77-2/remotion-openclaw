@@ -7,7 +7,7 @@ interface BarData {
   color?: string;
 }
 
-interface MiniChartProps {
+export interface MiniChartProps {
   data: BarData[];
   width?: number;
   height?: number;

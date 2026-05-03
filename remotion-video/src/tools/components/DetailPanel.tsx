@@ -74,7 +74,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({selectedCue, totalFrame
 
   const shotId = selectedCue.shotId;
   const cameraPath = getCameraPathForShot(shotId);
-  const raw = selectedCue.raw as Record<string, unknown>;
+  const raw = selectedCue.raw;
 
   return (
     <div style={panelStyle}>

@@ -1,28 +1,12 @@
 import React from 'react';
 import {useCurrentFrame} from 'remotion';
 import {GeometryAccent, RadialGauge, TextMaskWipe} from '../../visual-atoms';
-import {
-  getUltimateManualGlyph,
-  resolveUltimateIconPack,
-  ULTIMATE_ICON_URLS,
-  type UltimateIconName,
-} from '../iconography';
+import {iconMaskStyle, SemanticIconGlyph} from '../SemanticIcon';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
 import { useStaggerSlide, useScaleEmphasis } from '../motionGrammar';
 import type {UltimateMetricBarsProps, UltimateSceneGrammar} from '../types';
 
-const iconMaskStyle = (icon: UltimateIconName): React.CSSProperties => ({
-  background: 'currentColor',
-  WebkitMaskImage: `url(${ULTIMATE_ICON_URLS[icon]})`,
-  WebkitMaskRepeat: 'no-repeat',
-  WebkitMaskPosition: 'center',
-  WebkitMaskSize: 'contain',
-  maskImage: `url(${ULTIMATE_ICON_URLS[icon]})`,
-  maskRepeat: 'no-repeat',
-  maskPosition: 'center',
-  maskSize: 'contain',
-});
 
 const MetricIcon: React.FC<{
   iconValue?: string;
@@ -30,32 +14,16 @@ const MetricIcon: React.FC<{
   color: string;
   size: number;
   fallbackIndex?: number;
-}> = ({iconValue, semanticText, color, size, fallbackIndex = 0}) => {
-  const glyph = getUltimateManualGlyph(iconValue);
-  if (glyph) {
-    return <span style={{fontSize: size * 0.72, lineHeight: 1, fontWeight: 800, color}}>{glyph}</span>;
-  }
-
-  const icon = resolveUltimateIconPack({
-    requested: [iconValue],
-    hints: [iconValue, semanticText],
-    count: 1,
-    family: 'metrics',
-    seed: fallbackIndex,
-  })[0];
-
-  if (!icon) {
-    return null;
-  }
-
+}> = (props) => {
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        color,
-        ...iconMaskStyle(icon),
-      }}
+    <SemanticIconGlyph
+      iconValue={props.iconValue}
+      semanticText={props.semanticText}
+      color={props.color}
+      size={props.size}
+      fallbackIndex={props.fallbackIndex}
+      family="metrics"
+      silentFail
     />
   );
 };

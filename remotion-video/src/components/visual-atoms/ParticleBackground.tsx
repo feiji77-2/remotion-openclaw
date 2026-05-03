@@ -10,7 +10,7 @@ interface Particle {
   delay: number;
 }
 
-interface ParticleBackgroundProps {
+export interface ParticleBackgroundProps {
   particleCount?: number;
   color?: string;
   speed?: number;

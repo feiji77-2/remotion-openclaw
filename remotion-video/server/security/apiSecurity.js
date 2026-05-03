@@ -108,11 +108,7 @@ function getProvidedApiKey(req) {
 }
 
 function getProvidedAdminKey(req) {
-  const adminHeader = normalizeString(req.get('x-admin-key'));
-  if (adminHeader) {
-    return adminHeader;
-  }
-  return getProvidedApiKey(req);
+  return normalizeString(req.get('x-admin-key'));
 }
 
 function createApiAuthMiddleware(securityConfig = getSecurityConfig()) {
@@ -170,7 +166,23 @@ function createAdminAuthMiddleware(securityConfig = getSecurityConfig()) {
 function createRateLimitMiddleware({windowMs, max, keyPrefix}) {
   const buckets = new Map();
 
+  // 定期清理过期 bucket（每 5 分钟）
+  const CLEANUP_INTERVAL_MS = 300_000;
+  let lastCleanup = Date.now();
+
+  function evictStaleBuckets() {
+    const now = Date.now();
+    if (now - lastCleanup < CLEANUP_INTERVAL_MS) return;
+    lastCleanup = now;
+    const cutoff = now - windowMs;
+    for (const [key, bucket] of buckets) {
+      if (bucket.startedAt < cutoff) buckets.delete(key);
+    }
+  }
+
   const middleware = function rateLimit(req, res, next) {
+    evictStaleBuckets();
+
     const ip = normalizeString(req.ip)
       || normalizeString(req.headers['x-forwarded-for'])
       || 'unknown';

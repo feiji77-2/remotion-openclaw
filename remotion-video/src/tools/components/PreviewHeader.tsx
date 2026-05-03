@@ -59,7 +59,7 @@ export const PreviewHeader: React.FC<PreviewHeaderProps> = ({score}) => {
         <span style={{fontSize: 12, color: '#6b7280', marginRight: 4}}>能量:</span>
         {score.acts.map((act) => (
           <span key={act.actId} style={pillStyle(getEnergyColor(act.energy))} title={act.label}>
-            {ENERGY_LABELS[act.energy as EnergyLevel] ?? act.energy}
+            {ENERGY_LABELS[act.energy] ?? act.energy}
           </span>
         ))}
       </div>
