@@ -19,7 +19,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "setup": "npm --prefix remotion-video ci && npm --prefix video-pipeline-view/player-app ci",
+    "setup": "npm --prefix remotion-video install && npm --prefix video-pipeline-view/player-app install",
     "clean": "npm run remotion-video:clean:runtime && node -e \"const fs=require('node:fs'); for (const target of ['video-pipeline-view/player-app/dist','video-pipeline-view/player-app/.vite','remotion-video/out','remotion-video/dist']) fs.rmSync(target,{recursive:true,force:true});\"",
     "dev:player": "npm --prefix video-pipeline-view/player-app run dev",
     "dev:api": "npm --prefix remotion-video run pipeline:api",
