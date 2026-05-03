@@ -1,8 +1,10 @@
 import React from 'react';
+import { useCurrentFrame } from 'remotion';
 import {GeometryAccent, TextMaskWipe} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
 import type {UltimateQuoteHighlightProps, UltimateSceneGrammar} from '../types';
+import { useTextSlideIn, useFloatMotion } from '../motionGrammar';
 
 const normalizeText = (value?: string) => {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -40,6 +42,9 @@ export const UltimateQuoteHighlight: React.FC<UltimateQuoteHighlightProps & {gra
   const color = resolveUltimateAccent(accent);
   const revealDirection = resolveTextRevealDirection(grammar, 'right');
   const leadLines = splitLead(quote, 8);
+  const frame = useCurrentFrame();
+  const quoteSlideIn = useTextSlideIn(frame, 'up', 8);
+  const floatMotion = useFloatMotion(frame, 20);
   const accentWord = trimText(normalizeText(tags[0]?.label || quote), 10);
   const supportLine = trimText(normalizeText(attribution || tags[1]?.label || heading), 22);
   const footerTags = tags.slice(0, 3).map((tag) => trimText(normalizeText(tag.label), 12)).filter(Boolean);
@@ -78,7 +83,7 @@ export const UltimateQuoteHighlight: React.FC<UltimateQuoteHighlightProps & {gra
         <div style={{fontSize: 188, lineHeight: 0.78, fontWeight: 900, letterSpacing: -10, color: `${color}14`, textTransform: 'uppercase'}}>
           {accentWord}
         </div>
-        <div style={{marginTop: -38, display: 'grid', gap: 6, justifyItems: 'center'}}>
+        <div style={{marginTop: -38, display: 'grid', gap: 6, justifyItems: 'center', ...quoteSlideIn}}>
           {leadLines.map((line, index) => (
             <div key={`${line}-${index}`} style={{fontSize: index === 0 ? 108 : 96, lineHeight: 0.88, fontWeight: 900, color: color, letterSpacing: -5, textShadow: `0 0 36px ${color}30`}}>
               {line}
@@ -98,7 +103,7 @@ export const UltimateQuoteHighlight: React.FC<UltimateQuoteHighlightProps & {gra
             </div>
           ))}
         </div>
-        {attribution ? <div style={{fontSize: 22, color: 'rgba(229,236,255,0.54)'}}>{trimText(normalizeText(attribution), 18)}</div> : null}
+        {attribution ? <div style={{fontSize: 22, color: 'rgba(229,236,255,0.54)', ...floatMotion}}>{trimText(normalizeText(attribution), 18)}</div> : null}
       </div>
     </div>
   );

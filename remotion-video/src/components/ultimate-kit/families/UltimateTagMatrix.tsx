@@ -1,7 +1,9 @@
 import React from 'react';
+import {useCurrentFrame} from 'remotion';
 import {GeometryAccent, OrbitLabels, TextMaskWipe} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
+import {useStaggerScale, useFloatMotion} from '../motionGrammar';
 import type {UltimateSceneGrammar, UltimateTagMatrixProps} from '../types';
 
 export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps & {grammar?: UltimateSceneGrammar}> = ({
@@ -11,6 +13,7 @@ export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps & {grammar?: Ult
   items,
   grammar,
 }) => {
+  const frame = useCurrentFrame();
   const color = resolveUltimateAccent('cyan');
   const revealDirection = resolveTextRevealDirection(grammar, 'left');
   return (
@@ -49,12 +52,26 @@ export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps & {grammar?: Ult
           ))}
         </div>
         <div style={{display: 'grid', gap: 10, paddingTop: 8}}>
-          {items.slice(0, 5).map((item, index) => (
-            <div key={`${item.label}-${index}`} style={{display: 'flex', alignItems: 'center', gap: 12, color: 'rgba(229,236,255,0.72)'}}>
-              <div style={{width: 28, height: 1, background: `linear-gradient(90deg, ${resolveUltimateAccent(item.accent ?? 'cyan')}, transparent)`}} />
-              <div style={{fontSize: 20, lineHeight: 1.25}}>{item.label}</div>
-            </div>
-          ))}
+          {items.slice(0, 5).map((item, index) => {
+            const staggerScale = useStaggerScale(frame, index, 4);
+            const floatMotion = useFloatMotion(frame, index * 6, 3, 70);
+            return (
+              <div
+                key={`${item.label}-${index}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  color: 'rgba(229,236,255,0.72)',
+                  opacity: staggerScale.opacity,
+                  transform: `${staggerScale.transform} ${floatMotion.transform}`,
+                }}
+              >
+                <div style={{width: 28, height: 1, background: `linear-gradient(90deg, ${resolveUltimateAccent(item.accent ?? 'cyan')}, transparent)`}} />
+                <div style={{fontSize: 20, lineHeight: 1.25}}>{item.label}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
       <div style={{position: 'relative', minHeight: 620}}>

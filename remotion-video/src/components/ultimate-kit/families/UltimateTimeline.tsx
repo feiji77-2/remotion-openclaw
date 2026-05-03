@@ -20,6 +20,7 @@ import {
   createUltimateMicroJitter,
   resolveUltimateMicroJitterConfig,
 } from '../motion';
+import {useStaggerSlide, useScaleEmphasis} from '../motionGrammar';
 import type {
   UltimateArchitectureMapProps,
   UltimateBenchmarkChartProps,
@@ -734,6 +735,8 @@ export const UltimateTimeline: React.FC<UltimateTimelineProps & {grammar?: {stag
       {visibleItems.map((item, index) => {
         const delay = 6 + index * gap * 5;
         const reveal = buildReveal(frame, delay);
+        const scaleEmphasis = useScaleEmphasis(frame, index * 6);
+        const staggerSlide = useStaggerSlide(frame, index, 6, 'left', 20);
         const itemColor = toneToColor(item.accent ?? accent);
         const point = nodes[index];
         const width = index === 2 ? 340 : 270;
@@ -752,7 +755,8 @@ export const UltimateTimeline: React.FC<UltimateTimelineProps & {grammar?: {stag
                 borderRadius: '50%',
                 background: itemColor,
                 boxShadow: ultimateGlow(itemColor, 0.44),
-                opacity: reveal,
+                opacity: reveal * scaleEmphasis.opacity,
+                transform: scaleEmphasis.transform,
               }}
             />
             <div
@@ -773,12 +777,12 @@ export const UltimateTimeline: React.FC<UltimateTimelineProps & {grammar?: {stag
                 left: point.x + offsetX,
                 top: point.y + offsetY,
                 width,
-                opacity: reveal,
-                transform: withMicroJitter(
+                opacity: reveal * staggerSlide.opacity,
+                transform: `${staggerSlide.transform} ${withMicroJitter(
                   frame,
                   `translateY(${interpolate(reveal, [0, 1], [26, 0])}px) rotate(${index % 2 === 0 ? -2.2 : 2.2}deg)`,
                   resolveUltimateMicroJitterConfig('steady', {delay, seed: 700 + index}),
-                ),
+                )}`,
                 textAlign: point.align,
               }}
             >

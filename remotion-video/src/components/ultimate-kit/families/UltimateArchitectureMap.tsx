@@ -5,6 +5,7 @@ import {getUltimateManualGlyph, isUltimateManualGlyph, resolveUltimateIconPack, 
 import {appendUltimateMicroJitter, createUltimateMicroJitter, resolveUltimateMicroJitterConfig} from '../motion';
 import {resolveUltimateAccent, ultimateGlow, ultimateKitTokens} from '../tokens';
 import type {UltimateArchitectureMapProps} from '../types';
+import {useFloatMotion, useStaggerScale} from '../motionGrammar';
 
 const kit = ultimateKitTokens;
 
@@ -430,6 +431,13 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
           : link.slot.align === 'center'
             ? ({textAlign: 'center' as const, alignItems: 'center' as const})
             : ({textAlign: 'left' as const, alignItems: 'flex-start' as const});
+        const staggerStyle = useStaggerScale(frame, index, 6);
+        const floatStyle = useFloatMotion(frame, index * 7 + 20, 5, 100);
+        const nodeTransform = [
+          `translateY(${interpolate(nodeReveal, [0, 1], [16, 0])}px)`,
+          staggerStyle.transform,
+          floatStyle.transform,
+        ].join(' ');
 
         return (
           <div
@@ -442,11 +450,11 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
               display: 'flex',
               flexDirection: 'column',
               gap: 10,
-              opacity: nodeReveal,
+              opacity: nodeReveal * staggerStyle.opacity,
               ...alignStyle,
               transform: withMicroJitter(
                 frame,
-                `translateY(${interpolate(nodeReveal, [0, 1], [16, 0])}px)`,
+                nodeTransform,
                 {delay: linkDelay, amplitudeX: 0.8, amplitudeY: 0.8, rotateDeg: 0.14, scaleDelta: 0.002, seed: 200 + index},
               ),
               padding: '10px 0 0',

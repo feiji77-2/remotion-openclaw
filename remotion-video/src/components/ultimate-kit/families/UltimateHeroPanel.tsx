@@ -4,6 +4,7 @@ import {GeometryAccent, ShockwaveWord, TextMaskWipe} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent, ultimateKitTokens} from '../tokens';
 import type {UltimateHeroPanelProps, UltimateSceneGrammar} from '../types';
+import { useTextSlideIn, useScaleEmphasis, useFloatMotion } from '../motionGrammar';
 
 export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: UltimateSceneGrammar}> = ({
   kicker,
@@ -37,6 +38,9 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: Ult
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
+  const titleSlideIn = useTextSlideIn(frame, 'up', 6);
+  const scaleEmphasis = useScaleEmphasis(frame, 12);
+  const floatMotion = useFloatMotion(frame, 30);
 
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
@@ -51,7 +55,8 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: Ult
           letterSpacing: -14,
           color: `${color}20`,
           textTransform: 'uppercase',
-          transform: `scale(${giantScale})`,
+          ...scaleEmphasis,
+          transform: `scale(${giantScale}) ${scaleEmphasis.transform}`,
           transformOrigin: 'left top',
           pointerEvents: 'none',
           whiteSpace: 'nowrap',
@@ -101,7 +106,7 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: Ult
               {kicker}
             </div>
           ) : null}
-          <div style={{position: 'relative', minHeight: 190}}>
+          <div style={{position: 'relative', minHeight: 190, ...titleSlideIn}}>
             <TextMaskWipe
               text={title}
               direction={revealDirection}
@@ -120,7 +125,7 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: Ult
             />
           </div>
           {subtitle ? (
-            <div style={{maxWidth: 780, fontSize: 28, lineHeight: 1.3, color: 'rgba(229,236,255,0.76)'}}>
+            <div style={{maxWidth: 780, fontSize: 28, lineHeight: 1.3, color: 'rgba(229,236,255,0.76)', ...floatMotion}}>
               {subtitle}
             </div>
           ) : null}

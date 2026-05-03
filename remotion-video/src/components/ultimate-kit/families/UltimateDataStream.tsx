@@ -20,6 +20,7 @@ import {
   createUltimateMicroJitter,
   resolveUltimateMicroJitterConfig,
 } from '../motion';
+import { useStaggerSlide, useFloatMotion } from '../motionGrammar';
 import type {
   UltimateArchitectureMapProps,
   UltimateBenchmarkChartProps,
@@ -799,6 +800,8 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
               extrapolateLeft: 'clamp',
               extrapolateRight: 'clamp',
             });
+            const staggerSlide = useStaggerSlide(frame, index, 5, 'right', 24);
+            const floatMotion = index % 2 === 0 ? useFloatMotion(frame, index * 5) : null;
             return (
               <div
                 key={`${item.label}-${index}`}
@@ -807,10 +810,10 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
                   gridTemplateColumns: '220px minmax(0, 1fr) 220px',
                   gap: 18,
                   alignItems: 'center',
-                  opacity: reveal,
+                  opacity: reveal * staggerSlide.opacity,
                   transform: withMicroJitter(
                     frame,
-                    `translateY(${interpolate(reveal, [0, 1], [14, 0])}px)`,
+                    `${staggerSlide.transform} translateY(${interpolate(reveal, [0, 1], [14, 0])}px)${floatMotion ? ' ' + floatMotion.transform : ''}`,
                     resolveUltimateMicroJitterConfig('steady', {
                       delay,
                       seed: 320 + index,

@@ -2,6 +2,7 @@ import React from 'react';
 import {interpolate, spring, useCurrentFrame} from 'remotion';
 import {GeometryAccent, PathDrawLink} from '../../visual-atoms';
 import {resolveUltimateAccent, ultimateGlow, ultimateKitTokens} from '../tokens';
+import { useStaggerScale, useStaggerSlide } from '../motionGrammar';
 import type {UltimateBenchmarkChartProps} from '../types';
 
 const toneToColor = (tone?: Parameters<typeof resolveUltimateAccent>[0]) => {
@@ -147,6 +148,8 @@ export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {gra
           const bottomY = 110;
           const primaryPath = `M ${trackLeft} ${topY} C ${trackLeft + 260} ${topY - 16}, ${trackLeft + 760} ${topY + 20}, ${primaryX} ${topY}`;
           const secondaryPath = `M ${trackLeft} ${bottomY} C ${trackLeft + 220} ${bottomY + 18}, ${trackLeft + 700} ${bottomY - 12}, ${secondaryX} ${bottomY}`;
+          const staggerScale = useStaggerScale(frame, index, 8);
+          const staggerSlide = useStaggerSlide(frame, index, 8, 'right', 16);
 
           return (
             <div
@@ -154,8 +157,8 @@ export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {gra
               style={{
                 position: 'relative',
                 height: 182,
-                opacity: reveal,
-                transform: `translateY(${interpolate(reveal, [0, 1], [28, 0])}px)`,
+                opacity: reveal * staggerScale.opacity,
+                transform: `${staggerScale.transform} translateY(${interpolate(reveal, [0, 1], [28, 0])}px)`,
               }}
             >
               <div
@@ -309,6 +312,8 @@ export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {gra
                   width: 188,
                   textAlign: 'right',
                   zIndex: 2,
+                  opacity: staggerSlide.opacity,
+                  transform: staggerSlide.transform,
                 }}
               >
                 <div style={{fontSize: 38, fontWeight: 860, lineHeight: 1, color: primaryColor}}>

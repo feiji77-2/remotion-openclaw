@@ -16,6 +16,7 @@ import {
   ultimateKitVideo,
 } from '../tokens';
 import {appendUltimateMicroJitter, createUltimateMicroJitter} from '../motion';
+import { useScaleEmphasis, useStaggerScale } from '../motionGrammar';
 import type {
   UltimateArchitectureMapProps,
   UltimateBenchmarkChartProps,
@@ -963,6 +964,7 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
 
           const color = toneToColor(item.accent ?? (index === 0 ? 'green' : index === 1 ? 'yellow' : 'purple'));
           const chipReveal = buildReveal(frame, 16 + index * 6);
+          const staggerScale = useStaggerScale(frame, index, 6);
           const itemLines = splitDisplayLinesBalanced(item.label, 14, 3);
           const detailLines = splitDisplayLinesBalanced(item.detail || '', 18, 2);
           const chips = (item.chips || []).slice(0, 3);
@@ -982,7 +984,8 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                   top: point.y - 64,
                   width: 128,
                   height: 128,
-                  opacity: chipReveal,
+                  opacity: chipReveal * staggerScale.opacity,
+                  transform: staggerScale.transform,
                 }}
               >
                 <RadialGauge
@@ -1003,10 +1006,10 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                   left: point.x + point.labelX,
                   top: point.y + point.labelY,
                   width: point.width,
-                  opacity: chipReveal,
+                  opacity: chipReveal * staggerScale.opacity,
                   transform: withMicroJitter(
                     frame,
-                    `translateY(${interpolate(chipReveal, [0, 1], [18, 0])}px)`,
+                    `${staggerScale.transform} translateY(${interpolate(chipReveal, [0, 1], [18, 0])}px)`,
                     {
                       delay: 16 + index * 6,
                       amplitudeX: 1.1,

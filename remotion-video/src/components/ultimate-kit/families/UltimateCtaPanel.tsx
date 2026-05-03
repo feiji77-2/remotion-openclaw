@@ -1,7 +1,9 @@
 import React from 'react';
+import { useCurrentFrame } from 'remotion';
 import {GeometryAccent, ReticleLockOn} from '../../visual-atoms';
 import {resolveUltimateAccent} from '../tokens';
 import type {UltimateCtaPanelProps, UltimateSceneGrammar} from '../types';
+import { useTextSlideIn, usePulseAttention } from '../motionGrammar';
 
 const normalizeText = (value?: string) => {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -40,6 +42,9 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps & {grammar?: Ultim
   const chips = distinctHighlights(highlights).filter((item) => item !== title && item !== subline).slice(0, 2);
   const kicker = chips[0] || trimText(subline || '告诉我你的真实场景', 16);
   const footer = chips[1] || trimText(searchLabel || subline || title, 18);
+  const frame = useCurrentFrame();
+  const headingSlideIn = useTextSlideIn(frame, 'up', 6);
+  const pulseAttention = usePulseAttention(frame, 30);
 
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
@@ -82,7 +87,7 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps & {grammar?: Ultim
           justifyItems: 'center',
         }}
       >
-        <div style={{fontSize: 78, lineHeight: 0.92, fontWeight: 900, color: '#f7fbff', textAlign: 'center', letterSpacing: -3}}>
+        <div style={{fontSize: 78, lineHeight: 0.92, fontWeight: 900, color: '#f7fbff', textAlign: 'center', letterSpacing: -3, ...headingSlideIn}}>
           {title}
         </div>
         <div style={{display: 'flex', alignItems: 'center', gap: 14}}>
@@ -94,6 +99,7 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps & {grammar?: Ultim
               color: '#f7fbff',
               fontSize: 24,
               fontWeight: 800,
+              ...pulseAttention,
             }}
           >
             {trimText(kicker, 10)}

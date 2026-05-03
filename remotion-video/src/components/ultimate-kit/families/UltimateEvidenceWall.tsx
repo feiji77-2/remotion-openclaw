@@ -5,6 +5,7 @@ import {getUltimateManualGlyph, isUltimateManualGlyph, resolveUltimateIconPack, 
 import {appendUltimateMicroJitter, createUltimateMicroJitter, resolveUltimateMicroJitterConfig} from '../motion';
 import {resolveUltimateAccent, ultimateGlow, ultimateKitTokens} from '../tokens';
 import type {UltimateEvidenceWallProps} from '../types';
+import {usePulseAttention, useStaggerScale} from '../motionGrammar';
 
 const kit = ultimateKitTokens;
 
@@ -396,6 +397,15 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
         const cardColor = toneToColor(card.accent ?? accent);
         const position = placements[index] || placements[placements.length - 1];
         const alignStyle = position.align === 'right' ? {textAlign: 'right' as const} : {textAlign: 'left' as const};
+        const stagger = useStaggerScale(frame, index, 5);
+        const isPulsing = index % 3 === 0;
+        const pulse = isPulsing ? usePulseAttention(frame, 30 + index * 5, 0.03, 90) : null;
+        const combinedTransform = [
+          `translateY(${interpolate(reveal, [0, 1], [22, 0])}px)`,
+          `rotate(${position.rotate}deg)`,
+          stagger.transform,
+          ...(pulse ? [pulse.transform] : []),
+        ].join(' ');
 
         return (
           <div
@@ -405,10 +415,10 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
               top: position.top,
               left: position.left,
               width: position.width,
-              opacity: reveal,
+              opacity: reveal * stagger.opacity,
               transform: withMicroJitter(
                 frame,
-                `translateY(${interpolate(reveal, [0, 1], [22, 0])}px) rotate(${position.rotate}deg)`,
+                combinedTransform,
                 resolveUltimateMicroJitterConfig('steady', {delay, seed: 150 + index}),
               ),
               ...alignStyle,

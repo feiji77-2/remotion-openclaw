@@ -20,6 +20,7 @@ import {
   createUltimateMicroJitter,
   resolveUltimateMicroJitterConfig,
 } from '../motion';
+import {useStaggerSlide, useFloatMotion} from '../motionGrammar';
 import type {
   UltimateArchitectureMapProps,
   UltimateBenchmarkChartProps,
@@ -771,6 +772,8 @@ export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps & {g
           const accentColor = toneToColor(item.accent ?? (index % 2 === 0 ? 'cyan' : 'green'));
           const delay = 8 + index * gap * 6;
           const reveal = buildReveal(frame, delay);
+          const staggerSlide = useStaggerSlide(frame, index, 5, 'up', 30);
+          const floatMotion = useFloatMotion(frame, index * 8 + 15, 4, 80);
           const alignStyle =
             point.align === 'right'
               ? {textAlign: 'right' as const}
@@ -779,7 +782,13 @@ export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps & {g
                 : {textAlign: 'left' as const};
 
           return (
-            <div key={`${item.title}-${index}`}>
+            <div
+              key={`${item.title}-${index}`}
+              style={{
+                opacity: staggerSlide.opacity,
+                transform: `${staggerSlide.transform} ${floatMotion.transform}`,
+              }}
+            >
               <div
                 style={{
                   position: 'absolute',

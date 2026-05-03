@@ -1,8 +1,10 @@
 import React from 'react';
+import { useCurrentFrame } from 'remotion';
 import {GeometryAccent, TextMaskWipe} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
 import type {UltimateGlossaryTermProps, UltimateSceneGrammar} from '../types';
+import { useTextSlideIn, useScaleEmphasis } from '../motionGrammar';
 
 export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar?: UltimateSceneGrammar}> = ({
   heading,
@@ -16,6 +18,10 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
   const color = resolveUltimateAccent(accent);
   const relatedItems = related.slice(0, 5);
   const revealDirection = resolveTextRevealDirection(grammar, 'center');
+  const frame = useCurrentFrame();
+  const headingSlideIn = useTextSlideIn(frame, 'left', 6);
+  const definitionSlideIn = useTextSlideIn(frame, 'up', 12);
+  const scaleEmphasis = useScaleEmphasis(frame, 18);
 
   return (
     <div style={{position: 'relative', height: '100%', overflow: 'hidden'}}>
@@ -42,7 +48,7 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
         <div style={{display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: 22}}>
           <div style={{display: 'grid', gap: 14}}>
             <div style={{fontSize: 18, letterSpacing: 4, textTransform: 'uppercase', color}}>{heading}</div>
-            <div style={{position: 'relative', minHeight: 116}}>
+            <div style={{position: 'relative', minHeight: 116, ...headingSlideIn}}>
               <TextMaskWipe
                 text={term}
                 direction={revealDirection}
@@ -86,7 +92,7 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
             }}
           >
             <div style={{fontSize: 14, letterSpacing: 2.2, textTransform: 'uppercase', color: `${color}cc`}}>definition</div>
-            <div style={{marginTop: 16, fontSize: 30, lineHeight: 1.42, color: 'rgba(229,236,255,0.78)'}}>
+            <div style={{marginTop: 16, fontSize: 30, lineHeight: 1.42, color: 'rgba(229,236,255,0.78)', ...definitionSlideIn}}>
               {definition}
             </div>
           </div>
@@ -100,6 +106,7 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
               display: 'grid',
               gap: 14,
               alignContent: 'start',
+              ...scaleEmphasis,
             }}
           >
             <div style={{fontSize: 14, letterSpacing: 2.2, textTransform: 'uppercase', color: 'rgba(229,236,255,0.46)'}}>

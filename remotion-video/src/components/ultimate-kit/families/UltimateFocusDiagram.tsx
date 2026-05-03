@@ -1,8 +1,10 @@
 import React from 'react';
+import { useCurrentFrame } from 'remotion';
 import {GeometryAccent, ReticleLockOn, TextMaskWipe} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
 import type {UltimateFocusDiagramProps, UltimateSceneGrammar} from '../types';
+import { useTextSlideIn, useScaleEmphasis } from '../motionGrammar';
 
 export const UltimateFocusDiagram: React.FC<UltimateFocusDiagramProps & {grammar?: UltimateSceneGrammar}> = ({
   eyebrow,
@@ -14,6 +16,9 @@ export const UltimateFocusDiagram: React.FC<UltimateFocusDiagramProps & {grammar
 }) => {
   const color = resolveUltimateAccent(accent);
   const revealDirection = resolveTextRevealDirection(grammar, 'left');
+  const frame = useCurrentFrame();
+  const keywordSlideIn = useTextSlideIn(frame, 'left', 6);
+  const scaleEmphasis = useScaleEmphasis(frame, 12);
 
   return (
     <div
@@ -40,7 +45,7 @@ export const UltimateFocusDiagram: React.FC<UltimateFocusDiagramProps & {grammar
             />
           </div>
         ) : null}
-        {description ? <div style={{fontSize: 22, lineHeight: 1.5, color: 'rgba(229,236,255,0.68)'}}>{description}</div> : null}
+        {description ? <div style={{fontSize: 22, lineHeight: 1.5, color: 'rgba(229,236,255,0.68)', ...scaleEmphasis}}>{description}</div> : null}
         <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
           <div style={{width: 56, height: 1, background: `linear-gradient(90deg, ${color} 0%, ${color}00 100%)`}} />
           <div style={{fontSize: 13, letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`}}>Primary subject locked</div>
@@ -76,7 +81,9 @@ export const UltimateFocusDiagram: React.FC<UltimateFocusDiagramProps & {grammar
         >
           Focus target
         </div>
-        <ReticleLockOn target={keyword} caption="primary subject" color={color} size={760} showBeam />
+        <div style={keywordSlideIn}>
+          <ReticleLockOn target={keyword} caption="primary subject" color={color} size={760} showBeam />
+        </div>
       </div>
     </div>
   );

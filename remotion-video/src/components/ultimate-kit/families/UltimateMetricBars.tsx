@@ -1,4 +1,5 @@
 import React from 'react';
+import {useCurrentFrame} from 'remotion';
 import {GeometryAccent, RadialGauge, TextMaskWipe} from '../../visual-atoms';
 import {
   getUltimateManualGlyph,
@@ -8,6 +9,7 @@ import {
 } from '../iconography';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
+import { useStaggerSlide, useScaleEmphasis } from '../motionGrammar';
 import type {UltimateMetricBarsProps, UltimateSceneGrammar} from '../types';
 
 const iconMaskStyle = (icon: UltimateIconName): React.CSSProperties => ({
@@ -64,6 +66,7 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
   items,
   grammar,
 }) => {
+  const frame = useCurrentFrame();
   const primary = items[0];
   const leadColor = resolveUltimateAccent(primary?.accent ?? 'cyan');
   const visibleItems = items.slice(0, 6);
@@ -221,6 +224,8 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
 
               {stripItems.map((item, index) => {
                 const color = resolveUltimateAccent(item.accent ?? (index % 2 === 0 ? 'cyan' : 'orange'));
+                const staggerSlide = useStaggerSlide(frame, index, 4, 'left', 20);
+                const scaleEmphasis = useScaleEmphasis(frame, index * 4 + 8);
                 return (
                   <div
                     key={item.label}
@@ -229,11 +234,13 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
                       gap: 10,
                       padding: '14px 0 16px',
                       borderBottom: index === stripItems.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                      opacity: staggerSlide.opacity,
+                      transform: staggerSlide.transform,
                     }}
                   >
                     <div style={{display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: 20, alignItems: 'baseline'}}>
                       <span style={{color: '#f7fbff'}}>{item.label}</span>
-                      <span style={{color}}>{item.value}</span>
+                      <span style={{color, opacity: scaleEmphasis.opacity, transform: scaleEmphasis.transform, display: 'inline-block'}}>{item.value}</span>
                     </div>
                     <div style={{display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 14, alignItems: 'center'}}>
                       <div style={{height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden'}}>
@@ -246,7 +253,7 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
                           }}
                         />
                       </div>
-                      <div style={{fontSize: 12, letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`}}>
+                      <div style={{fontSize: 12, letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`, opacity: scaleEmphasis.opacity, transform: scaleEmphasis.transform, display: 'inline-block'}}>
                         {Math.round(item.ratio * 100)}%
                       </div>
                     </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import {interpolate, useCurrentFrame} from 'remotion';
 import {GeometryAccent, PathDrawLink} from '../../visual-atoms';
 import {resolveUltimateAccent} from '../tokens';
+import {useStaggerSlide, useScaleEmphasis} from '../motionGrammar';
 import type {UltimateStepFlowProps} from '../types';
 
 const toneToColor = (tone?: Parameters<typeof resolveUltimateAccent>[0]) => {
@@ -89,6 +90,8 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps & {grammar?: {stag
         const point = points[index];
         const color = toneToColor(step.accent ?? (index % 2 === 0 ? 'cyan' : 'green'));
         const side = index % 2 === 0 ? 'left' : 'right';
+        const scaleEmphasis = useScaleEmphasis(frame, index * 8);
+        const staggerSlide = useStaggerSlide(frame, index, 8, 'right', 24);
         const boxLeft = side === 'left' ? point.x - 24 : point.x - 314;
         const boxTop = point.y - 158;
         return (
@@ -115,10 +118,29 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps & {grammar?: {stag
                 textAlign: side,
               }}
             >
-              <div style={{fontSize: 12, lineHeight: 1.2, letterSpacing: 2.2, color, textTransform: 'uppercase'}}>
+              <div
+                style={{
+                  fontSize: 12,
+                  lineHeight: 1.2,
+                  letterSpacing: 2.2,
+                  color,
+                  textTransform: 'uppercase',
+                  opacity: scaleEmphasis.opacity,
+                  transform: scaleEmphasis.transform,
+                }}
+              >
                 0{index + 1}
               </div>
-              <div style={{marginTop: 10, fontSize: 34, lineHeight: 1.08, fontWeight: 840, color: '#f7fbff'}}>
+              <div
+                style={{
+                  fontSize: 34,
+                  lineHeight: 1.08,
+                  fontWeight: 840,
+                  color: '#f7fbff',
+                  opacity: staggerSlide.opacity,
+                  transform: staggerSlide.transform,
+                }}
+              >
                 {step.label}
               </div>
               {step.detail ? (

@@ -1,7 +1,9 @@
 import React from 'react';
+import {useCurrentFrame} from 'remotion';
 import {GeometryAccent, TextMaskWipe} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
+import {useTextSlideIn} from '../motionGrammar';
 import type {UltimateCompareBoardProps, UltimateSceneGrammar} from '../types';
 
 const normalizeText = (value?: string) => {
@@ -59,9 +61,12 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps & {grammar
   rightAccent = 'cyan',
   grammar,
 }) => {
+  const frame = useCurrentFrame();
   const leftColor = resolveUltimateAccent(leftAccent);
   const rightColor = resolveUltimateAccent(rightAccent);
   const revealDirection = resolveTextRevealDirection(grammar, 'center');
+  const leftSlide = useTextSlideIn(frame, 'left', 0, 20);
+  const rightSlide = useTextSlideIn(frame, 'right', 3, 20);
   const firstRow = rows[0];
   const summaryParts = splitComparisonSummary(summary);
   const preferSummarySplit = summaryParts.length === 2 && isGenericSideLabel(leftTitle) && isGenericSideLabel(rightTitle);
@@ -121,7 +126,7 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps & {grammar
         ) : null}
       </div>
 
-      <div style={{position: 'absolute', left: 110, top: 296, width: 610}}>
+      <div style={{position: 'absolute', left: 110, top: 296, width: 610, opacity: leftSlide.opacity, transform: leftSlide.transform}}>
         <div style={{fontSize: 17, letterSpacing: 3, textTransform: 'uppercase', color: leftColor}}>
           {leftMeta || 'short context'}
         </div>
@@ -137,7 +142,7 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps & {grammar
         </div>
       </div>
 
-      <div style={{position: 'absolute', right: 108, bottom: 190, width: 650, textAlign: 'right'}}>
+      <div style={{position: 'absolute', right: 108, bottom: 190, width: 650, textAlign: 'right', opacity: rightSlide.opacity, transform: rightSlide.transform}}>
         <div style={{fontSize: 17, letterSpacing: 3, textTransform: 'uppercase', color: rightColor}}>
           {rightMeta || 'long context'}
         </div>
