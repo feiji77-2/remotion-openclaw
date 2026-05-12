@@ -141,4 +141,69 @@ async function shutdownAll(timeoutMs = 10000) {
   });
 }
 
-module.exports = { trackProcess, startMonitoring, stopMonitoring, getMemoryStats, shutdownAll, enforceMemoryLimit, TOTAL_MEMORY_LIMIT_MB, PER_PROCESS_MEMORY_LIMIT_MB };
+// P2: 前置限流 API — 在渲染任务开始前检查内存是否就绪
+
+/**
+ * 前置限流：检查是否能接受新的渲染任务
+ * @returns {{ accept: boolean, reason?: string }}
+ */
+function canAcceptRender() {
+  if (isShuttingDown) {
+    return { accept: false, reason: 'worker-shutting-down' };
+  }
+  updateMemoryStats();
+  const totalMb = getTotalRssMb();
+  const highWaterMark = Number(process.env.PIPELINE_MEMORY_HIGH_WATER || '0.85');
+  const limitMb = TOTAL_MEMORY_LIMIT_MB * highWaterMark;
+  if (totalMb >= limitMb) {
+    return {
+      accept: false,
+      reason: `memory-pressure ${totalMb}MB >= ${Math.round(limitMb)}MB (${Math.round(highWaterMark * 100)}% high water)`,
+    };
+  }
+  return { accept: true };
+}
+
+/**
+ * 根据当前内存状态推荐并发数
+ * @param {number} maxConcurrency - 配置的最大并发数
+ * @returns {number}
+ */
+function getRecommendedConcurrency(maxConcurrency) {
+  updateMemoryStats();
+  const totalMb = getTotalRssMb();
+  const usedPct = totalMb / TOTAL_MEMORY_LIMIT_MB;
+  if (usedPct < 0.5) return maxConcurrency;
+  if (usedPct < 0.7) return Math.max(1, Math.floor(maxConcurrency * 0.8));
+  if (usedPct < 0.85) return Math.max(1, Math.floor(maxConcurrency * 0.5));
+  return 1; // 串行安全模式
+}
+
+/**
+ * 等待内存就绪
+ * @param {number} intervalMs
+ * @param {number} timeoutMs
+ * @returns {Promise<boolean>} true=就绪, false=超时
+ */
+async function waitForMemory(intervalMs = 3000, timeoutMs = 120000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (canAcceptRender().accept) return true;
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+  return false;
+}
+
+module.exports = {
+  trackProcess,
+  startMonitoring,
+  stopMonitoring,
+  getMemoryStats,
+  shutdownAll,
+  enforceMemoryLimit,
+  canAcceptRender,
+  getRecommendedConcurrency,
+  waitForMemory,
+  TOTAL_MEMORY_LIMIT_MB,
+  PER_PROCESS_MEMORY_LIMIT_MB,
+};

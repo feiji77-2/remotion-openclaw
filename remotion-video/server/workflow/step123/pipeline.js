@@ -7,6 +7,7 @@ const {
   getWorkflowLLMCapabilities,
   hasWorkflowLLM,
 } = require('./llm');
+const { getCachedLLMResponse, setCachedLLMResponse } = require('../llmCache');
 const {
   normalizeStep1Payload,
   normalizeStep2Payload,
@@ -1034,6 +1035,21 @@ function buildStep3CopyPrompt(context, brief) {
 
 async function runStage(stepId, stageKey, context, buildPrompt, validator, options = {}) {
   const prompt = buildPrompt(context, options.previousStage);
+
+  // P1: LLM 缓存 — 仅缓存 Steps 1-3，intentInferrer 路径由 intentInferrerPipeline 控制
+  const topicQuery = context?.topic?.query || context?.topic?.inputTopic || '';
+  const skillId = context?.generation?.skill?.skillId || context?.generation?.skillId || String(stepId);
+  const cacheableSteps = ['1', '2', '3'];
+  const stepIdStr = String(stepId);
+
+  if (cacheableSteps.includes(stepIdStr)) {
+    const cached = getCachedLLMResponse(topicQuery, stepIdStr, skillId);
+    if (cached) {
+      console.info(`[llmCache] HIT stepId=${stepIdStr} stage=${stageKey} topic=${topicQuery.slice(0, 40)}`);
+      return { stepId, stageKey, model: 'cached', payload: cached };
+    }
+  }
+
   const result = await generateStructuredJson({
     messages: baseMessages(
       'You generate strict JSON for a Chinese short-video workflow. Return valid JSON only.',
@@ -1043,6 +1059,12 @@ async function runStage(stepId, stageKey, context, buildPrompt, validator, optio
     topP: options.topP || 1,
   });
   const payload = validator(result.payload, context);
+
+  // 写缓存
+  if (cacheableSteps.includes(stepIdStr)) {
+    setCachedLLMResponse(topicQuery, stepIdStr, skillId, payload);
+  }
+
   return {
     stepId,
     stageKey,

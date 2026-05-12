@@ -5,6 +5,7 @@
  */
 
 const fs = require('fs');
+const fsAsync = require('fs/promises');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const {JOBS_DIR, ensureDir} = require('../config/runtimePaths');
@@ -14,13 +15,17 @@ ensureDir(JOBS_DIR);
 const logger = createLogger({scope: 'file-queue'});
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
-const MAX_POLL_INTERVAL_MS = 5000;
+const MAX_POLL_INTERVAL_MS = 3000;
 const IDLE_BACKOFF_FACTOR = 1.5;
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 30000;
 const MAX_RETRIES = 3;
 
-// CRUD operations use sync I/O (readFileSync/writeFileSync) which is atomic
-// in Node.js single-threaded event loop — no file locking needed.
+async function pathExists(p) {
+  try {
+    await fsAsync.access(p);
+    return true;
+  } catch { return false; }
+}
 
 function sortJobsByCreatedAt(jobs, direction = 'desc') {
   const multiplier = direction === 'asc' ? 1 : -1;
@@ -39,7 +44,7 @@ function resolveNextIdlePollDelay(previousDelayMs = DEFAULT_POLL_INTERVAL_MS) {
 }
 
 // ─── 添加任务 ─────────────────────────────────────────────
-function addJob(jobType, data) {
+async function addJob(jobType, data) {
   const jobId = `job_${Date.now()}_${uuidv4().slice(0, 8)}`;
   const job = {
     id: jobId,
@@ -55,66 +60,66 @@ function addJob(jobType, data) {
     startedAt: null,
     completedAt: null,
   };
-  fs.writeFileSync(getJobPath(jobId), JSON.stringify(job, null, 2));
+  await fsAsync.writeFile(getJobPath(jobId), JSON.stringify(job, null, 2));
   logger.info('job-enqueued', {jobId, jobType});
   return jobId;
 }
 
 // ─── 查询任务 ─────────────────────────────────────────────
-function getJob(jobId) {
+async function getJob(jobId) {
   const p = getJobPath(jobId);
-  if (!fs.existsSync(p)) return null;
-  return JSON.parse(fs.readFileSync(p, 'utf8'));
+  if (!await pathExists(p)) return null;
+  return JSON.parse(await fsAsync.readFile(p, 'utf8'));
 }
 
 function getJobPath(jobId) {
   return path.join(JOBS_DIR, `${jobId}.json`);
 }
 
-function removeJob(jobId) {
+async function removeJob(jobId) {
   const jobPath = getJobPath(jobId);
-  if (!fs.existsSync(jobPath)) {
+  if (!await pathExists(jobPath)) {
     return false;
   }
-  fs.unlinkSync(jobPath);
+  await fsAsync.unlink(jobPath);
   return true;
 }
 
 // ─── 更新进度 ─────────────────────────────────────────────
-function updateProgress(jobId, progress, msg) {
-  const job = getJob(jobId);
+async function updateProgress(jobId, progress, msg) {
+  const job = await getJob(jobId);
   if (!job) return;
   job.progress = progress;
   job.progressMsg = msg;
-  fs.writeFileSync(getJobPath(jobId), JSON.stringify(job, null, 2));
+  await fsAsync.writeFile(getJobPath(jobId), JSON.stringify(job, null, 2));
 }
 
 // ─── 完成任务 ─────────────────────────────────────────────
-function completeJob(jobId, result) {
-  const job = getJob(jobId);
+async function completeJob(jobId, result) {
+  const job = await getJob(jobId);
   if (!job) return;
   job.status = 'done';
   job.progress = 100;
   job.progressMsg = '完成';
   job.result = result;
   job.completedAt = new Date().toISOString();
-  fs.writeFileSync(getJobPath(jobId), JSON.stringify(job, null, 2));
+  await fsAsync.writeFile(getJobPath(jobId), JSON.stringify(job, null, 2));
   logger.info('job-completed', {jobId});
 }
 
 // ─── 标记错误 ─────────────────────────────────────────────
-function failJob(jobId, error) {
-  const job = getJob(jobId);
+async function failJob(jobId, error) {
+  const job = await getJob(jobId);
   if (!job) return;
   job.status = 'error';
   job.error = error;
   job.completedAt = new Date().toISOString();
-  fs.writeFileSync(getJobPath(jobId), JSON.stringify(job, null, 2));
+  await fsAsync.writeFile(getJobPath(jobId), JSON.stringify(job, null, 2));
   logger.error('job-failed', {jobId, error});
 }
 
-function retryJob(jobId) {
-  const job = getJob(jobId);
+async function retryJob(jobId) {
+  const job = await getJob(jobId);
   if (!job) {
     return false;
   }
@@ -130,18 +135,18 @@ function retryJob(jobId) {
   job.error = null;
   job.startedAt = null;
   job.completedAt = null;
-  fs.writeFileSync(getJobPath(jobId), JSON.stringify(job, null, 2));
+  await fsAsync.writeFile(getJobPath(jobId), JSON.stringify(job, null, 2));
   return true;
 }
 
 // ─── 列出所有任务 ─────────────────────────────────────────
-function listJobs(filterStatus) {
-  const files = fs.readdirSync(JOBS_DIR).filter(f => f.endsWith('.json'));
-  const jobs = files.map(f => {
-    const job = JSON.parse(fs.readFileSync(path.join(JOBS_DIR, f), 'utf8'));
+async function listJobs(filterStatus) {
+  const files = (await fsAsync.readdir(JOBS_DIR)).filter(f => f.endsWith('.json'));
+  const jobs = await Promise.all(files.map(async f => {
+    const job = JSON.parse(await fsAsync.readFile(path.join(JOBS_DIR, f), 'utf8'));
     delete job.data; // 不返回完整数据，节省带宽
     return job;
-  });
+  }));
 
   if (filterStatus) {
     const filtered = jobs.filter(j => j.status === filterStatus);
@@ -189,7 +194,7 @@ function startSimpleWorker(handlers = {}) {
     }
   };
 
-  const runLoop = () => {
+  const runLoop = async () => {
     if (isStopped) {
       return;
     }
@@ -197,50 +202,60 @@ function startSimpleWorker(handlers = {}) {
       schedule(DEFAULT_POLL_INTERVAL_MS);
       return;
     }
-    const jobs = listJobs('pending');
-    if (jobs.length === 0) {
-      idlePollDelayMs = resolveNextIdlePollDelay(idlePollDelayMs);
-      schedule(idlePollDelayMs);
-      return;
+    try {
+      const jobs = await listJobs('pending');
+      if (jobs.length === 0) {
+        idlePollDelayMs = resolveNextIdlePollDelay(idlePollDelayMs);
+        schedule(idlePollDelayMs);
+        return;
+      }
+
+      const job = jobs[0];
+      const handler = handlers[job.type];
+
+      if (typeof handler !== 'function') {
+        await failJob(job.id, `No handler registered for job type: ${job.type}`);
+        schedule(0);
+        return;
+      }
+
+      logger.info('job-processing', {jobId: job.id, jobType: job.type});
+
+      // 标记为运行中
+      const fullJob = await getJob(job.id);
+      if (!fullJob) {
+        schedule(0);
+        return;
+      }
+      fullJob.status = 'running';
+      fullJob.startedAt = new Date().toISOString();
+      await fsAsync.writeFile(getJobPath(job.id), JSON.stringify(fullJob, null, 2));
+      isProcessing = true;
+      idlePollDelayMs = DEFAULT_POLL_INTERVAL_MS;
+      activeJobId = job.id;
+
+      // 执行处理函数
+      const update = (pct, msg) => {
+        updateProgress(job.id, pct, msg).catch(err => {
+          logger.warn('progress-update-failed', {jobId: job.id, error: String(err)});
+        });
+      };
+      activeRun = Promise.resolve()
+        .then(() => handler(fullJob, update))
+        .then(result => completeJob(job.id, result))
+        .catch(err => failJob(job.id, err ? String(err.message || err) : 'Unknown error'))
+        .finally(() => {
+          isProcessing = false;
+          activeJobId = null;
+          activeRun = null;
+          if (!isStopped) {
+            schedule(0);
+          }
+        });
+    } catch (err) {
+      logger.error('worker-loop-error', {error: String(err)});
+      schedule(DEFAULT_POLL_INTERVAL_MS);
     }
-
-    const job = jobs[0];
-    const handler = handlers[job.type];
-
-    if (typeof handler !== 'function') {
-      failJob(job.id, `No handler registered for job type: ${job.type}`);
-      schedule(0);
-      return;
-    }
-
-    logger.info('job-processing', {jobId: job.id, jobType: job.type});
-
-    // 标记为运行中
-    const fullJob = getJob(job.id);
-    if (!fullJob) {
-      schedule(0);
-      return;
-    }
-    fullJob.status = 'running';
-    fullJob.startedAt = new Date().toISOString();
-    fs.writeFileSync(getJobPath(job.id), JSON.stringify(fullJob, null, 2));
-    isProcessing = true;
-    idlePollDelayMs = DEFAULT_POLL_INTERVAL_MS;
-    activeJobId = job.id;
-
-    // 执行处理函数
-    activeRun = Promise.resolve()
-      .then(() => handler(fullJob, (pct, msg) => updateProgress(job.id, pct, msg)))
-      .then(result => completeJob(job.id, result))
-      .catch(err => failJob(job.id, err.message))
-      .finally(() => {
-        isProcessing = false;
-        activeJobId = null;
-        activeRun = null;
-        if (!isStopped) {
-          schedule(0);
-        }
-      });
   };
 
   try {
@@ -265,6 +280,7 @@ function startSimpleWorker(handlers = {}) {
         idlePollDelayMs,
       };
     },
+    wake,
     async stop({
       graceful = true,
       timeoutMs = DEFAULT_SHUTDOWN_TIMEOUT_MS,

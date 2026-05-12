@@ -35,7 +35,7 @@ const {getSecurityConfig, assertQueueModeAllowed} = require('../security/apiSecu
 const {
   buildUltimateRenderProps,
 } = require('../../scripts/lib/index.js');
-const { trackProcess, startMonitoring } = require('./memoryLimiter');
+const { trackProcess, startMonitoring, canAcceptRender, waitForMemory } = require('./memoryLimiter');
 
 const OUTPUT_DIR = OUTPUT_ASSETS_DIR;
 const VOICE_DIR = VOICE_ASSETS_DIR;
@@ -172,6 +172,41 @@ function resolveRemotionLaunch(cwd) {
     argsPrefix: ['remotion'],
     displayCommand: 'npx remotion',
   };
+}
+
+// P0: Build 预热 — 确保 build/ 已 bundle，消除每次 webpack 编译开销
+async function checkAndWarmBuild(cwd) {
+  const buildIndex = path.join(cwd, 'build', 'index.html');
+  if (fs.existsSync(buildIndex)) {
+    logger.info('build-already-warmed', { buildIndex });
+    return true;
+  }
+  logger.info('build-warming-started', { cwd });
+  return new Promise((resolve, reject) => {
+    const bundleArgs = [
+      'bundle',
+      'src/Root.tsx',
+      '--out-dir', 'build',
+    ];
+    const launch = resolveRemotionLaunch(cwd);
+    const proc = spawn(launch.command, [...launch.argsPrefix, ...bundleArgs], {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: false,
+    });
+    let stderr = '';
+    proc.stderr.on('data', (d) => { stderr += d.toString(); });
+    proc.on('close', (code) => {
+      if (code === 0) {
+        logger.info('build-warmed-success', { cwd });
+        resolve(true);
+      } else {
+        logger.error('build-warm-failed', { cwd, exitCode: code, stderr: stderr.slice(-500) });
+        reject(new Error(`build warm failed (exit ${code}): ${stderr.slice(-500)}`));
+      }
+    });
+    proc.on('error', reject);
+  });
 }
 
 // ─── Stage 1: 配音合成 ─────────────────────────────────
@@ -362,10 +397,8 @@ async function stageSubtitleGeneration(job, voiceFile, generatedSubtitleData, sy
   return { subtitleFile, subtitleData: null, syncedShots: Array.isArray(syncedShots) ? syncedShots : null };
 }
 
-// ─── Stage 3: Remotion 真实渲染 ────────────────────────
-async function stageRemotionRender(job, files, update, sharedDesignData) {
-  update(40, '开始 Remotion 渲染...');
-  const designRenderData = sharedDesignData;
+// ─── 渲染数据预计算 ─────────────────────────────────────
+function prepareRenderData(job, files, designRenderData) {
   const {
     template = 'ultimate',
     subtitleData = null,
@@ -373,6 +406,7 @@ async function stageRemotionRender(job, files, update, sharedDesignData) {
     projectId = 'default',
   } = job.data;
   const { subtitleFile, voiceFile, audioSegments = [] } = files;
+
   const resolvedSubtitleData = normalizeSubtitlePayload(
     Array.isArray(subtitleData) && subtitleData.length > 0
       ? subtitleData
@@ -416,9 +450,51 @@ async function stageRemotionRender(job, files, update, sharedDesignData) {
   const activeShots = resolvedShots.length > 0 ? resolvedShots : compatibilityShots;
 
   const outputDir = path.join(OUTPUT_DIR, projectId);
-  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
-
   const outputFile = path.join(outputDir, `${job.id}.mp4`);
+
+  return {
+    projectId, template, audioSegments,
+    resolvedShots, activeShots, compatibilityShots,
+    resolvedFrameRange, resolvedRenderFps, resolvedRenderWidth, resolvedRenderHeight,
+    publicVoiceFile, resolvedUltimateSubtitleData,
+    outputDir, outputFile,
+  };
+}
+
+// ─── Stage 3: Remotion 真实渲染 ────────────────────────
+async function stageRemotionRender(job, files, update, sharedDesignData) {
+  update(40, '开始 Remotion 渲染...');
+  const designRenderData = sharedDesignData;
+
+  // P0: Build 预热 — 确保 bundle 已就绪（复用 build/ 目录，消除 webpack 编译）
+  const remotionDir = PROJECT_ROOT;
+  try {
+    await checkAndWarmBuild(remotionDir);
+  } catch (warmErr) {
+    logger.warn('build-warm-skipped', { jobId: job.id, error: warmErr.message });
+    // 非致命：降级到不带 --serve 的渲染（Remotion 临时 bundle）
+  }
+
+  // P2: 前置内存检查 — 不满足则等待，最长 120s 后拒绝任务
+  const memoryCheck = canAcceptRender();
+  if (!memoryCheck.accept) {
+    logger.warn('memory-throttle', { jobId: job.id, reason: memoryCheck.reason });
+    update(40, '等待内存就绪...');
+    const ready = await waitForMemory(3000, 120000);
+    if (!ready) {
+      throw new Error(`memory-pressure-timeout — cannot accept render: ${memoryCheck.reason}`);
+    }
+  }
+
+  const renderData = prepareRenderData(job, files, designRenderData);
+  const {
+    projectId, activeShots, resolvedFrameRange, resolvedRenderFps,
+    resolvedRenderWidth, resolvedRenderHeight, publicVoiceFile,
+    resolvedUltimateSubtitleData, compatibilityShots,
+    resolvedShots, template, audioSegments, outputDir, outputFile,
+  } = renderData;
+
+  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   if (activeShots.length === 0) {
     throw new Error('Ultimate render requires payload.shots, syncedShots, or enough script/subtitle text to derive compatibility scenes.');
@@ -460,16 +536,33 @@ async function stageRemotionRender(job, files, update, sharedDesignData) {
   const propsJson = JSON.stringify(remotionProps);
 
   // 构建渲染命令（在项目根目录执行）
-  const remotionDir = PROJECT_ROOT;
+  // remotionDir 已在 stageRemotionRender 开头声明并预热
   const launch = resolveRemotionLaunch(remotionDir);
+
+  // P1: 并发数 — 优先读 env，否则按 RAM 估算（16GB → 5）
+  const RAM_GB_MB = Math.floor(require('os').totalmem() / (1024 * 1024));
+  const RAM_GB = RAM_GB_MB / 1024;
+  const concurrencyLevel = process.env.REMOTION_CONCURRENCY
+    ? Number(process.env.REMOTION_CONCURRENCY)
+    : Math.min(6, Math.max(2, Math.floor(RAM_GB / 3)));
+
   const args = [
     'render',
     'src/Root.tsx',
     compositionId,
     outputFile,
     '--props', propsJson,
+    '--hardware-acceleration', 'if-possible',
     '--log', 'info',
   ];
+
+  // P0: --serve build — 仅当 build/index.html 存在时（复用 bundle，消除 public 目录复制）
+  if (fs.existsSync(path.join(remotionDir, 'build', 'index.html'))) {
+    args.push('--serve', 'build');
+  }
+
+  // P1: --concurrency — 控制 Remotion 内部帧渲染并发
+  args.push('--concurrency', String(concurrencyLevel));
 
   if (resolvedFrameRange) {
     args.push('--frames', `${resolvedFrameRange[0]}-${resolvedFrameRange[1]}`);
@@ -498,7 +591,7 @@ async function stageRemotionRender(job, files, update, sharedDesignData) {
         env: {
           ...process.env,
           REMOTION_PUBLIC_DIR: path.join(remotionDir, 'public'),
-          REMOTION_GL: 'swiftshader',
+          // REMOTION_GL 已移除 — 允许 Remotion 自动选择 Metal/ANGLE（GPU 渲染）
         },
       });
       trackChildProcess(proc, {
@@ -1442,8 +1535,8 @@ async function synthesizeShotAudioSegments({
   const audioSegments = [];
   const shotRuntime = [];
 
-  // Batch synthesize in groups of 3 for parallel I/O without overwhelming the TTS service
-  const BATCH_SIZE = 3;
+  // Batch synthesize in groups of 6 — Qwen TTS handles concurrency well
+  const BATCH_SIZE = 6;
   for (let batchStart = 0; batchStart < validShots.length; batchStart += BATCH_SIZE) {
     const batch = validShots.slice(batchStart, batchStart + BATCH_SIZE);
     const batchPromises = batch.map((shot, batchIdx) => {

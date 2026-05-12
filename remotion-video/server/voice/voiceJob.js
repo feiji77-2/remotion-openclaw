@@ -9,6 +9,7 @@ const {
   resolveQwenTtsDefaultVoice,
   synthesizeQwenTtsToFile,
 } = require('./qwenTtsClient');
+const {enrichSegmentsWithWaveform} = require('./voiceTTSAnalyzer');
 
 const PROJECT_ROOT = path.join(__dirname, '../..');
 const PUBLIC_DIR = path.join(PROJECT_ROOT, 'public');
@@ -443,22 +444,21 @@ async function processVoiceJob(job, update) {
 
   update(10, '准备分镜配音 [qwen-tts]...');
 
-  for (let index = 0; index < shots.length; index += 1) {
-    const shot = shots[index];
+  // P1: 全并行合成 — 6-12 分镜从串行 ~60s → 并行 ~10s
+  const safeConcurrency = Math.min(
+    Number(process.env.TTS_CONCURRENCY) || shots.length,
+    shots.length,
+  );
+
+  // 每个 shot 的合成任务（异步）
+  const synthesisPromises = shots.map(async (shot, index) => {
     const speech = resolveShotSpeechPlan(shot, voiceSettings);
     const text = speech.spokenText;
     if (!speech.rawText) {
       throw new Error(`Shot ${shot.id} has no narration text`);
     }
-
-    update(
-      clamp(15 + Math.round(((index + 1) / shots.length) * 75), 15, 90),
-      `生成配音 ${index + 1}/${shots.length}: ${shot.title || shot.id} [qwen-tts]`,
-    );
-
     const fileName = `${String(index + 1).padStart(2, '0')}-${sanitizeFileSegment(shot.id)}.wav`;
     const outputPath = path.join(jobVoiceDir, fileName);
-
     await synthesizeClip({
       text,
       voice: voiceRequest,
@@ -468,10 +468,27 @@ async function processVoiceJob(job, update) {
       outputPath,
       model: requestModel,
     });
+    return { shot, speech, index, fileName, outputPath };
+  });
 
+  // 分批并行执行（避免同时打开太多 HTTP 连接）
+  const batches = [];
+  for (let i = 0; i < shots.length; i += safeConcurrency) {
+    batches.push(synthesisPromises.slice(i, i + safeConcurrency));
+  }
+
+  for (const batch of batches) {
+    await Promise.all(batch);
+  }
+
+  // 全部合成完毕，顺序收集结果并探测时长
+  for (let index = 0; index < shots.length; index += 1) {
+    const shot = shots[index];
+    const speech = resolveShotSpeechPlan(shot, voiceSettings);
+    const fileName = `${String(index + 1).padStart(2, '0')}-${sanitizeFileSegment(shot.id)}.wav`;
+    const outputPath = path.join(jobVoiceDir, fileName);
     const durationSeconds = probeDurationSeconds(outputPath);
     const relativeAssetPath = `/assets/voice/${projectId}/${job.id}/${fileName}`;
-
     generatedQueue.push({
       id: `tts-${shot.id}`,
       shotId: shot.id,
@@ -479,8 +496,18 @@ async function processVoiceJob(job, update) {
       durationSeconds,
       voiceFile: relativeAssetPath,
       language: speech.language || requestLanguage,
+      spokenText: speech.spokenText,
+      rawText: speech.rawText,
+      text: speech.rawText,
     });
+    update(
+      clamp(15 + Math.round(((index + 1) / shots.length) * 75), 15, 90),
+      `生成配音 ${index + 1}/${shots.length}: ${shot.title || shot.id} [qwen-tts]`,
+    );
   }
+
+  // Attach waveform and peakTime data to TTS segments (using real WAV analysis)
+  const enrichedQueue = enrichSegmentsWithWaveform(generatedQueue, { publicDir: PUBLIC_DIR });
 
   update(95, '整理语音任务结果...');
 
@@ -495,7 +522,7 @@ async function processVoiceJob(job, update) {
     requestModel,
     health: resolvedEngine.health,
     generatedAt: new Date().toISOString(),
-    queue: generatedQueue,
+    queue: enrichedQueue,
   }, null, 2));
 
   update(100, '语音任务完成');
@@ -510,10 +537,10 @@ async function processVoiceJob(job, update) {
     requestSpeed,
     requestModel,
     manifestFile: `/assets/voice/${projectId}/${job.id}/manifest.json`,
-    queue: generatedQueue,
-    totalClips: generatedQueue.length,
+    queue: enrichedQueue,
+    totalClips: enrichedQueue.length,
     totalDurationSeconds: Math.round(
-      generatedQueue.reduce((sum, item) => sum + item.durationSeconds, 0) * 1000,
+      enrichedQueue.reduce((sum, item) => sum + item.durationSeconds, 0) * 1000,
     ) / 1000,
   };
 }
