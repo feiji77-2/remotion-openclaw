@@ -109,8 +109,9 @@ function resolveWorkflowLLMConfig() {
   const explicitProvider = normalizeValue(process.env.WORKFLOW_LLM_PROVIDER);
   const legacyFallbackEnabled = process.env.OPENCLAW_LEGACY_FALLBACK === '1';
 
-  // ── 1. 显式指定优先 ─────────────────────────────────────
-  if (explicitProvider) {
+  // ── 1. WORKFLOW_LLM_PROVIDER 显式指定 ─────────────────────
+  // 'auto' 视为"跳过，继续自动探测"，不是无效 provider
+  if (explicitProvider && explicitProvider !== 'auto') {
     const config = resolveForExplicitProvider(explicitProvider);
     if (config) return config;
     // 显式指定了无效 provider，告知用户可用选项
@@ -180,13 +181,19 @@ function resolveWorkflowLLMConfig() {
   }
 
   // 2d. Gemini (via Google AI / Vertex AI)
+  // Google 官方 OpenAI 兼容端点: https://generativelanguage.googleapis.com/v1beta/openai/
   const geminiKey = normalizeValue(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
   if (geminiKey) {
-    const geminiBase = normalizeBaseUrl(process.env.GEMINI_BASE_URL, 'https://generativelanguage.googleapis.com');
+    // normalizeBaseUrl 会把尾斜杠去掉并在末尾追加 /v1
+    // 输入 https://generativelanguage.googleapis.com/v1beta/openai → 输出 .../v1beta/openai/v1
+    const geminiBase = normalizeBaseUrl(
+      process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
+      '',
+    );
     return {
       available: true,
       provider: 'gemini',
-      transport: 'openai-compatible',  // Gemini REST API 与 OpenAI 兼容
+      transport: 'openai',           // Gemini OpenAI 兼容接口走 openai transport
       apiKey: geminiKey,
       baseURL: geminiBase,
       model: normalizeValue(process.env.GEMINI_WORKFLOW_MODEL) || 'gemini-2.0-flash',
@@ -279,12 +286,16 @@ function resolveForExplicitProvider(provider) {
 
     case 'gemini':
       if (!normalizeValue(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)) return null;
+      const egBase = normalizeBaseUrl(
+        process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai',
+        '',
+      );
       return {
         available: true,
         provider: 'gemini',
-        transport: 'openai-compatible',
+        transport: 'openai',
         apiKey: normalizeValue(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
-        baseURL: normalizeBaseUrl(process.env.GEMINI_BASE_URL, 'https://generativelanguage.googleapis.com'),
+        baseURL: egBase,
         model: normalizeValue(process.env.GEMINI_WORKFLOW_MODEL) || 'gemini-2.0-flash',
         authSource: 'env:GEMINI_API_KEY',
         cliPath: null,
@@ -297,10 +308,6 @@ function resolveForExplicitProvider(provider) {
     case 'openclaw':
     case 'openclaw-legacy':
       return tryResolveOpenClawLegacy();
-
-    case 'auto':
-      // auto 走自动探测，递归调用时不带 explicit
-      return null; // 让自动探测继续
 
     default:
       return null;
@@ -747,11 +754,34 @@ async function generateStructuredJson({messages, temperature = 0.65, topP = 1}) 
   }
 
   if (config.transport === 'anthropic') {
-    const content = await requestAnthropicContent(config, {messages, temperature, topP});
-    return {
-      model: config.model,
-      payload: safeParseJson(content),
-    };
+    const client = createWorkflowClient(); // 复用 OpenAI 客户端做 JSON repair
+    try {
+      const content = await requestAnthropicContent(config, {messages, temperature, topP});
+      return {
+        model: config.model,
+        payload: safeParseJson(content),
+      };
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        try {
+          const repairedPayload = await repairJsonViaOpenAi(client, config, error.input || '', error.message);
+          return { model: config.model, payload: repairedPayload };
+        } catch (repairError) {
+          throw new WorkflowGenerationError({
+            status: 422,
+            code: 'WORKFLOW_LLM_INVALID_JSON',
+            message: 'Anthropic 模型返回了无法修复的 JSON 结构',
+            details: buildWorkflowLLMDetails(),
+          });
+        }
+      }
+      throw new WorkflowGenerationError({
+        status: 503,
+        code: 'WORKFLOW_LLM_REQUEST_FAILED',
+        message: `Anthropic API 调用失败：${error.message}`,
+        details: buildWorkflowLLMDetails(),
+      });
+    }
   }
 
   if (config.transport === 'openclaw-legacy') {
@@ -767,14 +797,46 @@ async function generateStructuredJson({messages, temperature = 0.65, topP = 1}) 
   });
 }
 
+/**
+ * Anthropic Messages API 要求：
+ * - system prompt 通过顶层 system 参数传入（不接受 role:"system" 的 message）
+ * - developer role 不存在（role:"developer" 在 messages 数组里也无效）
+ * - messages 数组只接受 role:"user" 和 role:"assistant"
+ */
+function normalizeAnthropicMessages(messages) {
+  const normalized = Array.isArray(messages) ? messages : [];
+  const systemParts = [];
+
+  const conversationMessages = normalized.filter((m) => {
+    const role = (m?.role || '').toLowerCase();
+    if (role === 'system' || role === 'developer') {
+      const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content || '');
+      if (content) systemParts.push(content);
+      return false;
+    }
+    return role === 'user' || role === 'assistant';
+  });
+
+  // 映射 role：user → user, assistant → assistant
+  const mapped = conversationMessages.map((m) => ({
+    role: m.role === 'assistant' ? 'assistant' : 'user',
+    content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content || ''),
+  }));
+
+  const system = systemParts.join('\n\n') || undefined;
+  return { system, messages: mapped };
+}
+
 async function requestAnthropicContent(config, {messages, temperature, topP}) {
-  const requestMessages = buildJsonOnlyMessages(messages);
+  const { system, messages: conversationMessages } = normalizeAnthropicMessages(messages);
+
   const body = {
     model: config.model,
-    messages: requestMessages.map((m) => ({ role: m.role, content: m.content })),
+    messages: conversationMessages,
     max_tokens: 8192,
     temperature,
   };
+  if (system) body.system = system;
   if (topP !== 1) body.top_p = topP;
 
   const url = `${config.baseURL}/v1/messages`;
