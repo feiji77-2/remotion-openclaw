@@ -28,7 +28,7 @@ function resetJobsDir() {
 async function waitFor(check, timeoutMs = 1500) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    if (check()) {
+    if (await check()) {
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -36,50 +36,50 @@ async function waitFor(check, timeoutMs = 1500) {
   throw new Error('Timed out waiting for condition');
 }
 
-before(() => {
+before(async () => {
   resetJobsDir();
 });
 
-after(() => {
+after(async () => {
   resetJobsDir();
 });
 
-test('retryJob respects MAX_RETRIES', () => {
+test('retryJob respects MAX_RETRIES', async () => {
   resetJobsDir();
 
-  const jobId = addJob('test', {});
+  const jobId = await addJob('test', {});
 
   // First MAX_RETRIES calls should succeed
   for (let index = 0; index < MAX_RETRIES; index += 1) {
-    assert.equal(retryJob(jobId), true);
+    assert.equal(await retryJob(jobId), true);
   }
 
   // The next call should return false (exceeded max retries)
-  assert.equal(retryJob(jobId), false);
+  assert.equal(await retryJob(jobId), false);
 });
 
-test('retryJob resets job state', () => {
+test('retryJob resets job state', async () => {
   resetJobsDir();
 
-  const jobId = addJob('test', {});
+  const jobId = await addJob('test', {});
   const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
 
   // Directly modify job to simulate a running state with progress
-  const modified = getJob(jobId);
+  const modified = await getJob(jobId);
   modified.status = 'running';
   modified.progress = 50;
   modified.progressMsg = 'processing';
   modified.startedAt = new Date().toISOString();
   fs.writeFileSync(jobPath, JSON.stringify(modified, null, 2));
 
-  const beforeRetry = getJob(jobId);
+  const beforeRetry = await getJob(jobId);
   assert.equal(beforeRetry.status, 'running');
   assert.equal(beforeRetry.progress, 50);
 
-  const result = retryJob(jobId);
+  const result = await retryJob(jobId);
   assert.equal(result, true);
 
-  const afterRetry = getJob(jobId);
+  const afterRetry = await getJob(jobId);
   assert.equal(afterRetry.status, 'pending');
   assert.equal(afterRetry.progress, 0);
   assert.equal(afterRetry.progressMsg, '等待重试');
@@ -92,7 +92,7 @@ test('retryJob resets job state', () => {
 test('startSimpleWorker processes pending jobs', async () => {
   resetJobsDir();
 
-  const jobId = addJob('render', { index: 1 });
+  const jobId = await addJob('render', { index: 1 });
 
   const worker = startSimpleWorker({
     async render(job) {
@@ -100,10 +100,10 @@ test('startSimpleWorker processes pending jobs', async () => {
     },
   });
 
-  await waitFor(() => getJob(jobId)?.status === 'done');
+  await waitFor(async () => (await getJob(jobId))?.status === 'done');
 
   await worker.stop();
-  const job = getJob(jobId);
+  const job = await getJob(jobId);
   assert.equal(job.status, 'done');
   assert.deepEqual(job.result, { ok: true, jobId });
 });
@@ -111,7 +111,7 @@ test('startSimpleWorker processes pending jobs', async () => {
 test('startSimpleWorker calls updateProgress', async () => {
   resetJobsDir();
 
-  const jobId = addJob('render', { index: 1 });
+  const jobId = await addJob('render', { index: 1 });
 
   let releaseHandler;
   const handlerReleased = new Promise((resolve) => {
@@ -126,17 +126,17 @@ test('startSimpleWorker calls updateProgress', async () => {
     },
   });
 
-  await waitFor(() => getJob(jobId)?.status === 'running');
-  await waitFor(() => {
-    const job = getJob(jobId);
+  await waitFor(async () => (await getJob(jobId))?.status === 'running');
+  await waitFor(async () => {
+    const job = await getJob(jobId);
     return job && job.progress === 50 && job.progressMsg === 'halfway';
   });
 
   releaseHandler();
-  await waitFor(() => getJob(jobId)?.status === 'done');
+  await waitFor(async () => (await getJob(jobId))?.status === 'done');
 
   await worker.stop();
-  const job = getJob(jobId);
+  const job = await getJob(jobId);
   assert.equal(job.status, 'done');
   assert.equal(job.progress, 100);
 });
@@ -144,7 +144,7 @@ test('startSimpleWorker calls updateProgress', async () => {
 test('Worker handles unknown job types', async () => {
   resetJobsDir();
 
-  const jobId = addJob('nonexistent', {});
+  const jobId = await addJob('nonexistent', {});
 
   const worker = startSimpleWorker({
     // Only 'render' handler — no 'nonexistent' handler registered
@@ -153,13 +153,13 @@ test('Worker handles unknown job types', async () => {
     },
   });
 
-  await waitFor(() => {
-    const job = getJob(jobId);
+  await waitFor(async () => {
+    const job = await getJob(jobId);
     return job && job.status === 'error';
   });
 
   await worker.stop();
-  const job = getJob(jobId);
+  const job = await getJob(jobId);
   assert.equal(job.status, 'error');
   assert.ok(job.error.includes('No handler registered'));
   assert.ok(job.error.includes('nonexistent'));

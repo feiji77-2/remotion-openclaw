@@ -42,7 +42,7 @@ function writeJob(id, status, createdAt) {
 async function waitFor(check, timeoutMs = 1500) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    if (check()) {
+    if (await check()) {
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -50,14 +50,14 @@ async function waitFor(check, timeoutMs = 1500) {
   throw new Error('Timed out waiting for condition');
 }
 
-test('pending jobs are listed in FIFO order for processing', () => {
+test('pending jobs are listed in FIFO order for processing', async () => {
   resetJobsDir();
 
   writeJob('job-newest', 'pending', '2026-04-25T08:00:02.000Z');
   writeJob('job-oldest', 'pending', '2026-04-25T08:00:00.000Z');
   writeJob('job-middle', 'pending', '2026-04-25T08:00:01.000Z');
 
-  const pendingJobs = listJobs('pending');
+  const pendingJobs = await listJobs('pending');
   assert.deepEqual(pendingJobs.map((job) => job.id), ['job-oldest', 'job-middle', 'job-newest']);
 });
 
@@ -82,8 +82,8 @@ test('graceful stop drains only the active job and leaves later jobs pending', a
     releaseFirstJob = resolve;
   });
 
-  const firstJobId = addJob('render', {index: 1});
-  const secondJobId = addJob('render', {index: 2});
+  const firstJobId = await addJob('render', {index: 1});
+  const secondJobId = await addJob('render', {index: 2});
 
   const worker = startSimpleWorker({
     async render(job) {
@@ -95,14 +95,14 @@ test('graceful stop drains only the active job and leaves later jobs pending', a
     },
   });
 
-  await waitFor(() => getJob(firstJobId)?.status === 'running');
+  await waitFor(async () => (await getJob(firstJobId))?.status === 'running');
   const stopPromise = worker.stop({graceful: true, timeoutMs: 1000});
   releaseFirstJob();
 
   const stopResult = await stopPromise;
-  await waitFor(() => getJob(firstJobId)?.status === 'done');
+  await waitFor(async () => (await getJob(firstJobId))?.status === 'done');
 
   assert.equal(stopResult.timedOut, false);
   assert.deepEqual(started, [firstJobId]);
-  assert.equal(getJob(secondJobId)?.status, 'pending');
+  assert.equal((await getJob(secondJobId))?.status, 'pending');
 });
