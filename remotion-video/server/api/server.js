@@ -317,7 +317,7 @@ async function enqueueJob(jobType, payload) {
       },
     );
   } else {
-    jobId = addFileJob(jobType, payload);
+    jobId = await addFileJob(jobType, payload);
   }
 
   return jobId;
@@ -332,7 +332,7 @@ async function getJobResponse(jobId) {
     return buildBullJobResponse(job);
   }
 
-  const job = getFileJob(jobId);
+  const job = await getFileJob(jobId);
   if (!job) {
     return null;
   }
@@ -367,7 +367,7 @@ app.post('/api/render', async (req, res) => {
         },
       );
     } else {
-      jobId = addFileJob('render', jobPayload);
+      jobId = await addFileJob('render', jobPayload);
     }
 
     if (req.requestId) linkJobId(req.requestId, jobId);
@@ -416,7 +416,7 @@ app.get('/api/render/:jobId', async (req, res) => {
 app.get('/api/render/:jobId/download', async (req, res) => {
   try {
     const { jobId } = req.params;
-    const rawJob = USE_REDIS ? await getBullJob(jobId) : getFileJob(jobId);
+    const rawJob = USE_REDIS ? await getBullJob(jobId) : await getFileJob(jobId);
 
     if (!rawJob) {
       return res.status(404).json({ error: '任务不存在', jobId });
@@ -479,7 +479,7 @@ app.delete('/api/render/:jobId', requireAdminAuth, adminWriteRateLimitMiddleware
       return res.status(404).json({ error: '任务不存在' });
     }
 
-    if (!removeFileJob(jobId)) {
+    if (!await removeFileJob(jobId)) {
       return res.status(404).json({ error: '任务不存在' });
     }
     cancelByJobId(jobId);
@@ -523,7 +523,7 @@ app.get('/api/render', requireAdminAuth, adminReadRateLimitMiddleware, async (re
         );
       }
     } else {
-      jobs = listFileJobs(status).map((job) => ({
+      jobs = (await listFileJobs(status)).map((job) => ({
         jobId: job.id,
         status: job.status,
         progress: job.progress,
@@ -560,7 +560,7 @@ app.post('/api/render/:jobId/retry', requireAdminAuth, adminWriteRateLimitMiddle
       return res.json({ jobId, status: 'retry_scheduled' });
     }
 
-    if (!retryFileJob(jobId)) {
+    if (!await retryFileJob(jobId)) {
       return res.status(404).json({ error: '任务不存在' });
     }
     return res.json({ jobId, status: 'retry_scheduled' });
@@ -707,7 +707,7 @@ app.post('/api/voice/:jobId/retry', requireAdminAuth, adminWriteRateLimitMiddlew
       return res.json({ jobId, status: 'retry_scheduled' });
     }
 
-    if (!retryFileJob(jobId)) {
+    if (!await retryFileJob(jobId)) {
       return res.status(404).json({ error: '任务不存在' });
     }
     return res.json({ jobId, status: 'retry_scheduled' });
@@ -794,7 +794,7 @@ app.get('/api/jobs', requireAdminAuth, adminReadRateLimitMiddleware, async (req,
       });
     }
 
-    const jobs = listFileJobs()
+    const jobs = (await listFileJobs())
       .map((job) => ({
         id: job.id,
         type: job.type,
@@ -866,7 +866,19 @@ app.get('/api/memory-stats', requireAdminAuth, (req, res) => {
 });
 
 // ─── Health ────────────────────────────────────────────────
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  let fileCounts = null;
+  if (!USE_REDIS) {
+    const allJobs = await listFileJobs();
+    fileCounts = {
+      total: allJobs.length,
+      pending: allJobs.filter(j => j.status === 'pending').length,
+      running: allJobs.filter(j => j.status === 'running').length,
+      done: allJobs.filter(j => j.status === 'done').length,
+      error: allJobs.filter(j => j.status === 'error').length,
+    };
+  }
+
   return res.json({
     status: 'ok',
     mode: QUEUE_MODE,
@@ -885,13 +897,7 @@ app.get('/health', (req, res) => {
           name: 'video-render',
           mode: 'file',
           jobsDir: JOBS_DIR,
-          counts: {
-            total: listFileJobs().length,
-            pending: listFileJobs('pending').length,
-            running: listFileJobs('running').length,
-            done: listFileJobs('done').length,
-            error: listFileJobs('error').length,
-          },
+          counts: fileCounts,
         },
   });
 });
