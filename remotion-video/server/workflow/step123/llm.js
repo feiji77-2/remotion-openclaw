@@ -81,39 +81,76 @@ function resolveOpenClawWorkflowModel(config) {
     || normalizeValue(config?.agents?.defaults?.model?.primary);
 }
 
-function resolveWorkflowLLMConfig() {
-  const explicitMiniMaxApiKey = normalizeValue(process.env.MINIMAX_API_KEY);
-  const explicitMiniMaxHost = normalizeBaseUrl(process.env.MINIMAX_API_HOST, DEFAULT_MINIMAX_API_HOST);
-  const explicitMiniMaxModel = normalizeValue(process.env.MINIMAX_WORKFLOW_MODEL || process.env.MINIMAX_MODEL);
-  const explicitApiKey = normalizeValue(process.env.OPENAI_API_KEY);
-  const explicitBaseURL = normalizeValue(process.env.OPENAI_BASE_URL);
-  const explicitOpenAIModel = normalizeValue(process.env.OPENAI_WORKFLOW_MODEL || process.env.OPENAI_MODEL);
+// ─────────────────────────────────────────────────────────────────
+// Provider 优先级（从高到低）
+// 1. WORKFLOW_LLM_PROVIDER 显式指定
+// 2. MINIMAX_API_KEY        → minimax-openai-compatible
+// 3. OPENAI_API_KEY        → openai / openai-compatible
+// 4. ANTHROPIC_API_KEY     → anthropic
+// 5. GEMINI_API_KEY         → gemini
+// 6. legacy OpenClaw        → 仅 OPENCLAW_LEGACY_FALLBACK=1 时启用
+// 7. unavailable           → 给出平台 API 配置提示
+// ─────────────────────────────────────────────────────────────────
 
-  if (explicitMiniMaxApiKey) {
+const PROVIDER_ORDER = [
+  'minimax-openai-compatible',
+  'openai',
+  'openai-compatible',
+  'anthropic',
+  'gemini',
+  'openclaw-legacy',
+];
+
+/**
+ * 根据 WORKFLOW_LLM_PROVIDER 显式指定或自动探测，返回可用配置。
+ * 始终返回稳定结果：available=true 时可立即使用，available=false 时 details 包含诊断信息。
+ */
+function resolveWorkflowLLMConfig() {
+  const explicitProvider = normalizeValue(process.env.WORKFLOW_LLM_PROVIDER);
+  const legacyFallbackEnabled = process.env.OPENCLAW_LEGACY_FALLBACK === '1';
+
+  // ── 1. 显式指定优先 ─────────────────────────────────────
+  if (explicitProvider) {
+    const config = resolveForExplicitProvider(explicitProvider);
+    if (config) return config;
+    // 显式指定了无效 provider，告知用户可用选项
+    return buildUnavailableResult({
+      code: 'WORKFLOW_LLM_PROVIDER_INVALID',
+      message: `WORKFLOW_LLM_PROVIDER="${explicitProvider}" 不支持。支持的值：auto、minimax、openai、anthropic、gemini、openclaw。`,
+    });
+  }
+
+  // ── 2. 自动探测（按优先级） ───────────────────────────
+  // 2a. MiniMax
+  const minimaxKey = normalizeValue(process.env.MINIMAX_API_KEY);
+  if (minimaxKey) {
     return {
       available: true,
       provider: 'minimax-openai-compatible',
       transport: 'openai',
-      apiKey: explicitMiniMaxApiKey,
-      baseURL: explicitMiniMaxHost,
-      model: explicitMiniMaxModel || DEFAULT_MINIMAX_MODEL,
+      apiKey: minimaxKey,
+      baseURL: normalizeBaseUrl(process.env.MINIMAX_API_HOST, DEFAULT_MINIMAX_API_HOST),
+      model: normalizeValue(process.env.MINIMAX_WORKFLOW_MODEL || process.env.MINIMAX_MODEL) || DEFAULT_MINIMAX_MODEL,
       authSource: 'env:MINIMAX_API_KEY',
       cliPath: null,
       jsonMode: 'prompt-only',
-      extraBody: {reasoning_split: true},
+      extraBody: { reasoning_split: true },
       requestTimeoutMs: resolveTimeoutMs(process.env.MINIMAX_WORKFLOW_TIMEOUT_MS, DEFAULT_MINIMAX_TIMEOUT_MS),
       maxRetries: 0,
     };
   }
 
-  if (explicitApiKey) {
+  // 2b. OpenAI / OpenAI-compatible
+  const openaiKey = normalizeValue(process.env.OPENAI_API_KEY);
+  if (openaiKey) {
+    const baseURL = normalizeValue(process.env.OPENAI_BASE_URL);
     return {
       available: true,
-      provider: explicitBaseURL ? 'openai-compatible' : 'openai',
+      provider: baseURL ? 'openai-compatible' : 'openai',
       transport: 'openai',
-      apiKey: explicitApiKey,
-      baseURL: explicitBaseURL || undefined,
-      model: explicitOpenAIModel || DEFAULT_OPENAI_MODEL,
+      apiKey: openaiKey,
+      baseURL: baseURL || undefined,
+      model: normalizeValue(process.env.OPENAI_WORKFLOW_MODEL || process.env.OPENAI_MODEL) || DEFAULT_OPENAI_MODEL,
       authSource: 'env:OPENAI_API_KEY',
       cliPath: null,
       jsonMode: 'response-format',
@@ -123,23 +160,173 @@ function resolveWorkflowLLMConfig() {
     };
   }
 
-  const openClawConfig = resolveOpenClawConfig();
-  const openClawCliPath = resolveOpenClawCliPath();
-  const openClawModel = resolveOpenClawWorkflowModel(openClawConfig);
-  const openClawTransport = clampOpenClawTransport(process.env.OPENCLAW_WORKFLOW_TRANSPORT);
-  const openClawConfigPath = resolveOpenClawConfigPath();
-  const cliAvailable = openClawCliPath === 'openclaw' || fs.existsSync(openClawCliPath);
-
-  if (openClawConfig && openClawModel && cliAvailable) {
+  // 2c. Anthropic
+  const anthropicKey = normalizeValue(process.env.ANTHROPIC_API_KEY);
+  if (anthropicKey) {
     return {
       available: true,
-      provider: 'openclaw-capability',
-      transport: openClawTransport,
+      provider: 'anthropic',
+      transport: 'anthropic',
+      apiKey: anthropicKey,
+      baseURL: normalizeBaseUrl(process.env.ANTHROPIC_BASE_URL, 'https://api.anthropic.com'),
+      model: normalizeValue(process.env.ANTHROPIC_WORKFLOW_MODEL) || 'claude-sonnet-4-20250514',
+      authSource: 'env:ANTHROPIC_API_KEY',
+      cliPath: null,
+      jsonMode: 'prompt-only',       // Anthropic 不支持 response_format，靠 prompt 约束
+      extraBody: null,
+      requestTimeoutMs: resolveTimeoutMs(process.env.ANTHROPIC_WORKFLOW_TIMEOUT_MS, DEFAULT_MINIMAX_TIMEOUT_MS),
+      maxRetries: 2,
+    };
+  }
+
+  // 2d. Gemini (via Google AI / Vertex AI)
+  const geminiKey = normalizeValue(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
+  if (geminiKey) {
+    const geminiBase = normalizeBaseUrl(process.env.GEMINI_BASE_URL, 'https://generativelanguage.googleapis.com');
+    return {
+      available: true,
+      provider: 'gemini',
+      transport: 'openai-compatible',  // Gemini REST API 与 OpenAI 兼容
+      apiKey: geminiKey,
+      baseURL: geminiBase,
+      model: normalizeValue(process.env.GEMINI_WORKFLOW_MODEL) || 'gemini-2.0-flash',
+      authSource: 'env:GEMINI_API_KEY (或 GOOGLE_API_KEY)',
+      cliPath: null,
+      jsonMode: 'response-format',
+      extraBody: null,
+      requestTimeoutMs: resolveTimeoutMs(process.env.GEMINI_WORKFLOW_TIMEOUT_MS, DEFAULT_OPENAI_TIMEOUT_MS),
+      maxRetries: 2,
+    };
+  }
+
+  // ── 3. Legacy OpenClaw（仅当显式启用时） ───────────────
+  if (legacyFallbackEnabled) {
+    const config = tryResolveOpenClawLegacy();
+    if (config) return config;
+  }
+
+  // ── 4. 没有任何可用 provider ───────────────────────────
+  return buildUnavailableResult({
+    code: 'WORKFLOW_LLM_UNAVAILABLE',
+    message:
+      '当前平台没有暴露 LLM API。' +
+      '请配置以下任一环境变量：' +
+      'MINIMAX_API_KEY（MiniMax）、' +
+      'OPENAI_API_KEY（OpenAI/兼容）、' +
+      'ANTHROPIC_API_KEY（Claude）、' +
+      'GEMINI_API_KEY（Gemini）。',
+  });
+}
+
+/**
+ * 根据显式 WORKFLOW_LLM_PROVIDER 值解析配置
+ */
+function resolveForExplicitProvider(provider) {
+  switch (provider) {
+    case 'minimax':
+    case 'minimax-openai-compatible':
+      if (!normalizeValue(process.env.MINIMAX_API_KEY)) return null;
+      return {
+        available: true,
+        provider: 'minimax-openai-compatible',
+        transport: 'openai',
+        apiKey: normalizeValue(process.env.MINIMAX_API_KEY),
+        baseURL: normalizeBaseUrl(process.env.MINIMAX_API_HOST, DEFAULT_MINIMAX_API_HOST),
+        model: normalizeValue(process.env.MINIMAX_WORKFLOW_MODEL || process.env.MINIMAX_MODEL) || DEFAULT_MINIMAX_MODEL,
+        authSource: 'env:MINIMAX_API_KEY',
+        cliPath: null,
+        jsonMode: 'prompt-only',
+        extraBody: { reasoning_split: true },
+        requestTimeoutMs: resolveTimeoutMs(process.env.MINIMAX_WORKFLOW_TIMEOUT_MS, DEFAULT_MINIMAX_TIMEOUT_MS),
+        maxRetries: 0,
+      };
+
+    case 'openai':
+    case 'openai-compatible':
+      if (!normalizeValue(process.env.OPENAI_API_KEY)) return null;
+      return {
+        available: true,
+        provider: provider,
+        transport: 'openai',
+        apiKey: normalizeValue(process.env.OPENAI_API_KEY),
+        baseURL: normalizeValue(process.env.OPENAI_BASE_URL) || undefined,
+        model: normalizeValue(process.env.OPENAI_WORKFLOW_MODEL || process.env.OPENAI_MODEL) || DEFAULT_OPENAI_MODEL,
+        authSource: 'env:OPENAI_API_KEY',
+        cliPath: null,
+        jsonMode: 'response-format',
+        extraBody: null,
+        requestTimeoutMs: resolveTimeoutMs(process.env.OPENAI_WORKFLOW_TIMEOUT_MS, DEFAULT_OPENAI_TIMEOUT_MS),
+        maxRetries: 2,
+      };
+
+    case 'anthropic':
+    case 'claude':
+      if (!normalizeValue(process.env.ANTHROPIC_API_KEY)) return null;
+      return {
+        available: true,
+        provider: 'anthropic',
+        transport: 'anthropic',
+        apiKey: normalizeValue(process.env.ANTHROPIC_API_KEY),
+        baseURL: normalizeBaseUrl(process.env.ANTHROPIC_BASE_URL, 'https://api.anthropic.com'),
+        model: normalizeValue(process.env.ANTHROPIC_WORKFLOW_MODEL) || 'claude-sonnet-4-20250514',
+        authSource: 'env:ANTHROPIC_API_KEY',
+        cliPath: null,
+        jsonMode: 'prompt-only',
+        extraBody: null,
+        requestTimeoutMs: resolveTimeoutMs(process.env.ANTHROPIC_WORKFLOW_TIMEOUT_MS, DEFAULT_MINIMAX_TIMEOUT_MS),
+        maxRetries: 2,
+      };
+
+    case 'gemini':
+      if (!normalizeValue(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)) return null;
+      return {
+        available: true,
+        provider: 'gemini',
+        transport: 'openai-compatible',
+        apiKey: normalizeValue(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+        baseURL: normalizeBaseUrl(process.env.GEMINI_BASE_URL, 'https://generativelanguage.googleapis.com'),
+        model: normalizeValue(process.env.GEMINI_WORKFLOW_MODEL) || 'gemini-2.0-flash',
+        authSource: 'env:GEMINI_API_KEY',
+        cliPath: null,
+        jsonMode: 'response-format',
+        extraBody: null,
+        requestTimeoutMs: resolveTimeoutMs(process.env.GEMINI_WORKFLOW_TIMEOUT_MS, DEFAULT_OPENAI_TIMEOUT_MS),
+        maxRetries: 2,
+      };
+
+    case 'openclaw':
+    case 'openclaw-legacy':
+      return tryResolveOpenClawLegacy();
+
+    case 'auto':
+      // auto 走自动探测，递归调用时不带 explicit
+      return null; // 让自动探测继续
+
+    default:
+      return null;
+  }
+}
+
+/**
+ * 仅在 OPENCLAW_LEGACY_FALLBACK=1 时尝试解析 OpenClaw legacy 配置
+ */
+function tryResolveOpenClawLegacy() {
+  const config = resolveOpenClawConfig();
+  const cliPath = resolveOpenClawCliPath();
+  const model = resolveOpenClawWorkflowModel(config);
+  const transport = clampOpenClawTransport(process.env.OPENCLAW_WORKFLOW_TRANSPORT);
+  const cliAvailable = cliPath === 'openclaw' || fs.existsSync(cliPath);
+
+  if (config && model && cliAvailable) {
+    return {
+      available: true,
+      provider: 'openclaw-legacy',
+      transport,
       apiKey: '',
       baseURL: null,
-      model: openClawModel,
-      authSource: `config:${openClawConfigPath}`,
-      cliPath: openClawCliPath,
+      model,
+      authSource: `config:${resolveOpenClawConfigPath()}`,
+      cliPath,
       jsonMode: 'cli-json',
       extraBody: null,
       requestTimeoutMs: resolveOpenClawTimeoutMs(),
@@ -147,19 +334,27 @@ function resolveWorkflowLLMConfig() {
     };
   }
 
+  return null; // 继续走到 unavailable
+}
+
+/**
+ * 构建 unavailable 结果（走到底都没有可用 provider 时）
+ */
+function buildUnavailableResult({ code, message }) {
   return {
     available: false,
-    provider: 'openclaw-capability',
-    transport: openClawTransport,
+    provider: 'none',
+    transport: null,
     apiKey: '',
     baseURL: null,
-    model: openClawModel || 'unset',
-    authSource: openClawConfig ? `config:${openClawConfigPath}` : null,
-    cliPath: cliAvailable ? openClawCliPath : null,
+    model: 'unset',
+    authSource: null,
+    cliPath: null,
     jsonMode: 'cli-json',
     extraBody: null,
-    requestTimeoutMs: resolveOpenClawTimeoutMs(),
+    requestTimeoutMs: 0,
     maxRetries: 0,
+    _diagnostic: { code, message },
   };
 }
 
@@ -196,6 +391,7 @@ function getWorkflowLLMCapabilities() {
 
 function createWorkflowClient() {
   const config = resolveWorkflowLLMConfig();
+  // openai transport 包括 minimax / openai / openai-compatible / gemini
   if (!config.available || config.transport !== 'openai') {
     return null;
   }
@@ -439,7 +635,7 @@ async function runOpenClawInferPrompt(prompt, config) {
     throw new WorkflowGenerationError({
       status: 422,
       code: 'WORKFLOW_LLM_EMPTY_OUTPUT',
-      message: 'OpenClaw infer 未返回可解析的文本结果',
+      message: 'OpenClaw legacy infer 未返回可解析的文本结果',
       details: buildWorkflowLLMDetails(),
     });
   }
@@ -488,7 +684,7 @@ async function generateViaOpenClawCapability({messages, temperature, topP}, conf
       throw new WorkflowGenerationError({
         status: 422,
         code: 'WORKFLOW_LLM_INVALID_JSON',
-        message: 'OpenClaw infer 返回了无法修复的 JSON 结构',
+        message: 'OpenClaw legacy infer 返回了无法修复的 JSON 结构',
         details: buildWorkflowLLMDetails(),
       });
     }
@@ -496,7 +692,7 @@ async function generateViaOpenClawCapability({messages, temperature, topP}, conf
     throw new WorkflowGenerationError({
       status: 503,
       code: 'WORKFLOW_LLM_REQUEST_FAILED',
-      message: `OpenClaw infer 调用失败：${summarizeExecError(error)}`,
+      message: `OpenClaw legacy infer 调用失败：${summarizeExecError(error)}`,
       details: buildWorkflowLLMDetails(),
     });
   }
@@ -505,10 +701,12 @@ async function generateViaOpenClawCapability({messages, temperature, topP}, conf
 async function generateStructuredJson({messages, temperature = 0.65, topP = 1}) {
   const config = resolveWorkflowLLMConfig();
   if (!config.available) {
+    const diag = config._diagnostic || {};
     throw new WorkflowGenerationError({
       status: 503,
-      code: 'WORKFLOW_LLM_UNAVAILABLE',
-      message: '工作流模型不可用；当前默认走 OpenClaw infer 网关链路，请确认本机已安装 OpenClaw、存在可用配置，并且已配置默认模型',
+      code: diag.code || 'WORKFLOW_LLM_UNAVAILABLE',
+      message: diag.message ||
+        '当前平台没有暴露 LLM API。请配置 MINIMAX_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / GEMINI_API_KEY 其一。',
       details: buildWorkflowLLMDetails(),
     });
   }
@@ -548,7 +746,61 @@ async function generateStructuredJson({messages, temperature = 0.65, topP = 1}) 
     }
   }
 
-  return generateViaOpenClawCapability({messages, temperature, topP}, config);
+  if (config.transport === 'anthropic') {
+    const content = await requestAnthropicContent(config, {messages, temperature, topP});
+    return {
+      model: config.model,
+      payload: safeParseJson(content),
+    };
+  }
+
+  if (config.transport === 'openclaw-legacy') {
+    return generateViaOpenClawCapability({messages, temperature, topP}, config);
+  }
+
+  // 兜底（不应该走到这里）
+  throw new WorkflowGenerationError({
+    status: 500,
+    code: 'WORKFLOW_LLM_UNSUPPORTED_TRANSPORT',
+    message: `不支持的 LLM transport: ${config.transport}`,
+    details: buildWorkflowLLMDetails(),
+  });
+}
+
+async function requestAnthropicContent(config, {messages, temperature, topP}) {
+  const requestMessages = buildJsonOnlyMessages(messages);
+  const body = {
+    model: config.model,
+    messages: requestMessages.map((m) => ({ role: m.role, content: m.content })),
+    max_tokens: 8192,
+    temperature,
+  };
+  if (topP !== 1) body.top_p = topP;
+
+  const url = `${config.baseURL}/v1/messages`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': config.apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(config.requestTimeoutMs || 60000),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`Anthropic API error ${response.status}: ${errText}`);
+  }
+
+  const data = await response.json();
+  const content = data.content?.[0]?.text;
+  if (!content) {
+    throw new Error('Anthropic returned empty content');
+  }
+  return content;
 }
 
 module.exports = {
