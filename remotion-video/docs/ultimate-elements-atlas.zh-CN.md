@@ -12,7 +12,7 @@
 适用范围：
 
 - `UltimateElementsLibrary`
-- `UltimateSceneTemplate`
+- `UltimateVideoV2`
 - `project.json -> build-project-package -> ultimate-project-adapter -> render`
 
 核心代码入口：

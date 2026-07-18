@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-      <defs>
-        <linearGradient id="zp1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fbbf24"/><stop offset="100%" stop-color="#f59e0b"/></linearGradient>
-        <linearGradient id="zp2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#f97316"/></linearGradient>
-      </defs>
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" stroke="url(#zp1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M13 2 12 10h9L11 22l1-8H3l10-12z" fill="url(#zp2)" opacity="0.12"/>
-    </svg>

@@ -9,7 +9,7 @@
  *   - stage shell config defaults
  *
  * AI-editable, version-controlled. No more switch-dispatch scattered across
- * UltimateSceneTemplate.tsx and storyboardLoader.ts.
+ * Reusable rhythm and family metadata for the Ultimate component library.
  *
  * NOTE: This module is the canonical source. A JSON copy at public/r/registry.json
  * is generated from this file for runtime/CLI consumption.
@@ -128,6 +128,7 @@ const FAMILY_STAGE_PRESET: Record<UltimateSceneFamily, UltimateStagePreset> = {
   timeline: 'data',
   'compare-board': 'climax',
   terminal: 'data',
+  'skill-showcase': 'data',
   'evidence-wall': 'evidence',
   'architecture-map': 'evidence',
   'tag-matrix': 'evidence',
@@ -147,6 +148,15 @@ const FAMILY_STAGE_PRESET: Record<UltimateSceneFamily, UltimateStagePreset> = {
   'minimal-number-strip': 'data',
   'minimal-timeline': 'data',
   'minimal-compare-board': 'climax',
+  // ── Spoken (口播驱动模式) ────────────────
+  'spoken-title': 'opening',
+  'spoken-metric': 'data',
+  'spoken-process': 'data',
+  'spoken-ranking': 'data',
+  'spoken-compare': 'climax',
+  'spoken-tags': 'data',
+  'spoken-code': 'data',
+  'spoken-takeaway': 'climax',
 };
 
 const STAGE_PRESET_SHELLS: Record<UltimateStagePreset, Required<Pick<FamilyStageConfig, 'showOverlay' | 'showMediaCard' | 'showIconOrbit'>> & {hudMode: UltimateHudMode}> = {
@@ -194,7 +204,7 @@ export interface FamilyEntry {
   optionalFields: string[];
   /** Default accent colour for this family when not overridden. */
   defaultAccent: 'cyan' | 'orange' | 'purple';
-  /** Default timing values. storyboardLoader / UltimateSceneTemplate defer to these. */
+  /** Default timing values used by component previews and visual tooling. */
   timing: FamilyTimingConfig;
   /** Transition preset used when shot.transition is absent. */
   defaultTransition: {
@@ -403,6 +413,28 @@ const REGISTRY: Record<UltimateSceneFamily, FamilyEntry> = {
     },
     defaultTransition: {preset: 'fade', durationInFrames: 12},
     stageConfig: {showOverlay: false, showMediaCard: false},
+  },
+
+  'skill-showcase': {
+    family: 'skill-showcase',
+    label: 'Skill Showcase',
+    description: 'Portrait editorial showcase with chapter headers, semantic beats, matched icons, and purpose-built proof visuals.',
+    semanticTags: ['skill', 'showcase', 'editorial', 'portrait', 'chapter', 'beat', 'icon', '口播', '技能', '竖屏', '章节', '语义节拍'],
+    requiredFields: ['variant', 'title'],
+    optionalFields: ['subtitle', 'index', 'accent', 'secondaryAccent', 'bullets', 'labels', 'beats'],
+    defaultAccent: 'cyan',
+    timing: {
+      baseDurationFrames: 300,
+      enterFrames: 18,
+      emphasisFrames: 252,
+      exitFrames: 30,
+      staggerFrames: 8,
+      easing: 'ease-out',
+      springPreset: 'snappy',
+      cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 10},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false, hudMode: 'minimal'},
   },
 
   'evidence-wall': {
@@ -804,6 +836,183 @@ const REGISTRY: Record<UltimateSceneFamily, FamilyEntry> = {
     defaultTransition: {preset: 'fade', durationInFrames: 14},
     stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
   },
+
+  // ── Spoken (口播驱动模式) ────────────────
+  'spoken-title': {
+    family: 'spoken-title',
+    label: 'Spoken Title',
+    description: '口播驱动大标题，逐字淡入。',
+    semanticTags: ['spoken', 'title', '口播', '大标题'],
+    requiredFields: ['title'],
+    optionalFields: ['subtitle', 'kicker'],
+    defaultAccent: 'purple',
+    timing: {
+      baseDurationFrames: 90,
+      enterFrames: 16,
+      emphasisFrames: 50,
+      exitFrames: 16,
+      staggerFrames: 0,
+      easing: 'ease-out',
+      springPreset: 'snappy',
+      cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 12},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+
+  'spoken-metric': {
+    family: 'spoken-metric',
+    label: 'Spoken Metric',
+    description: '口播驱动数字递增动画。',
+    semanticTags: ['spoken', 'metric', 'number', 'data', '口播', '数字'],
+    requiredFields: ['items'],
+    optionalFields: ['heading'],
+    defaultAccent: 'cyan',
+    timing: {
+      baseDurationFrames: 80,
+      enterFrames: 14,
+      emphasisFrames: 46,
+      exitFrames: 14,
+      staggerFrames: 8,
+      easing: 'ease-out',
+      springPreset: 'bouncy',
+      cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 12},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+
+  'spoken-process': {
+    family: 'spoken-process',
+    label: 'Spoken Process',
+    description: '口播驱动横向步骤条。',
+    semanticTags: ['spoken', 'process', 'step', '口播', '步骤'],
+    requiredFields: ['steps'],
+    optionalFields: [],
+    defaultAccent: 'purple',
+    timing: {
+      baseDurationFrames: 110,
+      enterFrames: 18,
+      emphasisFrames: 70,
+      exitFrames: 18,
+      staggerFrames: 10,
+      easing: 'ease-out',
+      springPreset: 'smooth',
+      cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 14},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+
+  'spoken-ranking': {
+    family: 'spoken-ranking',
+    label: 'Spoken Ranking',
+    description: '口播驱动榜单排名。',
+    semanticTags: ['spoken', 'ranking', 'top', '口播', '排名'],
+    requiredFields: ['items'],
+    optionalFields: ['heading'],
+    defaultAccent: 'orange',
+    timing: {
+      baseDurationFrames: 80,
+      enterFrames: 14,
+      emphasisFrames: 46,
+      exitFrames: 14,
+      staggerFrames: 8,
+      easing: 'ease-out',
+      springPreset: 'bouncy',
+      cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 12},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+
+  'spoken-compare': {
+    family: 'spoken-compare',
+    label: 'Spoken Compare',
+    description: '口播驱动对比展示。',
+    semanticTags: ['spoken', 'compare', '口播', '对比'],
+    requiredFields: ['left', 'right'],
+    optionalFields: ['heading'],
+    defaultAccent: 'purple',
+    timing: {
+      baseDurationFrames: 90,
+      enterFrames: 16,
+      emphasisFrames: 54,
+      exitFrames: 16,
+      staggerFrames: 0,
+      easing: 'ease-out',
+      springPreset: 'smooth',
+      cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 14},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+
+  'spoken-tags': {
+    family: 'spoken-tags',
+    label: 'Spoken Tags',
+    description: '口播驱动标签云。',
+    semanticTags: ['spoken', 'tags', '口播', '标签'],
+    requiredFields: ['items'],
+    optionalFields: ['heading'],
+    defaultAccent: 'cyan',
+    timing: {
+      baseDurationFrames: 80,
+      enterFrames: 14,
+      emphasisFrames: 46,
+      exitFrames: 14,
+      staggerFrames: 6,
+      easing: 'ease-out',
+      springPreset: 'bouncy',
+      cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 12},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+
+  'spoken-code': {
+    family: 'spoken-code',
+    label: 'Spoken Code',
+    description: '口播驱动代码展示。',
+    semanticTags: ['spoken', 'code', '口播', '代码'],
+    requiredFields: ['code'],
+    optionalFields: ['heading'],
+    defaultAccent: 'cyan',
+    timing: {
+      baseDurationFrames: 80,
+      enterFrames: 14,
+      emphasisFrames: 46,
+      exitFrames: 14,
+      staggerFrames: 0,
+      easing: 'ease-out',
+      springPreset: 'snappy',
+      cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 12},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+
+  'spoken-takeaway': {
+    family: 'spoken-takeaway',
+    label: 'Spoken Takeaway',
+    description: '口播驱动结论总结。',
+    semanticTags: ['spoken', 'takeaway', 'conclusion', '口播', '结论'],
+    requiredFields: ['title'],
+    optionalFields: ['subtitle'],
+    defaultAccent: 'purple',
+    timing: {
+      baseDurationFrames: 90,
+      enterFrames: 16,
+      emphasisFrames: 50,
+      exitFrames: 16,
+      staggerFrames: 0,
+      easing: 'ease-out',
+      springPreset: 'snappy',
+      cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 14},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
 };
 
 const DEFAULT_BACKDROP_CYCLE = ['particle-grid', 'god-rays', 'dot-grid'] as const satisfies readonly BackdropVariant[];
@@ -859,6 +1068,13 @@ const RHYTHM_CONTRACTS: Record<UltimateSceneFamily, FamilyRhythmContract> = {
     staggerGap: 0,
     revealStiffness: 180,
     backdropCycle: ['dot-grid', 'particle-grid', 'god-rays'],
+  },
+  'skill-showcase': {
+    layer: 'emphasis',
+    staggerGap: 8,
+    revealStiffness: 140,
+    preferredCameraMotion: 'none',
+    backdropCycle: ['dot-grid', 'particle-grid'],
   },
   'evidence-wall': {
     layer: 'proof',
@@ -975,6 +1191,15 @@ const RHYTHM_CONTRACTS: Record<UltimateSceneFamily, FamilyRhythmContract> = {
     revealStiffness: 120,
     backdropCycle: [],
   },
+  // ── Spoken (口播驱动模式) RHYTHM_CONTRACTS ────────────────
+  'spoken-title': { layer: 'context', staggerGap: 0, revealStiffness: 96, backdropCycle: [] },
+  'spoken-metric': { layer: 'emphasis', staggerGap: 8, revealStiffness: 100, backdropCycle: [] },
+  'spoken-process': { layer: 'structure', staggerGap: 10, revealStiffness: 110, backdropCycle: [] },
+  'spoken-ranking': { layer: 'emphasis', staggerGap: 8, revealStiffness: 100, backdropCycle: [] },
+  'spoken-compare': { layer: 'structure', staggerGap: 0, revealStiffness: 110, backdropCycle: [] },
+  'spoken-tags': { layer: 'emphasis', staggerGap: 6, revealStiffness: 100, backdropCycle: [] },
+  'spoken-code': { layer: 'structure', staggerGap: 0, revealStiffness: 96, backdropCycle: [] },
+  'spoken-takeaway': { layer: 'closing', staggerGap: 0, revealStiffness: 96, backdropCycle: [] },
 };
 
 // ─── Exports ────────────────────────────────────────────────────────────────

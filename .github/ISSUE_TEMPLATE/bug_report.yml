@@ -1,61 +1,21 @@
-name: Bug Report
-description: 报告一个可复现的问题
-title: "[Bug] "
-labels:
-  - bug
+name: Bug report
+description: Report a Project JSON validation or Remotion rendering issue
 body:
   - type: textarea
-    id: summary
     attributes:
-      label: 问题描述
-      description: 用 1-3 句话说清问题现象
-      placeholder: Step 6 提交配音后长期卡在 running，前端没有报错。
+      label: Problem
+      description: Describe the observed behavior and affected command.
     validations:
       required: true
   - type: textarea
-    id: steps
     attributes:
-      label: 复现步骤
-      description: 按顺序写清怎么稳定复现
-      placeholder: |
-        1. 打开 Step 6
-        2. 选择 ChatTTS 中文音色
-        3. 点击提交配音
-        4. 观察 API 返回和前端状态
+      label: Project JSON
+      description: Provide a minimal redacted Project JSON reproduction.
     validations:
       required: true
   - type: textarea
-    id: expected
     attributes:
-      label: 预期结果
-      placeholder: 正常生成音频，并可在 Step 6 试听。
+      label: Command output
+      description: Include project:check, still, or render output.
     validations:
       required: true
-  - type: textarea
-    id: actual
-    attributes:
-      label: 实际结果
-      placeholder: 请求无响应，或返回明确错误信息。
-    validations:
-      required: true
-  - type: textarea
-    id: env
-    attributes:
-      label: 环境信息
-      description: 尽量补充 Node 版本、系统、浏览器、相关服务状态
-      placeholder: |
-        - OS:
-        - Node:
-        - Browser:
-        - ChatTTS/Melo/OpenVoice:
-        - OpenClaw API:
-    validations:
-      required: false
-  - type: textarea
-    id: evidence
-    attributes:
-      label: 日志或截图
-      description: 可贴报错、接口响应、截图
-      render: shell
-    validations:
-      required: false

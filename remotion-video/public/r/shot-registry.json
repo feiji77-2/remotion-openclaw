@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-02T19:12:21.798Z",
+  "generatedAt": "2026-07-14T11:09:36.156Z",
   "shots": [
     {
       "family": "hero",
@@ -657,7 +657,7 @@
     {
       "family": "memory-graph",
       "label": "Memory / Knowledge Graph",
-      "description": "Node-graph with a central concept and surrounding related nodes.",
+      "description": "Node-graph with a central concept and surrounding related nodes. (Alias for architecture-map)",
       "semanticTags": [
         "graph",
         "nodes",
@@ -674,6 +674,7 @@
       ],
       "optionalFields": [
         "centerDetail",
+        "layout",
         "items",
         "heading"
       ],
@@ -686,11 +687,11 @@
       "rhythm": {
         "layer": "structure",
         "staggerGap": 10,
-        "revealStiffness": 120,
+        "revealStiffness": 110,
         "backdropCycle": [
           "dot-grid",
-          "god-rays",
-          "particle-grid"
+          "particle-grid",
+          "god-rays"
         ]
       },
       "memoryObject": {
@@ -704,7 +705,7 @@
     {
       "family": "pipeline-flow",
       "label": "Pipeline Flow",
-      "description": "Horizontal or vertical pipeline with labelled stages. Used for process illustration.",
+      "description": "Horizontal or vertical pipeline with labelled stages. Used for process illustration. (Alias for step-flow)",
       "semanticTags": [
         "pipeline",
         "flow",
@@ -716,12 +717,14 @@
         "阶段"
       ],
       "requiredFields": [
-        "stages"
+        "steps"
       ],
       "optionalFields": [
+        "items",
+        "variant",
+        "stepVariants",
         "heading",
-        "summary",
-        "items"
+        "summary"
       ],
       "defaultArchetype": "trace flow",
       "defaultCameraIntent": "chase",
@@ -732,7 +735,7 @@
       "rhythm": {
         "layer": "structure",
         "staggerGap": 6,
-        "revealStiffness": 110,
+        "revealStiffness": 150,
         "preferredCameraMotion": "pan-y",
         "backdropCycle": [
           "dot-grid",
@@ -1152,6 +1155,299 @@
         "layer": "emphasis",
         "staggerGap": 0,
         "revealStiffness": 120,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "spoken-title",
+      "label": "Spoken Title",
+      "description": "口播驱动大标题，逐字淡入。",
+      "semanticTags": [
+        "spoken",
+        "title",
+        "口播",
+        "大标题"
+      ],
+      "requiredFields": [
+        "title"
+      ],
+      "optionalFields": [
+        "subtitle",
+        "kicker"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "context",
+        "staggerGap": 0,
+        "revealStiffness": 96,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "spoken-metric",
+      "label": "Spoken Metric",
+      "description": "口播驱动数字递增动画。",
+      "semanticTags": [
+        "spoken",
+        "metric",
+        "number",
+        "data",
+        "口播",
+        "数字"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 8,
+        "revealStiffness": 100,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "spoken-process",
+      "label": "Spoken Process",
+      "description": "口播驱动横向步骤条。",
+      "semanticTags": [
+        "spoken",
+        "process",
+        "step",
+        "口播",
+        "步骤"
+      ],
+      "requiredFields": [
+        "steps"
+      ],
+      "optionalFields": [],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 10,
+        "revealStiffness": 110,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "spoken-ranking",
+      "label": "Spoken Ranking",
+      "description": "口播驱动榜单排名。",
+      "semanticTags": [
+        "spoken",
+        "ranking",
+        "top",
+        "口播",
+        "排名"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 8,
+        "revealStiffness": 100,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "spoken-compare",
+      "label": "Spoken Compare",
+      "description": "口播驱动对比展示。",
+      "semanticTags": [
+        "spoken",
+        "compare",
+        "口播",
+        "对比"
+      ],
+      "requiredFields": [
+        "left",
+        "right"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 0,
+        "revealStiffness": 110,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "spoken-tags",
+      "label": "Spoken Tags",
+      "description": "口播驱动标签云。",
+      "semanticTags": [
+        "spoken",
+        "tags",
+        "口播",
+        "标签"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 6,
+        "revealStiffness": 100,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "spoken-code",
+      "label": "Spoken Code",
+      "description": "口播驱动代码展示。",
+      "semanticTags": [
+        "spoken",
+        "code",
+        "口播",
+        "代码"
+      ],
+      "requiredFields": [
+        "code"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 0,
+        "revealStiffness": 96,
+        "backdropCycle": []
+      },
+      "memoryObject": {
+        "type": "beam",
+        "role": "一束漂移的光，把信息从边缘带进来",
+        "enterFrame": 8,
+        "color": "orange"
+      },
+      "directorNote": "[archetype命中] drift reveal | trace-flow | mem:beam"
+    },
+    {
+      "family": "spoken-takeaway",
+      "label": "Spoken Takeaway",
+      "description": "口播驱动结论总结。",
+      "semanticTags": [
+        "spoken",
+        "takeaway",
+        "conclusion",
+        "口播",
+        "结论"
+      ],
+      "requiredFields": [
+        "title"
+      ],
+      "optionalFields": [
+        "subtitle"
+      ],
+      "defaultArchetype": "drift reveal",
+      "defaultCameraIntent": "drift",
+      "defaultDataEvent": "trace-flow",
+      "defaultEnterFrames": 20,
+      "defaultEmphasisFrames": 50,
+      "defaultStaggerGap": 8,
+      "rhythm": {
+        "layer": "closing",
+        "staggerGap": 0,
+        "revealStiffness": 96,
         "backdropCycle": []
       },
       "memoryObject": {

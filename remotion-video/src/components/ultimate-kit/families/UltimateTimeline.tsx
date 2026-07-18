@@ -20,6 +20,9 @@ import {
   SemanticIconBadge,
 } from '../SemanticIcon';
 import {useStaggerSlide, useScaleEmphasis} from '../motionGrammar';
+import {UltimateHeading} from '../UltimateHeading';
+import {glassPanelStyle} from '../containerStyles';
+import {resolveSceneDirective, resolveEntranceParams} from '../directive';
 import type {
   UltimateArchitectureMapProps,
   UltimateBenchmarkChartProps,
@@ -39,12 +42,14 @@ import type {
   UltimatePlatformOverlayProps,
   UltimatePipelineFlowProps,
   UltimateQuoteHighlightProps,
+  UltimateSceneGrammar,
   UltimateStageProps,
   UltimateStepFlowProps,
   UltimateSubtitleBarProps,
   UltimateTagMatrixProps,
   UltimateTerminalPanelProps,
   UltimateTimelineProps,
+  FamilyDirectorMeta,
 } from '../types';
 
 const kit = ultimateKitTokens;
@@ -465,15 +470,23 @@ const frameCorners: FrameCorner[] = [
 
 
 
-export const UltimateTimeline: React.FC<UltimateTimelineProps & {grammar?: {staggerGap?: number}}> = ({
+export const UltimateTimeline: React.FC<UltimateTimelineProps & {grammar?: UltimateSceneGrammar; directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   summary,
   items,
   accent = 'cyan',
   grammar,
+  directorMeta,
 }) => {
   const frame = useCurrentFrame();
-  const gap = Math.max(6, grammar?.staggerGap ?? 6);
+  const d = resolveSceneDirective(grammar, 'timeline');
+  const gap = d.animation.staggerGap;
+  const adaptive = directorMeta?.adaptive;
+  const adaptedLabelSize = adaptive ? Math.round(d.typography.label.size * adaptive.contrast.sizeRatio) : d.typography.label.size;
+  const adaptedValueSize = adaptive ? Math.round(d.typography.value.size * adaptive.contrast.sizeRatio) : d.typography.value.size;
+  const adaptedBodySize = adaptive ? Math.round(d.typography.body.size * adaptive.contrast.sizeRatio) : d.typography.body.size;
+  const adaptedGap = adaptive ? Math.round(d.spacing.gap * adaptive.density.spacing) : d.spacing.gap;
+  const ep = resolveEntranceParams(d);
   const accentColor = toneToColor(accent);
   const visibleItems = items.slice(0, 5);
   const path = 'M 120 640 C 420 370, 780 760, 1080 488 S 1560 370, 1790 572';
@@ -496,15 +509,13 @@ export const UltimateTimeline: React.FC<UltimateTimelineProps & {grammar?: {stag
           zIndex: 2,
         }}
       >
-        <div style={{...eyebrowStyle(accentColor, false), fontSize: 15, letterSpacing: 5}}>timeline arc</div>
-        <div style={{marginTop: 20, fontSize: 82, lineHeight: 0.92, fontWeight: 900, letterSpacing: -4.8}}>
-          {heading}
-        </div>
-        {summary ? (
-          <div style={{marginTop: 18, maxWidth: 760, ...bodyTextStyle(24, 'rgba(255,255,255,0.66)', false)}}>
-            {summary}
-          </div>
-        ) : null}
+        <UltimateHeading
+          heading={heading}
+          archetype={grammar?.archetype}
+          accent={accent}
+          grammar={grammar}
+          subtitle={summary}
+        />
       </div>
 
       <div
@@ -577,8 +588,10 @@ export const UltimateTimeline: React.FC<UltimateTimelineProps & {grammar?: {stag
       {visibleItems.map((item, index) => {
         const delay = 6 + index * gap * 5;
         const reveal = buildReveal(frame, delay);
-        const scaleEmphasis = useScaleEmphasis(frame, index * 6);
-        const staggerSlide = useStaggerSlide(frame, index, 6, 'left', 20);
+        const itemAnim = useScaleEmphasis(frame, index * 6, ep.scaleFrom);
+        const staggerSlide = ep.useSlide
+          ? useStaggerSlide(frame, index, 6, ep.slideDirection, ep.slideDistance)
+          : {opacity: 1, transform: 'none'};
         const itemColor = toneToColor(item.accent ?? accent);
         const point = nodes[index];
         const width = index === 2 ? 340 : 270;
@@ -597,8 +610,8 @@ export const UltimateTimeline: React.FC<UltimateTimelineProps & {grammar?: {stag
                 borderRadius: '50%',
                 background: itemColor,
                 boxShadow: ultimateGlow(itemColor, 0.44),
-                opacity: reveal * scaleEmphasis.opacity,
-                transform: scaleEmphasis.transform,
+                opacity: reveal * itemAnim.opacity,
+                transform: itemAnim.transform,
               }}
             />
             <div
@@ -628,17 +641,19 @@ export const UltimateTimeline: React.FC<UltimateTimelineProps & {grammar?: {stag
                 textAlign: point.align,
               }}
             >
-              <div style={{fontSize: 13, letterSpacing: 2.6, textTransform: 'uppercase', color: itemColor, opacity: 0.9}}>
-                {item.label}
-              </div>
-              <div style={{marginTop: 8, fontSize: index === 2 ? 38 : 32, lineHeight: 1.04, fontWeight: 860}}>
-                {item.title}
-              </div>
-              {item.detail ? (
-                <div style={{marginTop: 12, fontSize: 18, lineHeight: 1.34, color: 'rgba(255,255,255,0.64)'}}>
-                  {item.detail}
+              <div style={glassPanelStyle(itemColor, {density: adaptive?.density}, {radius: 'md', intense: false})}>
+                <div style={{fontSize: adaptedLabelSize, letterSpacing: 2.6, textTransform: 'uppercase', color: itemColor, opacity: 0.9}}>
+                  {item.label}
                 </div>
-              ) : null}
+                <div style={{marginTop: Math.round((d.spacing.density === 'compact' ? 6 : 8) * (adaptive?.density.spacing ?? 1)), fontSize: index === 2 ? adaptedValueSize + 14 : adaptedValueSize + 8, lineHeight: 1.04, fontWeight: 860, color: '#f7fbff'}}>
+                  {item.title}
+                </div>
+                {item.detail ? (
+                  <div style={{marginTop: adaptedGap - 2, fontSize: adaptedBodySize, lineHeight: d.typography.body.lineHeight, color: `rgba(255,255,255,${d.atmosphere.textOpacity})`}}>
+                    {item.detail}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
         );

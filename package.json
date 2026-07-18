@@ -1,37 +1,29 @@
 {
-  "name": "openclaw-remotion-video-pipeline",
+  "name": "codex-remotion-project",
   "private": true,
-  "version": "1.0.0",
-  "description": "Open-source video workflow studio and Remotion render pipeline for Chinese short-form content",
+  "version": "2.0.0",
+  "description": "Codex-first Remotion renderer driven by one Project JSON contract",
   "license": "MIT",
   "keywords": [
     "remotion",
-    "video-pipeline",
-    "short-video",
-    "workflow",
     "react",
     "typescript",
-    "express",
-    "tts",
     "video-generation"
   ],
   "engines": {
     "node": ">=20.0.0"
   },
   "scripts": {
-    "setup": "npm --prefix remotion-video install && npm --prefix video-pipeline-view/player-app install",
-    "clean": "npm run remotion-video:clean:runtime && node -e \"const fs=require('node:fs'); for (const target of ['video-pipeline-view/player-app/dist','video-pipeline-view/player-app/.vite','remotion-video/out','remotion-video/dist']) fs.rmSync(target,{recursive:true,force:true});\"",
-    "dev:player": "npm --prefix video-pipeline-view/player-app run dev",
-    "dev:api": "npm --prefix remotion-video run pipeline:api",
-    "dev:worker": "npm --prefix remotion-video run pipeline:worker",
-    "dev:video": "npm --prefix remotion-video run dev",
-    "remotion-video:clean:runtime": "npm --prefix remotion-video run clean:runtime",
-    "workflow:ultimate": "npm --prefix remotion-video run workflow:ultimate --",
-    "smoke:staging": "npm --prefix remotion-video run smoke:staging --",
+    "setup": "npm --prefix remotion-video install",
+    "clean": "npm --prefix remotion-video run clean:runtime && node -e \"require('node:fs').rmSync('remotion-video/out',{recursive:true,force:true})\"",
+    "dev": "npm --prefix remotion-video run dev",
+    "project:check": "npm --prefix remotion-video run project:check --",
+    "project:still": "npm --prefix remotion-video run project:still --",
+    "project:render": "npm --prefix remotion-video run project:render --",
+    "project:import": "npm --prefix remotion-video run project:import --",
     "test": "npm --prefix remotion-video run test",
-    "typecheck": "npm --prefix video-pipeline-view/player-app run typecheck && npm --prefix remotion-video run typecheck && node --check remotion-video/server/api/server.js && node --check remotion-video/server/workers/renderWorker.js && node --check remotion-video/server/workflow/skillRegistry.js && node --check remotion-video/server/workflow/step123/pipeline.js",
-    "build:video": "npm --prefix remotion-video run build",
-    "build": "npm --prefix video-pipeline-view/player-app run build",
-    "release:check": "npm run clean && npm run test && npm run typecheck && npm run build && npm --prefix remotion-video run release:render && npm --prefix remotion-video run release:verify && npm run remotion-video:clean:runtime && node remotion-video/scripts/clean-runtime.mjs --check"
+    "typecheck": "npm --prefix remotion-video run typecheck",
+    "build": "npm --prefix remotion-video run build",
+    "release:check": "npm run test && npm run typecheck && npm run project:check -- examples/project.json && npm --prefix remotion-video run release:render && npm --prefix remotion-video run release:verify"
   }
 }

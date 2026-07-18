@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 2,
+  "projectId": "v2-smoke",
+  "title": "Remotion V2 编译链路",
+  "render": {
+    "fps": 30,
+    "width": 1920,
+    "height": 1080,
+    "qualityMode": "fast"
+  },
+  "timelinePlan": {
+    "totalFrames": 120,
+    "fps": 30,
+    "cues": [
+      {
+        "id": "cue-1",
+        "text": "一条时间线，决定整支视频。",
+        "startFrame": 0,
+        "endFrame": 52,
+        "keywords": ["时间线"],
+        "emphasis": true
+      },
+      {
+        "id": "cue-2",
+        "text": "场景、字幕和音频共享同一个帧坐标。",
+        "startFrame": 52,
+        "endFrame": 120,
+        "keywords": ["帧坐标"],
+        "emphasis": false
+      }
+    ],
+    "beats": [
+      {
+        "id": "beat-1",
+        "cueIds": ["cue-1"],
+        "startFrame": 0,
+        "endFrame": 60,
+        "spokenFamily": "spoken-title",
+        "headline": "唯一时间真源",
+        "payload": {},
+        "visualPriority": "high"
+      },
+      {
+        "id": "beat-2",
+        "cueIds": ["cue-2"],
+        "startFrame": 60,
+        "endFrame": 120,
+        "spokenFamily": "spoken-metric",
+        "headline": "零帧漂移",
+        "payload": {},
+        "visualPriority": "high"
+      }
+    ],
+    "visualModules": [
+      {
+        "id": "scene-title",
+        "family": "spoken-title",
+        "startFrame": 0,
+        "endFrame": 60,
+        "payload": {
+          "title": "唯一时间真源",
+          "subtitle": "TimelinePlan 驱动场景、字幕与音频",
+          "kicker": "REMOTION V2",
+          "accent": "cyan"
+        },
+        "assetRefs": [
+          {"assetId": "hero-grid", "role": "hero-art", "required": true}
+        ],
+        "transitionOut": {
+          "type": "slide",
+          "durationInFrames": 12,
+          "direction": "from-right"
+        },
+        "directorScore": {}
+      },
+      {
+        "id": "scene-metric",
+        "family": "spoken-metric",
+        "startFrame": 60,
+        "endFrame": 120,
+        "payload": {
+          "heading": "编译后时长不变量",
+          "items": [
+            {"label": "时间真源", "value": "1"},
+            {"label": "帧漂移", "value": "0"}
+          ],
+          "accent": "green"
+        },
+        "assetRefs": [
+          {"assetId": "metric-missing", "role": "metric-art", "required": false}
+        ],
+        "transitionOut": false,
+        "directorScore": {}
+      }
+    ]
+  },
+  "audio": {},
+  "captions": [
+    {
+      "text": "一条时间线，",
+      "startMs": 0,
+      "endMs": 1300,
+      "timestampMs": 0,
+      "confidence": 1
+    },
+    {
+      "text": "决定整支视频。",
+      "startMs": 1300,
+      "endMs": 2000,
+      "timestampMs": 1300,
+      "confidence": 1
+    },
+    {
+      "text": "场景、字幕和音频共享同一个帧坐标。",
+      "startMs": 2000,
+      "endMs": 4000,
+      "timestampMs": 2000,
+      "confidence": 1
+    }
+  ],
+  "visual": {
+    "theme": {
+      "background": "#05070d",
+      "foreground": "#f8fafc",
+      "accent": "#00f5ff",
+      "muted": "#94a3b8"
+    },
+    "defaultTransition": false,
+    "sceneOverrides": []
+  },
+  "assets": {
+    "assets": {
+      "hero-grid": {
+        "kind": "image",
+        "src": "projects/v2-fixtures/hero-grid.svg",
+        "remote": false,
+        "available": true,
+        "critical": true
+      },
+      "metric-missing": {
+        "kind": "image",
+        "src": "projects/v2-fixtures/metric-missing.png",
+        "remote": false,
+        "available": false,
+        "critical": false
+      }
+    }
+  }
+}

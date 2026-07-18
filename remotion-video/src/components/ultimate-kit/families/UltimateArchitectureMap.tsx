@@ -2,9 +2,11 @@ import React from 'react';
 import {interpolate, useCurrentFrame} from 'remotion';
 import {GeometryAccent, PathDrawLink} from '../../visual-atoms';
 import {resolveUltimateAccent, ultimateGlow, ultimateKitTokens} from '../tokens';
-import type {UltimateArchitectureMapProps} from '../types';
+import type {FamilyDirectorMeta, UltimateArchitectureMapProps, UltimateSceneGrammar} from '../types';
 import {useFloatMotion, useStaggerScale} from '../motionGrammar';
 import {cleanDisplayText, iconMaskStyle, withMicroJitter, SemanticIconGlyph, SemanticIconBadge} from '../SemanticIcon';
+import {UltimateHeading} from '../UltimateHeading';
+import {glassPanelStyle} from '../containerStyles';
 
 const kit = ultimateKitTokens;
 
@@ -94,20 +96,23 @@ const splitDisplayLinesBalanced = (value: string, maxChars: number, maxLines = 2
 };
 
 
-export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = ({
+export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps & {grammar?: UltimateSceneGrammar; directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   centerTitle,
   centerDetail,
   nodes,
   accent = 'cyan',
   layout = 'radial',
+  grammar,
+  directorMeta,
 }) => {
   const frame = useCurrentFrame();
   const accentColor = toneToColor(accent);
+  const adaptive = directorMeta?.adaptive;
+  const sizeScale = adaptive?.contrast.sizeRatio ?? 1;
+  const spacingScale = adaptive?.density.spacing ?? 1;
   const visibleNodes = nodes.slice(0, 5);
   const useRadial = layout !== 'stack' && visibleNodes.length > 3;
-  const headingLines = splitDisplayLinesBalanced(heading, useRadial ? 14 : 18, 3);
-  const headingSize = headingLines.length >= 3 ? 40 : headingLines.length === 2 || measureText(heading) > 24 ? 48 : 58;
   const centerDetailLines = centerDetail ? splitDisplayLinesBalanced(centerDetail, 28, 2) : [];
   const center = {x: 960, y: useRadial ? 596 : 542};
   const nodeSlots = useRadial
@@ -141,38 +146,10 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
 
   return (
     <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
-      <div style={{position: 'absolute', top: 94, left: 122, right: useRadial ? 520 : 130}}>
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 700,
-            letterSpacing: 4.2,
-            lineHeight: 1.2,
-            textTransform: 'uppercase',
-            color: accentColor,
-            opacity: 0.92,
-          }}
-        >
-          系统结构
-        </div>
-        <div style={{marginTop: 22, maxWidth: useRadial ? 860 : 980}}>
-          {headingLines.map((line, index) => (
-            <div
-              key={`${line}-${index}`}
-              style={{
-                marginTop: index === 0 ? 0 : 4,
-                fontFamily: kit.fonts.display,
-                fontSize: headingSize,
-                fontWeight: 800,
-                letterSpacing: -2.4,
-                lineHeight: 1.08,
-              }}
-            >
-              {line}
-            </div>
-          ))}
-        </div>
-      </div>
+      <UltimateHeading
+        heading={heading}
+        accent={accent}
+      />
 
       <div
         style={{
@@ -305,10 +282,10 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
           }}
         />
         <div style={{width: 236, transform: 'rotate(-45deg)'}}>
-          <div style={{fontSize: 15, letterSpacing: 2.2, color: accentColor, textTransform: 'uppercase'}}>core system</div>
-          <div style={{marginTop: 16, fontSize: 48, lineHeight: 1.08, fontWeight: 840}}>{centerTitle}</div>
+          <div style={{fontSize: Math.round(15 * sizeScale), letterSpacing: 2.2, color: accentColor, textTransform: 'uppercase'}}>core system</div>
+          <div style={{marginTop: 16, fontSize: Math.round(48 * sizeScale), lineHeight: 1.08, fontWeight: 840}}>{centerTitle}</div>
           {centerDetailLines.length > 0 ? (
-            <div style={{marginTop: 18, fontSize: 17, lineHeight: 1.54, color: 'rgba(255,255,255,0.66)'}}>
+            <div style={{marginTop: 18, fontSize: Math.round(17 * sizeScale), lineHeight: 1.54, color: 'rgba(255,255,255,0.66)'}}>
               {centerDetailLines.map((line, index) => (
                 <div key={`${line}-${index}`} style={{marginTop: index === 0 ? 0 : 4}}>
                   {line}
@@ -355,7 +332,7 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
               width: link.slot.width,
               display: 'flex',
               flexDirection: 'column',
-              gap: 10,
+              gap: Math.round(10 * spacingScale),
               opacity: nodeReveal * staggerStyle.opacity,
               ...alignStyle,
               transform: withMicroJitter(
@@ -381,13 +358,13 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
                 N/0{index + 1}
               </div>
             </div>
-            <div style={{marginTop: 10}}>
+            <div style={glassPanelStyle(nodeColor, {density: adaptive?.density}, {radius: 'md', intense: false})}>
               {labelLines.map((line, lineIndex) => (
                 <div
                   key={`${line}-${lineIndex}`}
                   style={{
                     marginTop: lineIndex === 0 ? 0 : 3,
-                    fontSize: 28,
+                    fontSize: Math.round(28 * sizeScale),
                     lineHeight: 1.08,
                     fontWeight: 820,
                     textShadow: `0 0 22px ${nodeColor}18`,
@@ -396,16 +373,16 @@ export const UltimateArchitectureMap: React.FC<UltimateArchitectureMapProps> = (
                   {line}
                 </div>
               ))}
+              {detailLines.length > 0 ? (
+                <div style={{marginTop: 8, fontSize: Math.round(16 * sizeScale), lineHeight: 1.54, color: 'rgba(255,255,255,0.6)'}}>
+                  {detailLines.map((line, lineIndex) => (
+                    <div key={`${line}-${lineIndex}`} style={{marginTop: lineIndex === 0 ? 0 : 3}}>
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
-            {detailLines.length > 0 ? (
-              <div style={{marginTop: 8, fontSize: 16, lineHeight: 1.54, color: 'rgba(255,255,255,0.6)'}}>
-                {detailLines.map((line, lineIndex) => (
-                  <div key={`${line}-${lineIndex}`} style={{marginTop: lineIndex === 0 ? 0 : 3}}>
-                    {line}
-                  </div>
-                ))}
-              </div>
-            ) : null}
           </div>
         );
       })}

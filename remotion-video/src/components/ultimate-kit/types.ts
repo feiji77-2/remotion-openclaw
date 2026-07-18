@@ -58,6 +58,7 @@ export interface UltimateHeroPanelProps {
   lines?: string[];
   brandIcon?: BrandIconName | string;
   brandLabel?: string;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateFeatureCardItem {
@@ -72,6 +73,7 @@ export interface UltimateFeatureCardRailProps {
   kicker?: string;
   heading: string;
   items: UltimateFeatureCardItem[];
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateFocusDiagramProps {
@@ -81,6 +83,7 @@ export interface UltimateFocusDiagramProps {
   description?: string;
   accent?: UltimateAccentTone;
   diagram?: 'framing' | 'rings' | 'scale';
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateStripItem {
@@ -98,6 +101,7 @@ export interface UltimateNumberStripProps {
   summary?: string;
   items: UltimateStripItem[];
   accent?: UltimateAccentTone;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateStepItem {
@@ -110,6 +114,7 @@ export interface UltimateStepItem {
 export interface UltimateStepFlowProps {
   heading: string;
   steps: UltimateStepItem[];
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateTimelineItem {
@@ -125,6 +130,7 @@ export interface UltimateTimelineProps {
   summary?: string;
   items: UltimateTimelineItem[];
   accent?: UltimateAccentTone;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateCompareBoardRow {
@@ -144,6 +150,7 @@ export interface UltimateCompareBoardProps {
   rows: UltimateCompareBoardRow[];
   leftAccent?: UltimateAccentTone;
   rightAccent?: UltimateAccentTone;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateTerminalPanelProps {
@@ -153,6 +160,7 @@ export interface UltimateTerminalPanelProps {
   outputs: string[];
   note?: string;
   accent?: UltimateAccentTone;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateTagChip {
@@ -165,6 +173,7 @@ export interface UltimateTagMatrixProps {
   tabs?: string[];
   activeTab?: string;
   items: UltimateTagChip[];
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateCodeLine {
@@ -179,6 +188,7 @@ export interface UltimateCodePanelProps {
   highlightLine?: number;
   footer?: string;
   accent?: UltimateAccentTone;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateMetricItem {
@@ -194,6 +204,7 @@ export interface UltimateMetricBarsProps {
   summary?: string;
   items: UltimateMetricItem[];
   layout?: 'bars' | 'cards';
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateDataStreamItem {
@@ -209,6 +220,7 @@ export interface UltimateDataStreamProps {
   summary?: string;
   items: UltimateDataStreamItem[];
   accent?: UltimateAccentTone;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateEvidenceCard {
@@ -225,6 +237,7 @@ export interface UltimateEvidenceWallProps {
   summary?: string;
   cards: UltimateEvidenceCard[];
   accent?: UltimateAccentTone;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateArchitectureNode {
@@ -241,6 +254,7 @@ export interface UltimateArchitectureMapProps {
   nodes: UltimateArchitectureNode[];
   accent?: UltimateAccentTone;
   layout?: 'radial' | 'stack';
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateMemoryGraphNode {
@@ -257,6 +271,7 @@ export interface UltimateMemoryGraphProps {
   centerDetail?: string;
   nodes: UltimateMemoryGraphNode[];
   accent?: UltimateAccentTone;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimatePipelineStage {
@@ -271,6 +286,7 @@ export interface UltimatePipelineFlowProps {
   summary?: string;
   stages: UltimatePipelineStage[];
   accent?: UltimateAccentTone;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateBenchmarkItem {
@@ -292,6 +308,7 @@ export interface UltimateBenchmarkChartProps {
   accent?: UltimateAccentTone;
   /** 导演层 grammar（staggerGap / dataEvent / enterFrames）*/
   grammar?: UltimateSceneGrammar;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateQuoteHighlightProps {
@@ -300,6 +317,7 @@ export interface UltimateQuoteHighlightProps {
   attribution?: string;
   tags?: UltimateTagChip[];
   accent?: UltimateAccentTone;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateGlossaryTermProps {
@@ -309,6 +327,7 @@ export interface UltimateGlossaryTermProps {
   definition: string;
   related?: UltimateTagChip[];
   accent?: UltimateAccentTone;
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateCtaPanelProps {
@@ -317,8 +336,20 @@ export interface UltimateCtaPanelProps {
   searchLabel?: string;
   badge?: string;
   highlights?: string[];
+  directorMeta?: FamilyDirectorMeta;
 }
 
 export interface UltimateSubtitleBarProps {
   text?: string;
+}
+
+export interface FamilyDirectorMeta {
+  adaptive: {
+    density: { padding: number; spacing: number; scale: number };
+    contrast: { sizeRatio: number; weightRatio: number; opacityRatio: number };
+    energy: { duration: number; bounce: number; intensity: number; peakFrame?: number };
+  };
+  platform: string;
+  /** 导演层元素动画 cue（可选）- 由 DirectorScoreOrchestrator 注入 */
+  directorCue?: import('../../data/directorScore').ElementCue;
 }

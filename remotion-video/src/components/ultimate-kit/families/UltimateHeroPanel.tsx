@@ -3,10 +3,12 @@ import {interpolate, spring, useCurrentFrame} from 'remotion';
 import {GeometryAccent, ShockwaveWord, TextMaskWipe, ParticleBackground, DotGridParallax} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent, ultimateKitTokens} from '../tokens';
-import type {UltimateHeroPanelProps, UltimateSceneGrammar} from '../types';
+import type {UltimateHeroPanelProps, UltimateSceneGrammar, FamilyDirectorMeta} from '../types';
 import { useTextSlideIn, useScaleEmphasis, useFloatMotion } from '../motionGrammar';
+import {UltimateHeading} from '../UltimateHeading';
+import {glassPanelStyle, contentCardStyle} from '../containerStyles';
 
-export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: UltimateSceneGrammar}> = ({
+export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: UltimateSceneGrammar; directorMeta?: FamilyDirectorMeta}> = ({
   kicker,
   title,
   subtitle,
@@ -18,8 +20,13 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: Ult
   lines = [],
   brandLabel,
   grammar,
+  directorMeta,
 }) => {
   const frame = useCurrentFrame();
+  const adaptive = directorMeta?.adaptive;
+  const contrastSize = adaptive?.contrast.sizeRatio ?? 1;
+  const densitySpacing = adaptive?.density.spacing ?? 1;
+  const densityPadding = adaptive?.density.padding ?? 1;
   const color = resolveUltimateAccent(accent);
   const revealDirection = resolveTextRevealDirection(grammar, 'center');
   const memoryWord = (highlightedWord ?? title.split(/[\s·:：，,]/).find(Boolean) ?? title).trim();
@@ -51,7 +58,7 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: Ult
           position: 'absolute',
           left: 940,
           top: 94,
-          fontSize: 250,
+          fontSize: Math.round(250 * contrastSize),
           lineHeight: 0.82,
           fontWeight: 900,
           letterSpacing: -14,
@@ -94,45 +101,25 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: Ult
           position: 'absolute',
           left: 84,
           right: 84,
-          bottom: 84,
+          bottom: 150,
           display: 'grid',
-          gridTemplateColumns: '1.15fr 0.85fr',
-          gap: 56,
-          alignItems: 'end',
+          gap: Math.round(28 * densitySpacing),
+          justifyItems: 'center',
           transform: `translateY(${bottomRise}px)`,
         }}
       >
-        <div style={{display: 'grid', gap: 18, maxWidth: 980}}>
-          {kicker ? (
-            <div style={{fontSize: 16, letterSpacing: 5.2, textTransform: 'uppercase', color, opacity: 0.9}}>
-              {kicker}
-            </div>
-          ) : null}
-          <div style={{position: 'relative', minHeight: 190, ...titleSlideIn}}>
-            <TextMaskWipe
-              text={title}
-              direction={revealDirection}
-              accent={color}
-              fontSize={94}
-              color="#f7fbff"
-              fontWeight={900}
-              fontFamily={ultimateKitTokens.fonts.display}
-              textStyle={{
-                width: '100%',
-                textAlign: 'left',
-                whiteSpace: 'normal',
-                lineHeight: 0.9,
-                letterSpacing: -4.4,
-              }}
-            />
-          </div>
-          {subtitle ? (
-            <div style={{maxWidth: 780, fontSize: 28, lineHeight: 1.3, color: 'rgba(229,236,255,0.76)', ...floatMotion}}>
-              {subtitle}
-            </div>
-          ) : null}
+        <div style={{...glassPanelStyle(color, {density: adaptive?.density, contrast: adaptive?.contrast}), display: 'grid', gap: Math.round(18 * densitySpacing), maxWidth: 1100, textAlign: 'center'}}>
+          <UltimateHeading
+            heading={title}
+            archetype={grammar?.archetype}
+            accent={accent}
+            grammar={grammar}
+            kicker={kicker}
+            subtitle={subtitle}
+            textAlignOverride="center"
+          />
         </div>
-        <div style={{display: 'grid', gap: 18, justifyItems: 'end', paddingBottom: 8}}>
+        <div style={{display: 'grid', gap: Math.round(18 * densitySpacing), justifyItems: 'center'}}>
           {showShockwaveWord ? (
             <ShockwaveWord
               word={memoryWord}
@@ -143,29 +130,29 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: Ult
           ) : (
             <div
               style={{
-                fontSize: 174,
+                fontSize: Math.round(174 * contrastSize),
                 fontWeight: 900,
                 letterSpacing: -9,
                 lineHeight: 0.86,
                 color,
                 textTransform: 'lowercase',
                 textShadow: `0 0 54px ${color}33`,
-                textAlign: 'right',
+                textAlign: 'center',
               }}
             >
               {brandLabel || memoryWord}
             </div>
           )}
           {lines.length > 0 ? (
-            <div style={{display: 'grid', gap: 10, maxWidth: 520, justifyItems: 'end'}}>
+            <div style={{...contentCardStyle(color, {density: adaptive?.density}), display: 'grid', gap: Math.round(10 * densitySpacing), maxWidth: 520, justifyItems: 'center'}}>
               {lines.slice(0, 3).map((line, index) => (
                 <div
                   key={`${line}-${index}`}
                   style={{
-                    fontSize: 18,
+                    fontSize: Math.round(18 * contrastSize),
                     lineHeight: 1.28,
                     color: index === lines.length - 1 ? '#f7fbff' : 'rgba(229,236,255,0.62)',
-                    textAlign: 'right',
+                    textAlign: 'center',
                   }}
                 >
                   {line}
@@ -174,17 +161,17 @@ export const UltimateHeroPanel: React.FC<UltimateHeroPanelProps & {grammar?: Ult
             </div>
           ) : null}
           {annotations.length > 0 ? (
-            <div style={{display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end'}}>
+            <div style={{display: 'flex', gap: Math.round(12 * densitySpacing), flexWrap: 'wrap', justifyContent: 'center'}}>
               {annotations.map((item) => (
                 <div
                   key={item}
                   style={{
-                    padding: '10px 16px',
+                    padding: `${Math.round(10 * densityPadding)}px ${Math.round(16 * densityPadding)}px`,
                     borderRadius: 999,
                     border: `1px solid ${color}36`,
                     background: `${color}12`,
                     color: '#f7fbff',
-                    fontSize: 14,
+                    fontSize: Math.round(14 * contrastSize),
                     letterSpacing: 1.8,
                     textTransform: 'uppercase',
                     boxShadow: `0 0 24px ${color}12`,

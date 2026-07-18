@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="UI skill icon">
+  <defs>
+    <linearGradient id="bg" x1="18" y1="18" x2="142" y2="142" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9A7CFF"/>
+      <stop offset="0.52" stop-color="#FF5F91"/>
+      <stop offset="1" stop-color="#20D9E8"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="136" height="136" rx="30" fill="url(#bg)"/>
+  <rect x="35" y="38" width="90" height="84" rx="16" fill="#F5F1E8"/>
+  <rect x="49" y="53" width="36" height="8" rx="4" fill="#101522"/>
+  <rect x="49" y="70" width="62" height="8" rx="4" fill="#9A7CFF"/>
+  <rect x="49" y="91" width="26" height="18" rx="5" fill="#20D9E8"/>
+  <rect x="83" y="91" width="26" height="18" rx="5" fill="#FF5F91"/>
+  <path d="M112 52v57" stroke="#101522" stroke-width="5" stroke-linecap="round" opacity="0.22"/>
+  <circle cx="112" cy="77" r="6" fill="#45E28D"/>
+</svg>

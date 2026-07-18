@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-02T19:12:21.798Z",
+  "generatedAt": "2026-07-14T11:09:36.156Z",
   "families": [
     {
       "family": "hero",
@@ -707,7 +707,7 @@
     {
       "family": "memory-graph",
       "label": "Memory / Knowledge Graph",
-      "description": "Node-graph with a central concept and surrounding related nodes.",
+      "description": "Node-graph with a central concept and surrounding related nodes. (Alias for architecture-map)",
       "semanticTags": [
         "graph",
         "nodes",
@@ -724,6 +724,7 @@
       ],
       "optionalFields": [
         "centerDetail",
+        "layout",
         "items",
         "heading"
       ],
@@ -746,18 +747,18 @@
       "rhythm": {
         "layer": "structure",
         "staggerGap": 10,
-        "revealStiffness": 120,
+        "revealStiffness": 110,
         "backdropCycle": [
           "dot-grid",
-          "god-rays",
-          "particle-grid"
+          "particle-grid",
+          "god-rays"
         ]
       }
     },
     {
       "family": "pipeline-flow",
       "label": "Pipeline Flow",
-      "description": "Horizontal or vertical pipeline with labelled stages. Used for process illustration.",
+      "description": "Horizontal or vertical pipeline with labelled stages. Used for process illustration. (Alias for step-flow)",
       "semanticTags": [
         "pipeline",
         "flow",
@@ -769,18 +770,20 @@
         "阶段"
       ],
       "requiredFields": [
-        "stages"
+        "steps"
       ],
       "optionalFields": [
+        "items",
+        "variant",
+        "stepVariants",
         "heading",
-        "summary",
-        "items"
+        "summary"
       ],
       "defaultAccent": "cyan",
       "timing": {
-        "baseDurationFrames": 80,
+        "baseDurationFrames": 84,
         "enterFrames": 16,
-        "emphasisFrames": 48,
+        "emphasisFrames": 52,
         "exitFrames": 16,
         "staggerFrames": 10,
         "easing": "ease-out",
@@ -795,7 +798,7 @@
       "rhythm": {
         "layer": "structure",
         "staggerGap": 6,
-        "revealStiffness": 110,
+        "revealStiffness": 150,
         "preferredCameraMotion": "pan-y",
         "backdropCycle": [
           "dot-grid",
@@ -1277,6 +1280,355 @@
         "layer": "emphasis",
         "staggerGap": 0,
         "revealStiffness": 120,
+        "backdropCycle": []
+      }
+    },
+    {
+      "family": "spoken-title",
+      "label": "Spoken Title",
+      "description": "口播驱动大标题，逐字淡入。",
+      "semanticTags": [
+        "spoken",
+        "title",
+        "口播",
+        "大标题"
+      ],
+      "requiredFields": [
+        "title"
+      ],
+      "optionalFields": [
+        "subtitle",
+        "kicker"
+      ],
+      "defaultAccent": "purple",
+      "timing": {
+        "baseDurationFrames": 90,
+        "enterFrames": 16,
+        "emphasisFrames": 50,
+        "exitFrames": 16,
+        "staggerFrames": 0,
+        "easing": "ease-out",
+        "springPreset": "snappy",
+        "cameraMotion": "none"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 12
+      },
+      "stageConfig": {
+        "showOverlay": false,
+        "showMediaCard": false,
+        "showIconOrbit": false
+      },
+      "rhythm": {
+        "layer": "context",
+        "staggerGap": 0,
+        "revealStiffness": 96,
+        "backdropCycle": []
+      }
+    },
+    {
+      "family": "spoken-metric",
+      "label": "Spoken Metric",
+      "description": "口播驱动数字递增动画。",
+      "semanticTags": [
+        "spoken",
+        "metric",
+        "number",
+        "data",
+        "口播",
+        "数字"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 80,
+        "enterFrames": 14,
+        "emphasisFrames": 46,
+        "exitFrames": 14,
+        "staggerFrames": 8,
+        "easing": "ease-out",
+        "springPreset": "bouncy",
+        "cameraMotion": "none"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 12
+      },
+      "stageConfig": {
+        "showOverlay": false,
+        "showMediaCard": false,
+        "showIconOrbit": false
+      },
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 8,
+        "revealStiffness": 100,
+        "backdropCycle": []
+      }
+    },
+    {
+      "family": "spoken-process",
+      "label": "Spoken Process",
+      "description": "口播驱动横向步骤条。",
+      "semanticTags": [
+        "spoken",
+        "process",
+        "step",
+        "口播",
+        "步骤"
+      ],
+      "requiredFields": [
+        "steps"
+      ],
+      "optionalFields": [],
+      "defaultAccent": "purple",
+      "timing": {
+        "baseDurationFrames": 110,
+        "enterFrames": 18,
+        "emphasisFrames": 70,
+        "exitFrames": 18,
+        "staggerFrames": 10,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "none"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": {
+        "showOverlay": false,
+        "showMediaCard": false,
+        "showIconOrbit": false
+      },
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 10,
+        "revealStiffness": 110,
+        "backdropCycle": []
+      }
+    },
+    {
+      "family": "spoken-ranking",
+      "label": "Spoken Ranking",
+      "description": "口播驱动榜单排名。",
+      "semanticTags": [
+        "spoken",
+        "ranking",
+        "top",
+        "口播",
+        "排名"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultAccent": "orange",
+      "timing": {
+        "baseDurationFrames": 80,
+        "enterFrames": 14,
+        "emphasisFrames": 46,
+        "exitFrames": 14,
+        "staggerFrames": 8,
+        "easing": "ease-out",
+        "springPreset": "bouncy",
+        "cameraMotion": "none"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 12
+      },
+      "stageConfig": {
+        "showOverlay": false,
+        "showMediaCard": false,
+        "showIconOrbit": false
+      },
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 8,
+        "revealStiffness": 100,
+        "backdropCycle": []
+      }
+    },
+    {
+      "family": "spoken-compare",
+      "label": "Spoken Compare",
+      "description": "口播驱动对比展示。",
+      "semanticTags": [
+        "spoken",
+        "compare",
+        "口播",
+        "对比"
+      ],
+      "requiredFields": [
+        "left",
+        "right"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultAccent": "purple",
+      "timing": {
+        "baseDurationFrames": 90,
+        "enterFrames": 16,
+        "emphasisFrames": 54,
+        "exitFrames": 16,
+        "staggerFrames": 0,
+        "easing": "ease-out",
+        "springPreset": "smooth",
+        "cameraMotion": "none"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": {
+        "showOverlay": false,
+        "showMediaCard": false,
+        "showIconOrbit": false
+      },
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 0,
+        "revealStiffness": 110,
+        "backdropCycle": []
+      }
+    },
+    {
+      "family": "spoken-tags",
+      "label": "Spoken Tags",
+      "description": "口播驱动标签云。",
+      "semanticTags": [
+        "spoken",
+        "tags",
+        "口播",
+        "标签"
+      ],
+      "requiredFields": [
+        "items"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 80,
+        "enterFrames": 14,
+        "emphasisFrames": 46,
+        "exitFrames": 14,
+        "staggerFrames": 6,
+        "easing": "ease-out",
+        "springPreset": "bouncy",
+        "cameraMotion": "none"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 12
+      },
+      "stageConfig": {
+        "showOverlay": false,
+        "showMediaCard": false,
+        "showIconOrbit": false
+      },
+      "rhythm": {
+        "layer": "emphasis",
+        "staggerGap": 6,
+        "revealStiffness": 100,
+        "backdropCycle": []
+      }
+    },
+    {
+      "family": "spoken-code",
+      "label": "Spoken Code",
+      "description": "口播驱动代码展示。",
+      "semanticTags": [
+        "spoken",
+        "code",
+        "口播",
+        "代码"
+      ],
+      "requiredFields": [
+        "code"
+      ],
+      "optionalFields": [
+        "heading"
+      ],
+      "defaultAccent": "cyan",
+      "timing": {
+        "baseDurationFrames": 80,
+        "enterFrames": 14,
+        "emphasisFrames": 46,
+        "exitFrames": 14,
+        "staggerFrames": 0,
+        "easing": "ease-out",
+        "springPreset": "snappy",
+        "cameraMotion": "none"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 12
+      },
+      "stageConfig": {
+        "showOverlay": false,
+        "showMediaCard": false,
+        "showIconOrbit": false
+      },
+      "rhythm": {
+        "layer": "structure",
+        "staggerGap": 0,
+        "revealStiffness": 96,
+        "backdropCycle": []
+      }
+    },
+    {
+      "family": "spoken-takeaway",
+      "label": "Spoken Takeaway",
+      "description": "口播驱动结论总结。",
+      "semanticTags": [
+        "spoken",
+        "takeaway",
+        "conclusion",
+        "口播",
+        "结论"
+      ],
+      "requiredFields": [
+        "title"
+      ],
+      "optionalFields": [
+        "subtitle"
+      ],
+      "defaultAccent": "purple",
+      "timing": {
+        "baseDurationFrames": 90,
+        "enterFrames": 16,
+        "emphasisFrames": 50,
+        "exitFrames": 16,
+        "staggerFrames": 0,
+        "easing": "ease-out",
+        "springPreset": "snappy",
+        "cameraMotion": "none"
+      },
+      "defaultTransition": {
+        "preset": "fade",
+        "durationInFrames": 14
+      },
+      "stageConfig": {
+        "showOverlay": false,
+        "showMediaCard": false,
+        "showIconOrbit": false
+      },
+      "rhythm": {
+        "layer": "closing",
+        "staggerGap": 0,
+        "revealStiffness": 96,
         "backdropCycle": []
       }
     }

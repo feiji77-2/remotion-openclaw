@@ -1,10 +1,10 @@
 import React from 'react';
 import {useCurrentFrame} from 'remotion';
-import {GeometryAccent, TextMaskWipe} from '../../visual-atoms';
-import {resolveTextRevealDirection} from '../revealDirection';
+import {GeometryAccent} from '../../visual-atoms';
 import {resolveUltimateAccent} from '../tokens';
 import {useTextSlideIn} from '../motionGrammar';
-import type {UltimateCompareBoardProps, UltimateSceneGrammar} from '../types';
+import {UltimateHeading} from '../UltimateHeading';
+import type {UltimateCompareBoardProps, UltimateSceneGrammar, FamilyDirectorMeta} from '../types';
 
 const normalizeText = (value?: string) => {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -49,7 +49,7 @@ const splitHeadline = (value: string, maxChars = 8) => {
   ];
 };
 
-export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps & {grammar?: UltimateSceneGrammar}> = ({
+export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps & {grammar?: UltimateSceneGrammar; directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   summary,
   leftTitle,
@@ -60,11 +60,15 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps & {grammar
   leftAccent = 'orange',
   rightAccent = 'cyan',
   grammar,
+  directorMeta,
 }) => {
   const frame = useCurrentFrame();
+  const adaptive = directorMeta?.adaptive;
+  const contrastSize = adaptive?.contrast.sizeRatio ?? 1;
+  const densitySpacing = adaptive?.density.spacing ?? 1;
+  const densityPadding = adaptive?.density.padding ?? 1;
   const leftColor = resolveUltimateAccent(leftAccent);
   const rightColor = resolveUltimateAccent(rightAccent);
-  const revealDirection = resolveTextRevealDirection(grammar, 'center');
   const leftSlide = useTextSlideIn(frame, 'left', 0, 20);
   const rightSlide = useTextSlideIn(frame, 'right', 3, 20);
   const firstRow = rows[0];
@@ -104,38 +108,26 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps & {grammar
       <GeometryAccent variant="slanted-panel" color={rightColor} opacity={0.18} style={{right: 104, bottom: 172, width: 430, height: 136, transform: 'rotate(9deg)'}} />
       <GeometryAccent variant="arc" color={rightColor} opacity={0.2} style={{left: 764, top: 156, width: 420, height: 160}} />
 
-      <div style={{position: 'absolute', left: 110, top: 82, width: 740}}>
-        <div style={{fontSize: 15, letterSpacing: 4.2, textTransform: 'uppercase', color: 'rgba(229,236,255,0.5)'}}>
-          split decision
-        </div>
-        <div style={{position: 'relative', minHeight: 114, marginTop: 18}}>
-          <TextMaskWipe
-            text={heading}
-            direction={revealDirection}
-            accent={rightColor}
-            fontSize={82}
-            color="#f7fbff"
-            fontWeight={900}
-            textStyle={{width: '100%', textAlign: 'left', whiteSpace: 'normal', lineHeight: 0.9, letterSpacing: -3}}
-          />
-        </div>
-        {summary ? (
-          <div style={{marginTop: 14, maxWidth: 640, fontSize: 24, lineHeight: 1.4, color: 'rgba(229,236,255,0.7)'}}>
-            {summary}
-          </div>
-        ) : null}
+      <div style={{position: 'absolute', left: 110, top: 88, maxWidth: 860, zIndex: 2}}>
+        <UltimateHeading
+          heading={heading}
+          archetype={grammar?.archetype}
+          accent={rightAccent}
+          grammar={grammar}
+          subtitle={summary}
+        />
       </div>
 
       <div style={{position: 'absolute', left: 110, top: 296, width: 610, opacity: leftSlide.opacity, transform: leftSlide.transform}}>
-        <div style={{fontSize: 17, letterSpacing: 3, textTransform: 'uppercase', color: leftColor}}>
+        <div style={{fontSize: Math.round(17 * contrastSize), letterSpacing: 3, textTransform: 'uppercase', color: leftColor}}>
           {leftMeta || 'short context'}
         </div>
-        <div style={{marginTop: 24, fontSize: 126, lineHeight: 0.82, fontWeight: 900, letterSpacing: -8, color: `${leftColor}18`}}>
+        <div style={{marginTop: Math.round(24 * densitySpacing), fontSize: Math.round(126 * contrastSize), lineHeight: 0.82, fontWeight: 900, letterSpacing: -8, color: `${leftColor}18`}}>
           {leftTitle}
         </div>
-        <div style={{marginTop: -6, display: 'grid', gap: 4}}>
+        <div style={{marginTop: -6, display: 'grid', gap: Math.round(4 * densitySpacing)}}>
           {leftHeadline.map((line, index) => (
-            <div key={`${line}-${index}`} style={{fontSize: index === 0 ? 82 : 76, lineHeight: 0.92, fontWeight: 900, color: '#f7fbff', letterSpacing: -4}}>
+            <div key={`${line}-${index}`} style={{fontSize: Math.round((index === 0 ? 82 : 76) * contrastSize), lineHeight: 0.92, fontWeight: 900, color: '#f7fbff', letterSpacing: -4}}>
               {line}
             </div>
           ))}
@@ -143,15 +135,15 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps & {grammar
       </div>
 
       <div style={{position: 'absolute', right: 108, bottom: 190, width: 650, textAlign: 'right', opacity: rightSlide.opacity, transform: rightSlide.transform}}>
-        <div style={{fontSize: 17, letterSpacing: 3, textTransform: 'uppercase', color: rightColor}}>
+        <div style={{fontSize: Math.round(17 * contrastSize), letterSpacing: 3, textTransform: 'uppercase', color: rightColor}}>
           {rightMeta || 'long context'}
         </div>
-        <div style={{marginTop: 22, fontSize: 122, lineHeight: 0.82, fontWeight: 900, letterSpacing: -8, color: `${rightColor}18`}}>
+        <div style={{marginTop: Math.round(22 * densitySpacing), fontSize: Math.round(122 * contrastSize), lineHeight: 0.82, fontWeight: 900, letterSpacing: -8, color: `${rightColor}18`}}>
           {rightTitle}
         </div>
-        <div style={{marginTop: -2, marginLeft: 'auto', display: 'grid', gap: 6, maxWidth: 630}}>
+        <div style={{marginTop: -2, marginLeft: 'auto', display: 'grid', gap: Math.round(6 * densitySpacing), maxWidth: 630}}>
           {rightHeadline.map((line, index) => (
-            <div key={`${line}-${index}`} style={{fontSize: index === 0 ? 72 : 66, lineHeight: 0.94, fontWeight: 900, color: '#f7fbff', letterSpacing: -3}}>
+            <div key={`${line}-${index}`} style={{fontSize: Math.round((index === 0 ? 72 : 66) * contrastSize), lineHeight: 0.94, fontWeight: 900, color: '#f7fbff', letterSpacing: -3}}>
               {line}
             </div>
           ))}
@@ -164,7 +156,7 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps & {grammar
           left: 648,
           right: 646,
           bottom: 92,
-          padding: '24px 28px 28px',
+          padding: `${Math.round(24 * densityPadding)}px ${Math.round(28 * densityPadding)}px ${Math.round(28 * densityPadding)}px`,
           borderRadius: 28,
           border: '1px solid rgba(255,255,255,0.08)',
           background: 'rgba(5,8,15,0.72)',
@@ -172,20 +164,20 @@ export const UltimateCompareBoard: React.FC<UltimateCompareBoardProps & {grammar
           backdropFilter: 'blur(14px)',
         }}
       >
-        <div style={{fontSize: 14, letterSpacing: 3, textTransform: 'uppercase', color: 'rgba(229,236,255,0.4)'}}>
+        <div style={{fontSize: Math.round(14 * contrastSize), letterSpacing: 3, textTransform: 'uppercase', color: 'rgba(229,236,255,0.4)'}}>
           conflict
         </div>
-        <div style={{marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 18}}>
-          <div style={{fontSize: 60, lineHeight: 0.94, fontWeight: 900, color: '#f7fbff', letterSpacing: -3}}>
+        <div style={{marginTop: Math.round(10 * densitySpacing), display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: Math.round(18 * densitySpacing)}}>
+          <div style={{fontSize: Math.round(60 * contrastSize), lineHeight: 0.94, fontWeight: 900, color: '#f7fbff', letterSpacing: -3}}>
             {bottomLabel}
           </div>
           <div
             style={{
-              padding: '12px 18px',
+              padding: `${Math.round(12 * densityPadding)}px ${Math.round(18 * densityPadding)}px`,
               borderRadius: 18,
               background: `${rightColor}18`,
               color: '#f7fbff',
-              fontSize: 22,
+              fontSize: Math.round(22 * contrastSize),
               fontWeight: 800,
               whiteSpace: 'nowrap',
             }}

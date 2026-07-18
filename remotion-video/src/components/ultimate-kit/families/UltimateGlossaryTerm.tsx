@@ -3,10 +3,10 @@ import { useCurrentFrame } from 'remotion';
 import {GeometryAccent, TextMaskWipe} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
-import type {UltimateGlossaryTermProps, UltimateSceneGrammar} from '../types';
+import type {FamilyDirectorMeta, UltimateGlossaryTermProps, UltimateSceneGrammar} from '../types';
 import { useTextSlideIn, useScaleEmphasis } from '../motionGrammar';
 
-export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar?: UltimateSceneGrammar}> = ({
+export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar?: UltimateSceneGrammar, directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   term,
   pronunciation,
@@ -14,12 +14,16 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
   related = [],
   accent = 'cyan',
   grammar,
+  directorMeta,
 }) => {
   const color = resolveUltimateAccent(accent);
   const relatedItems = related.slice(0, 5);
   const revealDirection = resolveTextRevealDirection(grammar, 'center');
   const frame = useCurrentFrame();
   const headingSlideIn = useTextSlideIn(frame, 'left', 6);
+  const adaptive = directorMeta?.adaptive;
+  const sizeScale = adaptive?.contrast.sizeRatio ?? 1;
+  const spacingScale = adaptive?.density.spacing ?? 1;
   const definitionSlideIn = useTextSlideIn(frame, 'up', 12);
   const scaleEmphasis = useScaleEmphasis(frame, 18);
 
@@ -44,16 +48,16 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
         style={{right: 120, bottom: 40, width: 220, height: 220}}
       />
 
-      <div style={{display: 'grid', gridTemplateColumns: '1.02fr 0.98fr', gap: 34, height: '100%', alignItems: 'stretch'}}>
-        <div style={{display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: 22}}>
-          <div style={{display: 'grid', gap: 14}}>
-            <div style={{fontSize: 18, letterSpacing: 4, textTransform: 'uppercase', color}}>{heading}</div>
+      <div style={{display: 'grid', gridTemplateColumns: '1.02fr 0.98fr', gap: Math.round(34 * spacingScale), height: '100%', alignItems: 'stretch'}}>
+        <div style={{display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: Math.round(22 * spacingScale)}}>
+          <div style={{display: 'grid', gap: Math.round(14 * spacingScale)}}>
+            <div style={{fontSize: Math.round(18 * sizeScale), letterSpacing: 4, textTransform: 'uppercase', color}}>{heading}</div>
             <div style={{position: 'relative', minHeight: 116, ...headingSlideIn}}>
               <TextMaskWipe
                 text={term}
                 direction={revealDirection}
                 accent={color}
-                fontSize={94}
+                fontSize={Math.round(94 * sizeScale)}
                 color="#f7fbff"
                 fontWeight={900}
                 textStyle={{width: '100%', textAlign: 'left', whiteSpace: 'normal', lineHeight: 0.92, letterSpacing: -3}}
@@ -70,7 +74,7 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
                   borderRadius: 999,
                   border: `1px solid ${color}2a`,
                   background: `${color}10`,
-                  fontSize: 17,
+                  fontSize: Math.round(17 * sizeScale),
                   letterSpacing: 1.8,
                   color: `${color}dd`,
                   fontFamily: 'JetBrains Mono, Menlo, monospace',
@@ -91,8 +95,8 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
               boxShadow: `0 0 32px ${color}10`,
             }}
           >
-            <div style={{fontSize: 14, letterSpacing: 2.2, textTransform: 'uppercase', color: `${color}cc`}}>definition</div>
-            <div style={{marginTop: 16, fontSize: 30, lineHeight: 1.42, color: 'rgba(229,236,255,0.78)', ...definitionSlideIn}}>
+            <div style={{fontSize: Math.round(14 * sizeScale), letterSpacing: 2.2, textTransform: 'uppercase', color: `${color}cc`}}>definition</div>
+            <div style={{marginTop: 16, fontSize: Math.round(30 * sizeScale), lineHeight: 1.42, color: 'rgba(229,236,255,0.78)', ...definitionSlideIn}}>
               {definition}
             </div>
           </div>
@@ -104,12 +108,12 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
               background: 'linear-gradient(180deg, rgba(8,12,20,0.82) 0%, rgba(6,9,16,0.98) 100%)',
               padding: '22px 22px 20px',
               display: 'grid',
-              gap: 14,
+              gap: Math.round(14 * spacingScale),
               alignContent: 'start',
               ...scaleEmphasis,
             }}
           >
-            <div style={{fontSize: 14, letterSpacing: 2.2, textTransform: 'uppercase', color: 'rgba(229,236,255,0.46)'}}>
+            <div style={{fontSize: Math.round(14 * sizeScale), letterSpacing: 2.2, textTransform: 'uppercase', color: 'rgba(229,236,255,0.46)'}}>
               related signals
             </div>
             {relatedItems.length > 0 ? (
@@ -121,7 +125,7 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
                     style={{
                       display: 'grid',
                       gridTemplateColumns: '26px minmax(0, 1fr)',
-                      gap: 12,
+                      gap: Math.round(12 * spacingScale),
                       alignItems: 'start',
                       paddingTop: index === 0 ? 0 : 4,
                     }}
@@ -135,7 +139,7 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: 11,
+                        fontSize: Math.round(11 * sizeScale),
                         lineHeight: 1,
                         color: `${itemColor}cc`,
                       }}
@@ -148,13 +152,13 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
                         borderBottom: index === relatedItems.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.08)',
                       }}
                     >
-                      <div style={{fontSize: 20, lineHeight: 1.18, color: '#f7fbff'}}>{item.label}</div>
+                      <div style={{fontSize: Math.round(20 * sizeScale), lineHeight: 1.18, color: '#f7fbff'}}>{item.label}</div>
                     </div>
                   </div>
                 );
               })
             ) : (
-              <div style={{fontSize: 18, lineHeight: 1.4, color: 'rgba(229,236,255,0.58)'}}>No related terms</div>
+              <div style={{fontSize: Math.round(18 * sizeScale), lineHeight: 1.4, color: 'rgba(229,236,255,0.58)'}}>No related terms</div>
             )}
           </div>
         </div>
@@ -182,7 +186,7 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
               filter: 'blur(8px)',
             }}
           />
-          <div style={{fontSize: 14, letterSpacing: 2.2, textTransform: 'uppercase', color: 'rgba(229,236,255,0.46)'}}>
+          <div style={{fontSize: Math.round(14 * sizeScale), letterSpacing: 2.2, textTransform: 'uppercase', color: 'rgba(229,236,255,0.46)'}}>
             term specimen
           </div>
 
@@ -228,12 +232,12 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
               }}
             >
               <div>
-                <div style={{fontSize: 13, letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`}}>label</div>
-                <div style={{marginTop: 14, fontSize: 46, lineHeight: 0.94, fontWeight: 860, color: '#f7fbff'}}>
+                <div style={{fontSize: Math.round(13 * sizeScale), letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`}}>label</div>
+                <div style={{marginTop: 14, fontSize: Math.round(46 * sizeScale), lineHeight: 0.94, fontWeight: 860, color: '#f7fbff'}}>
                   {term}
                 </div>
                 {pronunciation ? (
-                  <div style={{marginTop: 14, fontSize: 15, letterSpacing: 1.6, color: 'rgba(229,236,255,0.62)', fontFamily: 'JetBrains Mono, Menlo, monospace'}}>
+                  <div style={{marginTop: 14, fontSize: Math.round(15 * sizeScale), letterSpacing: 1.6, color: 'rgba(229,236,255,0.62)', fontFamily: 'JetBrains Mono, Menlo, monospace'}}>
                     {pronunciation}
                   </div>
                 ) : null}
@@ -246,12 +250,12 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
                 left: 64,
                 top: 86,
                 display: 'grid',
-                gap: 10,
+                gap: Math.round(10 * spacingScale),
                 maxWidth: 190,
               }}
             >
-              <div style={{fontSize: 12, letterSpacing: 1.8, textTransform: 'uppercase', color: `${color}cc`}}>context</div>
-              <div style={{fontSize: 18, lineHeight: 1.34, color: 'rgba(229,236,255,0.68)'}}>
+              <div style={{fontSize: Math.round(12 * sizeScale), letterSpacing: 1.8, textTransform: 'uppercase', color: `${color}cc`}}>context</div>
+              <div style={{fontSize: Math.round(18 * sizeScale), lineHeight: 1.34, color: 'rgba(229,236,255,0.68)'}}>
                 Core naming layer in the current video grammar.
               </div>
             </div>
@@ -272,7 +276,7 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
                 position: 'absolute',
                 right: 58,
                 top: 110,
-                fontSize: 12,
+                fontSize: Math.round(12 * sizeScale),
                 letterSpacing: 1.8,
                 textTransform: 'uppercase',
                 color: `${color}cc`,
@@ -298,7 +302,7 @@ export const UltimateGlossaryTerm: React.FC<UltimateGlossaryTermProps & {grammar
                 left: 64,
                 bottom: 86,
                 maxWidth: 180,
-                fontSize: 12,
+                fontSize: Math.round(12 * sizeScale),
                 lineHeight: 1.4,
                 letterSpacing: 1.6,
                 textTransform: 'uppercase',

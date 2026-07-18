@@ -3,6 +3,7 @@ import {AbsoluteFill, Easing, interpolate, spring, useCurrentFrame} from 'remoti
 import {ParticleBackground} from '../ParticleBackground';
 import {GeometryAccent, PathDrawLink, RadialGauge} from '../../visual-atoms';
 import {cleanDisplayText, iconMaskStyle, resolveSemanticIcon, withMicroJitter, SemanticIconGlyph, SemanticIconBadge} from '../SemanticIcon';
+import {glassPanelStyle, contentCardStyle} from '../containerStyles';
 import {
   resolveUltimateAccent,
   ultimateGlow,
@@ -35,6 +36,7 @@ import type {
   UltimateTagMatrixProps,
   UltimateTerminalPanelProps,
   UltimateTimelineProps,
+  FamilyDirectorMeta,
 } from '../types';
 
 const kit = ultimateKitTokens;
@@ -456,19 +458,24 @@ const frameCorners: FrameCorner[] = [
 
 
 
-export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
+export const UltimateNumberStrip: React.FC<UltimateNumberStripProps & {directorMeta?: FamilyDirectorMeta}> = ({
   count,
   heading,
   summary,
   items,
   accent = 'green',
+  directorMeta,
 }) => {
   const frame = useCurrentFrame();
+  const adaptive = directorMeta?.adaptive;
+  const contrastSize = adaptive?.contrast.sizeRatio ?? 1;
+  const densitySpacing = adaptive?.density.spacing ?? 1;
+  const densityPadding = adaptive?.density.padding ?? 1;
   const accentColor = toneToColor(accent);
   const reveal = buildReveal(frame, 0);
   const headingLines = splitDisplayLinesBalanced(heading, 16, 3);
   const summaryLines = splitDisplayLinesBalanced(summary || '', 24, 2);
-  const headingSize = headingLines.length > 2 ? 44 : headingLines.length > 1 ? 50 : measureText(heading) > 15 ? 54 : 56;
+  const headingSize = Math.round((headingLines.length > 2 ? 44 : headingLines.length > 1 ? 50 : measureText(heading) > 15 ? 54 : 56) * contrastSize);
   const primaryItem = items[0];
   const secondaryItems = items.slice(1, 4);
   const countToken = parseDisplayNumericToken(count);
@@ -516,7 +523,7 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: 18,
+          gap: Math.round(18 * densitySpacing),
           opacity: reveal,
         }}
       >
@@ -531,36 +538,38 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
           valueLabel={count}
           subtitle="count"
         />
-        <div style={{maxWidth: 1240, textAlign: 'center'}}>
-          {headingLines.map((line, index) => (
-            <div
-              key={`${line}-${index}`}
-              style={{
-                fontSize: headingSize,
-                fontWeight: 800,
-                letterSpacing: -1.6,
-                lineHeight: 1.12,
-              }}
-            >
-              {line}
-            </div>
-          ))}
-        </div>
-        {summaryLines.length > 0 ? (
-          <div style={{maxWidth: 980, textAlign: 'center'}}>
-            {summaryLines.map((line, index) => (
+        <div style={glassPanelStyle(accentColor, {density: adaptive?.density, contrast: adaptive?.contrast}, {radius: 'xl'})}>
+          <div style={{maxWidth: 1240, textAlign: 'center'}}>
+            {headingLines.map((line, index) => (
               <div
                 key={`${line}-${index}`}
                 style={{
-                  marginTop: index === 0 ? 0 : 6,
-                  ...bodyTextStyle(18, kit.colors.textMuted, true),
+                  fontSize: headingSize,
+                  fontWeight: 800,
+                  letterSpacing: -1.6,
+                  lineHeight: 1.12,
                 }}
               >
                 {line}
               </div>
             ))}
           </div>
-        ) : null}
+          {summaryLines.length > 0 ? (
+            <div style={{maxWidth: 980, textAlign: 'center'}}>
+              {summaryLines.map((line, index) => (
+                <div
+                  key={`${line}-${index}`}
+                  style={{
+                    marginTop: index === 0 ? 0 : Math.round(6 * densitySpacing),
+                    ...bodyTextStyle(Math.round(18 * contrastSize), kit.colors.textMuted, true),
+                  }}
+                >
+                  {line}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
       <div
         style={{
@@ -716,16 +725,16 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                   allowPrimaryThreeLines ? 20 : 24,
                   allowPrimaryThreeLines ? 3 : 2,
                 );
-                const primarySize = primaryLines.length > 2 ? 34 : primaryLines.length > 1 ? 40 : 48;
+                const primarySize = Math.round((primaryLines.length > 2 ? 34 : primaryLines.length > 1 ? 40 : 48) * contrastSize);
                 const primaryColor = toneToColor(primaryItem.accent ?? accent);
 
                 return (
-                  <>
+                  <div style={glassPanelStyle(primaryColor, {density: adaptive?.density}, {radius: 'lg'})}>
                     <div
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: 14,
+                        gap: Math.round(14 * densitySpacing),
                         ...overlineLabelStyle(primaryColor),
                       }}
                     >
@@ -766,18 +775,18 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                           marginTop: 22,
                           display: 'flex',
                           flexWrap: 'wrap',
-                          gap: 12,
+                          gap: Math.round(12 * densitySpacing),
                         }}
                       >
                         {(primaryItem.chips || []).slice(0, 4).map((chip, index) => (
                           <div
                             key={`${chip}-${index}`}
                             style={{
-                              padding: '10px 14px',
+                              padding: `${Math.round(10 * densityPadding)}px ${Math.round(14 * densityPadding)}px`,
                               borderRadius: kit.radius.pill,
                               border: `1px solid ${primaryColor}24`,
                               background: 'rgba(255,255,255,0.03)',
-                              fontSize: 15,
+                              fontSize: Math.round(15 * contrastSize),
                               fontWeight: 700,
                               color: primaryColor,
                             }}
@@ -787,7 +796,7 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                         ))}
                       </div>
                     ) : null}
-                  </>
+                  </div>
                 );
               })()}
             </div>
@@ -863,10 +872,10 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 12,
+                    gap: Math.round(12 * densitySpacing),
                     flexDirection: point.align === 'right' ? 'row-reverse' : 'row',
                     ...overlineLabelStyle(color),
-                    fontSize: 17,
+                    fontSize: Math.round(17 * contrastSize),
                   }}
                 >
                   <SemanticIconBadge
@@ -893,12 +902,12 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                     marginRight: point.align === 'center' ? 'auto' : 0,
                   }}
                 />
-                <div style={{marginTop: 14}}>
+                <div style={{marginTop: Math.round(14 * densitySpacing)}}>
                   {itemLines.map((line, lineIndex) => (
                     <div
                       key={`${line}-${lineIndex}`}
                       style={{
-                        fontSize: itemLines.length > 2 ? 28 : 32,
+                        fontSize: Math.round((itemLines.length > 2 ? 28 : 32) * contrastSize),
                         fontWeight: 800,
                         lineHeight: 1.14,
                         color: kit.colors.text,
@@ -909,13 +918,13 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                   ))}
                 </div>
                 {detailLines.length > 0 ? (
-                  <div style={{marginTop: 12}}>
+                  <div style={{marginTop: Math.round(12 * densitySpacing)}}>
                     {detailLines.map((line, lineIndex) => (
                       <div
                         key={`${line}-${lineIndex}`}
                         style={{
-                          marginTop: lineIndex === 0 ? 0 : 5,
-                          ...bodyTextStyle(16, 'rgba(255,255,255,0.66)', point.align !== 'left'),
+                          marginTop: lineIndex === 0 ? 0 : Math.round(5 * densitySpacing),
+                          ...bodyTextStyle(Math.round(16 * contrastSize), 'rgba(255,255,255,0.66)', point.align !== 'left'),
                           ...alignStyle,
                         }}
                       >
@@ -927,10 +936,10 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                 {chips.length > 0 ? (
                   <div
                     style={{
-                      marginTop: 16,
+                      marginTop: Math.round(16 * densitySpacing),
                       display: 'flex',
                       flexWrap: 'wrap',
-                      gap: 10,
+                      gap: Math.round(10 * densitySpacing),
                       justifyContent: point.align === 'right' ? 'flex-end' : point.align === 'center' ? 'center' : 'flex-start',
                     }}
                   >
@@ -938,11 +947,11 @@ export const UltimateNumberStrip: React.FC<UltimateNumberStripProps> = ({
                       <div
                         key={`${chip}-${chipIndex}`}
                         style={{
-                          padding: '10px 14px',
+                          padding: `${Math.round(10 * densityPadding)}px ${Math.round(14 * densityPadding)}px`,
                           borderRadius: kit.radius.pill,
                           border: `1px solid ${color}24`,
                           background: 'rgba(255,255,255,0.03)',
-                          fontSize: 14,
+                          fontSize: Math.round(14 * contrastSize),
                           fontWeight: 700,
                           color,
                         }}

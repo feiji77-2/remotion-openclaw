@@ -1,0 +1,50 @@
+{
+  "productionId": "2026-07-17-ai-tool-workflow",
+  "publicPathPrefix": "projects/2026-07-17-ai-tool-workflow",
+  "strategy": {
+    "missingAssetPolicy": "用 Logo + 解释型图表降级，并提醒补图",
+    "diagramPolicy": "根据文案自动选择流程图、对比图、三步图、架构图、数据图或时间线",
+    "sourceScreenshotPolicy": "只截关键段落"
+  },
+  "assets": [
+    {
+      "id": "product-logo",
+      "kind": "image",
+      "src": "projects/2026-07-17-ai-tool-workflow/logos/product-logo.png",
+      "required": false,
+      "role": "logo",
+      "status": "missing"
+    },
+    {
+      "id": "source-excerpt",
+      "kind": "image",
+      "src": "projects/2026-07-17-ai-tool-workflow/screenshots/source-excerpt.png",
+      "required": false,
+      "role": "news-source-excerpt",
+      "status": "missing"
+    },
+    {
+      "id": "workflow-diagram",
+      "kind": "image",
+      "src": "projects/2026-07-17-ai-tool-workflow/diagrams/workflow-diagram.png",
+      "required": false,
+      "role": "explanatory-diagram",
+      "status": "planned"
+    }
+  ],
+  "sceneAssetPlan": {
+    "opening": ["product-logo"],
+    "pain-solution": ["source-excerpt"],
+    "steps": ["workflow-diagram"]
+  },
+  "missingAssets": [
+    {
+      "assetId": "product-logo",
+      "reason": "等待官网或产品页截图"
+    },
+    {
+      "assetId": "source-excerpt",
+      "reason": "等待新闻原文关键段落截图"
+    }
+  ]
+}

@@ -4,9 +4,9 @@ import {CodeTraceSweep, GeometryAccent, TextMaskWipe} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
 import {useStaggerSlide} from '../motionGrammar';
-import type {UltimateSceneGrammar, UltimateTerminalPanelProps} from '../types';
+import type {FamilyDirectorMeta, UltimateSceneGrammar, UltimateTerminalPanelProps} from '../types';
 
-export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {grammar?: UltimateSceneGrammar}> = ({
+export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {grammar?: UltimateSceneGrammar, directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   windowTitle,
   command,
@@ -14,11 +14,15 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
   note,
   accent = 'green',
   grammar,
+  directorMeta,
 }) => {
   const color = resolveUltimateAccent(accent);
   const frame = useCurrentFrame();
   const visibleOutputs = outputs.slice(0, 5);
   const revealDirection = resolveTextRevealDirection(grammar, 'up');
+  const adaptive = directorMeta?.adaptive;
+  const sizeScale = adaptive?.contrast.sizeRatio ?? 1;
+  const spacingScale = adaptive?.density.spacing ?? 1;
   const statusRows = [
     {label: 'session', value: windowTitle || 'live-shell'},
     {label: 'command', value: command.split(/\s+/)[0] || 'run'},
@@ -46,16 +50,16 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
         style={{right: 54, bottom: 36, width: 340, height: 160, transform: 'rotate(8deg)'}}
       />
 
-      <div style={{display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: 26, height: '100%'}}>
-        <div style={{display: 'grid', gridTemplateColumns: '1.18fr 0.82fr', gap: 28, alignItems: 'end'}}>
-          <div style={{display: 'grid', gap: 14}}>
-            <div style={{fontSize: 18, letterSpacing: 4, textTransform: 'uppercase', color}}>runtime session</div>
+      <div style={{display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: Math.round(26 * spacingScale), height: '100%'}}>
+        <div style={{display: 'grid', gridTemplateColumns: '1.18fr 0.82fr', gap: Math.round(28 * spacingScale), alignItems: 'end'}}>
+          <div style={{display: 'grid', gap: Math.round(14 * spacingScale)}}>
+            <div style={{fontSize: Math.round(18 * sizeScale), letterSpacing: 4, textTransform: 'uppercase', color}}>runtime session</div>
             <div style={{position: 'relative', minHeight: 122}}>
               <TextMaskWipe
                 text={heading}
                 direction={revealDirection}
                 accent={color}
-                fontSize={76}
+                fontSize={Math.round(76 * sizeScale)}
                 color="#f7fbff"
                 fontWeight={900}
                 textStyle={{width: '100%', textAlign: 'left', whiteSpace: 'normal', lineHeight: 0.94, letterSpacing: -2}}
@@ -73,7 +77,7 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
               boxShadow: `0 0 36px ${color}14`,
               padding: '18px 18px 16px',
               display: 'grid',
-              gap: 12,
+              gap: Math.round(12 * spacingScale),
             }}
           >
             {statusRows.map((row) => (
@@ -82,13 +86,13 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '88px minmax(0, 1fr)',
-                  gap: 14,
+                  gap: Math.round(14 * spacingScale),
                   alignItems: 'center',
                 }}
               >
                 <div
                   style={{
-                    fontSize: 13,
+                    fontSize: Math.round(13 * sizeScale),
                     lineHeight: 1.2,
                     letterSpacing: 1.8,
                     textTransform: 'uppercase',
@@ -101,7 +105,7 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
                 <div
                   style={{
                     minWidth: 0,
-                    fontSize: 16,
+                    fontSize: Math.round(16 * sizeScale),
                     lineHeight: 1.32,
                     color: '#f7fbff',
                     fontFamily: 'JetBrains Mono, Menlo, monospace',
@@ -119,13 +123,13 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
           style={{
             display: 'grid',
             gridTemplateColumns: '148px minmax(0, 1fr)',
-            gap: 18,
+            gap: Math.round(18 * spacingScale),
             alignItems: 'start',
           }}
         >
           <div
             style={{
-              fontSize: 14,
+              fontSize: Math.round(14 * sizeScale),
               lineHeight: 1.2,
               letterSpacing: 2,
               textTransform: 'uppercase',
@@ -138,7 +142,7 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
           </div>
           <div
             style={{
-              fontSize: 24,
+              fontSize: Math.round(24 * sizeScale),
               lineHeight: 1.34,
               color: '#f7fbff',
               fontFamily: 'JetBrains Mono, Menlo, monospace',
@@ -149,7 +153,7 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
           </div>
         </div>
 
-        <div style={{display: 'grid', gridTemplateColumns: '1.42fr 0.58fr', gap: 28, minHeight: 0}}>
+        <div style={{display: 'grid', gridTemplateColumns: '1.42fr 0.58fr', gap: Math.round(28 * spacingScale), minHeight: 0}}>
           <div style={{position: 'relative', minHeight: 560}}>
             <div style={{transform: 'rotate(-0.4deg)', height: '100%'}}>
               <CodeTraceSweep
@@ -163,7 +167,7 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
             </div>
           </div>
 
-          <div style={{display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: 18, minHeight: 0}}>
+          <div style={{display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: Math.round(18 * spacingScale), minHeight: 0}}>
             <div
               style={{
                 borderRadius: 24,
@@ -171,16 +175,16 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
                 background: 'linear-gradient(180deg, rgba(8,12,20,0.84) 0%, rgba(6,9,16,0.96) 100%)',
                 padding: '18px 18px 16px',
                 display: 'grid',
-                gap: 12,
+                gap: Math.round(12 * spacingScale),
               }}
             >
-              <div style={{fontSize: 14, letterSpacing: 2, textTransform: 'uppercase', color}}>stdout preview</div>
+              <div style={{fontSize: Math.round(14 * sizeScale), letterSpacing: 2, textTransform: 'uppercase', color}}>stdout preview</div>
               {visibleOutputs.slice(0, 3).map((line, index) => {
                 const lineMotion = useStaggerSlide(frame, index, 3, 'left', 30);
                 return (
                   <div key={`${line}-${index}`} style={{display: 'flex', gap: 10, alignItems: 'flex-start', opacity: lineMotion.opacity, transform: lineMotion.transform}}>
                     <div style={{width: 8, height: 8, borderRadius: '50%', background: color, marginTop: 8, flexShrink: 0}} />
-                    <div style={{fontSize: 17, lineHeight: 1.42, color: 'rgba(229,236,255,0.78)'}}>{line}</div>
+                    <div style={{fontSize: Math.round(17 * sizeScale), lineHeight: 1.42, color: 'rgba(229,236,255,0.78)'}}>{line}</div>
                   </div>
                 );
               })}
@@ -195,8 +199,8 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
                   padding: '18px 18px 16px',
                 }}
               >
-                <div style={{fontSize: 14, letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`}}>operator note</div>
-                <div style={{marginTop: 10, fontSize: 18, lineHeight: 1.46, color: 'rgba(229,236,255,0.72)'}}>{note}</div>
+                <div style={{fontSize: Math.round(14 * sizeScale), letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`}}>operator note</div>
+                <div style={{marginTop: 10, fontSize: Math.round(18 * sizeScale), lineHeight: 1.46, color: 'rgba(229,236,255,0.72)'}}>{note}</div>
               </div>
             ) : null}
 
@@ -207,11 +211,11 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
                 background: 'linear-gradient(180deg, rgba(6,10,14,0.88) 0%, rgba(5,8,12,0.98) 100%)',
                 padding: '18px 18px 16px',
                 display: 'grid',
-                gap: 10,
+                gap: Math.round(10 * spacingScale),
                 alignContent: 'start',
               }}
             >
-              <div style={{fontSize: 14, letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`}}>stream map</div>
+              <div style={{fontSize: Math.round(14 * sizeScale), letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`}}>stream map</div>
               {visibleOutputs.slice(0, 5).map((line, index) => {
                 const lineMotion = useStaggerSlide(frame, index, 3, 'left', 30);
                 return (
@@ -220,7 +224,7 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
                     style={{
                       display: 'grid',
                       gridTemplateColumns: '20px minmax(0, 1fr)',
-                      gap: 10,
+                      gap: Math.round(10 * spacingScale),
                       alignItems: 'start',
                       opacity: lineMotion.opacity,
                       transform: lineMotion.transform,
@@ -235,14 +239,14 @@ export const UltimateTerminalPanel: React.FC<UltimateTerminalPanelProps & {gramm
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: 10,
+                        fontSize: Math.round(10 * sizeScale),
                         color: `${color}cc`,
                         fontFamily: 'JetBrains Mono, Menlo, monospace',
                       }}
                     >
                       {index + 1}
                     </div>
-                    <div style={{fontSize: 15, lineHeight: 1.36, color: 'rgba(229,236,255,0.62)'}}>{line}</div>
+                    <div style={{fontSize: Math.round(15 * sizeScale), lineHeight: 1.36, color: 'rgba(229,236,255,0.62)'}}>{line}</div>
                   </div>
                 );
               })}

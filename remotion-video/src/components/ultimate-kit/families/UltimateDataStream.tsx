@@ -45,6 +45,7 @@ import type {
   UltimateTagMatrixProps,
   UltimateTerminalPanelProps,
   UltimateTimelineProps,
+  FamilyDirectorMeta,
 } from '../types';
 
 const kit = ultimateKitTokens;
@@ -468,15 +469,21 @@ const frameCorners: FrameCorner[] = [
 
 
 
-export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {staggerGap?: number}}> = ({
+export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {staggerGap?: number}; directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   summary,
   items,
   accent = 'cyan',
   grammar,
+  directorMeta,
 }) => {
   const frame = useCurrentFrame();
   const gap = Math.max(6, grammar?.staggerGap ?? 6);
+  const adaptive = directorMeta?.adaptive;
+  const sizeScale = adaptive?.contrast.sizeRatio ?? 1;
+  const mainValueSize = adaptive ? Math.round(54 * sizeScale) : 54;
+  const subValueSize = adaptive ? Math.round(30 * sizeScale) : 30;
+  const labelSize = adaptive ? Math.round(28 * sizeScale) : 28;
   const accentColor = toneToColor(accent);
   const visibleItems = items.slice(0, 4);
   const headingLines = splitDisplayLinesBalanced(heading, 18, 2);
@@ -567,14 +574,14 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
         <div style={{fontSize: 14, letterSpacing: 2.2, textTransform: 'uppercase', color: `${accentColor}cc`}}>stream pressure</div>
         <div style={{marginTop: 18, display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'end'}}>
           <div>
-            <div style={{fontSize: 30, lineHeight: 1.08, fontWeight: 820, color: '#f7fbff'}}>
+            <div style={{fontSize: subValueSize, lineHeight: 1.08, fontWeight: 820, color: '#f7fbff'}}>
               {visibleItems.length} live feeds
             </div>
             <div style={{marginTop: 10, fontSize: 14, lineHeight: 1.34, color: 'rgba(229,236,255,0.58)'}}>
               Pulse lanes update independently instead of rendering like terminal logs.
             </div>
           </div>
-          <div style={{fontSize: 54, lineHeight: 0.9, fontWeight: 860, color: accentColor}}>
+          <div style={{fontSize: mainValueSize, lineHeight: 0.9, fontWeight: 860, color: accentColor}}>
             {Math.max(1, surgeCount)}
           </div>
         </div>
@@ -670,7 +677,7 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
               >
                 <div>
                   <div style={{...overlineLabelStyle(color), fontSize: 15}}>feed 0{index + 1}</div>
-                  <div style={{marginTop: 10, fontSize: 28, lineHeight: 1.08, fontWeight: 800, color: '#f7fbff'}}>
+                  <div style={{marginTop: 10, fontSize: labelSize, lineHeight: 1.08, fontWeight: 800, color: '#f7fbff'}}>
                     {item.label}
                   </div>
                   {item.detail ? (
@@ -709,7 +716,7 @@ export const UltimateDataStream: React.FC<UltimateDataStreamProps & {grammar?: {
                       textAlign: 'right',
                     }}
                   >
-                    <div style={{fontSize: 30, lineHeight: 1, fontWeight: 840, color}}>
+                    <div style={{fontSize: subValueSize, lineHeight: 1, fontWeight: 840, color}}>
                       {animateMetricDisplay(item.value, progress)}
                     </div>
                     <div style={{marginTop: 8, fontSize: 12, letterSpacing: 1.8, textTransform: 'uppercase', color: 'rgba(229,236,255,0.52)'}}>

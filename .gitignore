@@ -27,6 +27,13 @@ video-pipeline-view/player-app/.vite/
 .render-cache/
 
 # Runtime artifacts
+.claude/
+.superpowers/
+.render-props.json
+remotion-video/.superpowers/
+remotion-video/.render-props.json
+remotion-video/public/.render-props.json
+remotion-video/tmp/
 remotion-video/public/assets/*
 remotion-video/public/jobs/*
 remotion-video/public/runtime/*

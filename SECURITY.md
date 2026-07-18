@@ -1,49 +1,15 @@
 # Security Policy
 
-## Supported Scope
+## Supported scope
 
-当前安全响应主要覆盖以下目录：
+Security reports should focus on:
 
-- `video-pipeline-view/player-app`
-- `remotion-video/server`
-- `remotion-video/src`
-- `.github/workflows`
+- Project JSON validation
+- public asset path traversal
+- remote asset URL validation
+- Remotion rendering and local file handling
+- dependency vulnerabilities
 
-`docs/archive/` 中保留的少量升级归档不属于主维护面。
+Local assets must use paths relative to `remotion-video/public/`; absolute paths, `public/` prefixes, and `..` traversal are rejected. Remote assets must use HTTPS.
 
-## 报告内容
-
-如果你发现以下问题，建议报告：
-
-- API 未授权访问
-- 任意文件读取 / 写入
-- 任务队列可被恶意插入或污染
-- 配音、渲染、图片任务存在路径逃逸
-- 环境变量、密钥或本地服务地址泄露
-- 依赖带来的高风险漏洞
-
-## 不建议公开提交的问题
-
-以下内容不要直接发公开 Issue：
-
-- 可直接利用的漏洞细节
-- 凭证、密钥、token、cookie
-- 内网地址、本机路径、生产环境配置
-
-## 报告方式
-
-请通过私密渠道联系维护者，并至少附上：
-
-- 问题摘要
-- 影响范围
-- 复现步骤
-- 预期影响
-- 建议修复方向
-
-## 响应原则
-
-- 先确认是否可复现
-- 再评估影响范围和风险等级
-- 修复完成后再决定是否公开补充说明
-
-如果问题只影响 `docs/archive/` 中的归档资料，而不影响当前主链路，会按低优先级处理。
+Do not publish credentials, tokens, private URLs, or directly exploitable details in public issues. Include a concise impact summary, reproduction steps, and the affected Project JSON field when reporting privately.

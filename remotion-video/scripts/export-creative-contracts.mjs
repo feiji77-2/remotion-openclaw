@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {getRhythmContract, REGISTRY} from '../src/data/registry.ts';
 import {
@@ -8,6 +9,27 @@ import {
   resolveFamilyShotContract,
   SHOT_ARCHETYPE_REGISTRY,
 } from '../src/data/shotGrammar.ts';
+
+function hashJson(obj) {
+  return crypto.createHash('sha256').update(JSON.stringify(obj)).digest('hex').slice(0, 16);
+}
+
+function stripGeneratedAt(value) {
+  if (Array.isArray(value)) {
+    return value.map(stripGeneratedAt);
+  }
+
+  if (value && typeof value === 'object') {
+    const result = {};
+    for (const [key, child] of Object.entries(value)) {
+      if (key === 'generatedAt') continue;
+      result[key] = stripGeneratedAt(child);
+    }
+    return result;
+  }
+
+  return value;
+}
 
 export async function exportCreativeContracts(options = {}) {
   const cwd = options.cwd ?? process.cwd();
@@ -68,19 +90,36 @@ export async function exportCreativeContracts(options = {}) {
     },
   ];
 
+  // Check if all cached files exist with matching content — skip if unchanged
+  const stablePayloads = payloads.map((payload) => ({
+    file: payload.file,
+    data: stripGeneratedAt(payload.data),
+  }));
+  const contentMap = new Map(payloads.map(p => [p.file, `${JSON.stringify(p.data, null, 2)}\n`]));
+  const contentHash = hashJson(stablePayloads);
+  const hashFile = path.join(outDir, '.contracts-hash');
+  let cachedHash = null;
+  try { cachedHash = await fs.readFile(hashFile, 'utf8'); } catch { /* no cache */ }
+
+  if (cachedHash === contentHash) {
+    return {
+      outDir,
+      files: payloads.map((payload) => path.join(outDir, payload.file)),
+      cached: true,
+    };
+  }
+
   await fs.mkdir(outDir, {recursive: true});
 
   for (const payload of payloads) {
-    await fs.writeFile(
-      path.join(outDir, payload.file),
-      `${JSON.stringify(payload.data, null, 2)}\n`,
-      'utf8',
-    );
+    await fs.writeFile(path.join(outDir, payload.file), contentMap.get(payload.file), 'utf8');
   }
+  await fs.writeFile(hashFile, contentHash, 'utf8');
 
   return {
     outDir,
     files: payloads.map((payload) => path.join(outDir, payload.file)),
+    cached: false,
   };
 }
 
@@ -88,7 +127,7 @@ const isMain = process.argv[1] && import.meta.url === pathToFileURL(path.resolve
 
 if (isMain) {
   const result = await exportCreativeContracts();
-  console.log(`[contracts] exported ${result.files.length} files to ${result.outDir}`);
+  console.log(`[contracts] ${result.cached ? 'cached' : 'exported'} ${result.files.length} files at ${result.outDir}`);
   for (const file of result.files) {
     console.log(`- ${file}`);
   }

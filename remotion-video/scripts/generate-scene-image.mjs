@@ -103,31 +103,30 @@ const COLORS = {
   textMuted: '#64748b',
 };
 
-const FAMILY_CONFIG = {
-  hero: {icon: '🎬', color: '#f59e0b', label: 'Hero 开场'},
-  'feature-rail': {icon: '🔑', color: '#22d3ee', label: 'Feature Rail'},
-  focus: {icon: '🎯', color: '#a78bfa', label: 'Focus 焦点'},
-  'number-strip': {icon: '📊', color: '#34d399', label: 'Number Strip'},
-  'step-flow': {icon: '➡️', color: '#22d3ee', label: 'Step Flow'},
-  timeline: {icon: '📅', color: '#fb923c', label: 'Timeline'},
-  'compare-board': {icon: '⚖️', color: '#f59e0b', label: 'Compare Board'},
-  terminal: {icon: '💻', color: '#34d399', label: 'Terminal'},
-  'evidence-wall': {icon: '🧱', color: '#94a3b8', label: 'Evidence Wall'},
-  'architecture-map': {icon: '🏗️', color: '#22d3ee', label: 'Architecture'},
-  'tag-matrix': {icon: '🏷️', color: '#f472b6', label: 'Tag Matrix'},
-  code: {icon: '📝', color: '#34d399', label: 'Code'},
-  metrics: {icon: '📈', color: '#f59e0b', label: 'Metrics'},
-  'data-stream': {icon: '🌊', color: '#22d3ee', label: 'Data Stream'},
-  'memory-graph': {icon: '🧠', color: '#a78bfa', label: 'Memory Graph'},
-  'pipeline-flow': {icon: '🔗', color: '#22d3ee', label: 'Pipeline'},
-  'benchmark-chart': {icon: '🏁', color: '#f59e0b', label: 'Benchmark'},
-  'quote-highlight': {icon: '💬', color: '#f472b6', label: 'Quote'},
-  'glossary-term': {icon: '📖', color: '#94a3b8', label: 'Glossary'},
-  cta: {icon: '📢', color: '#f472b6', label: 'CTA 收尾'},
-};
+// ─── Family metadata imported from registry.ts (canonical source) ──
+const familyMetadata = await import(
+  /* webpackIgnore: true */
+  '../src/data/registry.ts'
+).catch(() => import(
+  /* webpackIgnore: true */
+  '../src/data/registry.js'
+)).catch(() => {
+  console.warn('[warn] Could not import registry.ts; using fallback colors');
+  return null;
+});
 
 function getFamily(family) {
-  return FAMILY_CONFIG[family] || {icon: '📽️', color: '#94a3b8', label: family};
+  const entry = familyMetadata?.REGISTRY?.[family];
+  if (entry) {
+    const accentColor = entry.defaultAccent === 'cyan' ? '#22d3ee'
+      : entry.defaultAccent === 'orange' ? '#fb923c'
+      : entry.defaultAccent === 'purple' ? '#a78bfa'
+      : '#94a3b8';
+    return {icon: '📽️', color: accentColor, label: entry.label ?? family};
+  }
+
+  // Fallback for unknown families
+  return {icon: '📽️', color: '#94a3b8', label: family};
 }
 
 // ── HTML generation ────────────────────────────────────────────────

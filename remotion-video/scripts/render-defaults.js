@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const os = require('node:os');
 
 const BROWSER_CANDIDATES = [
   '/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
@@ -12,6 +13,11 @@ const VALID_OPENGL_RENDERERS = new Set(['swangle', 'angle', 'egl', 'swiftshader'
 const VALID_HARDWARE_ACCELERATION = new Set(['disable', 'if-possible', 'required']);
 
 const normalizeString = (value) => String(value || '').trim();
+
+const normalizePositiveInteger = (value) => {
+  const normalized = Number.parseInt(normalizeString(value), 10);
+  return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
+};
 
 const parseBooleanEnv = (value) => {
   const normalized = normalizeString(value).toLowerCase();
@@ -91,26 +97,69 @@ const resolvePreferredOpenGlRenderer = (browserExecutable) => {
   return null;
 };
 
-const resolvePreferredHardwareAcceleration = () => {
-  const explicitMode = normalizeString(process.env.REMOTION_HARDWARE_ACCELERATION);
+const resolvePreferredHardwareAcceleration = (env = process.env) => {
+  const explicitMode = normalizeString(env.REMOTION_HARDWARE_ACCELERATION);
   if (explicitMode) {
     return VALID_HARDWARE_ACCELERATION.has(explicitMode) ? explicitMode : null;
   }
 
-  if (parseBooleanEnv(process.env.REMOTION_DISABLE_GPU) === true) {
+  if (parseBooleanEnv(env.REMOTION_DISABLE_GPU) === true) {
     return 'disable';
   }
 
   return null;
 };
 
-const buildPreferredRemotionFlags = ({existingArgs = [], browserExecutable} = {}) => {
+const getDefaultRenderConcurrency = ({
+  cpuCount = os.cpus().length,
+  totalMemoryMb = Math.floor(os.totalmem() / (1024 * 1024)),
+} = {}) => {
+  const safeCpuCount = Math.max(1, Number(cpuCount) || 1);
+  const safeMemoryMb = Math.max(1024, Number(totalMemoryMb) || 1024);
+  const memoryBound = Math.max(2, Math.floor(safeMemoryMb / 4096));
+  const cpuBound = Math.max(2, safeCpuCount - 2);
+  return Math.min(8, memoryBound, cpuBound);
+};
+
+const buildRenderPerformanceFlags = ({
+  existingArgs = [],
+  env = process.env,
+  cpuCount = os.cpus().length,
+  totalMemoryMb = Math.floor(os.totalmem() / (1024 * 1024)),
+} = {}) => {
+  const flags = [];
+  const concurrency = normalizePositiveInteger(env.REMOTION_CONCURRENCY)
+    ?? getDefaultRenderConcurrency({cpuCount, totalMemoryMb});
+  const codec = normalizeString(env.REMOTION_CODEC) || 'h264';
+  const crf = normalizePositiveInteger(env.REMOTION_CRF) ?? 18;
+  const audioBitrate = normalizeString(env.REMOTION_AUDIO_BITRATE) || '320k';
+
+  if (!hasCliFlag(existingArgs, '--concurrency')) {
+    flags.push('--concurrency', String(concurrency));
+  }
+
+  if (!hasCliFlag(existingArgs, '--codec')) {
+    flags.push('--codec', codec);
+  }
+
+  if (!hasCliFlag(existingArgs, '--crf')) {
+    flags.push('--crf', String(crf));
+  }
+
+  if (!hasCliFlag(existingArgs, '--audio-bitrate')) {
+    flags.push('--audio-bitrate', audioBitrate);
+  }
+
+  return flags;
+};
+
+const buildPreferredRemotionFlags = ({existingArgs = [], browserExecutable, env = process.env} = {}) => {
   const resolvedBrowserExecutable = typeof browserExecutable === 'string'
     ? browserExecutable
     : detectPreferredBrowserExecutable();
   const chromeMode = resolveChromeMode(resolvedBrowserExecutable);
   const gl = resolvePreferredOpenGlRenderer(resolvedBrowserExecutable);
-  const hardwareAcceleration = resolvePreferredHardwareAcceleration();
+  const hardwareAcceleration = resolvePreferredHardwareAcceleration(env);
   const flags = [];
 
   if (resolvedBrowserExecutable && !hasCliFlag(existingArgs, '--browser-executable')) {
@@ -146,5 +195,7 @@ module.exports = {
   resolveChromeMode,
   resolvePreferredOpenGlRenderer,
   resolvePreferredHardwareAcceleration,
+  getDefaultRenderConcurrency,
+  buildRenderPerformanceFlags,
   buildPreferredRemotionFlags,
 };

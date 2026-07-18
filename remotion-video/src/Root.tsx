@@ -1,163 +1,40 @@
-import {registerRoot} from 'remotion';
-import {Composition} from 'remotion';
-import type {SRTSubtitle} from './components/SRTParser';
-import FileBackedUltimateSceneTemplate from './compositions/FileBackedUltimateSceneTemplate';
-import UltimateElementsLibrary, {ULTIMATE_ELEMENTS_LIBRARY_DURATION} from './compositions/UltimateElementsLibrary';
+import {Composition, Folder, registerRoot} from 'remotion';
+import {AdaptiveVerification} from './compositions/AdaptiveVerification';
+import {DirectorScorePreviewComposition} from './compositions/DirectorScorePreviewComposition';
 import IconEmojiCapabilityPreview from './compositions/IconEmojiCapabilityPreview';
 import MorfeoStylePreview from './compositions/MorfeoStylePreview';
-import {type UltimateProjectConfig, getUltimateProjectDuration} from './components/ultimate-kit';
-import {ULTIMATE_SCENE_DEMO} from './data/ultimateSceneDemo';
-import {
-  shotsToScenes,
-  calcTotalFrames,
-  hydrateUltimateProjectConfigWithDirectorGrammar,
-  type NormalizedShot,
-} from './data/storyboardLoader';
+import {MultiPlatformComparison} from './compositions/MultiPlatformComparison';
+import UltimateElementsLibrary, {ULTIMATE_ELEMENTS_LIBRARY_DURATION} from './compositions/UltimateElementsLibrary';
+import {UltimateVideoV2} from './compositions/v2/UltimateVideoV2';
+import {calculateUltimateVideoV2Metadata} from './compositions/v2/calculateMetadata';
+import {DEFAULT_PROJECT_DURATION, DEFAULT_VIDEO_PROJECT} from './compositions/v2/defaultProject';
+import {VideoProjectSchema} from './project/projectSchema';
 
-export type AudioSegmentProps = {
-  src: string;
-  startFrame: number;
-  durationInFrames: number;
-};
-
-export type RenderShotProps = {
-  id: string;
-  title?: string;
-  narration?: string;
-  durationSeconds?: number;
-  imageUrl?: string | null;
-  posterMode?: boolean;
-  promptZh?: string;
-  sceneIntent?: string;
-  evidenceAnchor?: string;
-  storyboardCueZh?: string;
-  scriptBlockId?: string;
-  scriptBlockLabel?: string;
-  scriptSourceText?: string;
-  scriptExcerpt?: string;
-  visualSummaryZh?: string;
-  visualFocusZh?: string;
-  comparisonSummaryZh?: string;
-  mood?: string;
-  style?: string;
-  keywords?: string[];
-  dataPoints?: string[];
-};
-
-export type CaptionWordTimingProps = {
-  text: string;
-  startFrame: number;
-  endFrame: number;
-  startMs?: number;
-  endMs?: number;
-  confidence?: number;
-  isKeyword?: boolean;
-};
-
-export type SubtitleCueProps = SRTSubtitle & {
-  words?: CaptionWordTimingProps[] | null;
-};
-
-export type CaptionStyleProps = {
-  fontSize?: number;
-  fontFamily?: string;
-  fontWeight?: string | number;
-  fontStyle?: string;
-  color?: string;
-  backgroundColor?: string;
-  borderColor?: string;
-  borderWidth?: number;
-  textAlign?: 'left' | 'center' | 'right';
-  textShadow?: string;
-  strokeColor?: string;
-  strokeWidth?: string;
-  lineHeight?: string;
-  letterSpacing?: string;
-  wordSpacing?: string;
-  linesPerCaption?: number;
-  wordWrap?: string;
-  wordBreak?: string;
-  opacity?: number;
-  top?: string;
-  left?: string;
-  height?: number;
-  width?: number;
-  appearedColor?: string;
-  activeColor?: string;
-  activeFillColor?: string;
-  boxShadow?: {
-    color?: string;
-    x?: number;
-    y?: number;
-    blur?: number;
-  } | null;
-  transform?: string;
-  blur?: number;
-  brightness?: number;
-};
-
-export type CaptionStyleSegmentProps = {
-  startFrame: number;
-  endFrame: number;
-  style: CaptionStyleProps;
-};
-
-/**
- * 视频组件接收的外部 props。
- * 旧模板类型仅为兼容静态组件定义保留；Root 只注册 Ultimate 主线 composition。
- */
-export type VideoTheme = 'tech-dark' | 'minimal-light' | 'neon';
-
-export type VideoProps = {
-  propsFile?: string | null;
-  subtitleFile?: string;
-  subtitleStyle?: 'caption' | 'bottom';
-  template?: 'caption' | 'split' | 'fullscreen' | 'card-draw' | 'ultimate';
-  theme?: VideoTheme;
-  typewriter?: boolean;
-  useBundledShotAudio?: boolean;
-  projectId?: string;
-  voiceFile?: string;
-  quality?: 'low' | 'medium' | 'high';
-  subtitleData?: SubtitleCueProps[] | null;
-  subtitleText?: string;
-  audioSegments?: AudioSegmentProps[] | null;
-  shots?: RenderShotProps[] | null;
-  captionStyleSegments?: CaptionStyleSegmentProps[] | null;
-  durationInFrames?: number;
-  renderFps?: number;
-  renderWidth?: number;
-  renderHeight?: number;
-  // 抽卡模板专用 props
-  cardSeed?: number;
-  cardCount?: number;
-};
-
-export type UltimateSceneCompositionProps = {
-  propsFile?: string | null;
-  shots?: NormalizedShot[] | null;   // 官方方法：CLI --props='{"shots":[...]}' 传入
-  config?: UltimateProjectConfig;
-  voiceFile?: string | null;
-  audioSegments?: AudioSegmentProps[] | null;
-  subtitleData?: SubtitleCueProps[] | null;
-  __meta?: Record<string, unknown>;
-  durationInFrames?: number;
-  renderFps?: number;
-  renderWidth?: number;
-  renderHeight?: number;
-};
-
-const DEFAULT_ULTIMATE_PROPS: UltimateSceneCompositionProps = {
-  propsFile: null,
-  config: ULTIMATE_SCENE_DEMO,
-  voiceFile: null,
-  audioSegments: null,
-  subtitleData: null,
-};
-
-export const RemotionRoot: React.FC = () => {
-  return (
-    <>
+export const RemotionRoot: React.FC = () => (
+  <>
+    <Composition
+      id="UltimateVideoV2"
+      component={UltimateVideoV2}
+      durationInFrames={DEFAULT_PROJECT_DURATION}
+      fps={30}
+      width={1920}
+      height={1080}
+      schema={VideoProjectSchema}
+      defaultProps={DEFAULT_VIDEO_PROJECT}
+      calculateMetadata={calculateUltimateVideoV2Metadata}
+    />
+    <Composition
+      id="UltimateVideoV2-Portrait"
+      component={UltimateVideoV2}
+      durationInFrames={DEFAULT_PROJECT_DURATION}
+      fps={30}
+      width={1080}
+      height={1920}
+      schema={VideoProjectSchema}
+      defaultProps={{...DEFAULT_VIDEO_PROJECT, render: {...DEFAULT_VIDEO_PROJECT.render, width: 1080, height: 1920, orientation: 'portrait'}}}
+      calculateMetadata={calculateUltimateVideoV2Metadata}
+    />
+    <Folder name="Tools">
       <Composition
         id="UltimateElementsLibrary"
         component={UltimateElementsLibrary}
@@ -166,74 +43,13 @@ export const RemotionRoot: React.FC = () => {
         width={1920}
         height={1080}
       />
-      <Composition
-        id="UltimateSceneTemplate"
-        component={FileBackedUltimateSceneTemplate}
-        durationInFrames={getUltimateProjectDuration(ULTIMATE_SCENE_DEMO)}
-        fps={30}
-        width={1920}
-        height={1080}
-        calculateMetadata={async ({props}: {props: UltimateSceneCompositionProps}) => {
-          // 官方方法：从 props 读取 shots 数组（由 CLI --props 传入）
-          // CLI 命令: --props='{"shots": [...]}' （来自 step-04.json 的 payload.shots）
-          const shots = props?.shots;
-          let totalFrames = 0;
-
-          if (shots && Array.isArray(shots) && shots.length > 0) {
-            const scenes = shotsToScenes(shots, {directorQA: 'error'});
-            totalFrames = calcTotalFrames(scenes);
-            return {
-              durationInFrames: totalFrames,
-              fps: 30,
-              width: 1920,
-              height: 1080,
-              props: {
-                ...props,
-                config: {
-                  title: shots[0]?.title?.slice(0, 50) ?? 'Video',
-                  defaultTransition: false, // per-shot transitions in scenes[]
-                  scenes,
-                },
-              } as UltimateSceneCompositionProps,
-            };
-          }
-
-          // 无 shots 时降级到 demo（仅预览用）
-          const resolvedConfig = hydrateUltimateProjectConfigWithDirectorGrammar(
-            props?.config ?? ULTIMATE_SCENE_DEMO,
-            {directorQA: 'error'},
-          );
-          return {
-            durationInFrames: getUltimateProjectDuration(resolvedConfig),
-            fps: 30,
-            width: 1920,
-            height: 1080,
-            props: {
-              ...props,
-              config: resolvedConfig,
-            } as UltimateSceneCompositionProps,
-          };
-        }}
-        defaultProps={DEFAULT_ULTIMATE_PROPS}
-      />
-      <Composition
-        id="IconEmojiCapabilityPreview"
-        component={IconEmojiCapabilityPreview}
-        durationInFrames={1}
-        fps={30}
-        width={1600}
-        height={900}
-      />
-      <Composition
-        id="MorfeoStylePreview"
-        component={MorfeoStylePreview}
-        durationInFrames={180}
-        fps={30}
-        width={1600}
-        height={900}
-      />
-    </>
-  );
-};
+      <Composition id="IconEmojiCapabilityPreview" component={IconEmojiCapabilityPreview} durationInFrames={1} fps={30} width={1600} height={900} />
+      <Composition id="MorfeoStylePreview" component={MorfeoStylePreview} durationInFrames={180} fps={30} width={1600} height={900} />
+      <Composition id="DirectorScorePreview" component={DirectorScorePreviewComposition} durationInFrames={210} fps={30} width={1920} height={1080} />
+      <Composition id="AdaptiveVerification" component={AdaptiveVerification} durationInFrames={1} fps={30} width={1920} height={1080} />
+      <Composition id="MultiPlatformComparison" component={MultiPlatformComparison} durationInFrames={1} fps={30} width={1920} height={1080} />
+    </Folder>
+  </>
+);
 
 registerRoot(RemotionRoot);

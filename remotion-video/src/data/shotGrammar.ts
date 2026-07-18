@@ -374,6 +374,24 @@ const NUMERIC_DATA_FAMILIES = new Set([
   'number-strip',
 ]);
 
+/**
+ * 中文 storyboard cue → archetype 映射表。
+ * 每个条目包含触发关键词和对应的镜头原型/数据事件。
+ * 在 resolveShotGrammar 的优先级 1 中使用。
+ */
+const INTENT_CUE_MAP = [
+  {keywords: ['追', '超', '赶', '赛', '赢', '领先'], archetype: 'overtake race' as const, dataEvent: 'overtake' as const},
+  {keywords: ['爆发', '炸', '爆', '扩散', '展开'], archetype: 'burst spread' as const, dataEvent: 'burst-spread' as const},
+  {keywords: ['揭示', '出现', '曝光', '曝光'], archetype: 'lock-on reveal' as const, dataEvent: 'pin' as const},
+  {keywords: ['对比', '压缩', '碰撞', '对峙'], archetype: 'compress compare' as const, dataEvent: 'delta-hit' as const},
+  {keywords: ['追踪', '追随', '跟随', '流动', '流'], archetype: 'follow focus' as const, dataEvent: 'trace-flow' as const},
+  {keywords: ['穿透', '突破', '越线', '穿过'], archetype: 'threshold breach' as const, dataEvent: 'threshold-cross' as const},
+  {keywords: ['子弹', '高速', '连续', '轰', '一连串'], archetype: 'bullet train' as const, dataEvent: 'count-up' as const},
+  {keywords: ['钉', '定', '按'], archetype: 'evidence pin' as const, dataEvent: 'pin' as const},
+  {keywords: ['漂', '浮', '慢慢'], archetype: 'drift reveal' as const, dataEvent: 'trace-flow' as const},
+  {keywords: ['停留', '凝固', '定格', '后'], archetype: 'aftershock hold' as const, dataEvent: 'settle' as const},
+];
+
 export interface ResolvedShotGrammar {
   /** 推导出的 ShotArchetype */
   archetype: ShotArchetype;
@@ -395,7 +413,7 @@ export interface ResolvedShotGrammar {
 
 /**
  * 从 ShotContext 推导导演层参数。
- * 这是 storyboardLoader → UltimateSceneTemplate 之间的"翻译层"。
+ * Ultimate 组件视觉工具使用的 motion grammar 定义。
  *
  * 规则（v2 — 语义优先于 family）：
  * 0. DirectorBeat：若 ctx.directorBeats 中有匹配 beatId 的 beat，直接使用
@@ -424,21 +442,6 @@ export function resolveShotGrammar(ctx: ShotContext): ResolvedShotGrammar {
   }
 
   // ── 优先级 1：中文 storyboard cue → 直接映射到 archetype ──────────────
-  // Intent cue map — keyword triggers for Chinese storyboard cues
-// Defined at module level to avoid recreating on every resolveShotGrammar call
-const INTENT_CUE_MAP = [
-  {keywords: ['追', '超', '赶', '赛', '赢', '领先'], archetype: 'overtake race', dataEvent: 'overtake'},
-  {keywords: ['爆发', '炸', '爆', '扩散', '展开'], archetype: 'burst spread', dataEvent: 'burst-spread'},
-  {keywords: ['揭示', '出现', '曝光', '曝光'], archetype: 'lock-on reveal', dataEvent: 'pin'},
-  {keywords: ['对比', '压缩', '碰撞', '对峙'], archetype: 'compress compare', dataEvent: 'delta-hit'},
-  {keywords: ['追踪', '追随', '跟随', '流动', '流'], archetype: 'follow focus', dataEvent: 'trace-flow'},
-  {keywords: ['穿透', '突破', '越线', '穿过'], archetype: 'threshold breach', dataEvent: 'threshold-cross'},
-  {keywords: ['子弹', '高速', '连续', '轰', '一连串'], archetype: 'bullet train', dataEvent: 'count-up'},
-  {keywords: ['钉', '定', '按'], archetype: 'evidence pin', dataEvent: 'pin'},
-  {keywords: ['漂', '浮', '慢慢'], archetype: 'drift reveal', dataEvent: 'trace-flow'},
-  {keywords: ['停留', '凝固', '定格', '后'], archetype: 'aftershock hold', dataEvent: 'settle'},
-] as const;
-
   for (const entry of INTENT_CUE_MAP) {
     const cueText = ctx.storyboardCueZh || '';
     if (cueText && entry.keywords.some((kw) => cueText.includes(kw))) {

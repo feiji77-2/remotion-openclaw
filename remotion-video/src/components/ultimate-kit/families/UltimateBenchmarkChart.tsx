@@ -1,9 +1,11 @@
 import React from 'react';
+import {UltimateHeading} from '../UltimateHeading';
 import {interpolate, spring, useCurrentFrame} from 'remotion';
 import {GeometryAccent, PathDrawLink} from '../../visual-atoms';
 import {resolveUltimateAccent, ultimateGlow, ultimateKitTokens} from '../tokens';
 import { useStaggerScale, useStaggerSlide } from '../motionGrammar';
-import type {UltimateBenchmarkChartProps} from '../types';
+import {resolveSceneDirective, resolveEntranceParams} from '../directive';
+import type {UltimateBenchmarkChartProps, UltimateSceneGrammar, FamilyDirectorMeta} from '../types';
 
 const toneToColor = (tone?: Parameters<typeof resolveUltimateAccent>[0]) => {
   return resolveUltimateAccent(tone ?? 'cyan');
@@ -21,7 +23,7 @@ const animateMetricDisplay = (value: string, progress: number) => {
   return `${prefix}${Math.round(numeric * progress)}${suffix}`;
 };
 
-export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {grammar?: {staggerGap?: number}}> = ({
+export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {grammar?: UltimateSceneGrammar; directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   summary,
   primaryLabel,
@@ -29,13 +31,19 @@ export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {gra
   items,
   accent = 'yellow',
   grammar,
+  directorMeta,
 }) => {
   const frame = useCurrentFrame();
   const accentColor = toneToColor(accent);
   const primaryColor = resolveUltimateAccent('cyan');
   const secondaryColor = resolveUltimateAccent('yellow');
+  const d = resolveSceneDirective(grammar, 'benchmark-chart');
+  const gap = d.animation.staggerGap;
+  const ep = resolveEntranceParams(d);
+  const adaptive = directorMeta?.adaptive;
+  const sizeScale = adaptive?.contrast.sizeRatio ?? 1;
+  const adaptiveGap = adaptive ? Math.round(d.spacing.gap * adaptive.density.spacing) : d.spacing.gap;
   const visibleItems = items.slice(0, 3);
-  const gap = Math.max(6, grammar?.staggerGap ?? 6);
   const trackLeft = 360;
   const trackWidth = 1060;
   const bestLead = visibleItems.reduce((max, item) => {
@@ -53,17 +61,13 @@ export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {gra
           zIndex: 3,
         }}
       >
-        <div style={{fontSize: 15, letterSpacing: 5.2, textTransform: 'uppercase', color: accentColor, opacity: 0.9}}>
-          benchmark race
-        </div>
-        <div style={{marginTop: 18, fontSize: 90, lineHeight: 0.9, fontWeight: 900, letterSpacing: -5.2}}>
-          {heading}
-        </div>
-        {summary ? (
-          <div style={{marginTop: 20, maxWidth: 720, fontSize: 24, lineHeight: 1.34, color: 'rgba(255,255,255,0.62)'}}>
-            {summary}
-          </div>
-        ) : null}
+        <UltimateHeading
+          heading={heading}
+          archetype={grammar?.archetype}
+          accent={accent}
+          grammar={grammar}
+          subtitle={summary}
+        />
       </div>
 
       <div
@@ -93,7 +97,7 @@ export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {gra
           zIndex: 2,
         }}
       >
-        <div style={{fontSize: 18, letterSpacing: 2.6, textTransform: 'uppercase', color: 'rgba(255,255,255,0.46)'}}>
+        <div style={{fontSize: Math.round((d.typography.label.size + 5) * sizeScale), letterSpacing: 2.6, textTransform: 'uppercase', color: `rgba(255,255,255,${d.atmosphere.labelOpacity})`}}>
           max lead
         </div>
         <div style={{marginTop: 10, fontSize: 132, lineHeight: 0.84, fontWeight: 900, letterSpacing: -7, color: accentColor}}>
@@ -122,7 +126,7 @@ export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {gra
           top: 344,
           bottom: 108,
           display: 'grid',
-          gap: 28,
+          gap: adaptiveGap * 2,
         }}
       >
         {visibleItems.map((item, index) => {
@@ -149,7 +153,9 @@ export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {gra
           const primaryPath = `M ${trackLeft} ${topY} C ${trackLeft + 260} ${topY - 16}, ${trackLeft + 760} ${topY + 20}, ${primaryX} ${topY}`;
           const secondaryPath = `M ${trackLeft} ${bottomY} C ${trackLeft + 220} ${bottomY + 18}, ${trackLeft + 700} ${bottomY - 12}, ${secondaryX} ${bottomY}`;
           const staggerScale = useStaggerScale(frame, index, 8);
-          const staggerSlide = useStaggerSlide(frame, index, 8, 'right', 16);
+          const staggerSlide = ep.useSlide
+            ? useStaggerSlide(frame, index, 8, ep.slideDirection, ep.slideDistance)
+            : {opacity: 1, transform: 'none'};
 
           return (
             <div
@@ -170,7 +176,7 @@ export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {gra
                   zIndex: 2,
                 }}
               >
-                <div style={{fontSize: 14, lineHeight: 1.2, letterSpacing: 2.4, textTransform: 'uppercase', color: laneColor}}>
+                <div style={{fontSize: Math.round(d.typography.label.size * sizeScale), lineHeight: 1.2, letterSpacing: 2.4, textTransform: 'uppercase', color: laneColor}}>
                   lane 0{index + 1}
                 </div>
                 <div
@@ -181,12 +187,12 @@ export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {gra
                     fontSize: 118,
                     lineHeight: 0.84,
                     fontWeight: 900,
-                    color: `${laneColor}12`,
+                    color: `${laneColor}${Math.round(d.atmosphere.decorationOpacity * 100).toString(16).padStart(2, '0')}`,
                   }}
                 >
                   0{index + 1}
                 </div>
-                <div style={{marginTop: 18, fontSize: 36, lineHeight: 1.02, fontWeight: 860, color: ultimateKitTokens.colors.text}}>
+                <div style={{marginTop: adaptiveGap + 4, fontSize: Math.round((d.typography.value.size + 12) * sizeScale), lineHeight: 1.02, fontWeight: 860, color: ultimateKitTokens.colors.text}}>
                   {item.label}
                 </div>
               </div>
@@ -316,16 +322,16 @@ export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {gra
                   transform: staggerSlide.transform,
                 }}
               >
-                <div style={{fontSize: 38, fontWeight: 860, lineHeight: 1, color: primaryColor}}>
+                <div style={{fontSize: Math.round((d.typography.value.size + 14) * sizeScale), fontWeight: 860, lineHeight: 1, color: primaryColor}}>
                   {animateMetricDisplay(item.primaryValue, Math.min(1, reveal))}
                 </div>
-                <div style={{marginTop: 4, fontSize: 12, lineHeight: 1.2, letterSpacing: 1.8, textTransform: 'uppercase', color: 'rgba(255,255,255,0.42)'}}>
+                <div style={{marginTop: d.spacing.density === 'compact' ? 2 : 4, fontSize: Math.round((d.typography.label.size - 1) * sizeScale), lineHeight: 1.2, letterSpacing: 1.8, textTransform: 'uppercase', color: `rgba(255,255,255,${d.atmosphere.labelOpacity})`}}>
                   {primaryLabel}
                 </div>
-                <div style={{marginTop: 10, fontSize: 24, fontWeight: 760, lineHeight: 1, color: secondaryColor}}>
+                <div style={{marginTop: adaptiveGap - 4, fontSize: Math.round(d.typography.value.size * sizeScale), fontWeight: 760, lineHeight: 1, color: secondaryColor}}>
                   {animateMetricDisplay(item.secondaryValue, Math.min(1, reveal))}
                 </div>
-                <div style={{marginTop: 4, fontSize: 12, lineHeight: 1.2, letterSpacing: 1.8, textTransform: 'uppercase', color: 'rgba(255,255,255,0.42)'}}>
+                <div style={{marginTop: d.spacing.density === 'compact' ? 2 : 4, fontSize: d.typography.label.size - 1, lineHeight: 1.2, letterSpacing: 1.8, textTransform: 'uppercase', color: `rgba(255,255,255,${d.atmosphere.labelOpacity})`}}>
                   {secondaryLabel}
                 </div>
               </div>
@@ -342,8 +348,8 @@ export const UltimateBenchmarkChart: React.FC<UltimateBenchmarkChartProps & {gra
           display: 'flex',
           gap: 26,
           alignItems: 'center',
-          color: 'rgba(255,255,255,0.5)',
-          fontSize: 14,
+          color: `rgba(255,255,255,${d.atmosphere.labelOpacity + 0.08})`,
+          fontSize: Math.round(d.typography.label.size * sizeScale),
           letterSpacing: 1.8,
           textTransform: 'uppercase',
         }}

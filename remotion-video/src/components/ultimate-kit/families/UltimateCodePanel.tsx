@@ -4,9 +4,11 @@ import {CodeTraceSweep, GeometryAccent, TextMaskWipe} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
 import {useStaggerSlide} from '../motionGrammar';
-import type {UltimateCodePanelProps, UltimateSceneGrammar} from '../types';
+import type {UltimateCodePanelProps, UltimateSceneGrammar, FamilyDirectorMeta} from '../types';
+import {UltimateHeading} from '../UltimateHeading';
+import {glassPanelStyle} from '../containerStyles';
 
-export const UltimateCodePanel: React.FC<UltimateCodePanelProps & {grammar?: UltimateSceneGrammar}> = ({
+export const UltimateCodePanel: React.FC<UltimateCodePanelProps & {grammar?: UltimateSceneGrammar; directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   filename,
   lines,
@@ -14,9 +16,14 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps & {grammar?: Ult
   footer,
   accent = 'cyan',
   grammar,
+  directorMeta,
 }) => {
   const color = resolveUltimateAccent(accent);
   const frame = useCurrentFrame();
+  const adaptive = directorMeta?.adaptive;
+  const sizeScale = adaptive?.contrast.sizeRatio ?? 1;
+  const spacingScale = adaptive?.density.spacing ?? 1;
+  const codeGap = adaptive ? Math.round(12 * spacingScale) : 12;
   const revealDirection = resolveTextRevealDirection(grammar, 'left');
   const focusToken = lines[highlightLine ? highlightLine - 1 : 0]?.text?.trim().split(/\s+/)[0] || heading;
 
@@ -40,30 +47,20 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps & {grammar?: Ult
       </div>
 
       <div style={{position: 'absolute', left: 112, top: 96, width: 620, zIndex: 3}}>
-        <div style={{fontSize: 16, letterSpacing: 4.4, textTransform: 'uppercase', color}}>
-          trace flow
-        </div>
-        <div style={{position: 'relative', minHeight: 120, marginTop: 16}}>
-          <TextMaskWipe
-            text={heading}
-            direction={revealDirection}
-            accent={color}
-            fontSize={82}
-            color="#f7fbff"
-            fontWeight={900}
-            textStyle={{width: '100%', textAlign: 'left', whiteSpace: 'normal', lineHeight: 0.94, letterSpacing: -3}}
+        <div style={glassPanelStyle(color, {density: adaptive?.density, contrast: adaptive?.contrast}, {radius: 'lg'})}>
+          <UltimateHeading
+            heading={heading}
+            archetype={grammar?.archetype}
+            accent={accent}
+            grammar={grammar}
+            subtitle={filename}
           />
+          {footer ? (
+            <div style={{marginTop: 22, maxWidth: 540, fontSize: Math.round(24 * sizeScale), lineHeight: 1.42, color: 'rgba(229,236,255,0.68)'}}>
+              {footer}
+            </div>
+          ) : null}
         </div>
-        {filename ? (
-          <div style={{marginTop: 10, fontSize: 18, letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`, fontFamily: 'JetBrains Mono, Menlo, monospace'}}>
-            {filename}
-          </div>
-        ) : null}
-        {footer ? (
-          <div style={{marginTop: 22, maxWidth: 540, fontSize: 24, lineHeight: 1.42, color: 'rgba(229,236,255,0.68)'}}>
-            {footer}
-          </div>
-        ) : null}
       </div>
 
       <GeometryAccent variant="slanted-panel" color={color} opacity={0.12} style={{left: 860, top: 238, width: 760, height: 360, transform: 'rotate(-8deg)'}} />
@@ -96,7 +93,7 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps & {grammar?: Ult
           bottom: 132,
           right: 980,
           display: 'grid',
-          gap: 12,
+          gap: codeGap,
         }}
       >
         {lines.slice(0, 4).map((line, index) => {
@@ -104,7 +101,7 @@ export const UltimateCodePanel: React.FC<UltimateCodePanelProps & {grammar?: Ult
           return (
             <div key={`${line.text}-${index}`} style={{display: 'flex', gap: 12, alignItems: 'center', opacity: lineMotion.opacity, transform: lineMotion.transform}}>
               <div style={{width: 36, height: 1, background: `linear-gradient(90deg, ${color}, transparent)`}} />
-              <div style={{fontSize: 20, lineHeight: 1.28, color: line.tone === 'accent' ? color : 'rgba(229,236,255,0.7)'}}>
+              <div style={{fontSize: Math.round(20 * sizeScale), lineHeight: 1.28, color: line.tone === 'accent' ? color : 'rgba(229,236,255,0.7)'}}>
                 {line.text}
               </div>
             </div>

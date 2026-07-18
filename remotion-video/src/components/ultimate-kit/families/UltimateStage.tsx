@@ -3,6 +3,7 @@ import {AbsoluteFill} from 'remotion';
 import {UltimateBackdrop} from './UltimateBackdrop';
 import {ultimateKitTokens} from '../tokens';
 import type {UltimateStageProps} from '../types';
+import {cinematicVignetteStyle, subtleFilmGrainStyle} from '../renderQuality';
 
 export const UltimateStage: React.FC<UltimateStageProps> = ({
   children,
@@ -33,6 +34,7 @@ export const UltimateStage: React.FC<UltimateStageProps> = ({
             backgroundSize: stagePreset === 'data' ? '140px 140px' : '180px 180px',
             maskImage: 'radial-gradient(circle at 50% 56%, black 44%, transparent 92%)',
             pointerEvents: 'none',
+            transform: 'translate3d(0, 0, 0)',
           }}
         />
       ) : null}
@@ -58,6 +60,8 @@ export const UltimateStage: React.FC<UltimateStageProps> = ({
       >
         {children}
       </div>
+      <AbsoluteFill style={cinematicVignetteStyle} />
+      <AbsoluteFill style={subtleFilmGrainStyle} />
       {typeof sceneDurationFrames === 'number' && (stagePreset === 'data' || stagePreset === 'evidence') ? (
         <div
           style={{

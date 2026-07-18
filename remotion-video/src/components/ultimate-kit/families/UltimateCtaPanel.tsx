@@ -2,8 +2,10 @@ import React from 'react';
 import { useCurrentFrame } from 'remotion';
 import {GeometryAccent, ReticleLockOn, ParticleBackground, DotGridParallax} from '../../visual-atoms';
 import {resolveUltimateAccent} from '../tokens';
-import type {UltimateCtaPanelProps, UltimateSceneGrammar} from '../types';
+import type {UltimateCtaPanelProps, UltimateSceneGrammar, FamilyDirectorMeta} from '../types';
 import { useTextSlideIn, usePulseAttention } from '../motionGrammar';
+import {UltimateHeading} from '../UltimateHeading';
+import {glassPanelStyle, contentCardStyle} from '../containerStyles';
 
 const normalizeText = (value?: string) => {
   return String(value || '').replace(/\s+/g, ' ').trim();
@@ -29,12 +31,14 @@ const distinctHighlights = (items: string[]) => {
     });
 };
 
-export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps & {grammar?: UltimateSceneGrammar}> = ({
+export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps & {grammar?: UltimateSceneGrammar; directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   subtitle,
   searchLabel,
   badge,
   highlights = [],
+  grammar,
+  directorMeta,
 }) => {
   const color = resolveUltimateAccent('lime');
   const title = normalizeText(heading);
@@ -45,6 +49,10 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps & {grammar?: Ultim
   const frame = useCurrentFrame();
   const headingSlideIn = useTextSlideIn(frame, 'up', 6);
   const pulseAttention = usePulseAttention(frame, 30);
+  const adaptive = directorMeta?.adaptive;
+  const sizeScale = adaptive?.contrast.sizeRatio ?? 1;
+  const ctaLabelSize = adaptive ? Math.round(16 * sizeScale) : 16;
+  const ctaKickerSize = adaptive ? Math.round(18 * sizeScale) : 18;
 
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
@@ -53,11 +61,11 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps & {grammar?: Ultim
       <GeometryAccent variant="ring" color={color} opacity={0.16} style={{left: '50%', top: '48%', width: 680, height: 680, transform: 'translate(-50%, -50%)'}} />
       <GeometryAccent variant="slanted-panel" color={color} opacity={0.12} style={{left: 298, top: 108, width: 412, height: 168, transform: 'rotate(-12deg)'}} />
 
-      <div style={{position: 'absolute', top: 92, left: 106, right: 106, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-        <div style={{fontSize: 16, letterSpacing: 4, textTransform: 'uppercase', color: 'rgba(229,236,255,0.5)'}}>
+      <div style={{...contentCardStyle(color, {density: adaptive?.density}), position: 'absolute', top: 92, left: 106, right: 106, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <div style={{fontSize: ctaLabelSize, letterSpacing: 4, textTransform: 'uppercase', color: 'rgba(229,236,255,0.5)'}}>
           {badge ? trimText(normalizeText(badge), 18) : 'final call'}
         </div>
-        <div style={{fontSize: 18, color: color, letterSpacing: 1.8}}>
+        <div style={{fontSize: ctaKickerSize, color: color, letterSpacing: 1.8}}>
           {trimText(kicker, 18)}
         </div>
       </div>
@@ -89,26 +97,15 @@ export const UltimateCtaPanel: React.FC<UltimateCtaPanelProps & {grammar?: Ultim
           justifyItems: 'center',
         }}
       >
-        <div style={{fontSize: 78, lineHeight: 0.92, fontWeight: 900, color: '#f7fbff', textAlign: 'center', letterSpacing: -3, ...headingSlideIn}}>
-          {title}
-        </div>
-        <div style={{display: 'flex', alignItems: 'center', gap: 14}}>
-          <div
-            style={{
-              padding: '12px 18px',
-              borderRadius: 18,
-              background: `${color}22`,
-              color: '#f7fbff',
-              fontSize: 24,
-              fontWeight: 800,
-              ...pulseAttention,
-            }}
-          >
-            {trimText(kicker, 10)}
-          </div>
-          <div style={{fontSize: 28, lineHeight: 1.3, color: 'rgba(229,236,255,0.8)'}}>
-            {trimText(footer, 22)}
-          </div>
+        <div style={glassPanelStyle(resolveUltimateAccent('orange'), {density: adaptive?.density, contrast: adaptive?.contrast}, {radius: 'xl'})}>
+          <UltimateHeading
+            heading={title || heading}
+            archetype={grammar?.archetype}
+            accent={'orange'}
+            grammar={grammar}
+            subtitle={subtitle}
+            style={{textAlign: 'center'}}
+          />
         </div>
       </div>
     </div>

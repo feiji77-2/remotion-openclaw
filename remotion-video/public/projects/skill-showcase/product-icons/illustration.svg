@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Article illustration skill icon">
+  <defs>
+    <linearGradient id="bg" x1="18" y1="18" x2="140" y2="142" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF5F91"/>
+      <stop offset="1" stop-color="#FFC44D"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="136" height="136" rx="30" fill="url(#bg)"/>
+  <rect x="34" y="31" width="92" height="98" rx="12" fill="#FFFEFA"/>
+  <path d="M53 57h54M53 73h39" stroke="#2A2D37" stroke-width="7" stroke-linecap="round"/>
+  <path d="M53 106c18-22 34-22 52 0" fill="none" stroke="#2A2D37" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="63" cy="94" r="8" fill="#20D9E8"/>
+  <path d="M101 91 122 70" stroke="#FF5F91" stroke-width="8" stroke-linecap="round"/>
+  <path d="m126 66-7 23-16-16 23-7Z" fill="#FF5F91"/>
+</svg>

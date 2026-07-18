@@ -24,7 +24,6 @@ jobs:
           cache: npm
           cache-dependency-path: |
             remotion-video/package-lock.json
-            video-pipeline-view/player-app/package-lock.json
 
       - name: Install dependencies
         run: npm run setup

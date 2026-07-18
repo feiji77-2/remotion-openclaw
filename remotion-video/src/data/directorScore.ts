@@ -20,6 +20,8 @@
  * @packageDocumentation
  */
 
+import type {CameraMotionPreset} from './registry';
+
 // ================================================================
 // 1. Energy / Act Level
 // ================================================================
@@ -828,15 +830,9 @@ function deriveStaggerGap(cues: ElementCue[]): number {
 /**
  * CameraMotionPreset 映射表。
  * 与 CameraDirector.tsx 的 7 个预设对应。
+ * 类型定义来自 registry.ts — 此处仅重导出。
  */
-export type CameraMotionPreset =
-  | 'push-in'
-  | 'pan-x'
-  | 'pan-y'
-  | 'drift'
-  | 'zoom-pulse'
-  | 'growth'
-  | 'none';
+export type {CameraMotionPreset};
 
 /**
  * 将 CameraPathCue[] 转换为 CameraMotionPreset。

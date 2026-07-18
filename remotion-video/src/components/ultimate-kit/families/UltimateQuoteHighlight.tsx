@@ -1,27 +1,11 @@
 import React from 'react';
-import { useCurrentFrame } from 'remotion';
 import {GeometryAccent, TextMaskWipe} from '../../visual-atoms';
-import {resolveTextRevealDirection} from '../revealDirection';
-import {resolveUltimateAccent} from '../tokens';
-import type {UltimateQuoteHighlightProps, UltimateSceneGrammar} from '../types';
-import { useTextSlideIn, useFloatMotion } from '../motionGrammar';
+import {resolveUltimateAccent, ultimateKitTokens} from '../tokens';
+import type {UltimateQuoteHighlightProps, UltimateSceneGrammar, FamilyDirectorMeta} from '../types';
+import {archetypeToHeadingStyle, archetypeToEyebrowStyle} from '../heading';
 
 const normalizeText = (value?: string) => {
   return String(value || '').replace(/\s+/g, ' ').trim();
-};
-
-const splitLead = (value: string, maxChars = 9) => {
-  const text = normalizeText(value);
-  if (!text) {
-    return [];
-  }
-  if (text.length <= maxChars) {
-    return [text];
-  }
-  return [
-    text.slice(0, maxChars),
-    `${text.slice(maxChars, maxChars * 2).trim()}${text.length > maxChars * 2 ? '…' : ''}`,
-  ];
 };
 
 const trimText = (value: string, maxLength: number) => {
@@ -31,42 +15,27 @@ const trimText = (value: string, maxLength: number) => {
   return `${value.slice(0, Math.max(1, maxLength - 1)).trim()}…`;
 };
 
-export const UltimateQuoteHighlight: React.FC<UltimateQuoteHighlightProps & {grammar?: UltimateSceneGrammar}> = ({
+export const UltimateQuoteHighlight: React.FC<UltimateQuoteHighlightProps & {grammar?: UltimateSceneGrammar; directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   quote,
   attribution,
   tags = [],
   accent = 'orange',
   grammar,
+  directorMeta,
 }) => {
   const color = resolveUltimateAccent(accent);
-  const revealDirection = resolveTextRevealDirection(grammar, 'right');
-  const leadLines = splitLead(quote, 8);
-  const frame = useCurrentFrame();
-  const quoteSlideIn = useTextSlideIn(frame, 'up', 8);
-  const floatMotion = useFloatMotion(frame, 20);
+  const hs = archetypeToHeadingStyle(grammar?.archetype);
+  const eb = archetypeToEyebrowStyle(grammar?.archetype);
+  const adaptive = directorMeta?.adaptive;
+  const sizeScale = adaptive?.contrast.sizeRatio ?? 1;
+  const spacingScale = adaptive?.density.spacing ?? 1;
   const accentWord = trimText(normalizeText(tags[0]?.label || quote), 10);
   const supportLine = trimText(normalizeText(attribution || tags[1]?.label || heading), 22);
   const footerTags = tags.slice(0, 3).map((tag) => trimText(normalizeText(tag.label), 12)).filter(Boolean);
 
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
-      {heading ? (
-        <div style={{position: 'absolute', left: 112, top: 90, right: 112, zIndex: 3}}>
-          <div style={{position: 'relative', minHeight: 40}}>
-            <TextMaskWipe
-              text={heading}
-              direction={revealDirection}
-              accent={color}
-              fontSize={24}
-              color={color}
-              fontWeight={700}
-              textStyle={{width: '100%', textAlign: 'left', whiteSpace: 'normal', letterSpacing: 4, textTransform: 'uppercase'}}
-            />
-          </div>
-        </div>
-      ) : null}
-
       <GeometryAccent variant="arc" color={color} opacity={0.3} style={{left: 238, top: 142, width: 520, height: 210}} />
       <GeometryAccent variant="ring" color={color} opacity={0.14} style={{left: '50%', top: '50%', width: 620, height: 620, transform: 'translate(-50%, -50%)'}} />
 
@@ -78,32 +47,67 @@ export const UltimateQuoteHighlight: React.FC<UltimateQuoteHighlightProps & {gra
           width: 1180,
           transform: 'translate(-50%, -52%)',
           textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: Math.round(16 * spacingScale),
         }}
       >
-        <div style={{fontSize: 188, lineHeight: 0.78, fontWeight: 900, letterSpacing: -10, color: `${color}14`, textTransform: 'uppercase'}}>
+        {/* Eyebrow — from heading prop, archetype-driven */}
+        {heading && eb.show ? (
+          <div style={{fontSize: eb.fontSize, letterSpacing: eb.letterSpacing, textTransform: 'uppercase', color, opacity: 0.85, fontWeight: 600, marginBottom: 8}}>
+            {heading}
+          </div>
+        ) : null}
+
+        {/* Main quote — archetype-driven typography */}
+        {hs.useTextMaskWipe ? (
+          <TextMaskWipe
+            text={quote}
+            direction="right"
+            accent={color}
+            fontSize={Math.round((hs.fontSize + 14) * sizeScale)}
+            color="#f7fbff"
+            fontWeight={hs.fontWeight}
+            fontFamily={ultimateKitTokens.fonts.display}
+            textStyle={{textAlign: 'center', lineHeight: hs.lineHeight, letterSpacing: hs.letterSpacing}}
+          />
+        ) : (
+          <div
+            style={{
+              fontSize: Math.round((hs.fontSize + 14) * sizeScale),
+              fontWeight: hs.fontWeight,
+              letterSpacing: hs.letterSpacing,
+              lineHeight: hs.lineHeight,
+              color: '#f7fbff',
+              fontFamily: ultimateKitTokens.fonts.display,
+            }}
+          >
+            {quote}
+          </div>
+        )}
+
+        {/* Attribution */}
+        {attribution ? (
+          <div style={{fontSize: Math.round(24 * sizeScale), lineHeight: 1.4, color: 'rgba(229,236,255,0.68)', maxWidth: 800, marginTop: 8}}>
+            {attribution}
+          </div>
+        ) : null}
+
+        {/* Decorative background word */}
+        <div style={{fontSize: 188, lineHeight: 0.78, fontWeight: 900, letterSpacing: -10, color: `${color}14`, textTransform: 'uppercase', marginTop: 12, position: 'absolute', zIndex: -1, pointerEvents: 'none'}}>
           {accentWord}
-        </div>
-        <div style={{marginTop: -38, display: 'grid', gap: 6, justifyItems: 'center', ...quoteSlideIn}}>
-          {leadLines.map((line, index) => (
-            <div key={`${line}-${index}`} style={{fontSize: index === 0 ? 108 : 96, lineHeight: 0.88, fontWeight: 900, color: color, letterSpacing: -5, textShadow: `0 0 36px ${color}30`}}>
-              {line}
-            </div>
-          ))}
-        </div>
-        <div style={{marginTop: 28, fontSize: 28, lineHeight: 1.46, color: 'rgba(229,236,255,0.78)'}}>
-          {supportLine}
         </div>
       </div>
 
       <div style={{position: 'absolute', left: 112, right: 112, bottom: 102, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 24}}>
         <div style={{display: 'flex', gap: 14, flexWrap: 'wrap'}}>
           {footerTags.map((tag) => (
-            <div key={tag} style={{paddingBottom: 6, borderBottom: `1px solid ${color}66`, color: '#f7fbff', fontSize: 18}}>
+            <div key={tag} style={{paddingBottom: 6, borderBottom: `1px solid ${color}66`, color: '#f7fbff', fontSize: Math.round(18 * sizeScale)}}>
               {tag}
             </div>
           ))}
         </div>
-        {attribution ? <div style={{fontSize: 22, color: 'rgba(229,236,255,0.54)', ...floatMotion}}>{trimText(normalizeText(attribution), 18)}</div> : null}
       </div>
     </div>
   );

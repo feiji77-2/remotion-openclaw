@@ -1,10 +1,12 @@
 /**
  * DirectorScoreOrchestrator.tsx — 导演总谱运行时编排器
  *
- * 接收 scoreToSequences() 编译后的 SequenceConfig[] 树，
- * 递归渲染为 Remotion <Sequence> 组件嵌套树。
+ * @deprecated 该组件是元素级动画编排的高级方案，目前未接入主渲染链路。
+ *   主链路使用 SceneTimeline（TransitionSeries）+ ProjectSceneRegistry 的简单路径。
+ *   如需接入，需在 CompileProject 中增加 DirectorScore 输出通道，
+ *   并在 SceneTimeline 中增加 DirectorScore 检测分支（见 SceneTimeline 注释）。
  *
- * 职责：
+ * 历史职责：
  *   1. 递归渲染 <Sequence> 层级结构
  *   2. 摄像机路径逐帧插值（精确模式）或 CameraDirector 预设模式
  *   3. 元素级动画参数映射到 spring / interpolate 值
@@ -30,6 +32,9 @@ import {
 } from '../../data/directorScore';
 import {CameraDirector} from '../camera/CameraDirector';
 
+/** 快速渲染模式 — 关掉滤镜、drop-shadow 等昂贵 GPU 效果 */
+const FAST_VISUAL_MODE = process.env.RENDER_VISUAL_MODE !== 'cinematic';
+
 // ── Props ────────────────────────────────────────────────────────
 
 export interface DirectorScoreOrchestratorProps {
@@ -41,6 +46,8 @@ export interface DirectorScoreOrchestratorProps {
   fallbackComponent?: React.ComponentType<{elementId: string}>;
   /** 全局帧率 */
   fps?: number;
+  /** 场景过渡溢出边距（px），为过渡动画（slide/lift）提供移出屏幕的空间。默认 96 */
+  transitionOverflowMargin?: number;
 }
 
 // ── Defaults ──────────────────────────────────────────────────────
@@ -54,6 +61,7 @@ export const DirectorScoreOrchestrator: React.FC<DirectorScoreOrchestratorProps>
   elementRenderMap,
   fallbackComponent: Fallback,
   fps = 30,
+  transitionOverflowMargin = 96,
 }) => {
   return (
     <>
@@ -64,6 +72,7 @@ export const DirectorScoreOrchestrator: React.FC<DirectorScoreOrchestratorProps>
           elementRenderMap={elementRenderMap}
           fallbackComponent={Fallback}
           fps={fps}
+          overflowMargin={transitionOverflowMargin}
         />
       ))}
     </>
@@ -77,6 +86,7 @@ interface SequenceRendererProps {
   elementRenderMap: Map<string, React.ReactNode>;
   fallbackComponent?: React.ComponentType<{elementId: string}>;
   fps: number;
+  overflowMargin: number;
 }
 
 const SequenceRenderer: React.FC<SequenceRendererProps> = ({
@@ -84,6 +94,7 @@ const SequenceRenderer: React.FC<SequenceRendererProps> = ({
   elementRenderMap,
   fallbackComponent: Fallback,
   fps,
+  overflowMargin,
 }) => {
   const frame = useCurrentFrame();
   const hasChildren = config.children && config.children.length > 0;
@@ -91,6 +102,20 @@ const SequenceRenderer: React.FC<SequenceRendererProps> = ({
   const hasAnimation = config.animationParams;
   const anim = config.animationParams;
   const isPresetCamera = config.cameraMode === 'preset' || (hasCameraPath && config.cameraMode !== 'exact' && anim?.type !== 'path');
+
+  // ── 检测是否存在退场动画（用于过渡溢出边距） ──
+  const hasExitAnimation = useMemo(() => {
+    if (anim?.exitAnimation && anim.exitAtFrame !== undefined) return true;
+    if (hasChildren) {
+      return config.children!.some((child) =>
+        child.animationParams?.exitAnimation && child.animationParams.exitAtFrame !== undefined,
+      );
+    }
+    return false;
+  }, [anim, hasChildren, config.children]);
+
+  // ── 需要溢出边距的场景：有退场动画或摄像机运动 ──
+  const needsOverflowMargin = hasExitAnimation || hasCameraPath;
 
   // ── 解析内容 ──
   const innerContent = useMemo(() => {
@@ -102,6 +127,7 @@ const SequenceRenderer: React.FC<SequenceRendererProps> = ({
           elementRenderMap={elementRenderMap}
           fallbackComponent={Fallback}
           fps={fps}
+          overflowMargin={overflowMargin}
         />
       ));
     }
@@ -147,16 +173,18 @@ const SequenceRenderer: React.FC<SequenceRendererProps> = ({
     return cameraPathToPreset(config.cameraPath);
   }, [isPresetCamera, config.cameraPath]);
 
+  // ── 溢出边距样式（为退场 / 摄像机运动提供额外空间） ──
+  const marginStyle: React.CSSProperties = needsOverflowMargin
+    ? {position: 'absolute', top: -overflowMargin, left: -overflowMargin, right: -overflowMargin, bottom: -overflowMargin}
+    : {position: 'relative', width: '100%', height: '100%'};
+
   // ── 内容 JSX ──
   let content: React.ReactNode = (
     <div style={{
-      position: 'relative',
-      width: '100%',
-      height: '100%',
+      ...marginStyle,
       ...(cameraTransform ? {
         transform: `scale(${cameraTransform.zoom}) translate3d(${cameraTransform.panX}px, ${cameraTransform.panY}px, 0) rotate(${cameraTransform.rotate}deg)`,
         transformOrigin: '50% 50%',
-        willChange: 'transform',
       } : {}),
       ...(animationStyle ?? {}),
     }}>
@@ -170,9 +198,7 @@ const SequenceRenderer: React.FC<SequenceRendererProps> = ({
     content = (
       <CameraDirector preset={cameraPreset} enterFrames={anim?.enterDuration ?? 18}>
         <div style={{
-          position: 'relative',
-          width: '100%',
-          height: '100%',
+          ...marginStyle,
           ...(animationStyle ?? {}),
         }}>
           {innerContent}
@@ -234,7 +260,7 @@ const SVGPathRenderer: React.FC<{cue: ElementCue; frame: number; fps: number}> =
         style={{
           strokeDasharray: 2000,
           strokeDashoffset: keepVisible ? (easedProgress >= 1 ? 0 : dashOffset) : dashOffset,
-          filter: `drop-shadow(0 0 8px ${cue.pathColor ?? '#38bdf8'})`,
+          filter: FAST_VISUAL_MODE ? undefined : `drop-shadow(0 0 8px ${cue.pathColor ?? '#38bdf8'})`,
           transition: 'none',
         }}
       />
@@ -350,7 +376,7 @@ const EffectLayer: React.FC<EffectLayerProps> = ({preset, cue, frame, fps}) => {
             style={{
               strokeDasharray: 2000,
               strokeDashoffset: dashOffset,
-              filter: `drop-shadow(0 0 6px ${accent})`,
+              filter: FAST_VISUAL_MODE ? undefined : `drop-shadow(0 0 6px ${accent})`,
             }}
           />
         </svg>

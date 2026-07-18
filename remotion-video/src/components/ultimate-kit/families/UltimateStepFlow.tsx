@@ -3,20 +3,34 @@ import {interpolate, useCurrentFrame} from 'remotion';
 import {GeometryAccent, PathDrawLink} from '../../visual-atoms';
 import {resolveUltimateAccent} from '../tokens';
 import {useStaggerSlide, useScaleEmphasis} from '../motionGrammar';
-import type {UltimateStepFlowProps} from '../types';
+import type {UltimateStepFlowProps, UltimateSceneGrammar, FamilyDirectorMeta} from '../types';
+import {UltimateHeading} from '../UltimateHeading';
+import {resolveSceneDirective, resolveEntranceParams} from '../directive';
 
 const toneToColor = (tone?: Parameters<typeof resolveUltimateAccent>[0]) => {
   return resolveUltimateAccent(tone ?? 'cyan');
 };
 
-export const UltimateStepFlow: React.FC<UltimateStepFlowProps & {grammar?: {staggerGap?: number}}> = ({
+export const UltimateStepFlow: React.FC<UltimateStepFlowProps & {grammar?: UltimateSceneGrammar; directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   steps,
   grammar,
+  directorMeta,
 }) => {
   const frame = useCurrentFrame();
-  const gap = Math.max(6, grammar?.staggerGap ?? 6);
-  const visibleSteps = steps.slice(0, 5);
+  const d = resolveSceneDirective(grammar, 'step-flow');
+  const staggerGap = d.animation.staggerGap;
+  const adaptive = directorMeta?.adaptive;
+  const BASE_RENDER_OFFSET = 10;
+  const valueSize = adaptive
+    ? Math.round((d.typography.value.size + BASE_RENDER_OFFSET) * adaptive.contrast.sizeRatio)
+    : d.typography.value.size;
+  const gap = adaptive
+    ? Math.round(d.spacing.gap * adaptive.density.spacing)
+    : d.spacing.gap;
+  const ep = resolveEntranceParams(d);
+  const safeSteps = steps ?? [];
+  const visibleSteps = safeSteps.slice(0, 5);
   const points = [
     {x: 214, y: 664},
     {x: 580, y: 498},
@@ -42,12 +56,11 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps & {grammar?: {stag
   return (
     <div style={{position: 'absolute', inset: 0, overflow: 'hidden'}}>
       <div style={{position: 'absolute', top: 96, left: 110, maxWidth: 900}}>
-        <div style={{fontSize: 16, letterSpacing: 4.4, textTransform: 'uppercase', color: 'rgba(229,236,255,0.52)'}}>
-          step arc
-        </div>
-        <div style={{marginTop: 18, fontSize: 88, lineHeight: 0.9, fontWeight: 900, letterSpacing: -4.6}}>
-          {heading}
-        </div>
+        <UltimateHeading
+          heading={heading}
+          archetype={grammar?.archetype}
+          grammar={grammar}
+        />
       </div>
 
       <GeometryAccent variant="slanted-panel" color={resolveUltimateAccent('cyan')} opacity={0.13} style={{left: 92, top: 300, width: 320, height: 110, transform: 'rotate(-8deg)'}} />
@@ -58,7 +71,7 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps & {grammar?: {stag
           const from = points[index];
           const to = points[index + 1];
           const color = toneToColor(step.accent ?? (index % 2 === 0 ? 'cyan' : 'green'));
-          const delay = 10 + index * gap * 5;
+          const delay = 10 + index * staggerGap * 5;
           const progress = interpolate(frame, [delay, delay + 28], [0, 1], {
             extrapolateLeft: 'clamp',
             extrapolateRight: 'clamp',
@@ -90,8 +103,12 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps & {grammar?: {stag
         const point = points[index];
         const color = toneToColor(step.accent ?? (index % 2 === 0 ? 'cyan' : 'green'));
         const side = index % 2 === 0 ? 'left' : 'right';
-        const scaleEmphasis = useScaleEmphasis(frame, index * 8);
-        const staggerSlide = useStaggerSlide(frame, index, 8, 'right', 24);
+        const itemAnim = ep.useScale
+          ? useScaleEmphasis(frame, index * 8, ep.scaleFrom)
+          : useScaleEmphasis(frame, index * 8, 0.95);
+        const staggerSlide = ep.useSlide
+          ? useStaggerSlide(frame, index, 8, ep.slideDirection, ep.slideDistance)
+          : {opacity: 1, transform: 'none'};
         const boxLeft = side === 'left' ? point.x - 24 : point.x - 314;
         const boxTop = point.y - 158;
         return (
@@ -120,20 +137,20 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps & {grammar?: {stag
             >
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: d.typography.label.size - 1,
                   lineHeight: 1.2,
                   letterSpacing: 2.2,
                   color,
                   textTransform: 'uppercase',
-                  opacity: scaleEmphasis.opacity,
-                  transform: scaleEmphasis.transform,
+                  opacity: itemAnim.opacity,
+                  transform: itemAnim.transform,
                 }}
               >
                 0{index + 1}
               </div>
               <div
                 style={{
-                  fontSize: 34,
+                  fontSize: valueSize + 10,
                   lineHeight: 1.08,
                   fontWeight: 840,
                   color: '#f7fbff',
@@ -144,7 +161,7 @@ export const UltimateStepFlow: React.FC<UltimateStepFlowProps & {grammar?: {stag
                 {step.label}
               </div>
               {step.detail ? (
-                <div style={{marginTop: 10, fontSize: 18, lineHeight: 1.46, color: 'rgba(229,236,255,0.64)'}}>
+                <div style={{marginTop: gap - 4, fontSize: d.typography.body.size, lineHeight: d.typography.body.lineHeight, color: `rgba(229,236,255,${d.atmosphere.textOpacity})`}}>
                   {step.detail}
                 </div>
               ) : null}

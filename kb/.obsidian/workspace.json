@@ -4,19 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "5df37a2e6a13a08d",
+        "id": "af442351a39da96e",
         "type": "tabs",
         "children": [
           {
-            "id": "7aee758516dc453b",
+            "id": "99761192ca75b34e",
             "type": "leaf",
             "state": {
-              "type": "image",
-              "state": {
-                "file": "Assets 样品库/icons 图标/concept/layers.svg"
-              },
-              "icon": "lucide-image",
-              "title": "layers"
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "新标签页"
             }
           }
         ]
@@ -92,7 +90,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Assets/family-gallery/timeline.png",
+                "file": "00 首页.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -102,7 +100,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "timeline 的反向链接列表"
+              "title": "首页的反向链接列表"
             }
           },
           {
@@ -111,12 +109,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Assets/family-gallery/timeline.png",
+                "file": "00 首页.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "timeline 的出链列表"
+              "title": "首页的出链列表"
             }
           },
           {
@@ -163,53 +161,15 @@
       "bases:新建数据库": false
     }
   },
-  "active": "7aee758516dc453b",
+  "active": "99761192ca75b34e",
   "lastOpenFiles": [
-    "Assets 样品库/icons 图标/concept/inbox.svg",
-    "Assets 样品库/icons 图标/concept/home.svg",
-    "Assets 样品库/icons 图标/concept/heart.svg",
-    "Assets 样品库/icons 图标/concept/git-merge.svg",
-    "Assets 样品库/icons 图标/concept/git-branch.svg",
-    "Assets 样品库/icons 图标/concept/folder.svg",
-    "Assets 样品库/icons 图标/concept/flame.svg",
-    "Assets 样品库/icons 图标/concept/file-text.svg",
-    "Assets 样品库/icons 图标/concept/database.svg",
-    "Assets 样品库/icons 图标/concept/cpu.svg",
-    "Assets 样品库/icons 图标/concept/code.svg",
-    "Assets/icons 图标/concept",
-    "Assets/icons 图标/brand",
-    "Assets/icons 图标",
-    "Assets/family-gallery 图片",
-    "Assets",
     "00 首页.md",
-    "Assets 样品库/icons 图标/concept",
-    "Assets 样品库/icons 图标/brand",
-    "Assets 样品库/icons 图标",
-    "17 Fast Pipeline 与架构变更.md",
-    "16 失败案例对照.md",
-    "15 字段命中示例库.md",
-    "14 图片图库.md",
-    "13 命中规则与抢占地图.md",
-    "12 模块组件总表.md",
-    "Assets/renders/ultimate-scene-all-families-2026-04-30.mp4",
-    "01 项目总览.md",
-    "02 目录结构.md",
-    "06 导演层与Shot Grammar.md",
-    "04 渲染链路.md",
-    "未命名.base",
-    "18 失败案例对照.md",
-    "16 图片图库.md",
-    "15 命中规则与抢占地图.md",
-    "17 字段命中示例库.md",
-    "14 模块组件总表.md",
-    "12 脚本输入输出合同.md",
-    "Families/00 总览.md",
-    "13 Family视觉语法总表.md",
-    "09 产物路径与缓存.md",
-    "Families/timeline.md",
-    "Families/terminal.md",
-    "Families/tag-matrix.md",
-    "Families/step-flow.md",
-    "Families/quote-highlight.md"
+    "01 当前项目总览.md",
+    "02 Project JSON 合同.md",
+    "03 V2 渲染架构.md",
+    "04 口播语义节拍视频方法.md",
+    "05 skill-showcase 场景族.md",
+    "06 QA 与调试.md",
+    "Assets/skill-showcase-v2-beats.jpg"
   ]
 }

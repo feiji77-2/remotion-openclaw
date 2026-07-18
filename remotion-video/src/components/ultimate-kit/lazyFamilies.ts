@@ -76,3 +76,29 @@ export const LazyMinimalTimeline = lazy(() =>
 export const LazyMinimalCompareBoard = lazy(() =>
   import('./families/MinimalCompareBoard').then((m) => ({default: m.MinimalCompareBoard})),
 );
+
+// ── Spoken (口播驱动模式) ────────────────
+export const LazySpokenTitle = lazy(() =>
+  import('./families/SpokenTitle').then((m) => ({default: m.SpokenTitle})),
+);
+export const LazySpokenMetric = lazy(() =>
+  import('./families/SpokenMetric').then((m) => ({default: m.SpokenMetric})),
+);
+export const LazySpokenProcess = lazy(() =>
+  import('./families/SpokenProcess').then((m) => ({default: m.SpokenProcess})),
+);
+export const LazySpokenRanking = lazy(() =>
+  import('./families/SpokenRanking').then((m) => ({default: m.SpokenRanking})),
+);
+export const LazySpokenCompare = lazy(() =>
+  import('./families/SpokenCompare').then((m) => ({default: m.SpokenCompare})),
+);
+export const LazySpokenTags = lazy(() =>
+  import('./families/SpokenTags').then((m) => ({default: m.SpokenTags})),
+);
+export const LazySpokenCode = lazy(() =>
+  import('./families/SpokenCode').then((m) => ({default: m.SpokenCode})),
+);
+export const LazySpokenTakeaway = lazy(() =>
+  import('./families/SpokenTitle').then((m) => ({default: m.SpokenTitle})),
+);

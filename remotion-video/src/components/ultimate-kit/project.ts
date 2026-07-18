@@ -34,6 +34,7 @@ export type UltimateSceneFamily =
   | 'timeline'
   | 'compare-board'
   | 'terminal'
+  | 'skill-showcase'
   | 'evidence-wall'
   | 'architecture-map'
   | 'tag-matrix'
@@ -54,7 +55,16 @@ export type UltimateSceneFamily =
   | 'minimal-tag-matrix'
   | 'minimal-number-strip'
   | 'minimal-timeline'
-  | 'minimal-compare-board';
+  | 'minimal-compare-board'
+  // ── Spoken (口播驱动模式) ────────────────
+  | 'spoken-title'
+  | 'spoken-metric'
+  | 'spoken-process'
+  | 'spoken-ranking'
+  | 'spoken-compare'
+  | 'spoken-tags'
+  | 'spoken-code'
+  | 'spoken-takeaway';
 
 export type UltimateTransitionPreset =
   | 'fade'
@@ -90,11 +100,7 @@ type UltimateSceneBase = {
     stagePreset?: UltimateStagePreset;
     hudMode?: UltimateHudMode;
   } | null;
-  /**
-   * 导演层 shot grammar 元数据（由 storyboardLoader.shotsToScenes() 注入）。
-   * 包含：archetype, cameraIntent, dataEvent, enterFrames, emphasisFrames,
-   *       staggerGap, memoryObject, directorNote
-   */
+  /** Optional motion grammar consumed by reusable Ultimate components. */
   grammar?: UltimateSceneGrammar;
 };
 
@@ -136,6 +142,11 @@ export type UltimateCompareBoardScene = UltimateSceneBase & {
 export type UltimateTerminalScene = UltimateSceneBase & {
   family: 'terminal';
   data: UltimateTerminalPanelProps;
+};
+
+export type UltimateSkillShowcaseScene = UltimateSceneBase & {
+  family: 'skill-showcase';
+  data: Record<string, unknown>;
 };
 
 export type UltimateEvidenceWallScene = UltimateSceneBase & {
@@ -198,6 +209,60 @@ export type UltimateCtaScene = UltimateSceneBase & {
   data: UltimateCtaPanelProps;
 };
 
+export type SpokenMetricItem = {
+  label: string;
+  value: string;
+  accent?: string;
+};
+
+export type SpokenProcessStep = {
+  label: string;
+  detail?: string;
+  accent?: string;
+};
+
+export type SpokenTitleData = {
+  title: string;
+  subtitle?: string;
+  kicker?: string;
+  accent?: string;
+};
+
+export type SpokenMetricData = {
+  heading?: string;
+  items: SpokenMetricItem[];
+  accent?: string;
+};
+
+export type SpokenProcessData = {
+  steps: SpokenProcessStep[];
+  accent?: string;
+};
+
+// ── Spoken scene types (口播驱动模式) ────────────────
+// Extends UltimateSceneBase to inherit iconPack, grammar, stageConfig, etc.
+export type SpokenSceneBase = UltimateSceneBase & {
+  family: Exclude<UltimateSceneFamily,
+    | 'hero' | 'feature-rail' | 'focus' | 'number-strip' | 'step-flow'
+    | 'timeline' | 'compare-board' | 'terminal' | 'skill-showcase' | 'evidence-wall'
+    | 'architecture-map' | 'tag-matrix' | 'code' | 'metrics' | 'data-stream'
+    | 'memory-graph' | 'pipeline-flow' | 'benchmark-chart' | 'quote-highlight'
+    | 'glossary-term' | 'cta'
+    | 'minimal-hero' | 'minimal-step-flow' | 'minimal-tag-matrix'
+    | 'minimal-number-strip' | 'minimal-timeline' | 'minimal-compare-board'>;
+  id: string;
+  durationInFrames: number;
+};
+
+export type SpokenTitleScene = SpokenSceneBase & {family: 'spoken-title'; data: SpokenTitleData};
+export type SpokenMetricScene = SpokenSceneBase & {family: 'spoken-metric'; data: SpokenMetricData};
+export type SpokenProcessScene = SpokenSceneBase & {family: 'spoken-process'; data: SpokenProcessData};
+export type SpokenRankingScene = SpokenSceneBase & {family: 'spoken-ranking'; data: SpokenMetricData};
+export type SpokenCompareScene = SpokenSceneBase & {family: 'spoken-compare'; data: SpokenMetricData};
+export type SpokenTagsScene = SpokenSceneBase & {family: 'spoken-tags'; data: SpokenMetricData};
+export type SpokenCodeScene = SpokenSceneBase & {family: 'spoken-code'; data: SpokenMetricData};
+export type SpokenTakeawayScene = SpokenSceneBase & {family: 'spoken-takeaway'; data: SpokenTitleData};
+
 export type UltimateSceneConfig =
   | UltimateHeroScene
   | UltimateFeatureRailScene
@@ -207,6 +272,7 @@ export type UltimateSceneConfig =
   | UltimateTimelineScene
   | UltimateCompareBoardScene
   | UltimateTerminalScene
+  | UltimateSkillShowcaseScene
   | UltimateEvidenceWallScene
   | UltimateArchitectureMapScene
   | UltimateTagMatrixScene
@@ -218,44 +284,22 @@ export type UltimateSceneConfig =
   | UltimateBenchmarkChartScene
   | UltimateQuoteHighlightScene
   | UltimateGlossaryTermScene
-  | UltimateCtaScene;
+  | UltimateCtaScene
+  // ── Spoken (口播驱动模式) ────────────────
+  | SpokenTitleScene
+  | SpokenMetricScene
+  | SpokenProcessScene
+  | SpokenRankingScene
+  | SpokenCompareScene
+  | SpokenTagsScene
+  | SpokenCodeScene
+  | SpokenTakeawayScene;
 
 export type UltimateProjectConfig = {
   title?: string;
   defaultPlatformOverlay?: UltimatePlatformOverlayProps | false;
   defaultTransition?: UltimateTransitionConfig | false;
   scenes: UltimateSceneConfig[];
-};
-
-export type UltimateSubtitleWord = {
-  text: string;
-  startFrame: number;
-  endFrame: number;
-  startMs?: number;
-  endMs?: number;
-  confidence?: number;
-  isKeyword?: boolean;
-};
-
-export type UltimateSubtitleCue = {
-  index?: number;
-  text: string;
-  startFrame: number;
-  endFrame: number;
-  startMs?: number;
-  endMs?: number;
-  words?: UltimateSubtitleWord[] | null;
-};
-
-export type UltimateSceneTemplateProps = {
-  config: UltimateProjectConfig;
-  voiceFile?: string | null;
-  audioSegments?: Array<{
-    src: string;
-    startFrame: number;
-    durationInFrames: number;
-  }> | null;
-  subtitleData?: UltimateSubtitleCue[] | null;
 };
 
 export type ResolvedUltimateTransitionConfig = Required<UltimateTransitionConfig>;
@@ -273,6 +317,7 @@ export type ResolvedUltimateStepFlowScene = WithResolvedTiming<UltimateStepFlowS
 export type ResolvedUltimateTimelineScene = WithResolvedTiming<UltimateTimelineScene>;
 export type ResolvedUltimateCompareBoardScene = WithResolvedTiming<UltimateCompareBoardScene>;
 export type ResolvedUltimateTerminalScene = WithResolvedTiming<UltimateTerminalScene>;
+export type ResolvedUltimateSkillShowcaseScene = WithResolvedTiming<UltimateSkillShowcaseScene>;
 export type ResolvedUltimateEvidenceWallScene = WithResolvedTiming<UltimateEvidenceWallScene>;
 export type ResolvedUltimateArchitectureMapScene = WithResolvedTiming<UltimateArchitectureMapScene>;
 export type ResolvedUltimateTagMatrixScene = WithResolvedTiming<UltimateTagMatrixScene>;
@@ -286,6 +331,16 @@ export type ResolvedUltimateQuoteHighlightScene = WithResolvedTiming<UltimateQuo
 export type ResolvedUltimateGlossaryTermScene = WithResolvedTiming<UltimateGlossaryTermScene>;
 export type ResolvedUltimateCtaScene = WithResolvedTiming<UltimateCtaScene>;
 
+// ── Spoken resolved types (口播驱动模式) ────────────────
+export type ResolvedSpokenTitleScene = WithResolvedTiming<SpokenTitleScene>;
+export type ResolvedSpokenMetricScene = WithResolvedTiming<SpokenMetricScene>;
+export type ResolvedSpokenProcessScene = WithResolvedTiming<SpokenProcessScene>;
+export type ResolvedSpokenRankingScene = WithResolvedTiming<SpokenRankingScene>;
+export type ResolvedSpokenCompareScene = WithResolvedTiming<SpokenCompareScene>;
+export type ResolvedSpokenTagsScene = WithResolvedTiming<SpokenTagsScene>;
+export type ResolvedSpokenCodeScene = WithResolvedTiming<SpokenCodeScene>;
+export type ResolvedSpokenTakeawayScene = WithResolvedTiming<SpokenTakeawayScene>;
+
 export type ResolvedUltimateSceneConfig =
   | ResolvedUltimateHeroScene
   | ResolvedUltimateFeatureRailScene
@@ -295,6 +350,7 @@ export type ResolvedUltimateSceneConfig =
   | ResolvedUltimateTimelineScene
   | ResolvedUltimateCompareBoardScene
   | ResolvedUltimateTerminalScene
+  | ResolvedUltimateSkillShowcaseScene
   | ResolvedUltimateEvidenceWallScene
   | ResolvedUltimateArchitectureMapScene
   | ResolvedUltimateTagMatrixScene
@@ -306,7 +362,16 @@ export type ResolvedUltimateSceneConfig =
   | ResolvedUltimateBenchmarkChartScene
   | ResolvedUltimateQuoteHighlightScene
   | ResolvedUltimateGlossaryTermScene
-  | ResolvedUltimateCtaScene;
+  | ResolvedUltimateCtaScene
+  // ── Spoken (口播驱动模式) ────────────────
+  | ResolvedSpokenTitleScene
+  | ResolvedSpokenMetricScene
+  | ResolvedSpokenProcessScene
+  | ResolvedSpokenRankingScene
+  | ResolvedSpokenCompareScene
+  | ResolvedSpokenTagsScene
+  | ResolvedSpokenCodeScene
+  | ResolvedSpokenTakeawayScene;
 
 export type ResolvedUltimateProjectConfig = Omit<UltimateProjectConfig, 'defaultTransition' | 'scenes'> & {
   defaultTransition: ResolvedUltimateTransitionConfig | false;
@@ -523,6 +588,12 @@ const readSceneComplexity = (scene: UltimateSceneConfig) => {
         scene.data.badge,
         scene.subtitle,
       ]);
+    // ── Minimal / spoken families: no complex data, just count subtitle ─
+    // (MinimalXxxScene types not in UltimateSceneConfig union — handled by default)
+    // (SpokenXxxScene types have simple structure — counted via subtitle)
+    default:
+      // Covers minimal-*, spoken-*, and any future families added to UltimateSceneFamily
+      return countText(scene.subtitle);
   }
 };
 
@@ -535,6 +606,7 @@ const sceneBaseDurations: Record<UltimateSceneFamily, {base: number; max: number
   timeline: {base: 82, max: 186},
   'compare-board': {base: 90, max: 204},
   terminal: {base: 84, max: 186},
+  'skill-showcase': {base: 240, max: 900},
   'evidence-wall': {base: 84, max: 192},
   'architecture-map': {base: 90, max: 210},
   'tag-matrix': {base: 78, max: 168},
@@ -554,6 +626,15 @@ const sceneBaseDurations: Record<UltimateSceneFamily, {base: number; max: number
   'minimal-number-strip': {base: 90, max: 180},
   'minimal-timeline': {base: 120, max: 300},
   'minimal-compare-board': {base: 100, max: 240},
+  // ── Spoken (口播驱动模式) ────────────────
+  'spoken-title': {base: 90, max: 180},
+  'spoken-metric': {base: 80, max: 180},
+  'spoken-process': {base: 110, max: 300},
+  'spoken-ranking': {base: 80, max: 180},
+  'spoken-compare': {base: 90, max: 240},
+  'spoken-tags': {base: 70, max: 150},
+  'spoken-code': {base: 90, max: 240},
+  'spoken-takeaway': {base: 70, max: 150},
 };
 
 export const deriveUltimateSceneSubtitle = (scene: UltimateSceneConfig) => {

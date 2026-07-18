@@ -5,7 +5,8 @@ import {iconMaskStyle, SemanticIconGlyph} from '../SemanticIcon';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
 import { useStaggerSlide, useScaleEmphasis } from '../motionGrammar';
-import type {UltimateMetricBarsProps, UltimateSceneGrammar} from '../types';
+import type {UltimateMetricBarsProps, UltimateSceneGrammar, FamilyDirectorMeta} from '../types';
+import {glassPanelStyle} from '../containerStyles';
 
 
 const MetricIcon: React.FC<{
@@ -28,13 +29,18 @@ const MetricIcon: React.FC<{
   );
 };
 
-export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: UltimateSceneGrammar}> = ({
+export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: UltimateSceneGrammar; directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   summary,
   items,
   grammar,
+  directorMeta,
 }) => {
   const frame = useCurrentFrame();
+  const adaptive = directorMeta?.adaptive;
+  const contrastSize = adaptive?.contrast.sizeRatio ?? 1;
+  const densitySpacing = adaptive?.density.spacing ?? 1;
+  const densityPadding = adaptive?.density.padding ?? 1;
   const primary = items[0];
   const leadColor = resolveUltimateAccent(primary?.accent ?? 'cyan');
   const visibleItems = items.slice(0, 6);
@@ -63,54 +69,56 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
         style={{right: 52, bottom: 28, width: 340, height: 150, transform: 'rotate(6deg)'}}
       />
 
-      <div style={{display: 'grid', gridTemplateRows: 'auto 1fr', gap: 30, height: '100%'}}>
-        <div style={{display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 30, alignItems: 'end'}}>
-          <div style={{display: 'grid', gap: 14}}>
-            <div style={{fontSize: 18, letterSpacing: 4, textTransform: 'uppercase', color: leadColor}}>signal console</div>
+      <div style={{display: 'grid', gridTemplateRows: 'auto 1fr', gap: Math.round(30 * densitySpacing), height: '100%'}}>
+        <div style={{display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: Math.round(30 * densitySpacing), alignItems: 'end'}}>
+          <div style={{display: 'grid', gap: Math.round(14 * densitySpacing)}}>
+          <div style={glassPanelStyle(leadColor, {density: adaptive?.density}, {radius: 'lg'})}>
+            <div style={{fontSize: Math.round(18 * contrastSize), letterSpacing: 4, textTransform: 'uppercase', color: leadColor}}>signal console</div>
             <div style={{position: 'relative', minHeight: 120}}>
               <TextMaskWipe
                 text={heading}
                 direction={revealDirection}
                 accent={leadColor}
-                fontSize={76}
+                fontSize={Math.round(76 * contrastSize)}
                 color="#f7fbff"
                 fontWeight={900}
                 textStyle={{width: '100%', textAlign: 'left', whiteSpace: 'normal', lineHeight: 0.95, letterSpacing: -2}}
               />
             </div>
             {summary ? (
-              <div style={{maxWidth: 720, fontSize: 22, lineHeight: 1.42, color: 'rgba(229,236,255,0.74)'}}>
+              <div style={{maxWidth: 720, fontSize: Math.round(22 * contrastSize), lineHeight: 1.42, color: 'rgba(229,236,255,0.74)'}}>
                 {summary}
               </div>
             ) : null}
+            </div>
           </div>
 
           <div
             style={{
               justifySelf: 'end',
               width: 360,
-              padding: '22px 24px 24px',
+              padding: `${Math.round(22 * densityPadding)}px ${Math.round(24 * densityPadding)}px ${Math.round(24 * densityPadding)}px`,
               borderRadius: 30,
               border: `1px solid ${leadColor}1f`,
               background: 'linear-gradient(180deg, rgba(8,12,20,0.88) 0%, rgba(6,9,16,0.98) 100%)',
               boxShadow: `0 0 34px ${leadColor}12`,
             }}
           >
-            <div style={{fontSize: 14, letterSpacing: 2.2, textTransform: 'uppercase', color: `${leadColor}cc`}}>primary reading</div>
-            <div style={{marginTop: 18, display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'end'}}>
+            <div style={{fontSize: Math.round(14 * contrastSize), letterSpacing: 2.2, textTransform: 'uppercase', color: `${leadColor}cc`}}>primary reading</div>
+            <div style={{marginTop: Math.round(18 * densitySpacing), display: 'grid', gridTemplateColumns: '1fr auto', gap: Math.round(16 * densitySpacing), alignItems: 'end'}}>
               <div>
-                <div style={{fontSize: 32, lineHeight: 1.06, fontWeight: 820, color: '#f7fbff'}}>
+                <div style={{fontSize: Math.round(32 * contrastSize), lineHeight: 1.06, fontWeight: 820, color: '#f7fbff'}}>
                   {primary?.label ?? heading}
                 </div>
-                <div style={{marginTop: 10, fontSize: 14, lineHeight: 1.3, letterSpacing: 1.8, textTransform: 'uppercase', color: 'rgba(229,236,255,0.5)'}}>
+                <div style={{marginTop: Math.round(10 * densitySpacing), fontSize: Math.round(14 * contrastSize), lineHeight: 1.3, letterSpacing: 1.8, textTransform: 'uppercase', color: 'rgba(229,236,255,0.5)'}}>
                   live signal
                 </div>
               </div>
-              <div style={{fontSize: 52, lineHeight: 0.9, fontWeight: 860, color: leadColor}}>
+              <div style={{fontSize: Math.round(52 * contrastSize), lineHeight: 0.9, fontWeight: 860, color: leadColor}}>
                 {primary?.value ?? '--'}
               </div>
             </div>
-            <div style={{marginTop: 18, height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden'}}>
+            <div style={{marginTop: Math.round(18 * densitySpacing), height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden'}}>
               <div
                 style={{
                   width: `${Math.max(8, Math.min(100, (primary?.ratio ?? 0.5) * 100))}%`,
@@ -123,12 +131,12 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
           </div>
         </div>
 
-        <div style={{display: 'grid', gridTemplateColumns: '1.06fr 0.94fr', gap: 30, minHeight: 0}}>
+        <div style={{display: 'grid', gridTemplateColumns: '1.06fr 0.94fr', gap: Math.round(30 * densitySpacing), minHeight: 0}}>
           <div
             style={{
               display: 'grid',
               gridTemplateRows: 'auto 1fr',
-              gap: 24,
+              gap: Math.round(24 * densitySpacing),
               minHeight: 0,
             }}
           >
@@ -136,7 +144,7 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-                gap: 18,
+                gap: Math.round(18 * densitySpacing),
               }}
             >
               {gaugeItems.map((item, index) => {
@@ -145,16 +153,16 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
                   <div
                     key={`${item.label}-gauge`}
                     style={{
-                      padding: '18px 16px 16px',
+                      padding: `${Math.round(18 * densityPadding)}px ${Math.round(16 * densityPadding)}px ${Math.round(16 * densityPadding)}px`,
                       borderRadius: 28,
                       border: `1px solid ${color}1f`,
                       background: `linear-gradient(180deg, ${color}10 0%, rgba(8,10,18,0.94) 100%)`,
                       display: 'grid',
-                      gap: 16,
+                      gap: Math.round(16 * densitySpacing),
                       justifyItems: 'center',
                     }}
                   >
-                    <div style={{fontSize: 13, letterSpacing: 1.8, textTransform: 'uppercase', color: `${color}cc`}}>
+                    <div style={{fontSize: Math.round(13 * contrastSize), letterSpacing: 1.8, textTransform: 'uppercase', color: `${color}cc`}}>
                       node 0{index + 1}
                     </div>
                     <RadialGauge
@@ -175,17 +183,17 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
                 borderRadius: 34,
                 border: `1px solid ${leadColor}18`,
                 background: 'linear-gradient(180deg, rgba(8,12,20,0.88) 0%, rgba(6,9,16,0.98) 100%)',
-                padding: '22px 22px 20px',
+                padding: `${Math.round(22 * densityPadding)}px ${Math.round(22 * densityPadding)}px ${Math.round(20 * densityPadding)}px`,
                 display: 'grid',
-                gap: 16,
+                gap: Math.round(16 * densitySpacing),
                 alignContent: 'start',
               }}
             >
-              <div style={{display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center'}}>
-                <div style={{fontSize: 14, letterSpacing: 2.2, textTransform: 'uppercase', color: 'rgba(229,236,255,0.46)'}}>
+              <div style={{display: 'flex', justifyContent: 'space-between', gap: Math.round(16 * densitySpacing), alignItems: 'center'}}>
+                <div style={{fontSize: Math.round(14 * contrastSize), letterSpacing: 2.2, textTransform: 'uppercase', color: 'rgba(229,236,255,0.46)'}}>
                   channel load
                 </div>
-                <div style={{fontSize: 14, letterSpacing: 2, textTransform: 'uppercase', color: `${leadColor}cc`}}>
+                <div style={{fontSize: Math.round(14 * contrastSize), letterSpacing: 2, textTransform: 'uppercase', color: `${leadColor}cc`}}>
                   bars / thresholds
                 </div>
               </div>
@@ -199,18 +207,18 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
                     key={item.label}
                     style={{
                       display: 'grid',
-                      gap: 10,
-                      padding: '14px 0 16px',
+                      gap: Math.round(10 * densitySpacing),
+                      padding: `${Math.round(14 * densityPadding)}px 0 ${Math.round(16 * densityPadding)}px`,
                       borderBottom: index === stripItems.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.08)',
                       opacity: staggerSlide.opacity,
                       transform: staggerSlide.transform,
                     }}
                   >
-                    <div style={{display: 'flex', justifyContent: 'space-between', gap: 16, fontSize: 20, alignItems: 'baseline'}}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', gap: Math.round(16 * densitySpacing), fontSize: Math.round(20 * contrastSize), alignItems: 'baseline'}}>
                       <span style={{color: '#f7fbff'}}>{item.label}</span>
                       <span style={{color, opacity: scaleEmphasis.opacity, transform: scaleEmphasis.transform, display: 'inline-block'}}>{item.value}</span>
                     </div>
-                    <div style={{display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 14, alignItems: 'center'}}>
+                    <div style={{display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: Math.round(14 * densitySpacing), alignItems: 'center'}}>
                       <div style={{height: 10, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden'}}>
                         <div
                           style={{
@@ -221,7 +229,7 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
                           }}
                         />
                       </div>
-                      <div style={{fontSize: 12, letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`, opacity: scaleEmphasis.opacity, transform: scaleEmphasis.transform, display: 'inline-block'}}>
+                      <div style={{fontSize: Math.round(12 * contrastSize), letterSpacing: 2, textTransform: 'uppercase', color: `${color}cc`, opacity: scaleEmphasis.opacity, transform: scaleEmphasis.transform, display: 'inline-block'}}>
                         {Math.round(item.ratio * 100)}%
                       </div>
                     </div>
@@ -236,14 +244,14 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
               borderRadius: 36,
               border: `1px solid ${leadColor}18`,
               background: 'linear-gradient(180deg, rgba(8,12,20,0.9) 0%, rgba(6,9,16,0.98) 100%)',
-              padding: '24px 24px 22px',
+              padding: `${Math.round(24 * densityPadding)}px ${Math.round(24 * densityPadding)}px ${Math.round(22 * densityPadding)}px`,
               display: 'grid',
               gridTemplateRows: 'auto auto 1fr',
-              gap: 18,
+              gap: Math.round(18 * densitySpacing),
               minHeight: 0,
             }}
           >
-            <div style={{fontSize: 14, letterSpacing: 2.2, textTransform: 'uppercase', color: 'rgba(229,236,255,0.46)'}}>
+            <div style={{fontSize: Math.round(14 * contrastSize), letterSpacing: 2.2, textTransform: 'uppercase', color: 'rgba(229,236,255,0.46)'}}>
               diagnostics wall
             </div>
 
@@ -251,7 +259,7 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                gap: 14,
+                gap: Math.round(14 * densitySpacing),
               }}
             >
               {stripItems.slice(0, 4).map((item, index) => {
@@ -263,13 +271,13 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
                       borderRadius: 22,
                       border: `1px solid ${color}1e`,
                       background: `linear-gradient(180deg, ${color}10 0%, rgba(8,10,18,0.84) 100%)`,
-                      padding: '16px 14px 14px',
+                      padding: `${Math.round(16 * densityPadding)}px ${Math.round(14 * densityPadding)}px ${Math.round(14 * densityPadding)}px`,
                       display: 'grid',
-                      gap: 10,
+                      gap: Math.round(10 * densitySpacing),
                     }}
                   >
-                    <div style={{display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center'}}>
-                      <div style={{fontSize: 12, letterSpacing: 1.8, textTransform: 'uppercase', color: `${color}cc`}}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', gap: Math.round(10 * densitySpacing), alignItems: 'center'}}>
+                      <div style={{fontSize: Math.round(12 * contrastSize), letterSpacing: 1.8, textTransform: 'uppercase', color: `${color}cc`}}>
                         probe 0{index + 1}
                       </div>
                       <div
@@ -293,10 +301,10 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
                         />
                       </div>
                     </div>
-                    <div style={{fontSize: 22, lineHeight: 1.06, fontWeight: 760, color: '#f7fbff'}}>
+                    <div style={{fontSize: Math.round(22 * contrastSize), lineHeight: 1.06, fontWeight: 760, color: '#f7fbff'}}>
                       {item.label}
                     </div>
-                    <div style={{fontSize: 18, lineHeight: 1.1, color}}>
+                    <div style={{fontSize: Math.round(18 * contrastSize), lineHeight: 1.1, color}}>
                       {item.value}
                     </div>
                   </div>
@@ -309,13 +317,13 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
                 borderRadius: 26,
                 border: `1px solid ${leadColor}16`,
                 background: 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
-                padding: '18px 18px 16px',
+                padding: `${Math.round(18 * densityPadding)}px ${Math.round(18 * densityPadding)}px ${Math.round(16 * densityPadding)}px`,
                 display: 'grid',
-                gap: 12,
+                gap: Math.round(12 * densitySpacing),
                 alignContent: 'start',
               }}
             >
-              <div style={{fontSize: 14, letterSpacing: 2, textTransform: 'uppercase', color: `${leadColor}cc`}}>
+              <div style={{fontSize: Math.round(14 * contrastSize), letterSpacing: 2, textTransform: 'uppercase', color: `${leadColor}cc`}}>
                 operator feed
               </div>
               {stripItems.map((item, index) => (
@@ -324,7 +332,7 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '26px 28px minmax(0, 1fr)',
-                    gap: 10,
+                    gap: Math.round(10 * densitySpacing),
                     alignItems: 'start',
                   }}
                 >
@@ -337,7 +345,7 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 11,
+                      fontSize: Math.round(11 * contrastSize),
                       lineHeight: 1,
                       color: `${leadColor}cc`,
                     }}
@@ -364,7 +372,7 @@ export const UltimateMetricBars: React.FC<UltimateMetricBarsProps & {grammar?: U
                       fallbackIndex={index}
                     />
                   </div>
-                  <div style={{fontSize: 16, lineHeight: 1.34, color: 'rgba(229,236,255,0.68)'}}>
+                  <div style={{fontSize: Math.round(16 * contrastSize), lineHeight: 1.34, color: 'rgba(229,236,255,0.68)'}}>
                     <span style={{color: '#f7fbff'}}>{item.label}</span>
                     {'  '}
                     <span style={{color: resolveUltimateAccent(item.accent ?? 'cyan')}}>{item.value}</span>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="WorkBuddy app icon">
+  <defs>
+    <linearGradient id="bg" x1="20" y1="18" x2="142" y2="146" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#20D9E8"/>
+      <stop offset="0.48" stop-color="#5F7DFF"/>
+      <stop offset="1" stop-color="#9A7CFF"/>
+    </linearGradient>
+    <linearGradient id="face" x1="42" y1="42" x2="126" y2="126" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8FCFF"/>
+      <stop offset="1" stop-color="#CFE8FF"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#031023" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect x="12" y="12" width="136" height="136" rx="34" fill="url(#bg)"/>
+  <path d="M32 111C47 91 62 84 80 84s33 7 48 27v15H32v-15Z" fill="#06111F" opacity="0.25"/>
+  <g filter="url(#shadow)">
+    <rect x="39" y="43" width="82" height="76" rx="24" fill="url(#face)"/>
+    <rect x="52" y="61" width="56" height="31" rx="14" fill="#081525"/>
+    <circle cx="67" cy="76" r="6" fill="#20D9E8"/>
+    <circle cx="93" cy="76" r="6" fill="#45E28D"/>
+    <path d="M65 101c8 7 22 7 30 0" fill="none" stroke="#5F6F88" stroke-width="5" stroke-linecap="round"/>
+    <path d="M80 33v10" stroke="#DDEBFF" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="80" cy="29" r="8" fill="#45E28D"/>
+  </g>
+  <path d="M37 34h22M34 37v22M123 126h-22M126 123v-22" stroke="#EAF8FF" stroke-width="4" stroke-linecap="round" opacity="0.72"/>
+</svg>

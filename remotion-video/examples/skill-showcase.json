@@ -1,0 +1,293 @@
+{
+  "schemaVersion": 1,
+  "projectId": "workbuddy-six-skills-showcase",
+  "title": "装上这 6 个 Skill，WorkBuddy 才算真正的好帮手",
+  "render": {
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "qualityMode": "cinematic",
+    "orientation": "portrait",
+    "captionStyle": "editorial",
+    "showProjectLabel": false
+  },
+  "scenes": [
+    {
+      "id": "intro",
+      "family": "skill-showcase",
+      "durationInFrames": 148,
+      "payload": {
+        "variant": "intro",
+        "title": "装上 Skill 才算好帮手",
+        "accent": "#20d9e8",
+        "secondaryAccent": "#9a7cff",
+        "labels": ["写代码", "做视频", "生成 PPT", "做网页"],
+        "beats": [
+          {"startFrame": 0, "endFrame": 42, "keyword": "只会聊天", "icon": "message-circle", "action": "compare", "evidence": ["聊天", "帮手"]},
+          {"startFrame": 42, "endFrame": 86, "keyword": "装上 Skill", "icon": "plug-zap", "action": "spotlight"},
+          {"startFrame": 86, "endFrame": 120, "keyword": "真正帮手", "icon": "bot", "action": "focus"},
+          {"startFrame": 120, "endFrame": 148, "keyword": "能力开场", "icon": "rocket", "action": "burst"}
+        ]
+      },
+      "assetIds": [],
+      "transition": {"type": "fade", "durationInFrames": 10}
+    },
+    {
+      "id": "overview",
+      "family": "skill-showcase",
+      "durationInFrames": 248,
+      "payload": {
+        "variant": "overview",
+        "title": "我一直在用的几个 Skill",
+        "accent": "#20d9e8",
+        "secondaryAccent": "#5f7dff",
+        "labels": ["编码原则", "Remotion", "PPT Master", "正文配图", "HyperFrames", "UI Skill"],
+        "beats": [
+          {"startFrame": 0, "endFrame": 38, "keyword": "几个 Skill", "icon": "grid-3x3", "action": "counter", "value": "6"},
+          {"startFrame": 38, "endFrame": 76, "keyword": "写代码", "icon": "code", "action": "trace"},
+          {"startFrame": 76, "endFrame": 112, "keyword": "做视频", "icon": "film", "action": "trace"},
+          {"startFrame": 112, "endFrame": 148, "keyword": "生成 PPT", "icon": "presentation", "action": "trace"},
+          {"startFrame": 148, "endFrame": 184, "keyword": "正文配图", "icon": "image-plus", "action": "focus"},
+          {"startFrame": 184, "endFrame": 218, "keyword": "UI Skill", "icon": "layout-template", "action": "stack", "evidence": ["排版", "留白", "配色"]},
+          {"startFrame": 218, "endFrame": 248, "keyword": "能力组合", "icon": "blocks", "action": "burst"}
+        ]
+      },
+      "assetIds": [],
+      "transition": {"type": "slide", "durationInFrames": 10}
+    },
+    {
+      "id": "coding-guidelines",
+      "family": "skill-showcase",
+      "durationInFrames": 529,
+      "payload": {
+        "variant": "coding",
+        "index": "01",
+        "title": "编码原则",
+        "subtitle": "Karpathy Guidelines · 先约束，再动手",
+        "accent": "#45e28d",
+        "secondaryAccent": "#20d9e8",
+        "bullets": ["先讲清假设", "只做最小改动", "不碰无关文件", "改完自己验证"],
+        "beats": [
+          {"startFrame": 0, "endFrame": 107, "keyword": "编码原则", "icon": "code", "action": "stamp", "evidence": ["先约束", "再动手"]},
+          {"startFrame": 107, "endFrame": 226, "keyword": "最大毛病", "icon": "bug", "action": "focus", "evidence": ["乱猜需求", "瞎加抽象"]},
+          {"startFrame": 226, "endFrame": 292, "keyword": "无关改动", "icon": "shield-alert", "action": "compare", "evidence": ["没让它动", "顺手全改"]},
+          {"startFrame": 292, "endFrame": 371, "keyword": "讲清假设", "icon": "file-search", "action": "stack", "evidence": ["目标", "范围", "验收"]},
+          {"startFrame": 371, "endFrame": 405, "keyword": "最小改动", "icon": "git-compare-arrows", "action": "trace", "value": "3 files"},
+          {"startFrame": 405, "endFrame": 450, "keyword": "自己验证", "icon": "test-tube", "action": "counter", "value": "14/14"},
+          {"startFrame": 450, "endFrame": 529, "keyword": "更靠谱", "icon": "badge-check", "action": "burst"}
+        ]
+      },
+      "assetIds": [],
+      "transition": {"type": "fade", "durationInFrames": 10}
+    },
+    {
+      "id": "remotion",
+      "family": "skill-showcase",
+      "durationInFrames": 388,
+      "payload": {
+        "variant": "remotion",
+        "index": "02",
+        "title": "Remotion",
+        "subtitle": "用 React 写视频 · 一段代码就是一帧画面",
+        "accent": "#5f7dff",
+        "secondaryAccent": "#20d9e8",
+        "beats": [
+          {"startFrame": 0, "endFrame": 55, "keyword": "Remotion", "icon": "film", "action": "stamp"},
+          {"startFrame": 55, "endFrame": 120, "keyword": "网页方式", "icon": "panel-top", "action": "spotlight"},
+          {"startFrame": 120, "endFrame": 160, "keyword": "React 代码", "icon": "braces", "action": "trace"},
+          {"startFrame": 160, "endFrame": 198, "keyword": "一帧画面", "icon": "panels-top-left", "action": "focus"},
+          {"startFrame": 198, "endFrame": 235, "keyword": "AI 读得懂", "icon": "brain-circuit", "action": "stack", "evidence": ["DOM", "Props", "Frames"]},
+          {"startFrame": 235, "endFrame": 292, "keyword": "渲染成片", "icon": "play", "action": "burst", "value": "MP4"},
+          {"startFrame": 292, "endFrame": 388, "keyword": "底层都是它", "icon": "blocks", "action": "spotlight"}
+        ]
+      },
+      "assetIds": [],
+      "transition": {"type": "slide", "durationInFrames": 10}
+    },
+    {
+      "id": "ppt-master",
+      "family": "skill-showcase",
+      "durationInFrames": 500,
+      "payload": {
+        "variant": "ppt",
+        "index": "03",
+        "title": "PPT Master",
+        "subtitle": "真对象 · 真可编辑 · 真能交付",
+        "accent": "#ffc44d",
+        "secondaryAccent": "#ff7a45",
+        "beats": [
+          {"startFrame": 0, "endFrame": 54, "keyword": "PPT Master", "icon": "presentation", "action": "stamp"},
+          {"startFrame": 54, "endFrame": 173, "keyword": "一张图片", "icon": "image", "action": "compare", "evidence": ["只能看", "不能改"]},
+          {"startFrame": 173, "endFrame": 311, "keyword": "原生对象", "icon": "shapes", "action": "focus"},
+          {"startFrame": 311, "endFrame": 360, "keyword": "形状图表连线", "icon": "chart-pie", "action": "stack", "evidence": ["形状", "图表", "连接线"]},
+          {"startFrame": 360, "endFrame": 404, "keyword": "全都能编辑", "icon": "mouse-pointer-2", "action": "trace"},
+          {"startFrame": 404, "endFrame": 500, "keyword": "能改的 PPT", "icon": "badge-check", "action": "burst"}
+        ]
+      },
+      "assetIds": [],
+      "transition": {"type": "fade", "durationInFrames": 10}
+    },
+    {
+      "id": "article-illustration",
+      "family": "skill-showcase",
+      "durationInFrames": 560,
+      "payload": {
+        "variant": "illustration",
+        "index": "04",
+        "title": "小黑正文配图",
+        "subtitle": "先读懂正文，再把判断画出来",
+        "accent": "#ff5f91",
+        "secondaryAccent": "#ffc44d",
+        "beats": [
+          {"startFrame": 0, "endFrame": 78, "keyword": "正文配图", "icon": "pen-tool", "action": "stamp"},
+          {"startFrame": 78, "endFrame": 172, "keyword": "图文对不上", "icon": "unlink-2", "action": "compare", "evidence": ["正文判断", "随机配图"]},
+          {"startFrame": 172, "endFrame": 238, "keyword": "一个判断", "icon": "file-text", "action": "focus"},
+          {"startFrame": 238, "endFrame": 268, "keyword": "一个比喻", "icon": "quote", "action": "spotlight"},
+          {"startFrame": 268, "endFrame": 386, "keyword": "纯白手绘", "icon": "image-plus", "action": "stack", "evidence": ["判断", "比喻", "图解"]},
+          {"startFrame": 386, "endFrame": 529, "keyword": "两个断点", "icon": "workflow", "action": "compare", "evidence": ["素材孤岛", "结论没承接"]},
+          {"startFrame": 529, "endFrame": 560, "keyword": "一看就懂", "icon": "circle-check-big", "action": "burst"}
+        ]
+      },
+      "assetIds": [],
+      "transition": {"type": "slide", "durationInFrames": 10}
+    },
+    {
+      "id": "hyperframes",
+      "family": "skill-showcase",
+      "durationInFrames": 372,
+      "payload": {
+        "variant": "hyperframes",
+        "index": "05",
+        "title": "HyperFrames",
+        "subtitle": "视频动效 · 专为 AI Agent 设计",
+        "accent": "#20d9e8",
+        "secondaryAccent": "#45e28d",
+        "beats": [
+          {"startFrame": 0, "endFrame": 49, "keyword": "HyperFrames", "icon": "clapperboard", "action": "stamp"},
+          {"startFrame": 49, "endFrame": 85, "keyword": "同样做视频", "icon": "film", "action": "spotlight"},
+          {"startFrame": 85, "endFrame": 147, "keyword": "专为 Agent", "icon": "bot", "action": "focus"},
+          {"startFrame": 147, "endFrame": 200, "keyword": "HTML", "icon": "code-xml", "action": "trace"},
+          {"startFrame": 200, "endFrame": 253, "keyword": "AI 变视频", "icon": "wand-sparkles", "action": "burst"},
+          {"startFrame": 253, "endFrame": 310, "keyword": "20+ Skills", "icon": "blocks", "action": "counter", "value": "20+"},
+          {"startFrame": 310, "endFrame": 372, "keyword": "直接用", "icon": "plug-zap", "action": "spotlight"}
+        ]
+      },
+      "assetIds": [],
+      "transition": {"type": "fade", "durationInFrames": 10}
+    },
+    {
+      "id": "ui-skill",
+      "family": "skill-showcase",
+      "durationInFrames": 497,
+      "payload": {
+        "variant": "ui",
+        "index": "06",
+        "title": "我整理的 UI Skill",
+        "subtitle": "做网页 · 一整套设计立场",
+        "accent": "#9a7cff",
+        "secondaryAccent": "#ff5f91",
+        "beats": [
+          {"startFrame": 0, "endFrame": 99, "keyword": "UI Skill", "icon": "layout-template", "action": "stamp"},
+          {"startFrame": 99, "endFrame": 145, "keyword": "不是模板", "icon": "component", "action": "compare", "evidence": ["模板", "设计系统"]},
+          {"startFrame": 145, "endFrame": 190, "keyword": "设计立场", "icon": "palette", "action": "focus"},
+          {"startFrame": 190, "endFrame": 262, "keyword": "排版·留白·配色", "icon": "swatch-book", "action": "stack", "evidence": ["排版", "留白", "配色"]},
+          {"startFrame": 262, "endFrame": 315, "keyword": "页面实证", "icon": "image", "action": "spotlight"},
+          {"startFrame": 315, "endFrame": 425, "keyword": "AI 塑料味", "icon": "shield-alert", "action": "compare", "evidence": ["装之前", "装之后"]},
+          {"startFrame": 425, "endFrame": 497, "keyword": "能用的设计", "icon": "badge-check", "action": "burst"}
+        ]
+      },
+      "assetIds": [],
+      "transition": {"type": "slide", "durationInFrames": 10}
+    },
+    {
+      "id": "outro",
+      "family": "skill-showcase",
+      "durationInFrames": 407,
+      "payload": {
+        "variant": "outro",
+        "title": "装上 Skill，WorkBuddy 才算好帮手",
+        "accent": "#9a7cff",
+        "secondaryAccent": "#20d9e8",
+        "labels": ["代码", "视频", "PPT", "配图", "动效", "网页"],
+        "beats": [
+          {"startFrame": 0, "endFrame": 78, "keyword": "6 种能力", "icon": "blocks", "action": "stack", "evidence": ["代码", "视频", "PPT"]},
+          {"startFrame": 78, "endFrame": 160, "keyword": "进 WorkBuddy", "icon": "bot", "action": "focus"},
+          {"startFrame": 160, "endFrame": 242, "keyword": "不只聊天", "icon": "message-circle", "action": "compare", "evidence": ["聊天", "交付"]},
+          {"startFrame": 242, "endFrame": 322, "keyword": "真正帮手", "icon": "circle-check-big", "action": "spotlight"},
+          {"startFrame": 322, "endFrame": 407, "keyword": "评论区 Skill", "icon": "send", "action": "burst"}
+        ]
+      },
+      "assetIds": [],
+      "transition": false
+    }
+  ],
+  "captions": [
+    {"text": "很多人用 WorkBuddy 只会聊天", "startMs": 0, "endMs": 2080, "timestampMs": 0, "confidence": 1},
+    {"text": "装上这几个 Skill", "startMs": 2080, "endMs": 3440, "timestampMs": 2080, "confidence": 1},
+    {"text": "它才算真正的好帮手", "startMs": 3440, "endMs": 4920, "timestampMs": 3440, "confidence": 1},
+    {"text": "这是我现在一直在用的几个 Skill", "startMs": 4920, "endMs": 7320, "timestampMs": 4920, "confidence": 1},
+    {"text": "写代码、做网页、生成 PPT", "startMs": 7320, "endMs": 9840, "timestampMs": 7320, "confidence": 1},
+    {"text": "甚至直接做视频动效", "startMs": 9840, "endMs": 11720, "timestampMs": 9840, "confidence": 1},
+    {"text": "今天，一次分享给你", "startMs": 11720, "endMs": 13200, "timestampMs": 11720, "confidence": 1},
+    {"text": "第一个，一套按 Karpathy 观点整理的编码原则", "startMs": 13200, "endMs": 16760, "timestampMs": 13200, "confidence": 1},
+    {"text": "AI 写代码最大的毛病", "startMs": 16760, "endMs": 18640, "timestampMs": 16760, "confidence": 1},
+    {"text": "是乱猜需求、瞎加抽象", "startMs": 18640, "endMs": 20720, "timestampMs": 18640, "confidence": 1},
+    {"text": "还顺手改一堆没让它动的地方", "startMs": 20720, "endMs": 22920, "timestampMs": 20720, "confidence": 1},
+    {"text": "装上它，AI 会先把假设讲清楚", "startMs": 22920, "endMs": 25560, "timestampMs": 22920, "confidence": 1},
+    {"text": "只做最小改动，改完自己验证", "startMs": 25560, "endMs": 27840, "timestampMs": 25560, "confidence": 1},
+    {"text": "说白了，就是让 AI 写代码更靠谱", "startMs": 27840, "endMs": 30840, "timestampMs": 27840, "confidence": 1},
+    {"text": "第二个，Remotion", "startMs": 30840, "endMs": 32680, "timestampMs": 30840, "confidence": 1},
+    {"text": "它让你用写网页的方式写视频", "startMs": 32680, "endMs": 34840, "timestampMs": 32680, "confidence": 1},
+    {"text": "一段 React 代码，就是一帧画面", "startMs": 34840, "endMs": 37440, "timestampMs": 34840, "confidence": 1},
+    {"text": "AI 完全读得懂", "startMs": 37440, "endMs": 38680, "timestampMs": 37440, "confidence": 1},
+    {"text": "直接把代码渲染成片子", "startMs": 38680, "endMs": 40560, "timestampMs": 38680, "confidence": 1},
+    {"text": "你现在刷到的很多视频工具，底层用的都是它", "startMs": 40560, "endMs": 43760, "timestampMs": 40560, "confidence": 1},
+    {"text": "第三个，PPT Master", "startMs": 43760, "endMs": 45560, "timestampMs": 43760, "confidence": 1},
+    {"text": "AI 做 PPT 你肯定试过", "startMs": 45560, "endMs": 47640, "timestampMs": 45560, "confidence": 1},
+    {"text": "多半给你一张动不了的图片", "startMs": 47640, "endMs": 49520, "timestampMs": 47640, "confidence": 1},
+    {"text": "这个不一样", "startMs": 49520, "endMs": 50440, "timestampMs": 49520, "confidence": 1},
+    {"text": "它生成的是真正能在 PowerPoint 里", "startMs": 50440, "endMs": 52720, "timestampMs": 50440, "confidence": 1},
+    {"text": "继续改的原生对象", "startMs": 52720, "endMs": 54120, "timestampMs": 52720, "confidence": 1},
+    {"text": "形状、图表、连接线全都能编辑", "startMs": 54120, "endMs": 57240, "timestampMs": 54120, "confidence": 1},
+    {"text": "文档丢进去，一套能改的 PPT 就出来", "startMs": 57240, "endMs": 60440, "timestampMs": 57240, "confidence": 1},
+    {"text": "第四个，小黑正文配图", "startMs": 60440, "endMs": 63040, "timestampMs": 60440, "confidence": 1},
+    {"text": "写文章最头疼的是，配图跟文字对不上", "startMs": 63040, "endMs": 66160, "timestampMs": 63040, "confidence": 1},
+    {"text": "它会先读懂你正文里的一个判断", "startMs": 66160, "endMs": 68360, "timestampMs": 66160, "confidence": 1},
+    {"text": "一个比喻", "startMs": 68360, "endMs": 69360, "timestampMs": 68360, "confidence": 1},
+    {"text": "再画成一张纯白手绘插画", "startMs": 69360, "endMs": 71720, "timestampMs": 69360, "confidence": 1},
+    {"text": "比如这张讲的两个断点", "startMs": 71720, "endMs": 73520, "timestampMs": 71720, "confidence": 1},
+    {"text": "写之前素材孤岛，写完之后没承接", "startMs": 73520, "endMs": 76480, "timestampMs": 73520, "confidence": 1},
+    {"text": "一看就懂，几分钟出一整套", "startMs": 76480, "endMs": 79120, "timestampMs": 76480, "confidence": 1},
+    {"text": "第五个，HyperFrames", "startMs": 79120, "endMs": 80720, "timestampMs": 79120, "confidence": 1},
+    {"text": "同样是做视频", "startMs": 80720, "endMs": 81920, "timestampMs": 80720, "confidence": 1},
+    {"text": "但它是专门为 AI Agent 造的", "startMs": 81920, "endMs": 84000, "timestampMs": 81920, "confidence": 1},
+    {"text": "你写一段 HTML，AI 就能把它变成一条视频", "startMs": 84000, "endMs": 87520, "timestampMs": 84000, "confidence": 1},
+    {"text": "里面 20 多个技能按需加载", "startMs": 87520, "endMs": 89440, "timestampMs": 87520, "confidence": 1},
+    {"text": "主流的 AI 工具都能直接用", "startMs": 89440, "endMs": 91520, "timestampMs": 89440, "confidence": 1},
+    {"text": "最后压轴，是我自己整理的一套 UI Skill", "startMs": 91520, "endMs": 94800, "timestampMs": 91520, "confidence": 1},
+    {"text": "它给 AI 的不是模板", "startMs": 94800, "endMs": 96320, "timestampMs": 94800, "confidence": 1},
+    {"text": "是一整套设计立场", "startMs": 96320, "endMs": 97840, "timestampMs": 96320, "confidence": 1},
+    {"text": "排版、留白、配色全有规范", "startMs": 97840, "endMs": 100240, "timestampMs": 97840, "confidence": 1},
+    {"text": "这些页面全是它做的", "startMs": 100240, "endMs": 102000, "timestampMs": 100240, "confidence": 1},
+    {"text": "同样一句话：做网页", "startMs": 102000, "endMs": 103520, "timestampMs": 102000, "confidence": 1},
+    {"text": "装它之前一股 AI 塑料味", "startMs": 103520, "endMs": 105680, "timestampMs": 103520, "confidence": 1},
+    {"text": "装完之后，直接是能用的设计", "startMs": 105680, "endMs": 108080, "timestampMs": 105680, "confidence": 1},
+    {"text": "6 个 Skill，6 种能力", "startMs": 108080, "endMs": 109920, "timestampMs": 108080, "confidence": 1},
+    {"text": "写代码、做视频、生成 PPT", "startMs": 109920, "endMs": 112160, "timestampMs": 109920, "confidence": 1},
+    {"text": "正文配图，还有做网页的审美", "startMs": 112160, "endMs": 114400, "timestampMs": 112160, "confidence": 1},
+    {"text": "都装进 WorkBuddy", "startMs": 114400, "endMs": 115600, "timestampMs": 114400, "confidence": 1},
+    {"text": "它就不只是个聊天框了", "startMs": 115600, "endMs": 117120, "timestampMs": 115600, "confidence": 1},
+    {"text": "如果你也需要，评论区打个 Skill", "startMs": 117120, "endMs": 119440, "timestampMs": 117120, "confidence": 1},
+    {"text": "我整理给你", "startMs": 119440, "endMs": 120440, "timestampMs": 119440, "confidence": 1}
+  ],
+  "audio": {
+    "voiceAssetId": "voiceover"
+  },
+  "assets": {
+    "voiceover": {
+      "kind": "audio",
+      "src": "projects/skill-showcase/audio/voice.m4a",
+      "required": true
+    }
+  }
+}

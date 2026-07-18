@@ -22,10 +22,18 @@ export {
   UltimateTimeline,
   UltimateCodePanel,
 } from './UltimateElements';
-export {UltimateCaptionOverlay} from './UltimateCaptionOverlay';
+export {SkillShowcase} from './families/skill-showcase/SkillShowcase';
+export type {
+  SkillBeatAction,
+  SkillIconKey,
+  SkillShowcaseBeat,
+  SkillShowcaseProps,
+  SkillShowcaseVariant,
+} from './families/skill-showcase/types';
 export {UltimateDirectorEffects} from './UltimateDirectorEffects';
 export {UltimateSceneTransition} from './UltimateSceneTransition';
 export {DirectorScoreOrchestrator} from './DirectorScoreOrchestrator';
+export {UltimateHeading} from './UltimateHeading';
 export type {
   UltimateArchitectureMapProps,
   UltimateBenchmarkChartProps,
@@ -86,12 +94,10 @@ export type {
   UltimateTransitionPreset,
   UltimateSceneConfig,
   UltimateSceneFamily,
-  UltimateSceneTemplateProps,
-  UltimateSubtitleCue,
-  UltimateSubtitleWord,
   UltimateStepFlowScene,
   UltimateTagMatrixScene,
   UltimateTerminalScene,
+  UltimateSkillShowcaseScene,
   UltimateTimelineScene,
   ResolvedUltimateProjectConfig,
   ResolvedUltimateSceneConfig,
@@ -104,6 +110,7 @@ export type {
   ResolvedUltimateTimelineScene,
   ResolvedUltimateCompareBoardScene,
   ResolvedUltimateTerminalScene,
+  ResolvedUltimateSkillShowcaseScene,
   ResolvedUltimateEvidenceWallScene,
   ResolvedUltimateTagMatrixScene,
   ResolvedUltimateCodeScene,

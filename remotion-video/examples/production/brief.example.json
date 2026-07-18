@@ -1,0 +1,55 @@
+{
+  "productionId": "2026-07-17-ai-tool-workflow",
+  "title": "某个 AI 工具如何改变团队工作流",
+  "primaryLink": "https://example.com/product",
+  "platform": "douyin",
+  "format": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "maxDurationSeconds": 180
+  },
+  "audience": [
+    "技术小白",
+    "AI 从业者",
+    "创业者",
+    "产品经理",
+    "老板/投资人"
+  ],
+  "contentType": "技术教程",
+  "tone": "技术布道",
+  "structure": "痛点 -> 方案 -> 3 步教程 -> 注意事项 -> 结论",
+  "visualStyle": {
+    "palette": "蓝绿 AI 感",
+    "subtitles": "固定字幕样式",
+    "branding": "第一阶段不做强品牌化"
+  },
+  "research": {
+    "sourcePriority": [
+      "官方文档/官网",
+      "GitHub/论文/发布页",
+      "权威媒体",
+      "社交平台讨论"
+    ],
+    "socialPolicy": "只当线索，不当证据",
+    "allowLoggedInBrowserScreenshots": true
+  },
+  "viewpointCandidates": [
+    {
+      "id": "view-1",
+      "claim": "这个工具的关键价值不是替代人，而是把重复工作压缩成标准流程。",
+      "whyItMatters": "适合解释它如何改变团队工作流。"
+    },
+    {
+      "id": "view-2",
+      "claim": "真正的门槛不在安装，而在把它接进现有业务流程。",
+      "whyItMatters": "适合做 3 步教程。"
+    },
+    {
+      "id": "view-3",
+      "claim": "它短期提升效率，长期改变岗位分工。",
+      "whyItMatters": "适合面向创业者和管理者。"
+    }
+  ],
+  "selectedViewpointId": "view-1"
+}

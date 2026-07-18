@@ -1,0 +1,371 @@
+{
+  "ref": "ref1",
+  "duration": 176.016,
+  "frames_2fps": 352,
+  "sampling_note": "2fps dense sampling; layout records every 3s; motion uses every adjacent 0.5s pair",
+  "module_counts_3s": {
+    "sparse-center-module": 51,
+    "headline-plus-subtitle": 2,
+    "ambient-stage/subtitle-only": 5,
+    "headline-or-hero-card": 1
+  },
+  "region_counts_3s": {
+    "large-stage": 16,
+    "subtitle": 5,
+    "right": 20,
+    "center": 18
+  },
+  "motion": {
+    "avg_diff": 1.608,
+    "median_diff": 0.913,
+    "p95_diff": 2.896,
+    "max_diff": 55.746
+  },
+  "segments_3s_collapsed": [
+    {
+      "start": 0.0,
+      "end": 3.0,
+      "key": [
+        "sparse-center-module",
+        "large-stage"
+      ],
+      "samples": 2,
+      "module_hint": "sparse-center-module",
+      "region": "large-stage"
+    },
+    {
+      "start": 6.0,
+      "end": 9.0,
+      "key": [
+        "headline-plus-subtitle",
+        "large-stage"
+      ],
+      "samples": 2,
+      "module_hint": "headline-plus-subtitle",
+      "region": "large-stage"
+    },
+    {
+      "start": 12.0,
+      "end": 15.0,
+      "key": [
+        "ambient-stage/subtitle-only",
+        "subtitle"
+      ],
+      "samples": 2,
+      "module_hint": "ambient-stage/subtitle-only",
+      "region": "subtitle"
+    },
+    {
+      "start": 18.0,
+      "end": 21.0,
+      "key": [
+        "sparse-center-module",
+        "large-stage"
+      ],
+      "samples": 2,
+      "module_hint": "sparse-center-module",
+      "region": "large-stage"
+    },
+    {
+      "start": 24.0,
+      "end": 24.0,
+      "key": [
+        "sparse-center-module",
+        "right"
+      ],
+      "samples": 1,
+      "module_hint": "sparse-center-module",
+      "region": "right"
+    },
+    {
+      "start": 27.0,
+      "end": 30.0,
+      "key": [
+        "sparse-center-module",
+        "large-stage"
+      ],
+      "samples": 2,
+      "module_hint": "sparse-center-module",
+      "region": "large-stage"
+    },
+    {
+      "start": 33.0,
+      "end": 33.0,
+      "key": [
+        "sparse-center-module",
+        "right"
+      ],
+      "samples": 1,
+      "module_hint": "sparse-center-module",
+      "region": "right"
+    },
+    {
+      "start": 36.0,
+      "end": 36.0,
+      "key": [
+        "ambient-stage/subtitle-only",
+        "subtitle"
+      ],
+      "samples": 1,
+      "module_hint": "ambient-stage/subtitle-only",
+      "region": "subtitle"
+    },
+    {
+      "start": 39.0,
+      "end": 45.0,
+      "key": [
+        "sparse-center-module",
+        "center"
+      ],
+      "samples": 3,
+      "module_hint": "sparse-center-module",
+      "region": "center"
+    },
+    {
+      "start": 48.0,
+      "end": 48.0,
+      "key": [
+        "ambient-stage/subtitle-only",
+        "subtitle"
+      ],
+      "samples": 1,
+      "module_hint": "ambient-stage/subtitle-only",
+      "region": "subtitle"
+    },
+    {
+      "start": 51.0,
+      "end": 54.0,
+      "key": [
+        "sparse-center-module",
+        "large-stage"
+      ],
+      "samples": 2,
+      "module_hint": "sparse-center-module",
+      "region": "large-stage"
+    },
+    {
+      "start": 57.0,
+      "end": 66.0,
+      "key": [
+        "sparse-center-module",
+        "center"
+      ],
+      "samples": 4,
+      "module_hint": "sparse-center-module",
+      "region": "center"
+    },
+    {
+      "start": 69.0,
+      "end": 69.0,
+      "key": [
+        "sparse-center-module",
+        "right"
+      ],
+      "samples": 1,
+      "module_hint": "sparse-center-module",
+      "region": "right"
+    },
+    {
+      "start": 72.0,
+      "end": 72.0,
+      "key": [
+        "sparse-center-module",
+        "center"
+      ],
+      "samples": 1,
+      "module_hint": "sparse-center-module",
+      "region": "center"
+    },
+    {
+      "start": 75.0,
+      "end": 75.0,
+      "key": [
+        "sparse-center-module",
+        "right"
+      ],
+      "samples": 1,
+      "module_hint": "sparse-center-module",
+      "region": "right"
+    },
+    {
+      "start": 78.0,
+      "end": 81.0,
+      "key": [
+        "sparse-center-module",
+        "center"
+      ],
+      "samples": 2,
+      "module_hint": "sparse-center-module",
+      "region": "center"
+    },
+    {
+      "start": 84.0,
+      "end": 87.0,
+      "key": [
+        "sparse-center-module",
+        "large-stage"
+      ],
+      "samples": 2,
+      "module_hint": "sparse-center-module",
+      "region": "large-stage"
+    },
+    {
+      "start": 90.0,
+      "end": 93.0,
+      "key": [
+        "sparse-center-module",
+        "center"
+      ],
+      "samples": 2,
+      "module_hint": "sparse-center-module",
+      "region": "center"
+    },
+    {
+      "start": 96.0,
+      "end": 99.0,
+      "key": [
+        "sparse-center-module",
+        "large-stage"
+      ],
+      "samples": 2,
+      "module_hint": "sparse-center-module",
+      "region": "large-stage"
+    },
+    {
+      "start": 102.0,
+      "end": 105.0,
+      "key": [
+        "sparse-center-module",
+        "center"
+      ],
+      "samples": 2,
+      "module_hint": "sparse-center-module",
+      "region": "center"
+    },
+    {
+      "start": 108.0,
+      "end": 114.0,
+      "key": [
+        "sparse-center-module",
+        "right"
+      ],
+      "samples": 3,
+      "module_hint": "sparse-center-module",
+      "region": "right"
+    },
+    {
+      "start": 117.0,
+      "end": 120.0,
+      "key": [
+        "sparse-center-module",
+        "center"
+      ],
+      "samples": 2,
+      "module_hint": "sparse-center-module",
+      "region": "center"
+    },
+    {
+      "start": 123.0,
+      "end": 123.0,
+      "key": [
+        "sparse-center-module",
+        "right"
+      ],
+      "samples": 1,
+      "module_hint": "sparse-center-module",
+      "region": "right"
+    },
+    {
+      "start": 126.0,
+      "end": 126.0,
+      "key": [
+        "sparse-center-module",
+        "large-stage"
+      ],
+      "samples": 1,
+      "module_hint": "sparse-center-module",
+      "region": "large-stage"
+    },
+    {
+      "start": 129.0,
+      "end": 147.0,
+      "key": [
+        "sparse-center-module",
+        "right"
+      ],
+      "samples": 7,
+      "module_hint": "sparse-center-module",
+      "region": "right"
+    },
+    {
+      "start": 150.0,
+      "end": 150.0,
+      "key": [
+        "ambient-stage/subtitle-only",
+        "subtitle"
+      ],
+      "samples": 1,
+      "module_hint": "ambient-stage/subtitle-only",
+      "region": "subtitle"
+    },
+    {
+      "start": 153.0,
+      "end": 159.0,
+      "key": [
+        "sparse-center-module",
+        "right"
+      ],
+      "samples": 3,
+      "module_hint": "sparse-center-module",
+      "region": "right"
+    },
+    {
+      "start": 162.0,
+      "end": 165.0,
+      "key": [
+        "sparse-center-module",
+        "center"
+      ],
+      "samples": 2,
+      "module_hint": "sparse-center-module",
+      "region": "center"
+    },
+    {
+      "start": 168.0,
+      "end": 171.0,
+      "key": [
+        "sparse-center-module",
+        "right"
+      ],
+      "samples": 2,
+      "module_hint": "sparse-center-module",
+      "region": "right"
+    },
+    {
+      "start": 174.0,
+      "end": 174.0,
+      "key": [
+        "headline-or-hero-card",
+        "large-stage"
+      ],
+      "samples": 1,
+      "module_hint": "headline-or-hero-card",
+      "region": "large-stage"
+    }
+  ],
+  "artifacts": {
+    "contact_5s": [
+      "/tmp/reference-video-deep-analysis/ref1/contact-5s.png"
+    ],
+    "contact_1s_sheets": [
+      "/tmp/reference-video-deep-analysis/ref1/contact-1s-01.png",
+      "/tmp/reference-video-deep-analysis/ref1/contact-1s-02.png",
+      "/tmp/reference-video-deep-analysis/ref1/contact-1s-03.png",
+      "/tmp/reference-video-deep-analysis/ref1/contact-1s-04.png"
+    ],
+    "motion_timeline": "/tmp/reference-video-deep-analysis/ref1/motion-timeline.png",
+    "motion_heatmap": "/tmp/reference-video-deep-analysis/ref1/motion-heatmap.png",
+    "motion_peak_boxes": "/tmp/reference-video-deep-analysis/ref1/motion-peak-boxes.png",
+    "layout_boxes_3s": "/tmp/reference-video-deep-analysis/ref1/layout-boxes-3s.png"
+  }
+}

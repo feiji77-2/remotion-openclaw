@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "projectId": "examples-project",
+  "title": "未来一年，别再低估别再低估别再低估别再低估codex5.6，真正变化已经开始，真正变化已经开始，真正变化已经开始，真正变化已经开始会先改变这类工作",
+  "render": {
+    "fps": 30,
+    "width": 1920,
+    "height": 1080,
+    "qualityMode": "fast"
+  },
+  "scenes": [
+    {
+      "id": "opening",
+      "family": "spoken-title",
+      "durationInFrames": 600,
+      "payload": {
+        "title": "未来一年，别再低估别再低估别再低估别再低估codex5.6，真正变化已经开始，真正变化已经开始，真正变化已经开始，真正变化已经开始会先改变这类工作",
+        "subtitle": "先用一句反常识开场，让观众意识到工作流正在变化。",
+        "kicker": "PERSONAL IP",
+        "accent": "cyan"
+      },
+      "assetIds": [],
+      "transition": {
+        "type": "slide",
+        "durationInFrames": 8
+      }
+    },
+    {
+      "id": "pain-solution",
+      "family": "spoken-compare",
+      "durationInFrames": 381,
+      "payload": {
+        "heading": "痛点到方案",
+        "items": [
+          {
+            "label": "旧方式",
+            "value": "过去我们花很多时间不是在创造，而是在推动流程、催进度、对"
+          },
+          {
+            "label": "新方案",
+            "value": "把目标、上下文和验收标准交给 Agent，让它自己组织步"
+          }
+        ],
+        "accent": "cyan"
+      },
+      "assetIds": [],
+      "transition": {
+        "type": "fade",
+        "durationInFrames": 8
+      }
+    },
+    {
+      "id": "steps",
+      "family": "spoken-process",
+      "durationInFrames": 78,
+      "payload": {
+        "steps": [
+          {
+            "label": "待补充步骤",
+            "detail": "请在脚本中补充具体步骤"
+          }
+        ],
+        "accent": "green"
+      },
+      "assetIds": [],
+      "transition": {
+        "type": "slide",
+        "durationInFrames": 8
+      }
+    },
+    {
+      "id": "takeaway",
+      "family": "spoken-takeaway",
+      "durationInFrames": 78,
+      "payload": {
+        "title": "AI Agent 真正改变的是工作流所有权，不只是生成内容。",
+        "subtitle": "听懂、能复述、能上手，是这条视频的交付标准。",
+        "kicker": "TAKEAWAY",
+        "accent": "green"
+      },
+      "assetIds": [],
+      "transition": false
+    }
+  ],
+  "captions": [
+    {
+      "text": "先用一句反常识开场，让观众意识到工作流正在变化。",
+      "startMs": 0,
+      "endMs": 5414,
+      "timestampMs": 0,
+      "confidence": 1
+    },
+    {
+      "text": "过去我们花很多时间不是在创造，而是在推动流程、催进度、对齐状态。",
+      "startMs": 5414,
+      "endMs": 10828,
+      "timestampMs": 5414,
+      "confidence": 1
+    },
+    {
+      "text": "把目标、上下文和验收标准交给 Agent，让它自己组织步骤并交付结果。",
+      "startMs": 10828,
+      "endMs": 16242,
+      "timestampMs": 10828,
+      "confidence": 1
+    },
+    {
+      "text": "第一步，写清楚目标和观众，让系统知道这条视频到底要说服谁。",
+      "startMs": 16242,
+      "endMs": 21656,
+      "timestampMs": 16242,
+      "confidence": 1
+    },
+    {
+      "text": "第二步，冻结标题、口播和分镜，不要一边渲染一边漂移。",
+      "startMs": 21656,
+      "endMs": 27070,
+      "timestampMs": 21656,
+      "confidence": 1
+    },
+    {
+      "text": "第三步，先生成关键帧验收，再进入完整 MP4 渲染。",
+      "startMs": 27070,
+      "endMs": 32484,
+      "timestampMs": 27070,
+      "confidence": 1
+    },
+    {
+      "text": "所以未来的视频生产，不是从命令开始，而是从选题、文案和验收标准开始。",
+      "startMs": 32484,
+      "endMs": 37898,
+      "timestampMs": 32484,
+      "confidence": 1
+    }
+  ],
+  "audio": {},
+  "assets": {}
+}

@@ -8,7 +8,11 @@ const runnerBase = () => (window.location.port === '8787' ? window.location.orig
 
 export async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(`${runnerBase()}${path}`);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try { const body = await response.json(); if (body?.error) detail = body.error; } catch { /* ignore */ }
+    throw new Error(detail);
+  }
   return response.json() as Promise<T>;
 }
 
@@ -31,17 +35,25 @@ export async function loadProjects(): Promise<ProjectOption[]> {
 }
 
 export async function loadStudioFile(path: string): Promise<StudioFile> {
-  const payload = await fetchJson<{file: StudioFile}>(`/api/files?path=${encodeURIComponent(path)}`);
-  return payload.file;
+  try {
+    const payload = await fetchJson<{file: StudioFile}>(`/api/files?path=${encodeURIComponent(path)}`);
+    return payload.file;
+  } catch {
+    return {path, exists: false, data: null, error: 'failed to load'};
+  }
 }
 
 export async function saveFile(path: string, data: unknown): Promise<boolean> {
-  const response = await fetch(`${runnerBase()}/api/files`, {
-    method: 'POST',
-    headers: {'content-type': 'application/json'},
-    body: JSON.stringify({path, data}),
-  });
-  return response.ok;
+  try {
+    const response = await fetch(`${runnerBase()}/api/files`, {
+      method: 'POST',
+      headers: {'content-type': 'application/json'},
+      body: JSON.stringify({path, data}),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function startJob(

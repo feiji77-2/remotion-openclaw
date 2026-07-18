@@ -3,9 +3,12 @@ import {interpolate, spring, useCurrentFrame} from 'remotion';
 import {GeometryAccent, PathDrawLink} from '../../visual-atoms';
 import {resolveUltimateMicroJitterConfig} from '../motion';
 import {resolveUltimateAccent, ultimateGlow, ultimateKitTokens} from '../tokens';
-import type {UltimateEvidenceWallProps} from '../types';
+import type {UltimateEvidenceWallProps, UltimateSceneGrammar, FamilyDirectorMeta} from '../types';
 import {usePulseAttention, useStaggerScale} from '../motionGrammar';
 import {cleanDisplayText, iconMaskStyle, withMicroJitter, SemanticIconGlyph, SemanticIconBadge} from '../SemanticIcon';
+import {UltimateHeading} from '../UltimateHeading';
+import {glassPanelStyle, contentCardStyle} from '../containerStyles';
+import {resolveSceneDirective, resolveEntranceParams} from '../directive';
 
 const kit = ultimateKitTokens;
 
@@ -116,18 +119,24 @@ const buildReveal = (frame: number, delay = 0) => {
   });
 };
 
-export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar?: {enterFrames?: number; emphasisFrames?: number}}> = ({
+export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar?: UltimateSceneGrammar; directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   summary,
   cards,
   accent = 'yellow',
   grammar,
+  directorMeta,
 }) => {
   const frame = useCurrentFrame();
   const accentColor = toneToColor(accent);
+  const d = resolveSceneDirective(grammar, 'evidence-wall');
+  const ep = resolveEntranceParams(d);
+  const adaptive = directorMeta?.adaptive;
+  const sizeScale = adaptive?.contrast.sizeRatio ?? 1;
+  const bodySize = adaptive ? Math.round(34 * sizeScale) : 34;
+  const adaptiveGap = adaptive ? Math.round(d.spacing.gap * adaptive.density.spacing) : d.spacing.gap;
   const visibleCards = cards.slice(0, 3);
   const pacingWindow = (grammar?.enterFrames ?? 20) + (grammar?.emphasisFrames ?? 40);
-  const headingLines = splitDisplayLinesBalanced(heading, 15, 3);
   const railPath = 'M 970 214 C 844 348, 1116 470, 986 602 C 850 742, 1076 844, 962 930';
   const anchors = [
     {x: 886, y: 364},
@@ -142,43 +151,13 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
 
   return (
     <div style={{position: 'absolute', inset: 0, padding: `${kit.spacing.pageY}px ${kit.spacing.pageX}px`}}>
-      <div style={{position: 'absolute', top: 92, left: 126, right: 126}}>
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 700,
-            letterSpacing: 4.2,
-            lineHeight: 1.2,
-            textTransform: 'uppercase',
-            color: accentColor,
-            opacity: 0.92,
-          }}
-        >
-          证据层
-        </div>
-        <div style={{marginTop: 22, maxWidth: 980}}>
-          {headingLines.map((line, index) => (
-            <div
-              key={`${line}-${index}`}
-              style={{
-                marginTop: index === 0 ? 0 : 4,
-                fontFamily: kit.fonts.display,
-                fontSize: index === 0 ? 58 : 54,
-                fontWeight: 800,
-                letterSpacing: -2.4,
-                lineHeight: 1.08,
-              }}
-            >
-              {line}
-            </div>
-          ))}
-        </div>
-        {summary ? (
-          <div style={{marginTop: 22, maxWidth: 700, fontSize: 18, lineHeight: 1.64, color: kit.colors.textMuted}}>
-            {summary}
-          </div>
-        ) : null}
-      </div>
+      <UltimateHeading
+        heading={heading}
+        archetype={grammar?.archetype}
+        accent={accent}
+        grammar={grammar}
+        subtitle={summary}
+      />
 
       <div
         style={{
@@ -234,7 +213,7 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
           boxShadow: `0 0 54px ${accentColor}12`,
         }}
       >
-        <div style={{fontSize: 34, fontWeight: 840, lineHeight: 1, color: accentColor}}>
+        <div style={{fontSize: bodySize, fontWeight: 840, lineHeight: 1, color: accentColor}}>
           {String(visibleCards.length).padStart(2, '0')}
         </div>
         <div style={{fontSize: 13, letterSpacing: 2.2, color: 'rgba(255,255,255,0.46)', textTransform: 'uppercase'}}>
@@ -388,63 +367,64 @@ export const UltimateEvidenceWall: React.FC<UltimateEvidenceWallProps & {grammar
               <span>{card.source}</span>
             </div>
 
-            <div
-              style={{
-                marginTop: 24,
-                fontSize: position.quoteSize,
-                lineHeight: index === 2 ? 1.24 : 1.34,
-                fontWeight: 780,
-                color: kit.colors.text,
-                ...lineClampStyle(index === 2 ? 3 : 2),
-                ...alignStyle,
-              }}
-            >
-              {card.quote}
-            </div>
-
-            {card.detail ? (
+            <div style={glassPanelStyle(cardColor, {density: adaptive?.density}, {radius: 'md'})}>
               <div
                 style={{
-                  marginTop: 14,
-                  fontSize: 17,
-                  lineHeight: 1.64,
-                  color: 'rgba(255,255,255,0.66)',
-                  ...lineClampStyle(index === 2 ? 2 : 3),
+                  fontSize: Math.round(position.quoteSize * sizeScale),
+                  lineHeight: index === 2 ? 1.24 : 1.34,
+                  fontWeight: 780,
+                  color: kit.colors.text,
+                  ...lineClampStyle(index === 2 ? 3 : 2),
                   ...alignStyle,
                 }}
               >
-                {card.detail}
+                {card.quote}
               </div>
-            ) : null}
 
-            {card.chips && card.chips.length > 0 ? (
-              <div
-                style={{
-                  marginTop: 18,
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 10,
-                  justifyContent: position.align === 'right' ? 'flex-end' : 'flex-start',
-                }}
-              >
-                {card.chips.slice(0, 3).map((chip) => (
-                  <div
-                    key={chip}
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: kit.radius.pill,
-                      border: `1px solid ${cardColor}24`,
-                      background: 'rgba(255,255,255,0.03)',
-                      color: kit.colors.textSoft,
-                      fontSize: 14,
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    {chip}
-                  </div>
-                ))}
-              </div>
-            ) : null}
+              {card.detail ? (
+                <div
+                  style={{
+                    marginTop: adaptiveGap,
+                    fontSize: d.typography.body.size,
+                    lineHeight: d.typography.body.lineHeight,
+                    color: `rgba(255,255,255,${d.atmosphere.textOpacity})`,
+                    ...lineClampStyle(index === 2 ? 2 : 3),
+                    ...alignStyle,
+                  }}
+                >
+                  {card.detail}
+                </div>
+              ) : null}
+
+              {card.chips && card.chips.length > 0 ? (
+                <div
+                  style={{
+                    marginTop: adaptiveGap + 4,
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 10,
+                    justifyContent: position.align === 'right' ? 'flex-end' : 'flex-start',
+                  }}
+                >
+                  {card.chips.slice(0, 3).map((chip) => (
+                    <div
+                      key={chip}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: kit.radius.pill,
+                        border: `1px solid ${cardColor}24`,
+                        background: 'rgba(255,255,255,0.03)',
+                        color: kit.colors.textSoft,
+                        fontSize: d.typography.label.size + 1,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {chip}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
         );
       })}

@@ -4,36 +4,41 @@ import {GeometryAccent, OrbitLabels, TextMaskWipe} from '../../visual-atoms';
 import {resolveTextRevealDirection} from '../revealDirection';
 import {resolveUltimateAccent} from '../tokens';
 import {useStaggerScale, useFloatMotion} from '../motionGrammar';
-import type {UltimateSceneGrammar, UltimateTagMatrixProps} from '../types';
+import {glassPanelStyle} from '../containerStyles';
+import type {FamilyDirectorMeta, UltimateSceneGrammar, UltimateTagMatrixProps} from '../types';
 
-export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps & {grammar?: UltimateSceneGrammar}> = ({
+export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps & {grammar?: UltimateSceneGrammar; directorMeta?: FamilyDirectorMeta}> = ({
   heading,
   tabs = [],
   activeTab,
   items,
   grammar,
+  directorMeta,
 }) => {
   const frame = useCurrentFrame();
   const color = resolveUltimateAccent('cyan');
   const revealDirection = resolveTextRevealDirection(grammar, 'left');
+  const adaptive = directorMeta?.adaptive;
+  const sizeScale = adaptive?.contrast.sizeRatio ?? 1;
+  const spacingScale = adaptive?.density.spacing ?? 1;
   return (
-    <div style={{display: 'grid', gridTemplateColumns: '0.82fr 1.18fr', height: '100%', gap: 28, alignItems: 'center'}}>
-      <div style={{display: 'grid', gap: 18, alignSelf: 'stretch'}}>
+    <div style={{display: 'grid', gridTemplateColumns: '0.82fr 1.18fr', height: '100%', gap: Math.round(28 * spacingScale), alignItems: 'center'}}>
+      <div style={{display: 'grid', gap: Math.round(18 * spacingScale), alignSelf: 'stretch'}}>
         <div>
-          <div style={{fontSize: 20, letterSpacing: 4, textTransform: 'uppercase', color}}>orbit cluster</div>
+          <div style={{fontSize: Math.round(20 * sizeScale), letterSpacing: 4, textTransform: 'uppercase', color}}>orbit cluster</div>
           <div style={{position: 'relative', minHeight: 124, marginTop: 10}}>
             <TextMaskWipe
               text={heading}
               direction={revealDirection}
               accent={color}
-              fontSize={80}
+              fontSize={Math.round(80 * sizeScale)}
               color="#f7fbff"
               fontWeight={900}
               textStyle={{width: '100%', textAlign: 'left', whiteSpace: 'normal', lineHeight: 0.95, letterSpacing: -2}}
             />
           </div>
         </div>
-        <div style={{display: 'grid', gap: 12, maxWidth: 520}}>
+        <div style={{display: 'grid', gap: Math.round(12 * spacingScale), maxWidth: 520}}>
           {(tabs.length > 0 ? tabs : [activeTab].filter(Boolean)).map((tab) => (
             <div
               key={tab}
@@ -43,7 +48,7 @@ export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps & {grammar?: Ult
                 border: `1px solid ${tab === activeTab ? color : 'rgba(255,255,255,0.1)'}`,
                 background: tab === activeTab ? `${color}18` : 'rgba(255,255,255,0.03)',
                 color: '#f7fbff',
-                fontSize: 18,
+                fontSize: Math.round(18 * sizeScale),
                 transform: `rotate(${tab === activeTab ? -1.2 : 1.1}deg)`,
               }}
             >
@@ -51,7 +56,7 @@ export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps & {grammar?: Ult
             </div>
           ))}
         </div>
-        <div style={{display: 'grid', gap: 10, paddingTop: 8}}>
+        <div style={glassPanelStyle(color, {density: adaptive?.density, contrast: adaptive?.contrast}, {radius: 'md'})}>
           {items.slice(0, 5).map((item, index) => {
             const staggerScale = useStaggerScale(frame, index, 4);
             const floatMotion = useFloatMotion(frame, index * 6, 3, 70);
@@ -68,7 +73,7 @@ export const UltimateTagMatrix: React.FC<UltimateTagMatrixProps & {grammar?: Ult
                 }}
               >
                 <div style={{width: 28, height: 1, background: `linear-gradient(90deg, ${resolveUltimateAccent(item.accent ?? 'cyan')}, transparent)`}} />
-                <div style={{fontSize: 20, lineHeight: 1.25}}>{item.label}</div>
+                <div style={{fontSize: Math.round(20 * sizeScale), lineHeight: 1.25}}>{item.label}</div>
               </div>
             );
           })}

@@ -11,6 +11,7 @@ import {
 import {resolveUltimateMicroJitterConfig} from '../motion';
 import {cleanDisplayText, iconMaskStyle, resolveSemanticIcon, withMicroJitter, SemanticIconGlyph, SemanticIconBadge} from '../SemanticIcon';
 import {useStaggerSlide, useFloatMotion} from '../motionGrammar';
+import {glassPanelStyle} from '../containerStyles';
 import type {
   UltimateArchitectureMapProps,
   UltimateBenchmarkChartProps,
@@ -36,6 +37,7 @@ import type {
   UltimateTagMatrixProps,
   UltimateTerminalPanelProps,
   UltimateTimelineProps,
+  FamilyDirectorMeta,
 } from '../types';
 
 const kit = ultimateKitTokens;
@@ -459,15 +461,21 @@ const frameCorners: FrameCorner[] = [
 
 
 
-export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps & {grammar?: {staggerGap?: number}}> = ({
+export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps & {grammar?: {staggerGap?: number}; directorMeta?: FamilyDirectorMeta}> = ({
   kicker = '',
   heading,
   items,
   grammar,
+  directorMeta,
 }) => {
   const frame = useCurrentFrame();
   const gap = Math.min(grammar?.staggerGap ?? 2, 2);
-  const visibleItems = items.slice(0, 4);
+  const adaptive = directorMeta?.adaptive;
+  const contrastSize = adaptive?.contrast.sizeRatio ?? 1;
+  const densitySpacing = adaptive?.density.spacing ?? 1;
+  const densityPadding = adaptive?.density.padding ?? 1;
+  const normalizedItems = Array.isArray(items) ? items : [];
+  const visibleItems = normalizedItems.slice(0, 4);
   const pointPresets = [
     {x: 220, y: 618, labelX: -8, labelY: -174, align: 'left' as const},
     {x: 612, y: 444, labelX: -20, labelY: -156, align: 'left' as const},
@@ -522,8 +530,8 @@ export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps & {g
         {kicker ? <div style={eyebrowStyle(resolveUltimateAccent('green'))}>{kicker}</div> : null}
         <div
           style={{
-            marginTop: kicker ? 24 : 0,
-            ...sectionHeadingStyle(relaxedTypeScale.title.lg),
+            marginTop: kicker ? Math.round(24 * densitySpacing) : 0,
+            ...sectionHeadingStyle(Math.round(relaxedTypeScale.title.lg * contrastSize)),
           }}
         >
           {heading}
@@ -673,11 +681,11 @@ export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps & {g
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 12,
+                    gap: Math.round(12 * densitySpacing),
                     flexDirection: point.align === 'right' ? 'row-reverse' : 'row',
                   }}
                 >
-                  <div style={{fontSize: 14, lineHeight: 1.2, letterSpacing: 2, color: accentColor, textTransform: 'uppercase'}}>
+                  <div style={{fontSize: Math.round(14 * contrastSize), lineHeight: 1.2, letterSpacing: 2, color: accentColor, textTransform: 'uppercase'}}>
                     0{index + 1}
                   </div>
                   <div
@@ -702,45 +710,46 @@ export const UltimateFeatureCardRail: React.FC<UltimateFeatureCardRailProps & {g
                     />
                   </div>
                   {item.eyebrow ? (
-                    <div style={{...overlineLabelStyle(kit.colors.textSoft), fontSize: 14}}>
+                    <div style={{...overlineLabelStyle(kit.colors.textSoft), fontSize: Math.round(14 * contrastSize)}}>
                       {item.eyebrow}
                     </div>
                   ) : null}
                 </div>
-                <div
-                  style={{
-                    marginTop: 18,
-                    fontSize: index === 2 ? 36 : 34,
-                    fontWeight: 820,
-                    lineHeight: 1.08,
-                    color: kit.colors.text,
-                    textShadow: ultimateGlow(accentColor, 0.18),
-                  }}
-                >
-                  {item.title}
-                </div>
-                <div
-                  style={{
-                    marginTop: 14,
-                    width: point.align === 'center' ? 140 : 92,
-                    height: 2,
-                    marginLeft: point.align === 'right' ? 'auto' : point.align === 'center' ? 'auto' : 0,
-                    marginRight: point.align === 'center' ? 'auto' : 0,
-                    background: `linear-gradient(90deg, ${accentColor}, transparent)`,
-                    opacity: 0.8,
-                  }}
-                />
-                {item.caption ? (
+                <div style={glassPanelStyle(accentColor, {density: adaptive?.density}, {radius: 'md'})}>
                   <div
                     style={{
-                      marginTop: 14,
-                      ...bodyTextStyle(17, 'rgba(255,255,255,0.68)', point.align !== 'left'),
-                      ...alignStyle,
+                      fontSize: Math.round((index === 2 ? 36 : 34) * contrastSize),
+                      fontWeight: 820,
+                      lineHeight: 1.08,
+                      color: kit.colors.text,
+                      textShadow: ultimateGlow(accentColor, 0.18),
                     }}
                   >
-                    {item.caption}
+                    {item.title}
                   </div>
-                ) : null}
+                  <div
+                    style={{
+                      marginTop: Math.round(14 * densitySpacing),
+                      width: point.align === 'center' ? 140 : 92,
+                      height: 2,
+                      marginLeft: point.align === 'right' ? 'auto' : point.align === 'center' ? 'auto' : 0,
+                      marginRight: point.align === 'center' ? 'auto' : 0,
+                      background: `linear-gradient(90deg, ${accentColor}, transparent)`,
+                      opacity: 0.8,
+                    }}
+                  />
+                  {item.caption ? (
+                    <div
+                      style={{
+                        marginTop: Math.round(14 * densitySpacing),
+                        ...bodyTextStyle(Math.round(17 * contrastSize), 'rgba(255,255,255,0.68)', point.align !== 'left'),
+                        ...alignStyle,
+                      }}
+                    >
+                      {item.caption}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           );
