@@ -1,28 +1,30 @@
 {
-  "productionId": "2026-07-17-ai-tool-workflow",
-  "title": "某个 AI 工具如何改变团队工作流",
+  "productionId": "2026-07-19-structured-workflow",
+  "title": "这个 AI 工具真正改变的不是效率，是工作流所有权",
   "primaryLink": "https://example.com/product",
   "platform": "douyin",
   "format": {
     "width": 1920,
     "height": 1080,
     "fps": 30,
-    "maxDurationSeconds": 180
+    "maxDurationSeconds": 150
   },
   "audience": [
-    "技术小白",
-    "AI 从业者",
-    "创业者",
+    "技术团队负责人",
+    "AI 工具使用者",
     "产品经理",
-    "老板/投资人"
+    "创业者"
   ],
-  "contentType": "技术教程",
-  "tone": "技术布道",
-  "structure": "痛点 -> 方案 -> 3 步教程 -> 注意事项 -> 结论",
+  "contentType": "技术布道",
+  "tone": "冷静分析",
+  "structure": "痛点 → 聚焦 → 方案对比 → 3步落地 → 代码路径 → 注意事项 → 结论",
   "visualStyle": {
-    "palette": "蓝绿 AI 感",
-    "subtitles": "固定字幕样式",
-    "branding": "第一阶段不做强品牌化"
+    "family": "blueprint",
+    "palette": "蓝绿科技感",
+    "captionStyle": "boxed",
+    "showProjectLabel": true,
+    "subtitles": "底部固定字幕，口播同步",
+    "branding": "左上角项目标签"
   },
   "research": {
     "sourcePriority": [
@@ -38,17 +40,17 @@
     {
       "id": "view-1",
       "claim": "这个工具的关键价值不是替代人，而是把重复工作压缩成标准流程。",
-      "whyItMatters": "适合解释它如何改变团队工作流。"
+      "whyItMatters": "解释它如何改变团队工作流。"
     },
     {
       "id": "view-2",
       "claim": "真正的门槛不在安装，而在把它接进现有业务流程。",
-      "whyItMatters": "适合做 3 步教程。"
+      "whyItMatters": "适合做落地教程。"
     },
     {
       "id": "view-3",
       "claim": "它短期提升效率，长期改变岗位分工。",
-      "whyItMatters": "适合面向创业者和管理者。"
+      "whyItMatters": "面向创业者和管理者。"
     }
   ],
   "selectedViewpointId": "view-1"

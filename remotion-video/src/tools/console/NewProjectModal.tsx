@@ -3,6 +3,8 @@ import React, {useState, useCallback} from 'react';
 import {theme} from './theme';
 import type {CreateProjectDraft, CreateProjectResult, CreateProjectError} from './types';
 import {createProject} from './api';
+import {StyleCard} from './StyleCard';
+import {STYLE_PRESETS, type StylePresetId} from '../../styles/video-gen/style-presets';
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -61,7 +63,7 @@ const DEFAULT_DRAFT: CreateProjectDraft = {
   projectId: '',
   title: '',
   orientation: 'portrait',
-  style: 'swiss',
+  style: 'tech-explainer',
   spokenScript: '',
   keywords: '',
 };
@@ -208,36 +210,26 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({onClose, onCrea
             )}
           </div>
 
-          {/* style + keywords */}
-          <div style={rowStyle}>
-            <div style={{flex: 1}}>
-              <label style={labelStyle}>风格</label>
-              <div style={radioGroupStyle}>
-                {(['swiss', 'minimal', 'cinematic', 'tech'] as const).map((s) => (
-                  <div
-                    key={s}
-                    style={{
-                      ...radioStyle(draft.style === s),
-                      fontSize: 9,
-                      padding: '5px 10px',
-                    }}
-                    onClick={() => updateField('style', s)}
-                  >
-                    {s === 'swiss' ? 'Swiss' : s === 'minimal' ? '极简' : s === 'cinematic' ? '电影' : '科技'}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div style={{flex: 1}}>
-              <label style={labelStyle}>关键词</label>
-              <input
-                type="text"
-                style={halfInputStyle}
-                placeholder="AI, 工作流, 效率"
-                value={draft.keywords}
-                onChange={(e) => updateField('keywords', e.target.value)}
-              />
-            </div>
+          {/* style — 视觉卡片选择器 (Stage C) */}
+          <div>
+            <label style={labelStyle}>风格</label>
+            <StyleCard
+              presets={STYLE_PRESETS}
+              selected={draft.style}
+              onSelect={(id) => updateField('style', id as StylePresetId)}
+            />
+          </div>
+
+          {/* keywords */}
+          <div>
+            <label style={labelStyle}>关键词</label>
+            <input
+              type="text"
+              style={inputStyle}
+              placeholder="AI, 工作流, 效率"
+              value={draft.keywords}
+              onChange={(e) => updateField('keywords', e.target.value)}
+            />
           </div>
 
           {/* spokenScript */}
@@ -251,7 +243,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({onClose, onCrea
                 fontFamily: 'inherit',
                 borderColor: fieldError.spokenScript ? theme.accent.red : theme.border.default,
               }}
-              placeholder={'粘贴口播稿……\\n\\n例如：\\n你有没有发现，过去我们花很多时间不是在创造，而是在推动流程？\\n新工具的价值，是把输入、处理和输出变成一条可重复的链路。'}
+              placeholder={'粘贴口播稿……\n\n例如：\n你有没有发现，过去我们花很多时间不是在创造，而是在推动流程？\n新工具的价值，是把输入、处理和输出变成一条可重复的链路。'}
               value={draft.spokenScript}
               onChange={(e) => updateField('spokenScript', e.target.value)}
             />

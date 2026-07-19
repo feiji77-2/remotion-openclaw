@@ -1,8 +1,8 @@
 // src/tools/console/index.tsx
 import React from 'react';
 import {createRoot} from 'react-dom/client';
-import {App} from './App';
+import {StudioApp} from './StudioApp';
 
 const root = document.getElementById('root');
-if (root) createRoot(root).render(<App />);
-export default App;
+if (root) createRoot(root).render(<StudioApp />);
+export default StudioApp;

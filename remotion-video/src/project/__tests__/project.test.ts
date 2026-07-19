@@ -19,10 +19,10 @@ describe('compact video project', () => {
     const first = compileProject(project());
     const second = compileProject(project());
     expect(first).toEqual(second);
-    // 基于当前示例 fixture 的值（4 scenes, 1137 frames total, 7 captions）
-    expect(first.durationInFrames).toBe(1137);
-    expect(first.scenes).toHaveLength(4);
-    expect(first.captions).toHaveLength(7);
+    // 基于当前示例 fixture 的值（7 scenes, 4497 frames total, 11 captions）
+    expect(first.durationInFrames).toBe(4497);
+    expect(first.scenes).toHaveLength(7);
+    expect(first.captions).toHaveLength(11);
   });
 
   it('turns an unavailable optional scene asset into a fallback', () => {
@@ -66,8 +66,8 @@ describe('compact video project', () => {
 
   it('rejects transitions longer than the next scene', () => {
     const value = project();
-    // scene[0] transition 不能长于 scene[1]（381 帧）
-    value.scenes[0].transition = {type: 'fade', durationInFrames: 400};
+    // scene[0] transition 不能长于 scene[1]（833 帧）
+    value.scenes[0].transition = {type: 'fade', durationInFrames: 900};
     expect(() => compileProject(value)).toThrow('TRANSITION_INVALID');
   });
 
