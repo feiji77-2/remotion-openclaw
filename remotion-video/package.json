@@ -34,6 +34,7 @@
     "test": "vitest run src/project src/tools scripts/lib",
     "test:all": "vitest run src/project src/tools scripts/lib",
     "test:e2e": "bash scripts/tools-studio-e2e-smoke.sh",
+    "test:visual-e2e": "bash scripts/studio-visual-e2e.sh",
     "typecheck": "tsc --noEmit",
     "validate:video": "bash scripts/validate-video.sh",
     "verify:render": "bash scripts/verify-render.sh",
