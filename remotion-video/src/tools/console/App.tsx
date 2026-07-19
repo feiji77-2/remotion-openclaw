@@ -8,7 +8,7 @@ import {DEFAULT_VIDEO_PROJECT} from '../../compositions/v2/defaultProject';
 import {theme} from './theme';
 import type {
   ProjectOption, RunnerStatus, ContractKey, StudioFile, RunnerJob,
-  ActivityEvent, DraftScript, Tone, SceneTimeline,
+  ActivityEvent, DraftScript, Tone, SceneTimeline, CreateProjectResult, CreateProjectError,
 } from './types';
 import {
   checkHealth, loadProjects, loadStudioFile, saveFile,
@@ -24,6 +24,7 @@ import {FullPreview} from './FullPreview';
 import {StoryboardView} from './StoryboardView';
 import {AssetManager} from './AssetManager';
 import {SettingsPanel} from './SettingsPanel';
+import {NewProjectModal} from './NewProjectModal';
 import './index.css';
 
 const nowTime = () => new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'});
@@ -70,6 +71,24 @@ export const App: React.FC = () => {
     {id: 'boot', time: nowTime(), tone: 'info', text: '制作台已打开，等待载入项目合同。'},
   ]);
 
+  // ── P1: 新建项目状态 ──
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [projectCreateStatus, setProjectCreateStatus] = useState<{
+    phase: 'idle' | 'creating';
+    error: string | null;
+  }>({phase: 'idle', error: null});
+
+  // ── P4: Draft dirty state (full fingerprint) ──
+  const [lastSavedDraft, setLastSavedDraft] = useState<string>('');
+  const draftDirty = useMemo(() => {
+    if (!files['brief.json']?.exists && !files['script-pack.json']?.exists) return true;
+    const currentFingerprint = [
+      draft.topic, draft.hook, draft.viewpoint, draft.pain, draft.solution,
+      draft.selectedTitle, ...draft.titles, draft.script, draft.keywords,
+    ].join('|||');
+    return currentFingerprint !== lastSavedDraft;
+  }, [draft, files, lastSavedDraft]);
+
   // ── Memoized ──
   const compiled = useMemo(() => {
     try {
@@ -103,10 +122,22 @@ export const App: React.FC = () => {
       keyOrder.map(async (key) => [key, await loadStudioFile(filePathFor(projectOption, key))] as const),
     );
     setFiles(Object.fromEntries(entries) as Record<ContractKey, StudioFile>);
-    const loadedProject = normalizeLoadedProject(entries.find(([k]) => k === 'project.json')?.[1].data);
-    setProject(loadedProject);
-    setDraft(defaultScriptFor(loadedProject));
-    pushActivity(`已载入 ${projectOption.title}。`, 'success');
+    const normalized = normalizeLoadedProject(entries.find(([k]) => k === 'project.json')?.[1].data);
+    setProject(normalized.project);
+    setDraft(defaultScriptFor(normalized.project));
+    const d = defaultScriptFor(normalized.project);
+    setLastSavedDraft([d.topic, d.hook, d.viewpoint, d.pain, d.solution, d.selectedTitle, ...d.titles, d.script, d.keywords].join('|||'));
+    if (!normalized.ok) {
+      const detail = normalized.diagnostics
+        .map((d) => `${d.path}: ${d.message}`)
+        .slice(0, 3)
+        .join('；');
+      pushActivity(`项目 JSON 校验失败，已回退默认合同。${normalized.diagnostics.length} 处错误${
+        detail ? `（${detail}${normalized.diagnostics.length > 3 ? '…' : ''}）` : ''
+      }`, 'danger');
+    } else {
+      pushActivity(`已载入 ${projectOption.title}。`, 'success');
+    }
   }, [pushActivity]);
 
   const selectProject = useCallback(async (projectOption: ProjectOption) => {
@@ -157,6 +188,7 @@ export const App: React.FC = () => {
     }
     await refreshContracts(selectedProject);
     setDraft(nextDraft);
+    setLastSavedDraft([nextDraft.topic, nextDraft.hook, nextDraft.viewpoint, nextDraft.pain, nextDraft.solution, nextDraft.selectedTitle, ...nextDraft.titles, nextDraft.script, nextDraft.keywords].join('|||'));
     pushActivity('选题和文案已保存到 brief/script-pack。', 'success');
     return true;
   }, [draft, files, project, refreshContracts, pushActivity, selectedProject]);
@@ -240,6 +272,30 @@ export const App: React.FC = () => {
     }
   }, [runCommand]);
 
+  // ── P1: 新建项目 ──
+  const handleCreateProject = useCallback(async (result: CreateProjectResult) => {
+    setShowNewProjectModal(false);
+    setProjectCreateStatus({phase: 'idle', error: null});
+    // Refresh project list from server
+    const loaded = await loadProjects();
+    if (loaded.length > 0) {
+      setProjects(loaded);
+      // Find and select the newly created project
+      const created = loaded.find((p) => p.id === result.project.id);
+      if (created) {
+        await selectProject(created);
+        pushActivity(`项目 ${created.title} 已创建。`, 'success');
+      } else {
+        pushActivity('项目已创建但未找到，请刷新。', 'warning');
+      }
+    }
+  }, [selectProject, pushActivity]);
+
+  const handleCreateProjectError = useCallback((message: string) => {
+    setProjectCreateStatus({phase: 'idle', error: message});
+    pushActivity(`项目创建失败：${message}`, 'danger');
+  }, [pushActivity]);
+
   // ── Effects ──
   useEffect(() => {
     let cancelled = false;
@@ -293,6 +349,10 @@ export const App: React.FC = () => {
               totalFrames={totalFrames}
               fps={project.render.fps}
               onStepClick={navigateToStep}
+              onNewProject={() => {
+                setProjectCreateStatus({phase: 'idle', error: null});
+                setShowNewProjectModal(true);
+              }}
             />
             <CenterPanel
               draft={draft}
@@ -304,6 +364,12 @@ export const App: React.FC = () => {
               totalFrames={totalFrames}
               fps={project.render.fps}
               project={project}
+              files={files}
+              compiled={compiled}
+              stillUrl={stillUrl}
+              videoUrl={videoUrl}
+              runnerOnline={runnerStatus === 'online'}
+              draftDirty={draftDirty}
             />
             <RightPanel
               compiled={compiled}
@@ -351,6 +417,36 @@ export const App: React.FC = () => {
         activity={activity}
         onRunCommand={runCommand}
       />
+
+      {/* P1: New Project Modal */}
+      {showNewProjectModal && (
+        <NewProjectModal
+          onClose={() => setShowNewProjectModal(false)}
+          onCreated={handleCreateProject}
+          onError={handleCreateProjectError}
+        />
+      )}
+
+      {/* P1: Create project error banner */}
+      {projectCreateStatus.error && (
+        <div style={{
+          position: 'fixed',
+          bottom: 16,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 300,
+          padding: '10px 20px',
+          borderRadius: 8,
+          background: `${theme.accent.red}22`,
+          border: `1px solid ${theme.accent.red}44`,
+          color: theme.accent.red,
+          fontSize: 10,
+          fontWeight: 600,
+          maxWidth: '80vw',
+        }}>
+          {projectCreateStatus.error}
+        </div>
+      )}
     </div>
   );
 };

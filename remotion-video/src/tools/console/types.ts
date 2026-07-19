@@ -61,3 +61,31 @@ export interface SceneTimeline {
   start: number;
   end: number;
 }
+
+// ── P1: 本地内容生产台 ──
+
+export interface CreateProjectDraft {
+  projectId: string;
+  title: string;
+  orientation: 'portrait' | 'landscape';
+  style: 'swiss' | 'minimal' | 'cinematic' | 'tech';
+  spokenScript: string;
+  keywords: string;
+}
+
+export interface CreateProjectResult {
+  ok: true;
+  project: ProjectOption;
+  files: {
+    brief: string;
+    scriptPack: string;
+    assetPack: string;
+    projectJson: string;
+  };
+}
+
+export interface CreateProjectError {
+  ok: false;
+  error: string;
+  path?: string;
+}

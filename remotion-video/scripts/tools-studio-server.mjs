@@ -6,6 +6,12 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {
+  buildStarterProject,
+  buildBrief,
+  buildScriptPack,
+  buildAssetPack,
+} from './lib/starter-project.mjs';
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = path.resolve(PROJECT_ROOT, '..');
@@ -72,6 +78,13 @@ const safeJsonRelPath = (value, label = 'file path') => {
 const safeProjectId = (value) => {
   const text = String(value ?? '').trim();
   if (!/^[A-Za-z0-9._-]{1,96}$/.test(text)) throw new Error('projectId is invalid');
+  return text;
+};
+
+const safeNonEmptyString = (value, label, minLen = 1, maxLen = 200) => {
+  const text = String(value ?? '').trim();
+  if (text.length < minLen) throw new Error(`${label} is required (min ${minLen} chars)`);
+  if (text.length > maxLen) throw new Error(`${label} is too long (max ${maxLen} chars)`);
   return text;
 };
 
@@ -274,6 +287,7 @@ const serveStatic = async (req, res, url) => {
   const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
   const requested = path.normalize(path.join(STATIC_ROOT, pathname));
   const fallback = path.join(STATIC_ROOT, 'index.html');
+  const isHtml = pathname === '/index.html' || (requested !== fallback && path.extname(requested).toLowerCase() === '.html');
   const file = requested.startsWith(STATIC_ROOT) && existsSync(requested) ? requested : fallback;
   if (!existsSync(file)) {
     sendJson(res, 404, {
@@ -283,7 +297,16 @@ const serveStatic = async (req, res, url) => {
     });
     return;
   }
-  res.writeHead(200, {'content-type': contentTypes.get(path.extname(file).toLowerCase()) || 'text/plain; charset=utf-8'});
+  const contentType = contentTypes.get(path.extname(file).toLowerCase()) || 'text/plain; charset=utf-8';
+  // Inject VIDEO_FACTORY_PORT into HTML so the frontend knows the runner origin
+  if (isHtml && contentType.includes('text/html')) {
+    let html = await fs.readFile(file, 'utf8');
+    html = html.replace('</head>', `<script>window.__VIDEO_FACTORY_PORT__=${PORT};</script></head>`);
+    res.writeHead(200, {'content-type': contentType});
+    res.end(html);
+    return;
+  }
+  res.writeHead(200, {'content-type': contentType});
   createReadStream(file).pipe(res);
 };
 
@@ -304,6 +327,61 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/api/projects' && req.method === 'GET') {
       sendJson(res, 200, {ok: true, projects: await discoverProjects()});
+      return;
+    }
+    if (url.pathname === '/api/projects' && req.method === 'POST') {
+      const body = await readJson(req);
+      const projectId = safeProjectId(body.projectId);
+      const title = safeNonEmptyString(body.title, 'title');
+      const orientation = body.orientation === 'landscape' ? 'landscape' : 'portrait';
+      const spokenScript = safeNonEmptyString(body.spokenScript ?? body.script ?? '', 'spokenScript', 20, 8000);
+      const productionPath = `projects/${projectId}`;
+      const outputVideoPath = `out/${projectId}.mp4`;
+
+      const projectDir = path.join(PROJECT_ROOT, productionPath);
+      if (existsSync(projectDir)) {
+        sendJson(res, 409, {ok: false, error: `项目 ${projectId} 已存在`, path: productionPath});
+        return;
+      }
+
+      // Create directories
+      await fs.mkdir(projectDir, {recursive: true});
+      await fs.mkdir(path.join(PROJECT_ROOT, 'public', 'projects', projectId, 'assets'), {recursive: true});
+      await fs.mkdir(path.join(PROJECT_ROOT, 'public', 'projects', projectId, 'audio'), {recursive: true});
+
+      // Write production contracts
+      const style = ['swiss', 'minimal', 'cinematic', 'tech'].includes(body.style) ? body.style : 'swiss';
+      const keywords = String(body.keywords ?? '').trim();
+      const brief = buildBrief(projectId, title, orientation, style);
+      const scriptPack = buildScriptPack(projectId, title, spokenScript, keywords);
+      const assetPack = buildAssetPack(projectId);
+      const starterProject = buildStarterProject(projectId, title, spokenScript, orientation, style, keywords);
+
+      const files = [
+        [`${productionPath}/brief.json`, brief],
+        [`${productionPath}/script-pack.json`, scriptPack],
+        [`${productionPath}/asset-pack.json`, assetPack],
+        [`${productionPath}/project.json`, starterProject],
+      ];
+      await Promise.all(files.map(([rel, data]) => writeStudioFile(rel, data)));
+
+      const projectOption = {
+        id: projectId,
+        title: await titleFromProjectJson(`${productionPath}/project.json`, title),
+        productionPath,
+        projectJsonPath: `${productionPath}/project.json`,
+        outputVideoPath,
+      };
+      sendJson(res, 201, {
+        ok: true,
+        project: projectOption,
+        files: {
+          brief: `${productionPath}/brief.json`,
+          scriptPack: `${productionPath}/script-pack.json`,
+          assetPack: `${productionPath}/asset-pack.json`,
+          projectJson: `${productionPath}/project.json`,
+        },
+      });
       return;
     }
     if (url.pathname === '/api/files' && req.method === 'GET') {

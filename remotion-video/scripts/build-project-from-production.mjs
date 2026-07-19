@@ -4,6 +4,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildSkillShowcaseProjectFromScript} from './lib/script-project-generator.mjs';
+import {
+  accentForPalette,
+  accentForFamily as contractAccentForFamily,
+} from './lib/production-style-contract.mjs';
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const input = process.argv[2];
@@ -29,8 +33,19 @@ const assetPack = await readJson('asset-pack.json');
 const projectId = String(brief.productionId ?? path.basename(productionDir))
   .replace(/[^A-Za-z0-9._-]/g, '-')
   .slice(0, 96);
-const fps = 30;
+const fps = brief.format?.fps ?? 30;
 const maxFrames = Number(brief.format?.maxDurationSeconds ?? 180) * fps;
+const orientation = (brief.format?.width === 1920 && brief.format?.height === 1080) ? 'landscape'
+  : (brief.format?.width === 1080 && brief.format?.height === 1920) ? 'portrait'
+  : undefined;
+const renderWidth = brief.format?.width ?? (orientation === 'portrait' ? 1080 : 1920);
+const renderHeight = brief.format?.height ?? (orientation === 'portrait' ? 1920 : 1080);
+const captionStyle = brief.visualStyle?.captionStyle ?? 'boxed';
+const showProjectLabel = brief.visualStyle?.showProjectLabel ?? true;
+
+// Derive accent colors from brief.visualStyle.palette (single source: production-style-contract)
+const styleAccent = accentForPalette(brief.visualStyle?.palette);
+const accentForFamily = (family) => contractAccentForFamily(family, styleAccent);
 const clean = (value, fallback = '') => {
   const text = String(value ?? '').trim();
   return text.length > 0 ? text : fallback;
@@ -188,7 +203,7 @@ const sceneBuilders = {
       title: clean(script.title, clean(brief.title, '技术教程')),
       subtitle: clean(script.hook, selectedViewpoint),
       kicker: 'PERSONAL IP',
-      accent: 'cyan',
+      accent: accentForFamily('spoken-title'),
     },
     assetIds: sceneAssetIds('opening'),
   }),
@@ -202,7 +217,7 @@ const sceneBuilders = {
         {label: '旧方式', value: clean(script.pain, '信息分散，流程不可复用。').slice(0, 28)},
         {label: '新方案', value: clean(script.solution, '用结构化流程稳定交付。').slice(0, 28)},
       ],
-      accent: 'cyan',
+      accent: accentForFamily('spoken-compare'),
     },
     assetIds: sceneAssetIds('pain-solution'),
   }),
@@ -217,7 +232,7 @@ const sceneBuilders = {
           label: clean(step.label, `第 ${index + 1} 步`),
           detail: clean(step.detail, '待补充'),
         })),
-      accent: 'green',
+      accent: accentForFamily('spoken-process'),
     },
     assetIds: sceneAssetIds('steps'),
   }),
@@ -234,7 +249,7 @@ const sceneBuilders = {
         {label: '素材', value: '截图+图表'},
         {label: '渲染', value: 'Project JSON'},
       ],
-      accent: 'purple',
+      accent: accentForFamily('spoken-tags'),
     },
     assetIds: sceneAssetIds('workflow-map'),
   }),
@@ -248,7 +263,7 @@ const sceneBuilders = {
         ? script.codeSnippets
         : [{label: 'pipeline', value: 'brief -> script -> assets -> project.json'}]
       ).slice(0, 5).map((item) => ({label: clean(item.label, 'line'), value: clean(item.value, '待补充')})),
-      accent: 'cyan',
+      accent: accentForFamily('spoken-code'),
     },
     assetIds: sceneAssetIds('code-path'),
   }),
@@ -259,7 +274,7 @@ const sceneBuilders = {
     payload: {
       heading: '上线前必须注意',
       items: itemsFromCautions(),
-      accent: 'amber',
+      accent: accentForFamily('spoken-ranking'),
     },
     assetIds: sceneAssetIds('cautions'),
   }),
@@ -271,7 +286,7 @@ const sceneBuilders = {
       title: clean(script.takeaway, selectedViewpoint),
       subtitle: '听懂、能复述、能上手，是这条视频的交付标准。',
       kicker: 'TAKEAWAY',
-      accent: 'green',
+      accent: accentForFamily('spoken-takeaway'),
     },
     assetIds: sceneAssetIds('takeaway'),
   }),
@@ -306,7 +321,15 @@ const project = {
   schemaVersion: 1,
   projectId,
   title: clean(script.title, clean(brief.title, projectId)),
-  render: {fps: 30, width: 1920, height: 1080, qualityMode: 'fast'},
+  render: {
+    fps,
+    width: renderWidth,
+    height: renderHeight,
+    qualityMode: 'fast',
+    ...(orientation ? {orientation} : {}),
+    captionStyle,
+    showProjectLabel,
+  },
   scenes: scenes.map((scene, index) => ({
     id: scene.id,
     family: scene.family,

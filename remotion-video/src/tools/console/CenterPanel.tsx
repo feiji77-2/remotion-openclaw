@@ -1,20 +1,28 @@
 // src/tools/console/CenterPanel.tsx
 import React, {useState} from 'react';
 import {theme} from './theme';
-import type {DraftScript, SceneTimeline} from './types';
+import type {DraftScript, SceneTimeline, ContractKey, StudioFile} from './types';
 import type {VideoProject} from '../../project/projectSchema';
+import type {CompiledProject} from '../../project/compileProject';
 import {ScriptEditor} from './ScriptEditor';
+import {ProjectStatusStrip} from './ProjectStatusStrip';
 
 interface CenterPanelProps {
   draft: DraftScript;
   onSetDraft: (d: DraftScript) => void;
   scriptSeconds: number;
-  onSaveScript: () => void;
+  onSaveScript: () => Promise<boolean>;
   onRunCommand: (cmd: string, label: string) => void;
   timeline: SceneTimeline[];
   totalFrames: number;
   fps: number;
   project: VideoProject;
+  files: Record<ContractKey, StudioFile | null>;
+  compiled: {project: CompiledProject | null; error: string | null};
+  stillUrl: string | null;
+  videoUrl: string | null;
+  runnerOnline: boolean;
+  draftDirty: boolean;
 }
 
 const subTabs = [
@@ -36,6 +44,18 @@ export const CenterPanel: React.FC<CenterPanelProps> = (props) => {
 
   return (
     <div style={{flex: 1, display: 'flex', flexDirection: 'column', background: theme.bg.base}}>
+      {/* P1: Production status strip */}
+      <ProjectStatusStrip
+        files={props.files}
+        compiled={props.compiled}
+        stillUrl={props.stillUrl}
+        videoUrl={props.videoUrl}
+        onRunCommand={props.onRunCommand}
+        onSaveScript={props.onSaveScript}
+        runnerOnline={props.runnerOnline}
+        draftDirty={props.draftDirty}
+      />
+
       {/* Sub tabs */}
       <div style={{display: 'flex', borderBottom: `1px solid ${theme.border.subtle}`, background: theme.bg.elevated}}>
         {subTabs.map((tab) => (

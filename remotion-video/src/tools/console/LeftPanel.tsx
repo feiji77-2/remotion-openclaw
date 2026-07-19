@@ -9,9 +9,10 @@ interface LeftPanelProps {
   totalFrames: number;
   fps: number;
   onStepClick: (index: number) => void;
+  onNewProject: () => void;
 }
 
-export const LeftPanel: React.FC<LeftPanelProps> = ({files, totalFrames, fps, onStepClick}) => {
+export const LeftPanel: React.FC<LeftPanelProps> = ({files, totalFrames, fps, onStepClick, onNewProject}) => {
   const checkedCount = ['brief.json', 'script-pack.json', 'asset-pack.json']
     .filter((key) => files[key as ContractKey]?.exists).length;
   return (
@@ -28,6 +29,30 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({files, totalFrames, fps, on
         <span style={{fontSize: 9, color: theme.text.muted, background: theme.bg.surface, padding: '1px 8px', borderRadius: 10}}>
           {checkedCount}/7
         </span>
+      </div>
+
+      {/* P1: New project button */}
+      <div style={{padding: '10px 12px 4px'}}>
+        <button
+          onClick={onNewProject}
+          style={{
+            width: '100%',
+            padding: '8px 0',
+            borderRadius: 6,
+            border: `1px dashed ${theme.border.accent}`,
+            background: `${theme.accent.blue}0f`,
+            color: theme.accent.blue,
+            fontSize: 10,
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+        >
+          <span style={{fontSize: 12}}>+</span> 新建视频
+        </button>
       </div>
 
       <FlowSteps files={files} onStepClick={onStepClick} />
