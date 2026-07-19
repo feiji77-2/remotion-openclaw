@@ -7,11 +7,31 @@ export type SkillShowcaseVariant =
   | 'illustration'
   | 'hyperframes'
   | 'ui'
-  | 'outro';
+  | 'outro'
+  | 'impeccable'
+  | 'frontend-design'
+  | 'ux-pro'
+  | 'cloud-design'
+  | 'generic';
+
+export type SkillShowcaseVisualMode =
+  | 'hero'
+  | 'grid'
+  | 'compare'
+  | 'process'
+  | 'metrics'
+  | 'quote';
+
+export type SkillShowcaseNarrativeSignal = {
+  key: string;
+  family: string;
+};
 
 import type {SkillIconKey} from './iconRegistry';
+import type {ProductIconKey} from './productIcons';
 
 export type {SkillIconKey} from './iconRegistry';
+export type {ProductIconKey} from './productIcons';
 
 export type SkillBeatAction =
   | 'spotlight'
@@ -23,12 +43,32 @@ export type SkillBeatAction =
   | 'focus'
   | 'burst';
 
+export type SkillBeatMotionPreset =
+  | 'slow-rise'
+  | 'scan-lock'
+  | 'number-roll'
+  | 'split-reveal'
+  | 'card-regroup'
+  | 'icon-relay'
+  | 'focus-pulse'
+  | 'flash-cut';
+
+export type SkillBeatPlacement =
+  | 'bottom'
+  | 'body'
+  | 'highlight';
+
 export type SkillShowcaseBeat = {
   startFrame: number;
   endFrame: number;
+  captionStartIndex?: number;
+  captionEndIndex?: number;
   keyword: string;
   icon: SkillIconKey;
   action: SkillBeatAction;
+  visualState?: string;
+  motionPreset?: SkillBeatMotionPreset;
+  placement?: SkillBeatPlacement;
   detail?: string;
   evidence?: string[];
   value?: string;
@@ -43,5 +83,22 @@ export interface SkillShowcaseProps {
   secondaryAccent?: string;
   bullets?: string[];
   labels?: string[];
+  labelIcons?: SkillIconKey[];
+  productIcon?: ProductIconKey;
+  productIcons?: ProductIconKey[];
+  brandName?: string;
+  brandIcon?: ProductIconKey;
+  eyebrow?: string;
+  headline?: string;
+  body?: string;
+  footer?: string;
+  progressIndex?: number;
+  progressTotal?: number;
+  visualMode?: SkillShowcaseVisualMode;
+  narrativeSignal?: SkillShowcaseNarrativeSignal;
+  layoutSignature?: string;
+  captionStartIndex?: number;
+  captionEndIndex?: number;
+  sourceText?: string;
   beats?: SkillShowcaseBeat[];
 }

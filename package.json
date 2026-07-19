@@ -21,6 +21,7 @@
     "project:still": "npm --prefix remotion-video run project:still --",
     "project:render": "npm --prefix remotion-video run project:render --",
     "project:import": "npm --prefix remotion-video run project:import --",
+    "project:from-script": "npm --prefix remotion-video run project:from-script --",
     "test": "npm --prefix remotion-video run test",
     "typecheck": "npm --prefix remotion-video run typecheck",
     "build": "npm --prefix remotion-video run build",

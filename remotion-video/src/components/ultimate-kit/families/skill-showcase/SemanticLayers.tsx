@@ -40,8 +40,13 @@ export const SemanticIcon: React.FC<{
 );
 
 const beatProgress = (frame: number, beat: SkillShowcaseBeat) => {
-  const enterFrames = Math.min(10, Math.max(4, beat.endFrame - beat.startFrame - 4));
-  const exitFrames = Math.min(8, Math.max(3, beat.endFrame - beat.startFrame - enterFrames));
+  const duration = Math.max(1, beat.endFrame - beat.startFrame);
+  let enterFrames = Math.min(24, Math.max(18, Math.round(duration * 0.22)));
+  let exitFrames = Math.min(14, Math.max(10, Math.round(duration * 0.13)));
+  if (enterFrames + exitFrames >= duration) {
+    enterFrames = Math.max(6, Math.floor(duration * 0.42));
+    exitFrames = Math.max(4, Math.floor(duration * 0.24));
+  }
   const enter = interpolate(frame, [beat.startFrame, beat.startFrame + enterFrames], [0, 1], {
     ...clamp,
     easing: crispEase,
@@ -51,6 +56,56 @@ const beatProgress = (frame: number, beat: SkillShowcaseBeat) => {
     easing: Easing.in(Easing.cubic),
   });
   return enter * exit;
+};
+
+const beatMotionStyle = (
+  progress: number,
+  beat: SkillShowcaseBeat,
+  frame: number,
+  accent: string,
+): React.CSSProperties => {
+  const preset = beat.motionPreset ?? 'slow-rise';
+  const pulse = Math.sin(frame / 9) * 0.5 + 0.5;
+  if (preset === 'scan-lock') {
+    return {
+      transform: `translateY(${interpolate(progress, [0, 1], [18, 0])}px) skewX(${interpolate(progress, [0, 1], [-4, 0])}deg)`,
+      filter: `drop-shadow(0 0 ${10 + pulse * 12}px ${accent}55)`,
+    };
+  }
+  if (preset === 'number-roll') {
+    return {
+      transform: `translateY(${interpolate(progress, [0, 1], [26, 0])}px) scale(${interpolate(progress, [0, 1], [0.92, 1])})`,
+      filter: `drop-shadow(0 0 ${18 + pulse * 18}px ${accent}66)`,
+    };
+  }
+  if (preset === 'split-reveal') {
+    return {
+      transform: `translateX(${interpolate(progress, [0, 1], [-34, 0])}px)`,
+      clipPath: `inset(0 ${interpolate(progress, [0, 1], [42, 0])}% 0 0)`,
+    };
+  }
+  if (preset === 'card-regroup') {
+    return {
+      transform: `translateY(${interpolate(progress, [0, 1], [20, 0])}px) rotateX(${interpolate(progress, [0, 1], [10, 0])}deg)`,
+      transformOrigin: '50% 100%',
+    };
+  }
+  if (preset === 'focus-pulse') {
+    return {
+      transform: `translateY(${interpolate(progress, [0, 1], [16, 0])}px) scale(${1 + pulse * 0.018 * progress})`,
+      filter: `drop-shadow(0 0 ${14 + pulse * 16}px ${accent}66)`,
+    };
+  }
+  if (preset === 'flash-cut') {
+    const snap = interpolate(progress, [0, 0.22, 1], [1.12, 0.96, 1], clamp);
+    return {
+      transform: `translateY(${interpolate(progress, [0, 1], [12, 0])}px) scale(${snap})`,
+      filter: `contrast(${1 + (1 - progress) * 0.25})`,
+    };
+  }
+  return {
+    transform: `translateY(${interpolate(progress, [0, 1], [30, 0])}px)`,
+  };
 };
 
 const evidenceFor = (beat: SkillShowcaseBeat) => beat.evidence?.length
@@ -266,18 +321,20 @@ export const SemanticBeatOverlay: React.FC<{
   const activeIndex = beats.findIndex((candidate) => frame >= candidate.startFrame && frame < candidate.endFrame);
   if (activeIndex < 0) return null;
   const beat = beats[activeIndex];
+  if (beat.placement === 'body') return null;
   const progress = beatProgress(frame, beat);
+  const overlayTop = beat.placement === 'highlight' ? 1080 : 1195;
 
   return (
     <div style={{
       position: 'absolute',
-      top: 1195,
+      top: overlayTop,
       left: 64,
       right: 64,
       height: 300,
       pointerEvents: 'none',
       opacity: progress,
-      transform: `translateY(${interpolate(progress, [0, 1], [30, 0])}px)`,
+      ...beatMotionStyle(progress, beat, frame, accent),
     }}>
       <IconRelay beats={beats} activeIndex={activeIndex} accent={accent} progress={progress} />
       <div style={{height: 238, display: 'grid', placeItems: 'center'}}>
@@ -299,8 +356,12 @@ export const DeterministicMotionField: React.FC<{
   const depthPhase = (frame % (fps * 8)) / (fps * 8);
   const depthPush = interpolate(depthPhase, [0, 0.5, 1], [0, 1, 0]);
   const beatFlash = beats.reduce((strongest, beat) => {
-    const flash = interpolate(frame, [beat.startFrame, beat.startFrame + 3, beat.startFrame + 10], [0, 1, 0], clamp);
+    const flash = interpolate(frame, [beat.startFrame, beat.startFrame + 6, beat.startFrame + 18], [0, 1, 0], clamp);
     return Math.max(strongest, flash);
+  }, 0);
+  const beatTrace = beats.reduce((strongest, beat) => {
+    const trace = interpolate(frame, [beat.startFrame + 8, beat.startFrame + 28], [1, 0], clamp);
+    return Math.max(strongest, trace);
   }, 0);
 
   return (
@@ -356,6 +417,8 @@ export const DeterministicMotionField: React.FC<{
       <div style={{position: 'absolute', right: 0, top: 720, width: 3, height: 640, background: `linear-gradient(180deg, transparent, ${secondary}88, transparent)`, opacity: 0.3}} />
       <AbsoluteFill style={{background: `linear-gradient(105deg, transparent 38%, ${accent}1c 48%, ${secondary}18 52%, transparent 62%)`, opacity: beatFlash}} />
       <AbsoluteFill style={{border: `${Math.round(beatFlash * 3)}px solid ${accent}`, opacity: beatFlash * 0.42}} />
+      <div style={{position: 'absolute', left: 76, right: 76, top: 1080, height: 1, background: `linear-gradient(90deg, transparent, ${accent}, transparent)`, opacity: beatTrace * 0.72, transform: `translateX(${interpolate(beatTrace, [0, 1], [120, 0])}px)`}} />
+      <div style={{position: 'absolute', left: 76, right: 76, top: 1480, height: 1, background: `linear-gradient(90deg, transparent, ${secondary}, transparent)`, opacity: beatTrace * 0.55, transform: `translateX(${interpolate(beatTrace, [0, 1], [-120, 0])}px)`}} />
       <div style={{position: 'absolute', left: 42, top: 42, width: 46, height: 46, borderLeft: `2px solid ${accent}77`, borderTop: `2px solid ${accent}77`}} />
       <div style={{position: 'absolute', right: 42, bottom: 42, width: 46, height: 46, borderRight: `2px solid ${secondary}77`, borderBottom: `2px solid ${secondary}77`}} />
     </AbsoluteFill>

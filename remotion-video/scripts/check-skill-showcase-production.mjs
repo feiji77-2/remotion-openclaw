@@ -57,6 +57,10 @@ const requiredProductIcons = [
   'illustration.svg',
   'hyperframes.svg',
   'ui-skill.svg',
+  'impeccable.svg',
+  'frontend-design.svg',
+  'ux-pro.svg',
+  'cloud-design.svg',
 ];
 
 assert(project.schemaVersion === 1, 'schemaVersion must be 1');

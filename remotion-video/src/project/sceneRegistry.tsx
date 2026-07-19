@@ -33,6 +33,7 @@ import {SpokenTags} from '../components/ultimate-kit/families/SpokenTags';
 import {SpokenTitle} from '../components/ultimate-kit/families/SpokenTitle';
 import {SkillShowcase} from '../components/ultimate-kit/families/skill-showcase/SkillShowcase';
 import {SKILL_ICON_KEYS} from '../components/ultimate-kit/families/skill-showcase/iconRegistry';
+import {PRODUCT_ICON_KEYS} from '../components/ultimate-kit/families/skill-showcase/productIcons';
 
 // ── Ultimate (完整) family 组件 ─────────────────────────────────────────
 
@@ -103,9 +104,22 @@ const ProcessPayloadSchema = z.object({
 });
 
 const SkillIconSchema = z.enum(SKILL_ICON_KEYS);
+const ProductIconSchema = z.enum(PRODUCT_ICON_KEYS);
+const SkillBeatMotionPresetSchema = z.enum([
+  'slow-rise',
+  'scan-lock',
+  'number-roll',
+  'split-reveal',
+  'card-regroup',
+  'icon-relay',
+  'focus-pulse',
+  'flash-cut',
+]);
+const SkillBeatPlacementSchema = z.enum(['bottom', 'body', 'highlight']);
 
 const SkillShowcasePayloadSchema = z.object({
-  variant: z.enum(['intro', 'overview', 'coding', 'remotion', 'ppt', 'illustration', 'hyperframes', 'ui', 'outro']),
+  variant: z.enum(['intro', 'overview', 'coding', 'remotion', 'ppt', 'illustration', 'hyperframes', 'ui', 'outro', 'impeccable', 'frontend-design', 'ux-pro', 'cloud-design', 'generic']),
+  visualMode: z.enum(['hero', 'grid', 'compare', 'process', 'metrics', 'quote']).optional(),
   title: z.string().min(1),
   subtitle: z.string().optional(),
   index: z.string().min(1).max(4).optional(),
@@ -113,12 +127,36 @@ const SkillShowcasePayloadSchema = z.object({
   secondaryAccent: z.string().min(1).optional(),
   bullets: z.array(z.string().min(1)).max(6).optional(),
   labels: z.array(z.string().min(1)).max(8).optional(),
+  labelIcons: z.array(SkillIconSchema).max(8).optional(),
+  productIcon: ProductIconSchema.optional(),
+  productIcons: z.array(ProductIconSchema).max(8).optional(),
+  brandName: z.string().min(1).max(32).optional(),
+  brandIcon: ProductIconSchema.optional(),
+  eyebrow: z.string().min(1).max(80).optional(),
+  headline: z.string().min(1).max(80).optional(),
+  body: z.string().min(1).max(120).optional(),
+  footer: z.string().min(1).max(120).optional(),
+  progressIndex: z.number().int().nonnegative().max(24).optional(),
+  progressTotal: z.number().int().positive().max(24).optional(),
+  captionStartIndex: z.number().int().nonnegative().optional(),
+  captionEndIndex: z.number().int().nonnegative().optional(),
+  narrativeSignal: z.object({
+    key: z.string().min(1).max(48),
+    family: z.string().min(1).max(80),
+  }).optional(),
+  layoutSignature: z.string().min(1).max(64).optional(),
+  sourceText: z.string().min(1).max(800).optional(),
   beats: z.array(z.object({
     startFrame: z.number().int().nonnegative(),
     endFrame: z.number().int().positive(),
+    captionStartIndex: z.number().int().nonnegative().optional(),
+    captionEndIndex: z.number().int().nonnegative().optional(),
     keyword: z.string().min(1).max(24),
     icon: SkillIconSchema,
     action: z.enum(['spotlight', 'stamp', 'trace', 'compare', 'counter', 'stack', 'focus', 'burst']),
+    visualState: z.string().min(1).max(48).optional(),
+    motionPreset: SkillBeatMotionPresetSchema.optional(),
+    placement: SkillBeatPlacementSchema.optional(),
     detail: z.string().min(1).max(60).optional(),
     evidence: z.array(z.string().min(1).max(28)).max(4).optional(),
     value: z.string().min(1).max(18).optional(),

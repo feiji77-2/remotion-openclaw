@@ -30,6 +30,14 @@ export const ProjectTransitionSchema = z.object({
   durationInFrames: z.number().int().positive().max(90),
 });
 
+export const ProjectCaptionRangeSchema = z.object({
+  startIndex: z.number().int().nonnegative(),
+  endIndex: z.number().int().nonnegative(),
+}).refine((range) => range.endIndex >= range.startIndex, {
+  message: 'endIndex must be greater than or equal to startIndex',
+  path: ['endIndex'],
+});
+
 export const ProjectAssetSchema = z.object({
   kind: z.enum(['image', 'audio', 'video', 'font', 'json']),
   src: z.string().min(1),
@@ -53,6 +61,7 @@ export const VideoProjectSchema = z.object({
     id: z.string().min(1),
     family: z.string().min(1),
     durationInFrames: z.number().int().positive(),
+    captionRange: ProjectCaptionRangeSchema.optional(),
     payload: z.record(z.string(), z.unknown()),
     assetIds: z.array(z.string().min(1)).default([]),
     transition: z.union([ProjectTransitionSchema, z.literal(false)]).default(false),
@@ -80,6 +89,7 @@ export const VideoProjectSchema = z.object({
 export type VideoProject = z.infer<typeof VideoProjectSchema>;
 export type ProjectTransition = z.infer<typeof ProjectTransitionSchema>;
 export type ProjectAsset = z.infer<typeof ProjectAssetSchema>;
+export type ProjectCaptionRange = z.infer<typeof ProjectCaptionRangeSchema>;
 
 export const formatProjectPath = (path: PropertyKey[]): string =>
   path.reduce<string>((result, part) => (

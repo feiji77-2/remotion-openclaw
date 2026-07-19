@@ -20,16 +20,21 @@
 | `illustration` | 正文判断到白底图解 |
 | `hyperframes` | HTML 到视频与 Skill 网格 |
 | `ui` | UI 前后对比 |
+| `impeccable` | 设计反模式检测样片 |
+| `frontend-design` | 审美方向与反模式清单样片 |
+| `ux-pro` | 设计系统数据库和行业决策样片 |
+| `cloud-design` | 品牌设计系统样片 |
+| `generic` | 新口播自动生成的通用视觉变体 |
 | `outro` | 能力总结和 CTA |
 
 ## 文件结构
 
 ```text
 skill-showcase/
-  SkillShowcase.tsx    场景布局和九种视觉变体
+  SkillShowcase.tsx    场景布局、固定样片变体、Design Skill 变体和 generic 变体
   SemanticLayers.tsx   八种 Beat、持续运动层、章节转场层
   iconRegistry.ts      76 个图标与 12 类固定语义映射
-  beatRegistry.ts      九种变体的默认 Beat 和章节主图标
+  beatRegistry.ts      固定变体的默认 Beat 和章节主图标
   types.ts             Variant、Beat、Props 合同
 ```
 
@@ -44,9 +49,17 @@ skill-showcase/
   "accent": "#45e28d",
   "secondaryAccent": "#20d9e8",
   "bullets": ["先讲清假设", "只做最小改动"],
+  "sourceText": "AI 写代码最大的毛病是乱猜需求，瞎加抽象。",
   "beats": []
 }
 ```
+
+换稿生成器会优先使用：
+
+- `variant: "generic"`
+- `visualMode: "hero" | "grid" | "compare" | "process" | "metrics" | "quote"`
+- `sourceText`: 当前 captions 中的原文片段
+- `labels/labelIcons/productIcons`: 从当前口播抽取，不从旧样片继承
 
 ## Beat Actions
 
@@ -76,7 +89,8 @@ skill-showcase/
 
 - 顶部章节头位置稳定。
 - 中部必须是视觉证明，不是解释卡片堆叠。
-- 每个变体都必须有默认 Beat，`intro`、`overview`、`outro` 不能空。
+- 固定样片变体可以有默认 Beat；新稿 `generic` 必须显式生成 Beat，不能吃旧默认。
+- 新稿每个 Scene 都必须有 `sourceText`，`intro`、`overview`、`outro` 也不能空。
 - 同一时刻只有一个主 Beat。
 - 主画面与 Beat 读取同一个局部帧和关键词，不允许各播各的。
 - Beat 位于字幕安全区上方。

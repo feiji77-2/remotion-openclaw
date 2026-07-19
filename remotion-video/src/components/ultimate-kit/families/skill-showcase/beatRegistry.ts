@@ -10,6 +10,11 @@ export const VARIANT_ICON: Record<SkillShowcaseVariant, SkillIconKey> = {
   hyperframes: 'clapperboard',
   ui: 'layout-template',
   outro: 'circle-check-big',
+  impeccable: 'scan-search',
+  'frontend-design': 'palette',
+  'ux-pro': 'swatch-book',
+  'cloud-design': 'component',
+  generic: 'blocks',
 };
 
 export const SUMMARY_ICONS: SkillIconKey[] = [
@@ -19,6 +24,38 @@ export const SUMMARY_ICONS: SkillIconKey[] = [
   'pen-tool',
   'clapperboard',
   'layout-template',
+];
+
+const IMPECCABLE_USUAL_SUSPECTS: SkillShowcaseBeat[] = [
+  {startFrame: 0, endFrame: 90, keyword: '反模式检测', icon: 'scan-search', action: 'stamp'},
+  {startFrame: 90, endFrame: 175, keyword: '紫渐变', icon: 'swatch-book', action: 'stack', evidence: ['紫色渐变', '毛玻璃', '居中堆叠']},
+  {startFrame: 175, endFrame: 260, keyword: '37 条规则', icon: 'list-checks', action: 'counter', value: '37'},
+  {startFrame: 260, endFrame: 340, keyword: '实时标注', icon: 'scan-line', action: 'focus'},
+  {startFrame: 340, endFrame: 450, keyword: '检测出声', icon: 'shield-alert', action: 'compare', evidence: ['AI 默认输出', '装上 Impeccable']},
+];
+
+const FRONTEND_DIRECTIONS: SkillShowcaseBeat[] = [
+  {startFrame: 0, endFrame: 80, keyword: '审美方向', icon: 'palette', action: 'stamp'},
+  {startFrame: 80, endFrame: 170, keyword: '六种方向', icon: 'grid-3x3', action: 'stack', evidence: ['Swiss', 'Baltic', 'Nordic', 'Neo']},
+  {startFrame: 170, endFrame: 250, keyword: '反模式清单', icon: 'shield-alert', action: 'focus'},
+  {startFrame: 250, endFrame: 330, keyword: '禁用规则', icon: 'list-checks', action: 'stack', evidence: ['Inter 字体', '紫色渐变', '居中堆叠']},
+  {startFrame: 330, endFrame: 450, keyword: '主动锚定', icon: 'badge-check', action: 'compare', evidence: ['默认 AI', '装 Frontend']},
+];
+
+const UXPRO_KIT: SkillShowcaseBeat[] = [
+  {startFrame: 0, endFrame: 80, keyword: '设计系统', icon: 'swatch-book', action: 'stamp'},
+  {startFrame: 80, endFrame: 180, keyword: '内置数据库', icon: 'database', action: 'counter', value: '161+67+57+99'},
+  {startFrame: 180, endFrame: 260, keyword: '按行业划分', icon: 'search', action: 'focus'},
+  {startFrame: 260, endFrame: 350, keyword: '一键输出', icon: 'zap', action: 'burst'},
+  {startFrame: 350, endFrame: 450, keyword: '行业立场', icon: 'badge-check', action: 'compare', evidence: ['通用模板', '行业系统']},
+];
+
+const CLOUD_BRANDS: SkillShowcaseBeat[] = [
+  {startFrame: 0, endFrame: 80, keyword: '品牌系统', icon: 'component', action: 'stamp'},
+  {startFrame: 80, endFrame: 180, keyword: '68 个品牌', icon: 'blocks', action: 'counter', value: '68'},
+  {startFrame: 180, endFrame: 260, keyword: 'Stripe', icon: 'external-link', action: 'focus'},
+  {startFrame: 260, endFrame: 340, keyword: 'Linear / Versa', icon: 'grid-3x3', action: 'stack', evidence: ['Linear', 'Versa', 'Recast']},
+  {startFrame: 340, endFrame: 450, keyword: '品牌立场', icon: 'badge-check', action: 'compare', evidence: ['普通 AI 模板', 'Cloud Design']},
 ];
 
 export const DEFAULT_SKILL_BEATS: Partial<Record<SkillShowcaseVariant, SkillShowcaseBeat[]>> = {
@@ -97,6 +134,10 @@ export const DEFAULT_SKILL_BEATS: Partial<Record<SkillShowcaseVariant, SkillShow
     {startFrame: 242, endFrame: 322, keyword: '真正帮手', icon: 'circle-check-big', action: 'spotlight'},
     {startFrame: 322, endFrame: 407, keyword: '评论区 Skill', icon: 'send', action: 'burst'},
   ],
+  impeccable: IMPECCABLE_USUAL_SUSPECTS,
+  'frontend-design': FRONTEND_DIRECTIONS,
+  'ux-pro': UXPRO_KIT,
+  'cloud-design': CLOUD_BRANDS,
 };
 
 export const resolveSkillBeats = (

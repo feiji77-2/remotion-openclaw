@@ -1,0 +1,1267 @@
+{
+  "schemaVersion": 1,
+  "projectId": "design-skills-showcase",
+  "title": "设计 Skill · 让 AI 有审美立场",
+  "render": {
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "qualityMode": "cinematic",
+    "orientation": "portrait",
+    "captionStyle": "editorial",
+    "showProjectLabel": false
+  },
+  "scenes": [
+    {
+      "id": "intro",
+      "family": "skill-showcase",
+      "durationInFrames": 564,
+      "captionRange": {
+        "startIndex": 0,
+        "endIndex": 3
+      },
+      "payload": {
+        "variant": "intro",
+        "title": "设计 Skill · 让 AI 有审美立场",
+        "productIcon": "impeccable",
+        "brandName": "Design Skill",
+        "brandIcon": "impeccable",
+        "eyebrow": "你有没有发现",
+        "headline": "AI 设计一眼就露馅",
+        "body": "紫色渐变、居中堆叠和毛玻璃，是默认审美的残影。",
+        "accent": "#20d9e8",
+        "secondaryAccent": "#9a7cff",
+        "labels": [
+          "反模式检测",
+          "审美方向",
+          "设计系统",
+          "品牌规则"
+        ],
+        "labelIcons": [
+          "scan-search",
+          "palette",
+          "swatch-book",
+          "component"
+        ],
+        "productIcons": [
+          "impeccable",
+          "frontend-design",
+          "ux-pro",
+          "cloud-design"
+        ],
+        "progressIndex": 0,
+        "progressTotal": 4,
+        "captionStartIndex": 0,
+        "captionEndIndex": 3,
+        "sourceText": "你有没有发现，AI 给你的设计一眼就能看出是 AI 做的？紫色渐变、居中布局，千篇一律。这些都是 AI 默认的平均审美。装一个 Design Skill，就不一样了。大多数 AI 出图的问题不是技术，是没有设计语言。",
+        "beats": [
+          {
+            "startFrame": 0,
+            "endFrame": 159,
+            "captionStartIndex": 0,
+            "captionEndIndex": 0,
+            "keyword": "AI 设计",
+            "icon": "palette",
+            "action": "compare",
+            "visualState": "problem",
+            "motionPreset": "split-reveal",
+            "placement": "bottom",
+            "detail": "你有没有发现，AI 给你的设计一眼就能看出是 AI 做的？",
+            "evidence": [
+              "AI 设计",
+              "一眼认出"
+            ]
+          },
+          {
+            "startFrame": 159,
+            "endFrame": 317,
+            "captionStartIndex": 1,
+            "captionEndIndex": 1,
+            "keyword": "紫色渐变",
+            "icon": "swatch-book",
+            "action": "focus",
+            "visualState": "problem",
+            "motionPreset": "focus-pulse",
+            "placement": "highlight",
+            "detail": "紫色渐变、居中布局，千篇一律。这些都是 AI 默认的平均审美。"
+          },
+          {
+            "startFrame": 317,
+            "endFrame": 423,
+            "captionStartIndex": 2,
+            "captionEndIndex": 2,
+            "keyword": "Design Skill",
+            "icon": "plug-zap",
+            "action": "burst",
+            "visualState": "install",
+            "motionPreset": "flash-cut",
+            "placement": "bottom",
+            "detail": "装一个 Design Skill，就不一样了。"
+          },
+          {
+            "startFrame": 423,
+            "endFrame": 564,
+            "captionStartIndex": 3,
+            "captionEndIndex": 3,
+            "keyword": "没有设计语言",
+            "icon": "shield-alert",
+            "action": "stack",
+            "visualState": "language",
+            "motionPreset": "card-regroup",
+            "placement": "bottom",
+            "detail": "大多数 AI 出图的问题不是技术，是没有设计语言。",
+            "evidence": [
+              "不是技术",
+              "没有设计语言"
+            ]
+          }
+        ]
+      },
+      "assetIds": [],
+      "transition": {
+        "type": "fade",
+        "durationInFrames": 10
+      }
+    },
+    {
+      "id": "impeccable",
+      "family": "skill-showcase",
+      "durationInFrames": 1022,
+      "captionRange": {
+        "startIndex": 4,
+        "endIndex": 10
+      },
+      "payload": {
+        "variant": "impeccable",
+        "index": "01",
+        "title": "Impeccable",
+        "subtitle": "37 条规则 · 8 个类别 · 一眼认出 AI 出图",
+        "productIcon": "impeccable",
+        "brandName": "Design Skill",
+        "brandIcon": "impeccable",
+        "accent": "#45e28d",
+        "secondaryAccent": "#20d9e8",
+        "bullets": [
+          "检测反模式",
+          "实时标注",
+          "分类规则",
+          "规避雷区"
+        ],
+        "labels": [
+          "反模式检测",
+          "审美方向",
+          "设计系统",
+          "品牌规则"
+        ],
+        "labelIcons": [
+          "scan-search",
+          "palette",
+          "swatch-book",
+          "component"
+        ],
+        "productIcons": [
+          "impeccable",
+          "frontend-design",
+          "ux-pro",
+          "cloud-design"
+        ],
+        "progressIndex": 0,
+        "progressTotal": 4,
+        "captionStartIndex": 4,
+        "captionEndIndex": 10,
+        "sourceText": "第一个，Impeccable。它把这些 AI 审美问题归纳成 37 条规则。Visual Typography、Color、Layout 等 8 个类别。这些就是让人一眼认出 AI 出图的特征，紫色渐变、毛玻璃滥用。每一条都有名字和说明，它能实时检测设计里存在哪些反模式，并标注出来。左边是装上之后，右边是默认 AI 输出。同样的提示词，完全不同的结果。22,000 Star，是 AI 辅助设计必装的第一个 Skill。",
+        "beats": [
+          {
+            "startFrame": 0,
+            "endFrame": 88,
+            "captionStartIndex": 4,
+            "captionEndIndex": 4,
+            "keyword": "Impeccable",
+            "icon": "scan-search",
+            "action": "stamp",
+            "visualState": "title",
+            "motionPreset": "slow-rise",
+            "placement": "bottom",
+            "detail": "第一个，Impeccable。"
+          },
+          {
+            "startFrame": 88,
+            "endFrame": 208,
+            "captionStartIndex": 5,
+            "captionEndIndex": 5,
+            "keyword": "37 条规则",
+            "icon": "list-checks",
+            "action": "counter",
+            "visualState": "rules",
+            "motionPreset": "number-roll",
+            "placement": "body",
+            "detail": "它把这些 AI 审美问题归纳成 37 条规则。",
+            "value": "37"
+          },
+          {
+            "startFrame": 208,
+            "endFrame": 282,
+            "captionStartIndex": 6,
+            "captionEndIndex": 6,
+            "keyword": "8 个类别",
+            "icon": "grid-3x3",
+            "action": "stack",
+            "visualState": "rules",
+            "motionPreset": "card-regroup",
+            "placement": "body",
+            "detail": "Visual Typography、Color、Layout 等 8 个类别。",
+            "evidence": [
+              "Visual Typography",
+              "Color",
+              "Layout"
+            ]
+          },
+          {
+            "startFrame": 282,
+            "endFrame": 458,
+            "captionStartIndex": 7,
+            "captionEndIndex": 7,
+            "keyword": "紫色渐变",
+            "icon": "swatch-book",
+            "action": "compare",
+            "visualState": "problem",
+            "motionPreset": "split-reveal",
+            "placement": "bottom",
+            "detail": "这些就是让人一眼认出 AI 出图的特征，紫色渐变、毛玻璃滥用。",
+            "evidence": [
+              "紫色渐变",
+              "毛玻璃滥用"
+            ]
+          },
+          {
+            "startFrame": 458,
+            "endFrame": 652,
+            "captionStartIndex": 8,
+            "captionEndIndex": 8,
+            "keyword": "实时检测",
+            "icon": "scan-line",
+            "action": "focus",
+            "visualState": "scan",
+            "motionPreset": "focus-pulse",
+            "placement": "highlight",
+            "detail": "每一条都有名字和说明，它能实时检测设计里存在哪些反模式，并标注出来。"
+          },
+          {
+            "startFrame": 652,
+            "endFrame": 846,
+            "captionStartIndex": 9,
+            "captionEndIndex": 9,
+            "keyword": "左边装上",
+            "icon": "shield-check",
+            "action": "compare",
+            "visualState": "compare",
+            "motionPreset": "split-reveal",
+            "placement": "bottom",
+            "detail": "左边是装上之后，右边是默认 AI 输出。同样的提示词，完全不同的结果。",
+            "evidence": [
+              "左边装上之后",
+              "右边默认 AI"
+            ]
+          },
+          {
+            "startFrame": 846,
+            "endFrame": 1022,
+            "captionStartIndex": 10,
+            "captionEndIndex": 10,
+            "keyword": "22,000 Star",
+            "icon": "badge-check",
+            "action": "counter",
+            "visualState": "metrics",
+            "motionPreset": "number-roll",
+            "placement": "body",
+            "detail": "22,000 Star，是 AI 辅助设计必装的第一个 Skill。",
+            "value": "22K"
+          }
+        ]
+      },
+      "assetIds": [],
+      "transition": {
+        "type": "slide",
+        "durationInFrames": 10
+      }
+    },
+    {
+      "id": "frontend-design",
+      "family": "skill-showcase",
+      "durationInFrames": 1058,
+      "captionRange": {
+        "startIndex": 11,
+        "endIndex": 20
+      },
+      "payload": {
+        "variant": "frontend-design",
+        "index": "02",
+        "title": "Skill Frontend Design",
+        "subtitle": "六种审美方向 · 主动锚定 · 稳定输出",
+        "productIcon": "frontend-design",
+        "brandName": "Design Skill",
+        "brandIcon": "frontend-design",
+        "accent": "#ffc44d",
+        "secondaryAccent": "#ff7a45",
+        "bullets": [
+          "Swiss 极简",
+          "Baltic 粗粝工业",
+          "Nordic 克制",
+          "Neo 赛博"
+        ],
+        "labels": [
+          "反模式检测",
+          "审美方向",
+          "设计系统",
+          "品牌规则"
+        ],
+        "labelIcons": [
+          "scan-search",
+          "palette",
+          "swatch-book",
+          "component"
+        ],
+        "productIcons": [
+          "impeccable",
+          "frontend-design",
+          "ux-pro",
+          "cloud-design"
+        ],
+        "progressIndex": 1,
+        "progressTotal": 4,
+        "captionStartIndex": 11,
+        "captionEndIndex": 20,
+        "sourceText": "第二个，Skill Frontend Design。提供了六种鲜明的审美方向。Swiss 极简。Baltic 粗粝工业。Nordic 克制。Neo 赛博。不是让 AI 乱选风格，是让你主动锚定一种，AI 才能稳定输出有记忆点的界面。它内置了一份反模式清单，禁用 Inter 字体，禁用紫色渐变，禁用居中堆叠。让 AI 从源头规避这些设计雷区。左边是装上之后，右边是没有 Skill 的默认输出。同样一句提示词，两个完全不同的结果。",
+        "beats": [
+          {
+            "startFrame": 0,
+            "endFrame": 124,
+            "captionStartIndex": 11,
+            "captionEndIndex": 11,
+            "keyword": "Frontend Design",
+            "icon": "palette",
+            "action": "stamp",
+            "visualState": "title",
+            "motionPreset": "slow-rise",
+            "placement": "bottom",
+            "detail": "第二个，Skill Frontend Design。"
+          },
+          {
+            "startFrame": 124,
+            "endFrame": 172,
+            "captionStartIndex": 12,
+            "captionEndIndex": 12,
+            "keyword": "六种方向",
+            "icon": "grid-3x3",
+            "action": "counter",
+            "visualState": "six",
+            "motionPreset": "number-roll",
+            "placement": "bottom",
+            "detail": "提供了六种鲜明的审美方向。",
+            "value": "6"
+          },
+          {
+            "startFrame": 172,
+            "endFrame": 220,
+            "captionStartIndex": 13,
+            "captionEndIndex": 13,
+            "keyword": "Swiss",
+            "icon": "ruler",
+            "action": "focus",
+            "visualState": "swiss",
+            "motionPreset": "focus-pulse",
+            "placement": "highlight",
+            "detail": "Swiss 极简。"
+          },
+          {
+            "startFrame": 220,
+            "endFrame": 273,
+            "captionStartIndex": 14,
+            "captionEndIndex": 14,
+            "keyword": "Baltic",
+            "icon": "component",
+            "action": "focus",
+            "visualState": "baltic",
+            "motionPreset": "focus-pulse",
+            "placement": "highlight",
+            "detail": "Baltic 粗粝工业。"
+          },
+          {
+            "startFrame": 273,
+            "endFrame": 310,
+            "captionStartIndex": 15,
+            "captionEndIndex": 15,
+            "keyword": "Nordic",
+            "icon": "panel-top",
+            "action": "focus",
+            "visualState": "nordic",
+            "motionPreset": "focus-pulse",
+            "placement": "highlight",
+            "detail": "Nordic 克制。"
+          },
+          {
+            "startFrame": 310,
+            "endFrame": 335,
+            "captionStartIndex": 16,
+            "captionEndIndex": 16,
+            "keyword": "Neo",
+            "icon": "zap",
+            "action": "focus",
+            "visualState": "neo",
+            "motionPreset": "focus-pulse",
+            "placement": "highlight",
+            "detail": "Neo 赛博。"
+          },
+          {
+            "startFrame": 335,
+            "endFrame": 547,
+            "captionStartIndex": 17,
+            "captionEndIndex": 17,
+            "keyword": "主动锚定",
+            "icon": "badge-check",
+            "action": "compare",
+            "visualState": "anchor",
+            "motionPreset": "split-reveal",
+            "placement": "bottom",
+            "detail": "不是让 AI 乱选风格，是让你主动锚定一种，AI 才能稳定输出有记忆点的界面。",
+            "evidence": [
+              "乱选风格",
+              "主动锚定"
+            ]
+          },
+          {
+            "startFrame": 547,
+            "endFrame": 741,
+            "captionStartIndex": 18,
+            "captionEndIndex": 18,
+            "keyword": "禁用规则",
+            "icon": "shield-alert",
+            "action": "stack",
+            "visualState": "rules",
+            "motionPreset": "card-regroup",
+            "placement": "body",
+            "detail": "它内置了一份反模式清单，禁用 Inter 字体，禁用紫色渐变，禁用居中堆叠。",
+            "evidence": [
+              "Inter 字体",
+              "紫色渐变",
+              "居中堆叠"
+            ]
+          },
+          {
+            "startFrame": 741,
+            "endFrame": 935,
+            "captionStartIndex": 19,
+            "captionEndIndex": 19,
+            "keyword": "源头规避",
+            "icon": "list-checks",
+            "action": "compare",
+            "visualState": "compare",
+            "motionPreset": "split-reveal",
+            "placement": "bottom",
+            "detail": "让 AI 从源头规避这些设计雷区。左边是装上之后，右边是没有 Skill 的默认输出。",
+            "evidence": [
+              "左边装上之后",
+              "右边默认输出"
+            ]
+          },
+          {
+            "startFrame": 935,
+            "endFrame": 1058,
+            "captionStartIndex": 20,
+            "captionEndIndex": 20,
+            "keyword": "完全不同",
+            "icon": "move-right",
+            "action": "burst",
+            "visualState": "compare",
+            "motionPreset": "flash-cut",
+            "placement": "bottom",
+            "detail": "同样一句提示词，两个完全不同的结果。"
+          }
+        ]
+      },
+      "assetIds": [],
+      "transition": {
+        "type": "fade",
+        "durationInFrames": 10
+      }
+    },
+    {
+      "id": "ux-pro",
+      "family": "skill-showcase",
+      "durationInFrames": 1093,
+      "captionRange": {
+        "startIndex": 21,
+        "endIndex": 30
+      },
+      "payload": {
+        "variant": "ux-pro",
+        "index": "03",
+        "title": "UI UX PRO Max",
+        "subtitle": "161+67+57+99 · 内置一整套设计系统",
+        "productIcon": "ux-pro",
+        "brandName": "Design Skill",
+        "brandIcon": "ux-pro",
+        "accent": "#ff5f91",
+        "secondaryAccent": "#ffc44d",
+        "labels": [
+          "反模式检测",
+          "审美方向",
+          "设计系统",
+          "品牌规则"
+        ],
+        "labelIcons": [
+          "scan-search",
+          "palette",
+          "swatch-book",
+          "component"
+        ],
+        "productIcons": [
+          "impeccable",
+          "frontend-design",
+          "ux-pro",
+          "cloud-design"
+        ],
+        "progressIndex": 2,
+        "progressTotal": 4,
+        "captionStartIndex": 21,
+        "captionEndIndex": 30,
+        "sourceText": "第三个，UI UX PRO Max。把你每次设计时都要查的东西全部内置进去了。161 套按行业划分的配色方案。67 种 UI 风格定义。57 个字体搭配推荐。99 条 UX 指导原则。告诉它你在做什么产品，它直接给你一整套设计系统，颜色、字体、间距。WCAG 无障碍标准，一次输出。不是给你建议，是帮你做决策。做官网、做工具、做作品集。每个场景都有对应的规则和反模式。装上它，AI 输出的设计才有行业立场，不是通用模板。",
+        "beats": [
+          {
+            "startFrame": 0,
+            "endFrame": 106,
+            "captionStartIndex": 21,
+            "captionEndIndex": 21,
+            "keyword": "UI UX PRO Max",
+            "icon": "swatch-book",
+            "action": "stamp",
+            "visualState": "title",
+            "motionPreset": "slow-rise",
+            "placement": "bottom",
+            "detail": "第三个，UI UX PRO Max。"
+          },
+          {
+            "startFrame": 106,
+            "endFrame": 247,
+            "captionStartIndex": 22,
+            "captionEndIndex": 22,
+            "keyword": "全部内置",
+            "icon": "database",
+            "action": "stack",
+            "visualState": "stack",
+            "motionPreset": "card-regroup",
+            "placement": "bottom",
+            "detail": "把你每次设计时都要查的东西全部内置进去了。"
+          },
+          {
+            "startFrame": 247,
+            "endFrame": 304,
+            "captionStartIndex": 23,
+            "captionEndIndex": 23,
+            "keyword": "161 配色",
+            "icon": "palette",
+            "action": "counter",
+            "visualState": "metrics",
+            "motionPreset": "number-roll",
+            "placement": "body",
+            "detail": "161 套按行业划分的配色方案。",
+            "value": "161"
+          },
+          {
+            "startFrame": 304,
+            "endFrame": 361,
+            "captionStartIndex": 24,
+            "captionEndIndex": 24,
+            "keyword": "67 UI 风格",
+            "icon": "layout-template",
+            "action": "counter",
+            "visualState": "metrics",
+            "motionPreset": "number-roll",
+            "placement": "body",
+            "detail": "67 种 UI 风格定义。",
+            "value": "67"
+          },
+          {
+            "startFrame": 361,
+            "endFrame": 419,
+            "captionStartIndex": 25,
+            "captionEndIndex": 25,
+            "keyword": "57 字体",
+            "icon": "type",
+            "action": "counter",
+            "visualState": "metrics",
+            "motionPreset": "number-roll",
+            "placement": "body",
+            "detail": "57 个字体搭配推荐。",
+            "value": "57"
+          },
+          {
+            "startFrame": 419,
+            "endFrame": 476,
+            "captionStartIndex": 26,
+            "captionEndIndex": 26,
+            "keyword": "99 条 UX",
+            "icon": "list-checks",
+            "action": "counter",
+            "visualState": "metrics",
+            "motionPreset": "number-roll",
+            "placement": "body",
+            "detail": "99 条 UX 指导原则。",
+            "value": "99"
+          },
+          {
+            "startFrame": 476,
+            "endFrame": 614,
+            "captionStartIndex": 27,
+            "captionEndIndex": 27,
+            "keyword": "颜色字体间距",
+            "icon": "swatch-book",
+            "action": "stack",
+            "visualState": "system-output",
+            "motionPreset": "card-regroup",
+            "placement": "body",
+            "detail": "告诉它你在做什么产品，它直接给你一整套设计系统，颜色、字体、间距。",
+            "evidence": [
+              "颜色",
+              "字体",
+              "间距"
+            ]
+          },
+          {
+            "startFrame": 614,
+            "endFrame": 740,
+            "captionStartIndex": 28,
+            "captionEndIndex": 28,
+            "keyword": "WCAG",
+            "icon": "shield-check",
+            "action": "focus",
+            "visualState": "system-output",
+            "motionPreset": "focus-pulse",
+            "placement": "body",
+            "detail": "WCAG 无障碍标准，一次输出。"
+          },
+          {
+            "startFrame": 740,
+            "endFrame": 899,
+            "captionStartIndex": 29,
+            "captionEndIndex": 29,
+            "keyword": "做决策",
+            "icon": "badge-check",
+            "action": "compare",
+            "visualState": "decision",
+            "motionPreset": "split-reveal",
+            "placement": "bottom",
+            "detail": "不是给你建议，是帮你做决策。做官网、做工具、做作品集。",
+            "evidence": [
+              "给建议",
+              "做决策"
+            ]
+          },
+          {
+            "startFrame": 899,
+            "endFrame": 1093,
+            "captionStartIndex": 30,
+            "captionEndIndex": 30,
+            "keyword": "行业立场",
+            "icon": "component",
+            "action": "burst",
+            "visualState": "decision",
+            "motionPreset": "flash-cut",
+            "placement": "bottom",
+            "detail": "每个场景都有对应的规则和反模式。装上它，AI 输出的设计才有行业立场，不是通用模板。"
+          }
+        ]
+      },
+      "assetIds": [],
+      "transition": {
+        "type": "slide",
+        "durationInFrames": 10
+      }
+    },
+    {
+      "id": "cloud-design",
+      "family": "skill-showcase",
+      "durationInFrames": 1163,
+      "captionRange": {
+        "startIndex": 31,
+        "endIndex": 40
+      },
+      "payload": {
+        "variant": "cloud-design",
+        "index": "04",
+        "title": "Awesome Cloud Design",
+        "subtitle": "68 个品牌设计系统 · 一个文件让 AI 有品牌立场",
+        "productIcon": "cloud-design",
+        "brandName": "Design Skill",
+        "brandIcon": "cloud-design",
+        "accent": "#5f7dff",
+        "secondaryAccent": "#9a7cff",
+        "labels": [
+          "反模式检测",
+          "审美方向",
+          "设计系统",
+          "品牌规则"
+        ],
+        "labelIcons": [
+          "scan-search",
+          "palette",
+          "swatch-book",
+          "component"
+        ],
+        "productIcons": [
+          "impeccable",
+          "frontend-design",
+          "ux-pro",
+          "cloud-design"
+        ],
+        "progressIndex": 3,
+        "progressTotal": 4,
+        "captionStartIndex": 31,
+        "captionEndIndex": 40,
+        "sourceText": "第四个，Awesome Cloud Design。把 68 个品牌的设计系统打包进一个文件。Stripe 的极简兼融感。Linear 的工程美学。Versa 的极致黑白。Recast 的精密渐变。每个模板包含完整的 Token 定义、排版层级和视觉规则。加载一个模板，AI 输出的每个组件都自带这套规则。左边是 Stripe Design MD 加持之后，右边是普通 AI 生成的定价页。同一个 Prompt，两个完全不同的结果。一个文件让 AI 有品牌立场。",
+        "beats": [
+          {
+            "startFrame": 0,
+            "endFrame": 123,
+            "captionStartIndex": 31,
+            "captionEndIndex": 31,
+            "keyword": "Awesome Cloud Design",
+            "icon": "component",
+            "action": "stamp",
+            "visualState": "title",
+            "motionPreset": "slow-rise",
+            "placement": "bottom",
+            "detail": "第四个，Awesome Cloud Design。"
+          },
+          {
+            "startFrame": 123,
+            "endFrame": 264,
+            "captionStartIndex": 32,
+            "captionEndIndex": 32,
+            "keyword": "68 个品牌",
+            "icon": "blocks",
+            "action": "counter",
+            "visualState": "metrics",
+            "motionPreset": "number-roll",
+            "placement": "body",
+            "detail": "把 68 个品牌的设计系统打包进一个文件。",
+            "value": "68"
+          },
+          {
+            "startFrame": 264,
+            "endFrame": 313,
+            "captionStartIndex": 33,
+            "captionEndIndex": 33,
+            "keyword": "Stripe",
+            "icon": "external-link",
+            "action": "focus",
+            "visualState": "brand-relay",
+            "motionPreset": "focus-pulse",
+            "placement": "body",
+            "detail": "Stripe 的极简兼融感。"
+          },
+          {
+            "startFrame": 313,
+            "endFrame": 367,
+            "captionStartIndex": 34,
+            "captionEndIndex": 34,
+            "keyword": "Linear",
+            "icon": "grid-3x3",
+            "action": "focus",
+            "visualState": "brand-relay",
+            "motionPreset": "focus-pulse",
+            "placement": "body",
+            "detail": "Linear 的工程美学。"
+          },
+          {
+            "startFrame": 367,
+            "endFrame": 418,
+            "captionStartIndex": 35,
+            "captionEndIndex": 35,
+            "keyword": "Versa",
+            "icon": "binary",
+            "action": "focus",
+            "visualState": "brand-relay",
+            "motionPreset": "focus-pulse",
+            "placement": "body",
+            "detail": "Versa 的极致黑白。"
+          },
+          {
+            "startFrame": 418,
+            "endFrame": 476,
+            "captionStartIndex": 36,
+            "captionEndIndex": 36,
+            "keyword": "Recast",
+            "icon": "wand-sparkles",
+            "action": "focus",
+            "visualState": "brand-relay",
+            "motionPreset": "focus-pulse",
+            "placement": "body",
+            "detail": "Recast 的精密渐变。"
+          },
+          {
+            "startFrame": 476,
+            "endFrame": 617,
+            "captionStartIndex": 37,
+            "captionEndIndex": 37,
+            "keyword": "Token 定义",
+            "icon": "component",
+            "action": "stack",
+            "visualState": "tokens",
+            "motionPreset": "card-regroup",
+            "placement": "body",
+            "detail": "每个模板包含完整的 Token 定义、排版层级和视觉规则。",
+            "evidence": [
+              "Token 定义",
+              "排版层级",
+              "视觉规则"
+            ]
+          },
+          {
+            "startFrame": 617,
+            "endFrame": 776,
+            "captionStartIndex": 38,
+            "captionEndIndex": 38,
+            "keyword": "自带规则",
+            "icon": "shield-check",
+            "action": "trace",
+            "visualState": "tokens",
+            "motionPreset": "scan-lock",
+            "placement": "body",
+            "detail": "加载一个模板，AI 输出的每个组件都自带这套规则。"
+          },
+          {
+            "startFrame": 776,
+            "endFrame": 969,
+            "captionStartIndex": 39,
+            "captionEndIndex": 39,
+            "keyword": "Stripe 加持",
+            "icon": "git-compare-arrows",
+            "action": "compare",
+            "visualState": "compare",
+            "motionPreset": "split-reveal",
+            "placement": "bottom",
+            "detail": "左边是 Stripe Design MD 加持之后，右边是普通 AI 生成的定价页。",
+            "evidence": [
+              "左边 Stripe 加持",
+              "右边普通 AI"
+            ]
+          },
+          {
+            "startFrame": 969,
+            "endFrame": 1163,
+            "captionStartIndex": 40,
+            "captionEndIndex": 40,
+            "keyword": "品牌立场",
+            "icon": "badge-check",
+            "action": "burst",
+            "visualState": "compare",
+            "motionPreset": "flash-cut",
+            "placement": "bottom",
+            "detail": "同一个 Prompt，两个完全不同的结果。一个文件让 AI 有品牌立场。"
+          }
+        ]
+      },
+      "assetIds": [],
+      "transition": {
+        "type": "fade",
+        "durationInFrames": 10
+      }
+    },
+    {
+      "id": "outro",
+      "family": "skill-showcase",
+      "durationInFrames": 318,
+      "captionRange": {
+        "startIndex": 41,
+        "endIndex": 42
+      },
+      "payload": {
+        "variant": "outro",
+        "title": "装对 Skill，AI 才有立场",
+        "productIcon": "cloud-design",
+        "brandName": "Design Skill",
+        "brandIcon": "cloud-design",
+        "headline": "装对 Skill，AI 才有立场",
+        "body": "以前：AI 只能生成平均审美。现在：4 个 Design Skill 让它有立场。",
+        "footer": "一个文件让 AI 有品牌立场",
+        "accent": "#9a7cff",
+        "secondaryAccent": "#20d9e8",
+        "bullets": [
+          "以前：AI 只能生成平均审美",
+          "现在：4 个 Design Skill 让它有立场"
+        ],
+        "labels": [
+          "反模式检测",
+          "审美方向",
+          "设计系统",
+          "品牌规则"
+        ],
+        "labelIcons": [
+          "scan-search",
+          "palette",
+          "swatch-book",
+          "component"
+        ],
+        "productIcons": [
+          "impeccable",
+          "frontend-design",
+          "ux-pro",
+          "cloud-design"
+        ],
+        "progressIndex": 3,
+        "progressTotal": 4,
+        "captionStartIndex": 41,
+        "captionEndIndex": 42,
+        "sourceText": "以前 AI 帮设计师出图，现在更重要的是帮设计师把审美判断变成可复用系统。装对 Skill，AI 才有立场。",
+        "beats": [
+          {
+            "startFrame": 0,
+            "endFrame": 194,
+            "captionStartIndex": 41,
+            "captionEndIndex": 41,
+            "keyword": "可复用系统",
+            "icon": "workflow",
+            "action": "compare",
+            "visualState": "system",
+            "motionPreset": "split-reveal",
+            "placement": "bottom",
+            "detail": "以前 AI 帮设计师出图，现在更重要的是帮设计师把审美判断变成可复用系统。",
+            "evidence": [
+              "帮设计师出图",
+              "审美判断系统"
+            ]
+          },
+          {
+            "startFrame": 194,
+            "endFrame": 318,
+            "captionStartIndex": 42,
+            "captionEndIndex": 42,
+            "keyword": "AI 有立场",
+            "icon": "send",
+            "action": "burst",
+            "visualState": "outro",
+            "motionPreset": "flash-cut",
+            "placement": "bottom",
+            "detail": "装对 Skill，AI 才有立场。"
+          }
+        ]
+      },
+      "assetIds": [],
+      "transition": false
+    }
+  ],
+  "captions": [
+    {
+      "text": "你有没有发现，AI 给你的设计一眼就能看出是 AI 做的？",
+      "startMs": 0,
+      "endMs": 5288,
+      "timestampMs": 0,
+      "confidence": 1
+    },
+    {
+      "text": "紫色渐变、居中布局，千篇一律。这些都是 AI 默认的平均审美。",
+      "startMs": 5288,
+      "endMs": 10576,
+      "timestampMs": 5288,
+      "confidence": 1
+    },
+    {
+      "text": "装一个 Design Skill，就不一样了。",
+      "startMs": 10576,
+      "endMs": 14102,
+      "timestampMs": 10576,
+      "confidence": 1
+    },
+    {
+      "text": "大多数 AI 出图的问题不是技术，是没有设计语言。",
+      "startMs": 14102,
+      "endMs": 18802,
+      "timestampMs": 14102,
+      "confidence": 1
+    },
+    {
+      "text": "第一个，Impeccable。",
+      "startMs": 18802,
+      "endMs": 21740,
+      "timestampMs": 18802,
+      "confidence": 1
+    },
+    {
+      "text": "它把这些 AI 审美问题归纳成 37 条规则。",
+      "startMs": 21740,
+      "endMs": 25720,
+      "timestampMs": 21740,
+      "confidence": 1
+    },
+    {
+      "text": "Visual Typography、Color、Layout 等 8 个类别。",
+      "startMs": 25720,
+      "endMs": 28203,
+      "timestampMs": 25720,
+      "confidence": 1
+    },
+    {
+      "text": "这些就是让人一眼认出 AI 出图的特征，紫色渐变、毛玻璃滥用。",
+      "startMs": 28203,
+      "endMs": 34079,
+      "timestampMs": 28203,
+      "confidence": 1
+    },
+    {
+      "text": "每一条都有名字和说明，它能实时检测设计里存在哪些反模式，并标注出来。",
+      "startMs": 34079,
+      "endMs": 40542,
+      "timestampMs": 34079,
+      "confidence": 1
+    },
+    {
+      "text": "左边是装上之后，右边是默认 AI 输出。同样的提示词，完全不同的结果。",
+      "startMs": 40542,
+      "endMs": 47005,
+      "timestampMs": 40542,
+      "confidence": 1
+    },
+    {
+      "text": "22,000 Star，是 AI 辅助设计必装的第一个 Skill。",
+      "startMs": 47005,
+      "endMs": 52881,
+      "timestampMs": 47005,
+      "confidence": 1
+    },
+    {
+      "text": "第二个，Skill Frontend Design。",
+      "startMs": 52881,
+      "endMs": 56994,
+      "timestampMs": 52881,
+      "confidence": 1
+    },
+    {
+      "text": "提供了六种鲜明的审美方向。",
+      "startMs": 56994,
+      "endMs": 58600,
+      "timestampMs": 56994,
+      "confidence": 1
+    },
+    {
+      "text": "Swiss 极简。",
+      "startMs": 58600,
+      "endMs": 60200,
+      "timestampMs": 58600,
+      "confidence": 1
+    },
+    {
+      "text": "Baltic 粗粝工业。",
+      "startMs": 60200,
+      "endMs": 61950,
+      "timestampMs": 60200,
+      "confidence": 1
+    },
+    {
+      "text": "Nordic 克制。",
+      "startMs": 61950,
+      "endMs": 63200,
+      "timestampMs": 61950,
+      "confidence": 1
+    },
+    {
+      "text": "Neo 赛博。",
+      "startMs": 63200,
+      "endMs": 64045,
+      "timestampMs": 63200,
+      "confidence": 1
+    },
+    {
+      "text": "不是让 AI 乱选风格，是让你主动锚定一种，AI 才能稳定输出有记忆点的界面。",
+      "startMs": 64045,
+      "endMs": 71096,
+      "timestampMs": 64045,
+      "confidence": 1
+    },
+    {
+      "text": "它内置了一份反模式清单，禁用 Inter 字体，禁用紫色渐变，禁用居中堆叠。",
+      "startMs": 71096,
+      "endMs": 77559,
+      "timestampMs": 71096,
+      "confidence": 1
+    },
+    {
+      "text": "让 AI 从源头规避这些设计雷区。左边是装上之后，右边是没有 Skill 的默认输出。",
+      "startMs": 77559,
+      "endMs": 84022,
+      "timestampMs": 77559,
+      "confidence": 1
+    },
+    {
+      "text": "同样一句提示词，两个完全不同的结果。",
+      "startMs": 84022,
+      "endMs": 88135,
+      "timestampMs": 84022,
+      "confidence": 1
+    },
+    {
+      "text": "第三个，UI UX PRO Max。",
+      "startMs": 88135,
+      "endMs": 91661,
+      "timestampMs": 88135,
+      "confidence": 1
+    },
+    {
+      "text": "把你每次设计时都要查的东西全部内置进去了。",
+      "startMs": 91661,
+      "endMs": 96361,
+      "timestampMs": 91661,
+      "confidence": 1
+    },
+    {
+      "text": "161 套按行业划分的配色方案。",
+      "startMs": 96361,
+      "endMs": 98270,
+      "timestampMs": 96361,
+      "confidence": 1
+    },
+    {
+      "text": "67 种 UI 风格定义。",
+      "startMs": 98270,
+      "endMs": 100180,
+      "timestampMs": 98270,
+      "confidence": 1
+    },
+    {
+      "text": "57 个字体搭配推荐。",
+      "startMs": 100180,
+      "endMs": 102090,
+      "timestampMs": 100180,
+      "confidence": 1
+    },
+    {
+      "text": "99 条 UX 指导原则。",
+      "startMs": 102090,
+      "endMs": 103999,
+      "timestampMs": 102090,
+      "confidence": 1
+    },
+    {
+      "text": "告诉它你在做什么产品，它直接给你一整套设计系统，颜色、字体、间距。",
+      "startMs": 103999,
+      "endMs": 108600,
+      "timestampMs": 103999,
+      "confidence": 1
+    },
+    {
+      "text": "WCAG 无障碍标准，一次输出。",
+      "startMs": 108600,
+      "endMs": 112813,
+      "timestampMs": 108600,
+      "confidence": 1
+    },
+    {
+      "text": "不是给你建议，是帮你做决策。做官网、做工具、做作品集。",
+      "startMs": 112813,
+      "endMs": 118101,
+      "timestampMs": 112813,
+      "confidence": 1
+    },
+    {
+      "text": "每个场景都有对应的规则和反模式。装上它，AI 输出的设计才有行业立场，不是通用模板。",
+      "startMs": 118101,
+      "endMs": 124564,
+      "timestampMs": 118101,
+      "confidence": 1
+    },
+    {
+      "text": "第四个，Awesome Cloud Design。",
+      "startMs": 124564,
+      "endMs": 128677,
+      "timestampMs": 124564,
+      "confidence": 1
+    },
+    {
+      "text": "把 68 个品牌的设计系统打包进一个文件。",
+      "startMs": 128677,
+      "endMs": 133378,
+      "timestampMs": 128677,
+      "confidence": 1
+    },
+    {
+      "text": "Stripe 的极简兼融感。",
+      "startMs": 133378,
+      "endMs": 135000,
+      "timestampMs": 133378,
+      "confidence": 1
+    },
+    {
+      "text": "Linear 的工程美学。",
+      "startMs": 135000,
+      "endMs": 136800,
+      "timestampMs": 135000,
+      "confidence": 1
+    },
+    {
+      "text": "Versa 的极致黑白。",
+      "startMs": 136800,
+      "endMs": 138500,
+      "timestampMs": 136800,
+      "confidence": 1
+    },
+    {
+      "text": "Recast 的精密渐变。",
+      "startMs": 138500,
+      "endMs": 140429,
+      "timestampMs": 138500,
+      "confidence": 1
+    },
+    {
+      "text": "每个模板包含完整的 Token 定义、排版层级和视觉规则。",
+      "startMs": 140429,
+      "endMs": 145129,
+      "timestampMs": 140429,
+      "confidence": 1
+    },
+    {
+      "text": "加载一个模板，AI 输出的每个组件都自带这套规则。",
+      "startMs": 145129,
+      "endMs": 150417,
+      "timestampMs": 145129,
+      "confidence": 1
+    },
+    {
+      "text": "左边是 Stripe Design MD 加持之后，右边是普通 AI 生成的定价页。",
+      "startMs": 150417,
+      "endMs": 156881,
+      "timestampMs": 150417,
+      "confidence": 1
+    },
+    {
+      "text": "同一个 Prompt，两个完全不同的结果。一个文件让 AI 有品牌立场。",
+      "startMs": 156881,
+      "endMs": 163344,
+      "timestampMs": 156881,
+      "confidence": 1
+    },
+    {
+      "text": "以前 AI 帮设计师出图，现在更重要的是帮设计师把审美判断变成可复用系统。",
+      "startMs": 163344,
+      "endMs": 169807,
+      "timestampMs": 163344,
+      "confidence": 1
+    },
+    {
+      "text": "装对 Skill，AI 才有立场。",
+      "startMs": 169807,
+      "endMs": 173920,
+      "timestampMs": 169807,
+      "confidence": 1
+    }
+  ],
+  "audio": {
+    "voiceAssetId": "voiceover"
+  },
+  "assets": {
+    "voiceover": {
+      "kind": "audio",
+      "src": "projects/design-skills-showcase/audio/voice.m4a",
+      "required": true
+    }
+  }
+}

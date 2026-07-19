@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import {printAssetWarnings, runRemotion, withPreparedProject} from './lib/project-cli.mjs';
+import {printAssetWarnings, PROJECT_ROOT, runRemotion, withPreparedProject} from './lib/project-cli.mjs';
+import {assertVisualContract} from './lib/visual-contract.mjs';
 
 const input = process.argv[2];
 if (!input) {
@@ -9,6 +10,7 @@ if (!input) {
 }
 
 await withPreparedProject(input, async ({project, tempPath, warnings}) => {
+  const visualContract = assertVisualContract(project, {projectRoot: PROJECT_ROOT});
   runRemotion(['compositions', 'src/Root.tsx', '--props', tempPath]);
   printAssetWarnings(warnings);
   console.log(JSON.stringify({
@@ -17,5 +19,6 @@ await withPreparedProject(input, async ({project, tempPath, warnings}) => {
     schemaVersion: project.schemaVersion ?? null,
     scenes: Array.isArray(project.scenes) ? project.scenes.length : 0,
     optionalAssetsMissing: warnings.length,
+    visualContract,
   }, null, 2));
 });

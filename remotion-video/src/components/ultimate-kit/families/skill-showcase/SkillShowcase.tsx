@@ -18,6 +18,16 @@ export type {SkillBeatAction, SkillIconKey, SkillShowcaseBeat, SkillShowcaseProp
 const FONT = '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Inter, system-ui, sans-serif';
 const MONO = '"SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace';
 const PALETTE = ['#45e28d', '#5f7dff', '#ffc44d', '#ff5f91', '#20d9e8', '#9a7cff'];
+const SAFE = {
+  headerTop: 84,
+  headerBottom: 210,
+  bodyTop: 240,
+  bodyBottom: 1050,
+  beatTop: 1080,
+  beatBottom: 1480,
+  captionTop: 1630,
+  captionBottom: 1810,
+};
 
 const clamp = {
   extrapolateLeft: 'clamp' as const,
@@ -46,6 +56,31 @@ const VARIANT_PRODUCT_ICON: Record<SkillShowcaseVariant, ProductIconKey> = {
   hyperframes: 'hyperframes',
   ui: 'ui',
   outro: 'workbuddy',
+  impeccable: 'impeccable',
+  'frontend-design': 'frontend-design',
+  'ux-pro': 'ux-pro',
+  'cloud-design': 'cloud-design',
+  generic: 'generic-ai',
+};
+
+const iconAt = <T,>(items: readonly T[] | undefined, index: number, fallback: readonly T[]): T =>
+  items?.[index] ?? fallback[index % fallback.length];
+
+const readableSize = (text: string, large = 108) => {
+  const length = text.replace(/\s+/g, '').length;
+  if (length > 26) return Math.round(large * 0.48);
+  if (length > 18) return Math.round(large * 0.58);
+  if (length > 12) return Math.round(large * 0.72);
+  return large;
+};
+
+const splitLeadLines = (text?: string): string[] => {
+  if (!text) return [];
+  return text
+    .split(/[。；;]\s*/u)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, 2);
 };
 
 const ProductIcon: React.FC<{
@@ -103,8 +138,8 @@ const ProductIcon: React.FC<{
   );
 };
 
-const WorkBuddyMark: React.FC<{accent: string; size?: number}> = ({accent, size = 68}) => (
-  <ProductIcon icon="workbuddy" accent={accent} size={size} floatSeed={0.2} floatStrength={0.75} />
+const BrandMark: React.FC<{accent: string; icon: ProductIconKey; size?: number}> = ({accent, icon, size = 68}) => (
+  <ProductIcon icon={icon} accent={accent} size={size} floatSeed={0.2} floatStrength={0.75} />
 );
 
 const Backdrop: React.FC<{accent: string; secondary: string; frame: number}> = ({accent, secondary, frame}) => {
@@ -137,19 +172,22 @@ const Backdrop: React.FC<{accent: string; secondary: string; frame: number}> = (
   );
 };
 
-const ProgressRail: React.FC<{active: number}> = ({active}) => (
+const ProgressRail: React.FC<{active: number; total?: number}> = ({active, total = PALETTE.length}) => (
   <div style={{
     position: 'absolute',
-    top: 78,
+    top: SAFE.headerTop,
     left: 76,
     right: 76,
     display: 'grid',
-    gridTemplateColumns: 'repeat(6, 1fr)',
+    gridTemplateColumns: `repeat(${Math.max(1, total)}, 1fr)`,
     gap: 8,
   }}>
-    {PALETTE.map((color, index) => (
-      <div key={color} style={{height: index === active ? 6 : 3, background: color, opacity: index <= active ? 1 : 0.25}} />
-    ))}
+    {Array.from({length: Math.max(1, total)}).map((_, index) => {
+      const color = PALETTE[index % PALETTE.length];
+      return (
+        <div key={`rail-${index}`} style={{height: index === active ? 6 : 3, background: color, opacity: index <= active ? 1 : 0.25}} />
+      );
+    })}
   </div>
 );
 
@@ -160,16 +198,17 @@ const SectionHeader: React.FC<{
   accent: string;
   frame: number;
   active: number;
+  progressTotal?: number;
   icon: SkillIconKey;
   productIcon: ProductIconKey;
-}> = ({index, title, subtitle, accent, frame, active, icon, productIcon}) => {
+}> = ({index, title, subtitle, accent, frame, active, progressTotal, icon, productIcon}) => {
   const p = reveal(frame, 2, 16);
   return (
     <>
-      <ProgressRail active={active} />
+      <ProgressRail active={active} total={progressTotal} />
       <div style={{
         position: 'absolute',
-        top: 124,
+        top: 116,
         left: 76,
         right: 76,
         display: 'flex',
@@ -234,55 +273,106 @@ const Chip: React.FC<{
   </div>
 );
 
-const IntroVisual: React.FC<{frame: number; accent: string; labels: string[]}> = ({frame, accent, labels}) => {
+const IntroVisual: React.FC<{
+  frame: number;
+  accent: string;
+  labels: string[];
+  labelIcons?: SkillIconKey[];
+  productIcons?: ProductIconKey[];
+  title: string;
+  subtitle?: string;
+  brandName?: string;
+  brandIcon?: ProductIconKey;
+  eyebrow?: string;
+  headline?: string;
+  body?: string;
+}> = ({
+  frame,
+  accent,
+  labels,
+  labelIcons,
+  productIcons,
+  title,
+  subtitle,
+  brandName,
+  brandIcon,
+  eyebrow,
+  headline,
+  body,
+}) => {
   const p1 = reveal(frame, 4, 18);
   const p2 = reveal(frame, 16, 20);
   const cursor = frame % 24 < 14;
+  const resolvedBrandIcon = brandIcon ?? productIcons?.[0] ?? 'workbuddy';
+  const brand = brandName ?? title;
+  const heroText = headline ?? title;
+  const supportText = body ?? subtitle ?? labels.join(' · ');
+  const heroSize = readableSize(heroText, 132);
   return (
     <AbsoluteFill style={{padding: '170px 76px 270px', justifyContent: 'center'}}>
       <div style={{display: 'flex', alignItems: 'center', gap: 20, ...enterStyle(p1, 26)}}>
-        <WorkBuddyMark accent={accent} size={64} />
-        <div style={{fontSize: 38, fontWeight: 900, color: '#fff'}}>Work<span style={{color: accent}}>Buddy</span></div>
+        <BrandMark accent={accent} icon={resolvedBrandIcon} size={64} />
+        <div style={{fontSize: 38, fontWeight: 900, color: '#fff'}}>{brand}</div>
         <div style={{marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10}}>
-          {SUMMARY_PRODUCT_ICONS.slice(0, 3).map((icon, index) => (
+          {(productIcons?.length ? productIcons : SUMMARY_PRODUCT_ICONS).slice(0, 3).map((icon, index) => (
             <ProductIcon key={icon} icon={icon} accent={PALETTE[index]} size={44} glow floatSeed={index + 1} floatDelay={18 + index * 5} floatStrength={0.9} />
           ))}
         </div>
       </div>
       <div style={{marginTop: 118, ...enterStyle(p2, 42)}}>
-        <div style={{fontSize: 34, color: 'rgba(255,255,255,0.72)', fontWeight: 700}}>装上这几个</div>
+        <div style={{fontSize: 34, color: 'rgba(255,255,255,0.72)', fontWeight: 700}}>{eyebrow ?? '本片重点'}</div>
         <div style={{display: 'flex', alignItems: 'flex-end', marginTop: 12}}>
-          <div style={{fontSize: 150, lineHeight: 0.92, fontWeight: 950, color: '#eef3ff'}}>Skill</div>
-          <div style={{width: 10, height: 126, marginLeft: 12, background: accent, opacity: cursor ? 1 : 0.18}} />
+          <div style={{fontSize: heroSize, lineHeight: 0.98, fontWeight: 950, color: '#eef3ff', maxWidth: 840}}>{heroText}</div>
+          <div style={{width: 10, height: Math.max(82, heroSize * 0.84), marginLeft: 12, background: accent, opacity: cursor ? 1 : 0.18}} />
         </div>
         <div style={{height: 8, width: 360, marginTop: 28, background: `linear-gradient(90deg, ${accent}, #5f7dff, transparent)`}} />
-        <div style={{marginTop: 42, fontSize: 34, lineHeight: 1.35, color: '#fff', fontWeight: 800}}>它才算真正的好帮手。</div>
+        <div style={{marginTop: 42, fontSize: 34, lineHeight: 1.35, color: '#fff', fontWeight: 800}}>{supportText}</div>
       </div>
       <div style={{display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 82}}>
         {labels.slice(0, 4).map((label, index) => (
-          <Chip key={label} color={PALETTE[index]} progress={reveal(frame, 34 + index * 6, 14)} icon={SUMMARY_ICONS[index]} productIcon={SUMMARY_PRODUCT_ICONS[index]} floatSeed={index + 2}>{label}</Chip>
+          <Chip key={label} color={PALETTE[index]} progress={reveal(frame, 34 + index * 6, 14)} icon={iconAt(labelIcons, index, SUMMARY_ICONS)} productIcon={iconAt(productIcons, index, SUMMARY_PRODUCT_ICONS)} floatSeed={index + 2}>{label}</Chip>
         ))}
       </div>
     </AbsoluteFill>
   );
 };
 
-const OverviewVisual: React.FC<{frame: number; accent: string; labels: string[]}> = ({frame, accent, labels}) => {
-  const title = reveal(frame, 2, 18);
+const OverviewVisual: React.FC<{
+  frame: number;
+  accent: string;
+  labels: string[];
+  labelIcons?: SkillIconKey[];
+  productIcons?: ProductIconKey[];
+  title: string;
+  subtitle?: string;
+  brandName?: string;
+  brandIcon?: ProductIconKey;
+  eyebrow?: string;
+  headline?: string;
+  body?: string;
+  footer?: string;
+}> = ({frame, accent, labels, labelIcons, productIcons, title, subtitle, brandName, brandIcon, eyebrow, headline, body, footer}) => {
+  const titleProgress = reveal(frame, 2, 18);
+  const displayTitle = headline ?? title;
+  const resolvedBrandIcon = brandIcon ?? productIcons?.[0] ?? 'workbuddy';
+  const supportText = footer ?? body ?? subtitle ?? '按口播节奏逐段展开。';
   return (
     <AbsoluteFill style={{padding: '210px 76px 280px'}}>
-      <div style={{...enterStyle(title, 28), marginTop: 120}}>
-        <div style={{fontSize: 32, color: 'rgba(255,255,255,0.66)', fontWeight: 700}}>我一直在用的</div>
-        <div style={{fontSize: 92, lineHeight: 1, color: '#fff', fontWeight: 950, marginTop: 14}}>几个 <span style={{color: accent}}>Skill</span></div>
+      <div style={{...enterStyle(titleProgress, 28), marginTop: 120}}>
+        <div style={{fontSize: 32, color: 'rgba(255,255,255,0.66)', fontWeight: 700}}>{eyebrow ?? '本片会拆的'}</div>
+        <div style={{fontSize: readableSize(displayTitle, 92), lineHeight: 1, color: '#fff', fontWeight: 950, marginTop: 14}}>{displayTitle}</div>
       </div>
       <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 72}}>
         {labels.slice(0, 6).map((label, index) => (
-          <Chip key={label} color={PALETTE[index]} progress={reveal(frame, 18 + index * 5, 16)} icon={SUMMARY_ICONS[index]} productIcon={SUMMARY_PRODUCT_ICONS[index]} floatSeed={index + 3}>{label}</Chip>
+          <Chip key={label} color={PALETTE[index]} progress={reveal(frame, 18 + index * 5, 16)} icon={iconAt(labelIcons, index, SUMMARY_ICONS)} productIcon={iconAt(productIcons, index, SUMMARY_PRODUCT_ICONS)} floatSeed={index + 3}>{label}</Chip>
         ))}
       </div>
       <div style={{display: 'flex', alignItems: 'center', gap: 18, marginTop: 'auto', ...enterStyle(reveal(frame, 52, 18), 20)}}>
-        <WorkBuddyMark accent={accent} size={68} />
-        <div style={{fontSize: 28, fontWeight: 800, color: 'rgba(255,255,255,0.72)'}}>今天，一次分享给你。</div>
+        <BrandMark accent={accent} icon={resolvedBrandIcon} size={68} />
+        <div>
+          <div style={{fontSize: 28, fontWeight: 900, color: '#fff'}}>{brandName ?? '视觉计划'}</div>
+          <div style={{fontSize: 21, fontWeight: 800, color: 'rgba(255,255,255,0.58)', marginTop: 6}}>{supportText}</div>
+        </div>
       </div>
     </AbsoluteFill>
   );
@@ -572,30 +662,527 @@ const UiVisual: React.FC<{frame: number; accent: string; activeBeat?: SkillShowc
   );
 };
 
-const OutroVisual: React.FC<{frame: number; accent: string; labels: string[]}> = ({frame, accent, labels}) => (
-  <AbsoluteFill style={{padding: '230px 76px 260px', justifyContent: 'center'}}>
-    <div style={{display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, ...enterStyle(reveal(frame, 4, 18), 18)}}>
-      {PALETTE.map((color) => <div key={color} style={{height: 7, background: color}} />)}
-    </div>
-    <div style={{marginTop: 76, color: 'rgba(255,255,255,0.58)', fontSize: 24, lineHeight: 1.6, ...enterStyle(reveal(frame, 14, 18), 24)}}>
-      <div>以前：WorkBuddy 只能陪你聊天</div>
-      <div>现在：6 个 Skill 让它真的干活</div>
-    </div>
-    <div style={{marginTop: 54, fontSize: 86, lineHeight: 1.05, color: '#fff', fontWeight: 950, ...enterStyle(reveal(frame, 28, 20), 34)}}>
-      装上 <span style={{color: accent}}>Skill</span>，<br />WorkBuddy<br />才算好帮手。
-    </div>
-    <div style={{display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 54}}>
-      {labels.slice(0, 6).map((label, index) => <Chip key={label} color={PALETTE[index]} progress={reveal(frame, 48 + index * 4, 14)} icon={SUMMARY_ICONS[index]} productIcon={SUMMARY_PRODUCT_ICONS[index]} floatSeed={index + 4}>{label}</Chip>)}
-    </div>
-    <div style={{marginTop: 58, display: 'flex', alignItems: 'center', gap: 22, ...enterStyle(reveal(frame, 78, 18), 22)}}>
-      <WorkBuddyMark accent={accent} size={78} />
-      <div>
-        <div style={{fontSize: 30, color: '#fff', fontWeight: 950}}>评论区打个 “Skill”</div>
-        <div style={{fontSize: 21, color: 'rgba(255,255,255,0.5)', marginTop: 7}}>我整理给你</div>
+const OutroVisual: React.FC<{
+  frame: number;
+  accent: string;
+  labels: string[];
+  labelIcons?: SkillIconKey[];
+  productIcons?: ProductIconKey[];
+  title: string;
+  subtitle?: string;
+  brandName?: string;
+  brandIcon?: ProductIconKey;
+  headline?: string;
+  body?: string;
+  footer?: string;
+  bullets?: string[];
+  progressTotal?: number;
+}> = ({
+  frame,
+  accent,
+  labels,
+  labelIcons,
+  productIcons,
+  title,
+  subtitle,
+  brandName,
+  brandIcon,
+  headline,
+  body,
+  footer,
+  bullets,
+  progressTotal,
+}) => {
+  const heroText = headline ?? title;
+  const leadLines = bullets?.length ? bullets.slice(0, 2) : splitLeadLines(body).length ? splitLeadLines(body) : [subtitle ?? '结论已经收束', labels.join(' · ')];
+  const resolvedBrandIcon = brandIcon ?? productIcons?.[0] ?? 'workbuddy';
+  return (
+    <AbsoluteFill style={{padding: '230px 76px 260px', justifyContent: 'center'}}>
+      <div style={{display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, progressTotal ?? labels.length ?? PALETTE.length)}, 1fr)`, gap: 10, ...enterStyle(reveal(frame, 4, 18), 18)}}>
+        {Array.from({length: Math.max(1, progressTotal ?? labels.length ?? PALETTE.length)}).map((_, index) => <div key={`outro-rail-${index}`} style={{height: 7, background: PALETTE[index % PALETTE.length]}} />)}
       </div>
-    </div>
-  </AbsoluteFill>
-);
+      <div style={{marginTop: 76, color: 'rgba(255,255,255,0.58)', fontSize: 24, lineHeight: 1.6, ...enterStyle(reveal(frame, 14, 18), 24)}}>
+        {leadLines.map((line, index) => <div key={`${line}-${index}`}>{line}</div>)}
+      </div>
+      <div style={{marginTop: 54, fontSize: readableSize(heroText, 86), lineHeight: 1.05, color: '#fff', fontWeight: 950, ...enterStyle(reveal(frame, 28, 20), 34)}}>
+        {heroText}
+      </div>
+      <div style={{display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 54}}>
+        {labels.slice(0, 6).map((label, index) => <Chip key={label} color={PALETTE[index]} progress={reveal(frame, 48 + index * 4, 14)} icon={iconAt(labelIcons, index, SUMMARY_ICONS)} productIcon={iconAt(productIcons, index, SUMMARY_PRODUCT_ICONS)} floatSeed={index + 4}>{label}</Chip>)}
+      </div>
+      <div style={{marginTop: 58, display: 'flex', alignItems: 'center', gap: 22, ...enterStyle(reveal(frame, 78, 18), 22)}}>
+        <ProductIcon icon={resolvedBrandIcon} accent={accent} size={78} floatStrength={0.75} floatSeed={0.2} />
+        <div>
+          <div style={{fontSize: 30, color: '#fff', fontWeight: 950}}>{footer ?? title}</div>
+          <div style={{fontSize: 21, color: 'rgba(255,255,255,0.5)', marginTop: 7}}>{brandName ?? subtitle ?? '按新口播生成新视觉合同'}</div>
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const ANTI_PATTERNS = ['紫色渐变', '毛玻璃泛滥', '居中堆叠', '圆角卡片', 'Inter 字体'];
+const DESIGN_DIRECTIONS = [
+  {name: 'Swiss', cn: '极简', color: '#f05a5a', bg: '#15191f'},
+  {name: 'Baltic', cn: '粗粝工业', color: '#a9b2bf', bg: '#11161d'},
+  {name: 'Nordic', cn: '克制', color: '#7ec8a5', bg: '#101a17'},
+  {name: 'Neo', cn: '赛博', color: '#20d9e8', bg: '#0d1324'},
+  {name: 'Editorial', cn: '杂志感', color: '#ffcf5a', bg: '#1b1510'},
+  {name: 'Utility', cn: '工具感', color: '#7b8cff', bg: '#111427'},
+];
+
+const ImpeccableVisual: React.FC<{frame: number; accent: string; secondary: string; activeBeat?: SkillShowcaseBeat}> = ({frame, accent, secondary, activeBeat}) => {
+  const keyword = activeBeat?.keyword ?? '';
+  const state = activeBeat?.visualState ?? keyword;
+  const scanActive = state === 'scan' || keyword.includes('检测') || keyword.includes('标注');
+  const rulesActive = state === 'rules' || state === 'metrics' || keyword.includes('37');
+  const compareActive = state === 'compare' || keyword.includes('左边') || keyword.includes('Star');
+  const scanX = interpolate(frame % 88, [0, 88], [-40, 420]);
+  return (
+    <AbsoluteFill style={{padding: `${SAFE.bodyTop}px 54px ${1920 - SAFE.bodyBottom}px`}}>
+      <div style={{position: 'relative', height: SAFE.bodyBottom - SAFE.bodyTop, marginTop: 8}}>
+        <div style={{position: 'absolute', left: 0, right: 0, top: 26, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16}}>
+          <div style={{height: 520, border: `2px solid ${accent}82`, borderRadius: 8, background: 'rgba(6,26,18,0.92)', overflow: 'hidden', boxShadow: compareActive ? `0 0 34px ${accent}44` : `0 0 18px ${accent}22`, ...enterStyle(reveal(frame, 8, 22), 24)}}>
+            <div style={{height: 58, padding: '0 18px', color: accent, borderBottom: '1px solid rgba(255,255,255,0.08)', fontSize: 18, fontWeight: 950, display: 'flex', alignItems: 'center', gap: 10}}>
+              <SemanticIcon icon="scan-search" color={accent} size={20} />左边 · 装上之后
+            </div>
+            <div style={{position: 'relative', padding: 20, height: 462}}>
+              {['Typography', 'Color', 'Layout', 'Glass', 'Center'].map((pattern, i) => {
+                const p = reveal(frame, 22 + i * 10, 18);
+                const detected = scanActive || rulesActive || compareActive || i < 2;
+                return (
+                  <div key={pattern} style={{
+                    height: 56,
+                    marginBottom: 12,
+                    borderRadius: 6,
+                    border: `1px solid ${detected ? accent : 'rgba(255,255,255,0.1)'}`,
+                    background: detected ? `${accent}14` : 'rgba(255,255,255,0.035)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '0 14px',
+                    opacity: p,
+                    transform: `translateX(${interpolate(p, [0, 1], [22, 0])}px)`,
+                  }}>
+                    <SemanticIcon icon={detected ? 'circle-check-big' : 'circle-help'} color={detected ? accent : '#657083'} size={18} />
+                    <span style={{fontSize: 17, color: detected ? '#f6fff9' : 'rgba(255,255,255,0.42)', fontWeight: 850}}>{ANTI_PATTERNS[i] ?? pattern}</span>
+                    {detected ? <span style={{marginLeft: 'auto', color: accent, fontSize: 12, fontWeight: 950}}>LOCKED</span> : null}
+                  </div>
+                );
+              })}
+              {scanActive ? (
+                <div style={{position: 'absolute', top: 12, bottom: 14, left: scanX, width: 58, background: `linear-gradient(90deg, transparent, ${accent}45, transparent)`, boxShadow: `0 0 24px ${accent}55`, transform: 'skewX(-10deg)'}} />
+              ) : null}
+            </div>
+          </div>
+
+          <div style={{height: 520, border: '1px solid rgba(255,95,145,0.34)', borderRadius: 8, background: 'rgba(18,12,28,0.92)', overflow: 'hidden', boxShadow: compareActive ? '0 0 34px rgba(255,95,145,0.34)' : 'none', ...enterStyle(reveal(frame, 16, 22), 24)}}>
+            <div style={{height: 58, padding: '0 18px', color: '#ff6d92', borderBottom: '1px solid rgba(255,255,255,0.08)', fontSize: 18, fontWeight: 950, display: 'flex', alignItems: 'center', gap: 10}}>
+              <SemanticIcon icon="shield-alert" color="#ff6d92" size={20} />右边 · 默认 AI 输出
+            </div>
+            <div style={{padding: 20, background: 'linear-gradient(145deg, rgba(124,58,237,0.34), rgba(37,99,235,0.26))'}}>
+              <div style={{height: 28, width: '62%', background: 'rgba(255,255,255,0.86)', borderRadius: 18, margin: '0 auto'}} />
+              <div style={{height: 156, borderRadius: 22, background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.36)', marginTop: 16}} />
+              {[0, 1, 2].map((i) => <div key={i} style={{height: 64, borderRadius: 18, background: 'rgba(255,255,255,0.13)', marginTop: 12}} />)}
+              <div style={{height: 44, marginTop: 14, borderRadius: 24, background: '#42e68c', display: 'grid', placeItems: 'center', color: '#06220f', fontSize: 14, fontWeight: 950}}>Get Started</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{position: 'absolute', left: 74, right: 74, bottom: 36, height: 174, borderTop: `3px solid ${rulesActive ? secondary : accent}`, background: rulesActive ? `${secondary}14` : 'rgba(255,255,255,0.035)', display: 'grid', gridTemplateColumns: '180px 1fr', alignItems: 'center', padding: '0 34px', boxShadow: rulesActive ? `0 0 38px ${secondary}33` : 'none', ...enterStyle(reveal(frame, 42, 22), 18)}}>
+          <div style={{fontSize: rulesActive ? 92 : 68, lineHeight: 0.9, color: rulesActive ? secondary : accent, fontWeight: 950}}>{keyword.includes('22') || keyword.includes('Star') ? '22K' : '37/8'}</div>
+          <div>
+            <div style={{fontSize: 30, color: '#fff', fontWeight: 950}}>{keyword.includes('22') || keyword.includes('Star') ? 'AI 辅助设计必装' : '37 条规则 · 8 个类别'}</div>
+            <div style={{fontSize: 19, color: 'rgba(255,255,255,0.58)', marginTop: 10, fontWeight: 800}}>命名问题、实时检测、标注反模式</div>
+          </div>
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const FrontendDesignVisual: React.FC<{frame: number; accent: string; secondary: string; activeBeat?: SkillShowcaseBeat}> = ({frame, accent, secondary, activeBeat}) => {
+  const keyword = activeBeat?.keyword ?? '';
+  const state = activeBeat?.visualState ?? keyword;
+  const spokenDirections = ['Swiss', 'Baltic', 'Nordic', 'Neo'];
+  const activeDirection = DESIGN_DIRECTIONS.findIndex((direction) => keyword.includes(direction.name) || state === direction.name.toLowerCase());
+  const showRules = state === 'rules' || keyword.includes('禁用') || keyword.includes('清单') || keyword.includes('雷区');
+  const showCompare = state === 'compare' || keyword.includes('左边') || keyword.includes('结果');
+  return (
+    <AbsoluteFill style={{padding: `${SAFE.bodyTop}px 54px ${1920 - SAFE.bodyBottom}px`}}>
+      <div style={{position: 'relative', height: SAFE.bodyBottom - SAFE.bodyTop, marginTop: 4}}>
+        <div style={{position: 'absolute', left: 0, top: 20, width: 260, height: 260, borderRadius: '50%', border: `3px solid ${accent}`, display: 'grid', placeItems: 'center', background: `${accent}12`, boxShadow: `0 0 40px ${accent}33`, ...enterStyle(reveal(frame, 8, 22), 22)}}>
+          <div style={{textAlign: 'center'}}>
+            <div style={{fontSize: 104, lineHeight: 0.82, color: accent, fontWeight: 950}}>6</div>
+            <div style={{fontSize: 20, color: '#fff', marginTop: 16, fontWeight: 950}}>审美方向</div>
+          </div>
+        </div>
+
+        <div style={{position: 'absolute', left: 306, right: 0, top: 12, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12}}>
+          {DESIGN_DIRECTIONS.map((direction, i) => {
+          const mentioned = spokenDirections.includes(direction.name);
+          const active = activeDirection === i || (keyword.includes('六种') && mentioned);
+          const p = reveal(frame, 20 + i * 6, 18);
+          return (
+            <div key={direction.name} style={{
+              height: 154,
+              borderRadius: 8,
+              border: `2px solid ${active ? direction.color : 'rgba(255,255,255,0.11)'}`,
+              background: direction.bg,
+              padding: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              opacity: p,
+              boxShadow: active ? `0 0 28px ${direction.color}4f` : 'none',
+              transform: `translateY(${interpolate(p, [0, 1], [18, 0])}px) scale(${active ? 1.035 : 1})`,
+            }}>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                <span style={{fontSize: 12, color: direction.color, fontWeight: 950}}>{String(i + 1).padStart(2, '0')}</span>
+                {mentioned ? <span style={{height: 8, width: 8, borderRadius: '50%', background: direction.color, boxShadow: `0 0 12px ${direction.color}`}} /> : null}
+              </div>
+              <div>
+                <div style={{fontSize: 24, color: '#fff', fontWeight: 950}}>{direction.name}</div>
+                <div style={{fontSize: 15, color: 'rgba(255,255,255,0.58)', marginTop: 6, fontWeight: 800}}>{direction.cn}</div>
+                <div style={{height: 3, width: active ? 76 : 36, background: direction.color, marginTop: 12}} />
+              </div>
+            </div>
+          );
+        })}
+        </div>
+
+        <div style={{position: 'absolute', left: 0, right: 0, bottom: showCompare ? 150 : 36, border: `1px solid ${showRules ? accent : 'rgba(255,255,255,0.12)'}`, borderRadius: 8, background: showRules ? `${accent}13` : 'rgba(255,255,255,0.035)', padding: '18px 22px', boxShadow: showRules ? `0 0 30px ${accent}28` : 'none', ...enterStyle(reveal(frame, 58, 22), 18)}}>
+          <div style={{fontSize: 17, color: '#fff', fontWeight: 950, marginBottom: 12}}>反模式清单 · 源头规避</div>
+          <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10}}>
+          {['禁用 Inter 字体', '禁用紫色渐变', '禁用居中堆叠'].map((rule, i) => {
+            const crossed = showRules || showCompare;
+            return (
+              <div key={rule} style={{height: 54, padding: '0 14px', borderRadius: 4, border: '1px solid rgba(255,95,120,0.44)', background: crossed ? 'rgba(255,50,60,0.16)' : 'rgba(255,255,255,0.035)', display: 'flex', alignItems: 'center', gap: 8, opacity: reveal(frame, 66 + i * 6, 16)}}>
+                <span style={{color: '#ff5f7a', fontSize: 16}}>⊘</span>
+                <span style={{color: crossed ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: crossed ? 800 : 400, textDecoration: crossed ? 'line-through' : 'none'}}>{rule}</span>
+              </div>
+            );
+          })}
+          </div>
+        </div>
+
+        {showCompare ? (
+          <div style={{position: 'absolute', left: 0, right: 0, bottom: 36, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, ...enterStyle(reveal(frame, 86, 20), 16)}}>
+            <div style={{height: 96, background: `${accent}18`, borderRadius: 6, padding: '16px 18px', borderLeft: `5px solid ${accent}`}}>
+              <div style={{fontSize: 13, color: accent, fontWeight: 950}}>左边 · 装上之后</div>
+              <div style={{fontSize: 24, color: '#fff', fontWeight: 950, marginTop: 8}}>主动锚定 · 稳定输出</div>
+            </div>
+            <div style={{height: 96, background: 'rgba(45,36,50,0.58)', borderRadius: 6, padding: '16px 18px', borderRight: '5px solid #ff5f7a'}}>
+              <div style={{fontSize: 13, color: '#ff7b96', fontWeight: 950}}>右边 · 默认输出</div>
+              <div style={{fontSize: 24, color: 'rgba(255,255,255,0.54)', marginTop: 8, fontWeight: 850}}>平均审美 · 没记忆点</div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const UxProVisual: React.FC<{frame: number; accent: string; activeBeat?: SkillShowcaseBeat}> = ({frame, accent, activeBeat}) => {
+  const keyword = activeBeat?.keyword ?? '';
+  const state = activeBeat?.visualState ?? keyword;
+  const metrics = [
+    {value: '161', label: '配色方案', desc: '按行业划分', color: '#45e28d'},
+    {value: '67', label: 'UI 风格', desc: '覆盖主流场景', color: '#5f7dff'},
+    {value: '57', label: '字体搭配', desc: '精选推荐方案', color: '#ffc44d'},
+    {value: '99', label: 'UX 原则', desc: '可执行指导', color: '#ff5f91'},
+  ];
+  const activeMetric = metrics.findIndex((metric) => keyword.includes(metric.value));
+  const showSystem = state === 'system-output' || keyword.includes('颜色') || keyword.includes('WCAG') || keyword.includes('输出');
+  const showDecision = state === 'decision' || keyword.includes('决策') || keyword.includes('行业立场');
+  return (
+    <AbsoluteFill style={{padding: `${SAFE.bodyTop}px 54px ${1920 - SAFE.bodyBottom}px`}}>
+      <div style={{position: 'relative', height: SAFE.bodyBottom - SAFE.bodyTop, marginTop: 4}}>
+        <div style={{position: 'absolute', left: 0, top: 28, width: 426, bottom: 28}}>
+          <div style={{fontSize: 17, color: accent, fontWeight: 950, ...enterStyle(reveal(frame, 8, 20), 18)}}>内置决策数据库</div>
+          <div style={{marginTop: 16, display: 'flex', flexDirection: 'column', gap: 11}}>
+        {metrics.map((m, i) => {
+          const p = reveal(frame, 16 + i * 9, 20);
+          const highlighted = activeMetric === i || keyword.includes('161') || state === 'metrics';
+          return (
+            <div key={m.label} style={{...enterStyle(p, 22), height: 114, border: `1px solid ${highlighted ? m.color : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, background: highlighted ? `${m.color}16` : 'rgba(255,255,255,0.035)', padding: '16px 18px', display: 'grid', gridTemplateColumns: '112px 1fr', alignItems: 'center', boxShadow: highlighted ? `0 0 24px ${m.color}38` : 'none', transform: `${enterStyle(p, 22).transform} translateX(${highlighted ? 8 : 0}px)`}}>
+              <div style={{fontSize: 56, lineHeight: 0.9, fontWeight: 950, color: m.color}}>{m.value}</div>
+              <div>
+                <div style={{fontSize: 21, color: '#fff', fontWeight: 950}}>{m.label}</div>
+                <div style={{fontSize: 15, color: 'rgba(255,255,255,0.5)', marginTop: 5, fontWeight: 800}}>{m.desc}</div>
+              </div>
+            </div>
+          );
+        })}
+          </div>
+      </div>
+
+        <div style={{position: 'absolute', left: 456, right: 0, top: 30, height: 322, borderRadius: 8, border: `1px solid ${showSystem ? accent : 'rgba(255,255,255,0.12)'}`, background: showSystem ? `${accent}12` : 'rgba(255,255,255,0.035)', padding: '24px 26px', boxShadow: showSystem ? `0 0 32px ${accent}33` : 'none', ...enterStyle(reveal(frame, 36, 20), 22)}}>
+          <div style={{fontSize: 17, color: '#fff', fontWeight: 950}}>告诉它你在做什么产品</div>
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 18}}>
+          {[{label: '官网', icon: 'panel-top', color: '#45e28d'}, {label: '工具', icon: 'component', color: '#5f7dff'}, {label: '作品集', icon: 'image', color: '#ffc44d'}, {label: '后台', icon: 'layout-template', color: '#9a7cff'}].map((item, i) => (
+            <div key={item.label} style={{height: 70, borderRadius: 6, border: `1px solid ${item.color}66`, background: `${item.color}12`, color: '#fff', fontSize: 21, fontWeight: 950, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: reveal(frame, 50 + i * 5, 16)}}>
+              <SemanticIcon icon={item.icon as SkillIconKey} color={item.color} size={20} />{item.label}
+            </div>
+          ))}
+          </div>
+          <div style={{height: 5, width: showSystem ? 270 : 110, marginTop: 28, background: `linear-gradient(90deg, ${accent}, transparent)`}} />
+        </div>
+
+        <div style={{position: 'absolute', left: 456, right: 0, bottom: 34, height: 344, borderRadius: 8, border: `1px solid ${showDecision ? '#ffcf5a' : `${accent}55`}`, background: showDecision ? 'rgba(255,196,77,0.11)' : 'rgba(255,255,255,0.035)', padding: '22px 26px', ...enterStyle(reveal(frame, 70, 22), 20)}}>
+          <div style={{fontSize: 15, color: '#ffcf5a', fontWeight: 950}}>SYSTEM OUTPUT</div>
+          <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 18}}>
+            {['颜色', '字体', '间距', 'WCAG'].map((token, i) => (
+              <div key={token} style={{height: 74, display: 'grid', placeItems: 'center', background: `${PALETTE[i]}18`, borderTop: `3px solid ${PALETTE[i]}`, color: '#fff', fontSize: 18, fontWeight: 950, opacity: showSystem || showDecision ? 1 : 0.42}}>{token}</div>
+            ))}
+          </div>
+          <div style={{marginTop: 30, fontSize: 38, lineHeight: 1.08, color: '#fff', fontWeight: 950}}>
+            {showDecision ? '不是建议，是决策' : '一次输出设计系统'}
+          </div>
+          <div style={{fontSize: 20, color: 'rgba(255,255,255,0.56)', marginTop: 12, fontWeight: 800}}>每个场景都有规则和反模式</div>
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const CloudDesignVisual: React.FC<{frame: number; accent: string; activeBeat?: SkillShowcaseBeat}> = ({frame, accent, activeBeat}) => {
+  const keyword = activeBeat?.keyword ?? '';
+  const state = activeBeat?.visualState ?? keyword;
+  const brands: Array<{name: string; style: string; color: string}> = [
+    {name: 'Stripe', style: '极简兼融感', color: '#635bff'},
+    {name: 'Linear', style: '工程美学', color: '#5e6ad2'},
+    {name: 'Versa', style: '极致黑白', color: '#f6f6f6'},
+    {name: 'Recast', style: '精密渐变', color: '#9a7cff'},
+  ];
+  const activeBrand = brands.findIndex((brand) => keyword.includes(brand.name));
+  const showRelay = state === 'brand-relay' || activeBrand >= 0 || keyword.includes('Linear');
+  const showTokens = state === 'tokens' || keyword.includes('Token') || keyword.includes('模板');
+  const showCompare = state === 'compare' || keyword.includes('左边') || keyword.includes('Prompt') || keyword.includes('立场');
+  return (
+    <AbsoluteFill style={{padding: `${SAFE.bodyTop}px 54px ${1920 - SAFE.bodyBottom}px`}}>
+      <div style={{position: 'relative', height: SAFE.bodyBottom - SAFE.bodyTop, marginTop: 4}}>
+        <div style={{position: 'absolute', left: 0, top: 24, width: 248, height: 248, display: 'grid', placeItems: 'center', border: `2px solid ${accent}`, background: `${accent}12`, boxShadow: `0 0 40px ${accent}33`, ...enterStyle(reveal(frame, 8, 22), 20)}}>
+          <div style={{textAlign: 'center'}}>
+            <div style={{fontSize: 92, color: accent, lineHeight: 0.86, fontWeight: 950}}>68</div>
+            <div style={{fontSize: 19, color: '#fff', marginTop: 14, fontWeight: 950}}>品牌设计系统</div>
+          </div>
+        </div>
+
+        <div style={{position: 'absolute', left: 292, right: 0, top: 28, height: 230, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, ...enterStyle(reveal(frame, 20, 22), 18)}}>
+        {brands.map((brand, i) => {
+          const p = reveal(frame, 30 + i * 8, 18);
+          const isFocused = activeBrand === i || (showRelay && activeBrand < 0);
+          return (
+            <div key={brand.name} style={{...enterStyle(p, 16), height: 178, borderRadius: 8, border: `2px solid ${isFocused ? brand.color : 'rgba(255,255,255,0.11)'}`, background: isFocused ? `${brand.color}18` : 'rgba(255,255,255,0.035)', padding: 14, boxShadow: isFocused ? `0 0 28px ${brand.color}44` : 'none'}}>
+              <div style={{width: 62, height: 62, borderRadius: 8, display: 'grid', placeItems: 'center', background: `${brand.color}22`, border: `1px solid ${brand.color}88`, color: brand.color === '#f6f6f6' ? '#fff' : brand.color, fontSize: 28, fontWeight: 950}}>{brand.name[0]}</div>
+              <div style={{fontSize: 23, color: '#fff', fontWeight: 950, marginTop: 20}}>{brand.name}</div>
+              <div style={{fontSize: 14, color: 'rgba(255,255,255,0.55)', marginTop: 6, fontWeight: 800}}>{brand.style}</div>
+              <div style={{height: 3, width: isFocused ? 78 : 34, background: brand.color, marginTop: 13}} />
+            </div>
+          );
+        })}
+        </div>
+
+        <div style={{position: 'absolute', left: 88, right: 88, top: 292, height: 166, borderRadius: 8, border: `1px solid ${showTokens ? accent : 'rgba(255,255,255,0.12)'}`, background: showTokens ? `${accent}12` : 'rgba(255,255,255,0.035)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, padding: 16, boxShadow: showTokens ? `0 0 28px ${accent}33` : 'none', ...enterStyle(reveal(frame, 54, 22), 18)}}>
+          {['Token 定义', '排版层级', '视觉规则'].map((token, i) => (
+            <div key={token} style={{display: 'grid', placeItems: 'center', borderTop: `4px solid ${PALETTE[(i + 1) % PALETTE.length]}`, background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 21, fontWeight: 950, opacity: showTokens || showCompare ? 1 : 0.46}}>{token}</div>
+          ))}
+        </div>
+
+        <div style={{position: 'absolute', left: 0, right: 0, bottom: 34, height: 252, display: 'grid', gridTemplateColumns: '1fr 74px 1fr', alignItems: 'center', gap: 14, opacity: showCompare ? 1 : 0.45, ...enterStyle(reveal(frame, 76, 22), 16)}}>
+          <div style={{height: 176, borderRadius: 8, background: `${accent}16`, borderLeft: `5px solid ${accent}`, padding: '22px 24px'}}>
+            <div style={{fontSize: 14, color: accent, fontWeight: 950}}>左边 · Stripe Design MD</div>
+            <div style={{fontSize: 31, lineHeight: 1.1, color: '#fff', fontWeight: 950, marginTop: 20}}>定价页继承品牌 Token</div>
+          </div>
+          <div style={{height: 74, display: 'grid', placeItems: 'center', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.16)', color: 'rgba(255,255,255,0.54)', fontSize: 18, fontWeight: 950}}>VS</div>
+          <div style={{height: 176, borderRadius: 8, background: 'rgba(36,20,34,0.74)', borderRight: '5px solid #ff5f91', padding: '22px 24px'}}>
+            <div style={{fontSize: 14, color: '#ff7b9e', fontWeight: 950}}>右边 · 普通 AI</div>
+            <div style={{fontSize: 31, lineHeight: 1.1, color: 'rgba(255,255,255,0.62)', fontWeight: 900, marginTop: 20}}>通用卡片，没有品牌立场</div>
+          </div>
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const compactLabel = (text: string, fallback: string) => {
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return fallback;
+  return cleaned.length > 28 ? `${cleaned.slice(0, 26)}...` : cleaned;
+};
+
+const numberCardsFrom = (values: string[]) => {
+  const cards = values.flatMap((value) => {
+    const matches = [...value.matchAll(/(\d+(?:[.,]\d+)?\s*(?:K|万|亿|\+|%|条|套|种|个)?)/gi)];
+    return matches.map((match) => ({
+      value: match[1].trim(),
+      label: value.replace(match[1], '').replace(/[，。,.、:：]/g, '').trim() || '关键指标',
+    }));
+  });
+  return cards.length ? cards.slice(0, 4) : [
+    {value: '01', label: values[0] ?? '锁定问题'},
+    {value: '02', label: values[1] ?? '生成结构'},
+    {value: '03', label: values[2] ?? '完成交付'},
+  ];
+};
+
+const GenericVisual: React.FC<{
+  frame: number;
+  accent: string;
+  secondary: string;
+  visualMode?: SkillShowcaseProps['visualMode'];
+  title: string;
+  subtitle?: string;
+  headline?: string;
+  body?: string;
+  footer?: string;
+  bullets: string[];
+  labels: string[];
+  labelIcons?: SkillIconKey[];
+  productIcons?: ProductIconKey[];
+  activeBeat?: SkillShowcaseBeat;
+  productIcon: ProductIconKey;
+}> = ({
+  frame,
+  accent,
+  secondary,
+  visualMode = 'grid',
+  title,
+  subtitle,
+  headline,
+  body,
+  footer,
+  bullets,
+  labels,
+  labelIcons,
+  productIcons,
+  activeBeat,
+  productIcon,
+}) => {
+  const activeKeyword = activeBeat?.keyword ?? '';
+  const contentItems = (labels.length ? labels : bullets.length ? bullets : [headline, title, subtitle, body].filter(Boolean) as string[])
+    .map((item, index) => compactLabel(item, `要点 ${index + 1}`))
+    .slice(0, 6);
+  const lead = headline ?? title;
+  const support = body ?? subtitle ?? footer ?? contentItems.join(' · ');
+
+  if (visualMode === 'hero' || visualMode === 'quote') {
+    const heroSize = readableSize(lead, visualMode === 'quote' ? 92 : 104);
+    return (
+      <AbsoluteFill style={{padding: '310px 76px 285px', justifyContent: 'center'}}>
+        <div style={{display: 'flex', alignItems: 'center', gap: 18, ...enterStyle(reveal(frame, 8, 18), 26)}}>
+          <ProductIcon icon={productIcon} accent={accent} size={78} floatSeed={1.2} />
+          <div>
+            <div style={{fontSize: 20, color: accent, fontWeight: 950}}>VOICE GENERATED VISUAL</div>
+            <div style={{fontSize: 26, color: 'rgba(255,255,255,0.58)', marginTop: 6, fontWeight: 800}}>{subtitle ?? '按当前口播生成'}</div>
+          </div>
+        </div>
+        <div style={{marginTop: 62, fontSize: heroSize, lineHeight: 1.04, color: '#fff', fontWeight: 950, ...enterStyle(reveal(frame, 22, 20), 36)}}>
+          {lead}
+        </div>
+        <div style={{height: 8, width: 430, marginTop: 34, background: `linear-gradient(90deg, ${accent}, ${secondary}, transparent)`, ...enterStyle(reveal(frame, 34, 16), 18)}} />
+        <div style={{marginTop: 42, fontSize: 32, lineHeight: 1.42, color: 'rgba(255,255,255,0.78)', fontWeight: 800, ...enterStyle(reveal(frame, 42, 18), 24)}}>
+          {support}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+
+  if (visualMode === 'compare') {
+    const left = compactLabel(bullets[0] ?? activeBeat?.evidence?.[0] ?? '旧方式', '旧方式');
+    const right = compactLabel(bullets[1] ?? activeBeat?.evidence?.[1] ?? '新判断', '新判断');
+    const rows = contentItems.slice(2, 6);
+    return (
+      <AbsoluteFill style={{padding: '300px 62px 285px'}}>
+        <div style={{marginTop: 74, display: 'grid', gridTemplateColumns: '1fr 92px 1fr', alignItems: 'center', gap: 14, ...enterStyle(reveal(frame, 8, 18), 24)}}>
+          <div style={{height: 360, border: '1px solid rgba(255,95,122,0.42)', background: 'rgba(38,12,22,0.78)', padding: 26, display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+            <div style={{fontSize: 18, color: '#ff6b82', fontWeight: 950}}>BEFORE</div>
+            <div style={{fontSize: 40, lineHeight: 1.16, color: '#fff', fontWeight: 950, marginTop: 18}}>{left}</div>
+          </div>
+          <div style={{height: 92, display: 'grid', placeItems: 'center', borderRadius: '50%', background: `${accent}1c`, color: accent, fontSize: 20, fontWeight: 950, border: `2px solid ${accent}`}}>VS</div>
+          <div style={{height: 360, border: `1px solid ${accent}88`, background: `${accent}15`, padding: 26, display: 'flex', flexDirection: 'column', justifyContent: 'center', boxShadow: `0 0 38px ${accent}22`}}>
+            <div style={{fontSize: 18, color: accent, fontWeight: 950}}>AFTER</div>
+            <div style={{fontSize: 40, lineHeight: 1.16, color: '#fff', fontWeight: 950, marginTop: 18}}>{right}</div>
+          </div>
+        </div>
+        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 24}}>
+          {rows.map((item, index) => <Chip key={item} color={PALETTE[(index + 2) % PALETTE.length]} progress={reveal(frame, 34 + index * 5, 14)} icon={iconAt(labelIcons, index + 2, SUMMARY_ICONS)} productIcon={iconAt(productIcons, index + 2, SUMMARY_PRODUCT_ICONS)} floatSeed={index + 6}>{item}</Chip>)}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+
+  if (visualMode === 'process') {
+    const steps = contentItems.length ? contentItems : ['输入', '处理', '输出'];
+    return (
+      <AbsoluteFill style={{padding: '300px 76px 285px'}}>
+        <div style={{marginTop: 54, position: 'relative'}}>
+          <div style={{position: 'absolute', left: 46, top: 40, bottom: 40, width: 3, background: `linear-gradient(180deg, ${accent}, ${secondary})`, opacity: 0.64}} />
+          {steps.slice(0, 5).map((step, index) => {
+            const p = reveal(frame, 10 + index * 12, 18);
+            const active = activeKeyword && step.includes(activeKeyword);
+            return (
+              <div key={step} style={{display: 'grid', gridTemplateColumns: '94px 1fr', gap: 18, alignItems: 'center', marginBottom: 22, ...enterStyle(p, 24)}}>
+                <div style={{width: 94, height: 94, borderRadius: 8, display: 'grid', placeItems: 'center', background: active ? `${accent}28` : 'rgba(255,255,255,0.055)', border: `2px solid ${active ? accent : 'rgba(255,255,255,0.12)'}`, boxShadow: active ? `0 0 28px ${accent}44` : 'none'}}>
+                  <SemanticIcon icon={iconAt(labelIcons, index, SUMMARY_ICONS)} color={accent} size={35} />
+                </div>
+                <div style={{minHeight: 94, padding: '18px 22px', background: active ? `${accent}16` : 'rgba(255,255,255,0.04)', border: `1px solid ${active ? accent : 'rgba(255,255,255,0.09)'}`}}>
+                  <div style={{fontSize: 16, color: accent, fontWeight: 950}}>STEP {String(index + 1).padStart(2, '0')}</div>
+                  <div style={{fontSize: 32, color: '#fff', fontWeight: 950, marginTop: 6}}>{step}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+
+  if (visualMode === 'metrics') {
+    const cards = numberCardsFrom([title, subtitle, headline, body, ...bullets, ...labels].filter(Boolean) as string[]);
+    return (
+      <AbsoluteFill style={{padding: '310px 60px 285px'}}>
+        <div style={{marginTop: 56, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16}}>
+          {cards.map((card, index) => {
+            const color = PALETTE[index % PALETTE.length];
+            const active = activeKeyword && (card.value.includes(activeKeyword) || card.label.includes(activeKeyword));
+            return (
+              <div key={`${card.value}-${index}`} style={{height: 220, borderRadius: 8, border: `1px solid ${active ? color : 'rgba(255,255,255,0.12)'}`, background: active ? `${color}1c` : 'rgba(255,255,255,0.045)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', boxShadow: active ? `0 0 30px ${color}44` : 'none', ...enterStyle(reveal(frame, 10 + index * 8, 18), 24)}}>
+                <div style={{fontSize: 70, lineHeight: 0.9, color, fontWeight: 950}}>{card.value}</div>
+                <div style={{fontSize: 24, color: '#fff', fontWeight: 900, marginTop: 16, textAlign: 'center'}}>{compactLabel(card.label, '关键指标')}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{marginTop: 34, fontSize: 31, lineHeight: 1.38, color: 'rgba(255,255,255,0.76)', textAlign: 'center', fontWeight: 850, ...enterStyle(reveal(frame, 58, 18), 20)}}>{support}</div>
+      </AbsoluteFill>
+    );
+  }
+
+  return (
+    <AbsoluteFill style={{padding: '300px 62px 285px'}}>
+      <div style={{marginTop: 54, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14}}>
+        {contentItems.map((item, index) => {
+          const color = PALETTE[index % PALETTE.length];
+          const active = activeKeyword && item.includes(activeKeyword);
+          return (
+            <div key={item} style={{height: 172, borderRadius: 8, border: `1px solid ${active ? color : 'rgba(255,255,255,0.11)'}`, background: active ? `${color}1b` : 'rgba(255,255,255,0.042)', padding: 20, display: 'flex', alignItems: 'center', gap: 16, boxShadow: active ? `0 0 26px ${color}33` : 'none', ...enterStyle(reveal(frame, 8 + index * 7, 16), 24)}}>
+              <ProductIcon icon={iconAt(productIcons, index, SUMMARY_PRODUCT_ICONS)} accent={color} size={54} glow floatSeed={index + 4} />
+              <div>
+                <div style={{fontSize: 15, color, fontWeight: 950}}>POINT {String(index + 1).padStart(2, '0')}</div>
+                <div style={{fontSize: 28, lineHeight: 1.18, color: '#fff', fontWeight: 950, marginTop: 8}}>{item}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{marginTop: 34, padding: '20px 22px', borderTop: `3px solid ${accent}`, background: `${accent}10`, color: 'rgba(255,255,255,0.78)', fontSize: 27, lineHeight: 1.34, fontWeight: 850, ...enterStyle(reveal(frame, 58, 18), 18)}}>
+        {support}
+      </div>
+    </AbsoluteFill>
+  );
+};
 
 const activeIndexForVariant = (variant: SkillShowcaseVariant) => {
   const map: Record<SkillShowcaseVariant, number> = {
@@ -608,6 +1195,11 @@ const activeIndexForVariant = (variant: SkillShowcaseVariant) => {
     hyperframes: 4,
     ui: 5,
     outro: 5,
+    impeccable: 1,
+    'frontend-design': 2,
+    'ux-pro': 3,
+    'cloud-design': 4,
+    generic: 0,
   };
   return map[variant];
 };
@@ -621,26 +1213,44 @@ export const SkillShowcase: React.FC<SkillShowcaseProps> = ({
   secondaryAccent = '#7c67ff',
   bullets = [],
   labels = [],
+  labelIcons,
+  productIcon,
+  productIcons,
+  brandName,
+  brandIcon,
+  eyebrow,
+  headline,
+  body,
+  footer,
+  progressIndex,
+  progressTotal,
+  visualMode,
   beats,
 }) => {
   const frame = useCurrentFrame();
   const {width, height, fps} = useVideoConfig();
   const scale = Math.min(width / 1080, height / 1920);
-  const active = activeIndexForVariant(variant);
+  const active = progressIndex ?? activeIndexForVariant(variant);
+  const resolvedProductIcon = productIcon ?? VARIANT_PRODUCT_ICON[variant];
   const resolvedBeats = resolveSkillBeats(variant, beats);
   const activeBeat = resolvedBeats.find((beat) => frame >= beat.startFrame && frame < beat.endFrame);
 
   const visual = (() => {
     switch (variant) {
-      case 'intro': return <IntroVisual frame={frame} accent={accent} labels={labels} />;
-      case 'overview': return <OverviewVisual frame={frame} accent={accent} labels={labels} />;
+      case 'intro': return <IntroVisual frame={frame} accent={accent} labels={labels} labelIcons={labelIcons} productIcons={productIcons} title={title} subtitle={subtitle} brandName={brandName} brandIcon={brandIcon} eyebrow={eyebrow} headline={headline} body={body} />;
+      case 'overview': return <OverviewVisual frame={frame} accent={accent} labels={labels} labelIcons={labelIcons} productIcons={productIcons} title={title} subtitle={subtitle} brandName={brandName} brandIcon={brandIcon} eyebrow={eyebrow} headline={headline} body={body} footer={footer} />;
       case 'coding': return <CodingVisual frame={frame} accent={accent} bullets={bullets} activeBeat={activeBeat} />;
       case 'remotion': return <RemotionVisual frame={frame} accent={accent} activeBeat={activeBeat} />;
       case 'ppt': return <PptVisual frame={frame} accent={accent} activeBeat={activeBeat} />;
       case 'illustration': return <IllustrationVisual frame={frame} accent={accent} activeBeat={activeBeat} />;
       case 'hyperframes': return <HyperFramesVisual frame={frame} accent={accent} activeBeat={activeBeat} />;
       case 'ui': return <UiVisual frame={frame} accent={accent} activeBeat={activeBeat} />;
-      case 'outro': return <OutroVisual frame={frame} accent={accent} labels={labels} />;
+      case 'outro': return <OutroVisual frame={frame} accent={accent} labels={labels} labelIcons={labelIcons} productIcons={productIcons} title={title} subtitle={subtitle} brandName={brandName} brandIcon={brandIcon} headline={headline} body={body} footer={footer} bullets={bullets} progressTotal={progressTotal} />;
+      case 'impeccable': return <ImpeccableVisual frame={frame} accent={accent} secondary={secondaryAccent} activeBeat={activeBeat} />;
+      case 'frontend-design': return <FrontendDesignVisual frame={frame} accent={accent} secondary={secondaryAccent} activeBeat={activeBeat} />;
+      case 'ux-pro': return <UxProVisual frame={frame} accent={accent} activeBeat={activeBeat} />;
+      case 'cloud-design': return <CloudDesignVisual frame={frame} accent={accent} activeBeat={activeBeat} />;
+      case 'generic': return <GenericVisual frame={frame} accent={accent} secondary={secondaryAccent} visualMode={visualMode} title={title} subtitle={subtitle} headline={headline} body={body} footer={footer} bullets={bullets} labels={labels} labelIcons={labelIcons} productIcons={productIcons} activeBeat={activeBeat} productIcon={resolvedProductIcon} />;
     }
   })();
 
@@ -651,7 +1261,7 @@ export const SkillShowcase: React.FC<SkillShowcaseProps> = ({
       <Backdrop accent={accent} secondary={secondaryAccent} frame={frame} />
       <div style={{position: 'absolute', width: 1080, height: 1920, left: '50%', top: '50%', transform: `translate(-50%, -50%) scale(${scale})`}}>
         <DeterministicMotionField frame={frame} fps={fps} accent={accent} secondary={secondaryAccent} beats={resolvedBeats} />
-        {showHeader ? <SectionHeader index={index} title={title} subtitle={subtitle} accent={accent} frame={frame} active={active} icon={VARIANT_ICON[variant]} productIcon={VARIANT_PRODUCT_ICON[variant]} /> : null}
+        {showHeader ? <SectionHeader index={index} title={title} subtitle={subtitle} accent={accent} frame={frame} active={active} progressTotal={progressTotal} icon={VARIANT_ICON[variant]} productIcon={resolvedProductIcon} /> : null}
         {visual}
         <SemanticBeatOverlay frame={frame} beats={resolvedBeats} accent={accent} />
         {showHeader ? <ChapterTransitionOverlay frame={frame} accent={accent} secondary={secondaryAccent} icon={VARIANT_ICON[variant]} index={index} title={title} /> : null}

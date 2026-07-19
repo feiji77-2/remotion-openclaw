@@ -3,6 +3,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {buildSkillShowcaseProjectFromScript} from './lib/script-project-generator.mjs';
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const input = process.argv[2];
@@ -67,6 +68,37 @@ for (const asset of Array.isArray(assetPack.assets) ? assetPack.assets : []) {
     src: asset.src,
     required: Boolean(asset.required),
   };
+}
+
+const output = path.resolve(productionDir, valueFor('--out', 'project.json'));
+const family = valueFor('--family', brief.visualStyle?.family ?? 'spoken');
+if (family === 'skill-showcase') {
+  const voiceAsset = Object.values(assets).find((asset) => asset.kind === 'audio' && asset.required)
+    ?? Object.values(assets).find((asset) => asset.kind === 'audio');
+  const project = buildSkillShowcaseProjectFromScript({
+    scriptText: spokenScript,
+    projectId,
+    title: clean(script.title, clean(brief.title, projectId)),
+    voiceSrc: voiceAsset?.src,
+    projectRoot: PROJECT_ROOT,
+    maxScenes: Number(valueFor('--max-scenes', '8')),
+  });
+  await fs.writeFile(output, `${JSON.stringify(project, null, 2)}\n`, 'utf8');
+  console.log(JSON.stringify({
+    ok: true,
+    family,
+    project: output,
+    projectId,
+    scenes: project.scenes.length,
+    durationInFrames: project.scenes.reduce((sum, scene) => sum + scene.durationInFrames, 0),
+    captions: project.captions.length,
+    next: [
+      `npm run project:visual-check -- ${path.relative(PROJECT_ROOT, output)}`,
+      `npm run project:check -- ${path.relative(PROJECT_ROOT, output)}`,
+      `npm run project:still -- ${path.relative(PROJECT_ROOT, output)} --frame 60`,
+    ],
+  }, null, 2));
+  process.exit(0);
 }
 
 const sceneAssetIds = (sceneId) => Array.isArray(assetPack.sceneAssetPlan?.[sceneId])
@@ -291,11 +323,11 @@ const project = {
   assets,
 };
 
-const output = path.resolve(productionDir, valueFor('--out', 'project.json'));
 await fs.writeFile(output, `${JSON.stringify(project, null, 2)}\n`, 'utf8');
 
 console.log(JSON.stringify({
   ok: true,
+  family,
   project: output,
   projectId,
   scenes: project.scenes.length,

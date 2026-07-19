@@ -5,8 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import fixture from '../../../examples/project.json';
+import designShowcaseFixture from '../../../examples/design-skills-showcase.json';
 import skillShowcaseFixture from '../../../examples/skill-showcase.json';
 import {ICON_PACKS, SKILL_ICON_KEYS} from '../../components/ultimate-kit/families/skill-showcase/iconRegistry';
+import {PRODUCT_ICONS} from '../../components/ultimate-kit/families/skill-showcase/productIcons';
 import {compileProject} from '../compileProject';
 import {VideoProjectSchema} from '../projectSchema';
 
@@ -97,6 +99,199 @@ describe('compact video project', () => {
         : []
     )));
     expect(actions).toEqual(new Set(['spotlight', 'stamp', 'trace', 'compare', 'counter', 'stack', 'focus', 'burst']));
+  });
+
+  it('compiles a changed-script design showcase without falling back to golden sample visuals', () => {
+    const value = VideoProjectSchema.parse(structuredClone(designShowcaseFixture));
+    const compiled = compileProject(value);
+    expect(compiled.projectId).toBe('design-skills-showcase');
+    expect(compiled.durationInFrames).toBe(5218);
+    expect(compiled.scenes).toHaveLength(6);
+    expect(compiled.scenes.every((scene) => scene.family === 'skill-showcase')).toBe(true);
+    expect(compiled.scenes.map((scene) => scene.payload.variant)).toEqual([
+      'intro',
+      'impeccable',
+      'frontend-design',
+      'ux-pro',
+      'cloud-design',
+      'outro',
+    ]);
+    expect(compiled.scenes[0].payload).toMatchObject({
+      brandName: 'Design Skill',
+      brandIcon: 'impeccable',
+      headline: 'AI 设计一眼就露馅',
+      productIcons: ['impeccable', 'frontend-design', 'ux-pro', 'cloud-design'],
+    });
+    expect(compiled.scenes[1].payload.productIcon).toBe('impeccable');
+    expect(compiled.scenes[2].payload.productIcon).toBe('frontend-design');
+    expect(compiled.scenes[3].payload.productIcon).toBe('ux-pro');
+    expect(compiled.scenes[4].payload.productIcon).toBe('cloud-design');
+    expect(compiled.scenes[5].captionRange).toEqual({startIndex: 41, endIndex: 42});
+    expect(compiled.scenes[5].durationInFrames).toBe(318);
+    expect(compiled.scenes.every((scene) => {
+      const range = scene.captionRange;
+      const payload = scene.payload as {captionStartIndex?: number; captionEndIndex?: number; beats?: Array<Record<string, unknown>>};
+      const beats = Array.isArray(payload.beats) ? payload.beats : [];
+      return range
+        && payload.captionStartIndex === range.startIndex
+        && payload.captionEndIndex === range.endIndex
+        && beats.every((beat) => (
+          Number.isInteger(beat.captionStartIndex)
+          && Number.isInteger(beat.captionEndIndex)
+          && typeof beat.visualState === 'string'
+          && typeof beat.motionPreset === 'string'
+          && typeof beat.placement === 'string'
+        ));
+    })).toBe(true);
+    const designIconFiles = (['impeccable', 'frontend-design', 'ux-pro', 'cloud-design'] as const)
+      .map((key) => PRODUCT_ICONS[key]);
+    expect(new Set(designIconFiles).size).toBe(4);
+    expect(JSON.stringify(compiled.scenes.map((scene) => scene.payload))).not.toContain('WorkBuddy');
+  });
+
+  it('rejects ranged scenes whose duration no longer matches captions', () => {
+    const value = VideoProjectSchema.parse(structuredClone(designShowcaseFixture));
+    value.scenes[1].durationInFrames += 8;
+    expect(() => compileProject(value)).toThrow('CAPTION_RANGE_MISMATCH');
+  });
+
+  it('builds a fresh skill-showcase project from a new voice script instead of reusing golden visuals', () => {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+    const output = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'script-project-test-')), 'project.json');
+    const script = [
+      '今天讲一个全新的知识库工作流。',
+      '过去资料散在聊天、文档和截图里，真正复用时经常断掉。',
+      '第一步，把输入统一成主题、来源和结论。',
+      '第二步，把判断拆成可检查的场景和关键词。',
+      '最后，沉淀成可以继续渲染和复盘的项目合同。',
+    ].join('');
+    const result = spawnSync(process.execPath, [
+      path.join(root, 'scripts/build-skill-showcase-from-script.mjs'),
+      '--id', 'knowledge-workflow-script',
+      '--title', '知识库工作流',
+      '--script', script,
+      '--out', output,
+    ], {encoding: 'utf8'});
+    expect(result.status, result.stderr).toBe(0);
+    const generated = VideoProjectSchema.parse(JSON.parse(fs.readFileSync(output, 'utf8')));
+    const compiled = compileProject(generated);
+    expect(compiled.projectId).toBe('knowledge-workflow-script');
+    expect(compiled.scenes.every((scene) => scene.family === 'skill-showcase')).toBe(true);
+    expect(compiled.scenes.some((scene) => scene.payload.variant === 'generic')).toBe(true);
+    expect(JSON.stringify(compiled.scenes.map((scene) => scene.payload))).not.toContain('WorkBuddy');
+    expect(compiled.scenes.every((scene) => typeof scene.payload.sourceText === 'string')).toBe(true);
+    expect(compiled.scenes.every((scene) => {
+      const sceneBeats = Array.isArray(scene.payload.beats) ? scene.payload.beats : [];
+      const lastBeat = sceneBeats[sceneBeats.length - 1];
+      return sceneBeats.length > 0 && sceneBeats[0].startFrame === 0 && lastBeat?.endFrame === scene.durationInFrames;
+    })).toBe(true);
+    expect(compiled.scenes.every((scene) => scene.captionRange)).toBe(true);
+    expect(compiled.scenes.every((scene) => {
+      const beats = Array.isArray(scene.payload.beats) ? scene.payload.beats : [];
+      return beats.every((beat) => Number.isInteger((beat as {captionStartIndex?: unknown}).captionStartIndex));
+    })).toBe(true);
+  });
+
+  it('does not merge generated scenes across numbered hard boundaries', () => {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+    const output = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hard-boundary-test-')), 'project.json');
+    const script = [
+      '第一个，先讲反模式检测。它会把紫色渐变和居中堆叠标出来。',
+      '第二个，讲审美方向。Swiss、Baltic、Nordic 和 Neo 要逐个出现。',
+      '第三个，讲设计系统。颜色、字体、间距和 WCAG 要一起输出。',
+      '最后，总结成可复用系统。',
+    ].join('');
+    const result = spawnSync(process.execPath, [
+      path.join(root, 'scripts/build-skill-showcase-from-script.mjs'),
+      '--id', 'hard-boundary-script',
+      '--title', '硬边界测试',
+      '--script', script,
+      '--max-scenes', '2',
+      '--out', output,
+    ], {encoding: 'utf8'});
+    expect(result.status, result.stderr).toBe(0);
+    const generated = VideoProjectSchema.parse(JSON.parse(fs.readFileSync(output, 'utf8')));
+    expect(generated.scenes.length).toBeGreaterThan(2);
+    const sceneTexts = generated.scenes.map((scene) => String(scene.payload.sourceText ?? ''));
+    expect(sceneTexts.some((text) => text.includes('第一个') && text.includes('第二个'))).toBe(false);
+    expect(sceneTexts.some((text) => text.includes('第二个') && text.includes('第三个'))).toBe(false);
+  });
+
+  it('maps spoken narrative signals into scene layouts for regenerated scripts', () => {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+    const output = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'narrative-signal-test-')), 'project.json');
+    const script = [
+      '今天讲一个全新的设计流程。',
+      '第一步，把需求排成编号路径。',
+      '但是旧方案和新方案要明确对比。',
+      '另外把规则、颜色、字体等等展开成标签。',
+      '因为输入输出要形成链路。',
+      '最后，总结成项目合同。',
+    ].join('');
+    const result = spawnSync(process.execPath, [
+      path.join(root, 'scripts/build-skill-showcase-from-script.mjs'),
+      '--id', 'narrative-signal-script',
+      '--title', '叙事信号测试',
+      '--script', script,
+      '--max-scenes', '8',
+      '--out', output,
+    ], {encoding: 'utf8'});
+    expect(result.status, result.stderr).toBe(0);
+    const generated = VideoProjectSchema.parse(JSON.parse(fs.readFileSync(output, 'utf8')));
+    const compiled = compileProject(generated);
+    const payloads = compiled.scenes.map((scene) => scene.payload as {
+      narrativeSignal?: {key?: string};
+      layoutSignature?: string;
+      visualMode?: string;
+    });
+    expect(payloads.map((payload) => payload.narrativeSignal?.key).filter(Boolean)).toEqual(expect.arrayContaining([
+      'spoken-ranking',
+      'spoken-compare',
+      'spoken-tags',
+      'spoken-process',
+    ]));
+    expect(payloads.map((payload) => payload.layoutSignature)).toEqual(expect.arrayContaining([
+      'vertical-step-flow',
+      'compare-board',
+      'tag-matrix',
+      'focus-diagram',
+    ]));
+    expect(new Set(payloads.map((payload) => payload.visualMode).filter(Boolean)).size).toBeGreaterThanOrEqual(3);
+  });
+
+  it('rejects three consecutive repeated skill-showcase body layouts', () => {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+    const output = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'layout-regression-test-')), 'project.json');
+    const repeated = VideoProjectSchema.parse(structuredClone(designShowcaseFixture));
+    repeated.scenes.slice(1, 4).forEach((scene) => {
+      scene.payload.variant = 'generic';
+      scene.payload.visualMode = 'grid';
+      scene.payload.layoutSignature = 'tag-matrix';
+    });
+    fs.writeFileSync(output, `${JSON.stringify(repeated, null, 2)}\n`, 'utf8');
+    const result = spawnSync(process.execPath, [
+      path.join(root, 'scripts/check-project-visual-contract.mjs'),
+      output,
+    ], {encoding: 'utf8'});
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('three consecutive skill-showcase scenes reuse the same body layout');
+  });
+
+  it('rejects changed captions that keep the golden sample project id and old visuals', () => {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+    const output = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'visual-contract-test-')), 'project.json');
+    const changed = VideoProjectSchema.parse(structuredClone(skillShowcaseFixture));
+    changed.captions = [
+      {text: '今天讲一个完全不同的知识库工作流。', startMs: 0, endMs: 2000, timestampMs: 0, confidence: 1},
+      {text: '这条新稿不应该继续出现旧样片画面。', startMs: 2000, endMs: 4000, timestampMs: 2000, confidence: 1},
+    ];
+    fs.writeFileSync(output, `${JSON.stringify(changed, null, 2)}\n`, 'utf8');
+    const result = spawnSync(process.execPath, [
+      path.join(root, 'scripts/check-project-visual-contract.mjs'),
+      output,
+    ], {encoding: 'utf8'});
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('reserved for the WorkBuddy golden sample');
   });
 
   it('keeps the 12 semantic icon packs backed by pinned local SVG assets', () => {

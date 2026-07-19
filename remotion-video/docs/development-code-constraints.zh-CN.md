@@ -12,7 +12,7 @@ out/workbuddy-six-skills-showcase-v3.mp4
 当前生产路径：
 
 ```text
-Project JSON -> compileProject -> UltimateVideoV2 -> SceneTimeline -> skill-showcase -> Caption/Audio -> MP4 -> Verify
+新口播/字幕 -> project:from-script -> Project JSON -> visual contract -> compileProject -> UltimateVideoV2 -> SceneTimeline -> skill-showcase -> Caption/Audio -> MP4 -> Verify
 ```
 
 所有后续开发都必须保护这条路径。视觉可以继续变强，特效可以继续变丰富，但不能把项目带回“预览像样、成片不稳、音画不同步、改完没人敢渲”的状态。
@@ -53,7 +53,11 @@ Project JSON -> compileProject -> UltimateVideoV2 -> SceneTimeline -> skill-show
 - 禁止 CSS `animation`、CSS `transition` 或 Tailwind animation class 驱动关键动效。
 - 禁止把绝对文件路径写进 `assets.src`。
 - 禁止让字幕、标题、关键词重复同一整句。
+- 禁止只更新 `captions` 或配音音频，却不更新 `scenes[].payload`。
+- 禁止新项目继续依赖旧样片的 intro、overview、outro 默认品牌、图标和结尾文案。
 - 禁止在长章节里只有一次入场动画。
+- 禁止新稿连续三个 `skill-showcase` Scene 复用同一 `layoutSignature`。
+- 禁止忽略口播结构信号；第一/第二/第三、但是/然而/不过、此外/另外、因为/所以/因此、数字范围词都必须进入 Scene 和 Beat 合同。
 - 禁止把图标当装饰随机配。
 - 禁止顺手删除、重命名或重构无关文件。
 
@@ -88,6 +92,7 @@ Project JSON -> compileProject -> UltimateVideoV2 -> SceneTimeline -> skill-show
 | `src/components/ultimate-kit/families/skill-showcase/` | 当前成品 family | 加视觉、特效、图标、变体 | 引入远程依赖、写通用业务框架 |
 | `public/projects/skill-showcase/` | 样片本地资产 | 放语音、图标、图片、许可证 | 放临时下载、缓存、绝对路径引用 |
 | `scripts/check-skill-showcase-production.mjs` | 成品守门 | 增加可机器验证的约束 | 只打印 warning 不失败 |
+| `scripts/lib/visual-contract.mjs` | 换稿防污染守门 | 检查 scene payload、Beat 覆盖、产品图标和旧样片词污染 | 允许只换字幕/音频后直接渲染 |
 | `docs/` | 长文档和方法文档 | 写完整规约和流程 | 记录过时命令不标注 |
 | `kb/` | 知识库入口 | 保留当前有效知识 | 恢复旧 Workflow 和无关图库 |
 | `out/` | 产物输出 | 放关键帧、联系表、MP4 | 作为运行时输入真源 |
@@ -140,7 +145,8 @@ examples/skill-showcase.json
 - 长口播样片为 `captionStyle: "editorial"`。
 - `showProjectLabel` 为 `false`。
 - `scene.id` 全局唯一。
-- `durationInFrames` 是整数帧。
+- 旧项目允许手写 `durationInFrames`；新口播项目必须声明 `captionRange`，并让 `durationInFrames` 与该字幕区间换算结果相差不超过 1 帧。
+- 新项目 `captionRange` 必须连续且不能跨越“第一个、第二个、第三个、第四个、最后”等硬边界。
 - `transition.durationInFrames` 小于下一个 scene 时长。
 - `captions[].endMs > captions[].startMs`。
 - `audio.voiceAssetId` 指向必需音频资产。
@@ -149,7 +155,10 @@ examples/skill-showcase.json
 禁止：
 
 - 组件内部根据音频时长反推 scene 时长。
+- 新口播项目按 Scene 长度平均分配 beat。
 - 组件内部补齐缺失 captions。
+- 只换新口播 captions/audio，不重写 `scene.payload.title/subtitle/labels/beats/productIcon`。
+- 新口播项目缺少 `scene.payload.sourceText`。
 - 用可选资产承载必需语音。
 - 把 `public/` 前缀写进 `assets.src`。
 - 用 `../`、绝对路径或 URL scheme 写本地资产。
@@ -174,8 +183,51 @@ type SkillShowcaseVariant =
   | 'illustration'
   | 'hyperframes'
   | 'ui'
-  | 'outro';
+  | 'outro'
+  | 'impeccable'
+  | 'frontend-design'
+  | 'ux-pro'
+  | 'cloud-design'
+  | 'generic';
 ```
+
+`generic` 是换稿生产专用的可复用变体，必须显式声明：
+
+```ts
+type SkillShowcaseVisualMode =
+  | 'hero'
+  | 'grid'
+  | 'compare'
+  | 'process'
+  | 'metrics'
+  | 'quote';
+```
+
+新口播 Project 还必须声明叙事信号和主体构图签名：
+
+```ts
+type SkillShowcaseNarrativeSignal = {
+  key: string;
+  family: string;
+};
+
+type SkillShowcaseProps = {
+  narrativeSignal?: SkillShowcaseNarrativeSignal;
+  layoutSignature?: string;
+};
+```
+
+默认映射：
+
+| 文案信号 | 视觉家族 | 主体构图 |
+|---|---|---|
+| 第一/第二/第三/首先/最后 | `spoken-ranking / step-flow` | `vertical-step-flow` |
+| 左右/大约/接近/数字 | `spoken-takeaway / number-strip` | `metric-strip` |
+| 等等/此外/另外/包括/清单 | `spoken-tags / tag-matrix` | `tag-matrix` |
+| 但是/然而/不过/不是/而是 | `spoken-compare / compare-board` | `compare-board` |
+| 因为/所以/因此/输入/输出/链路 | `spoken-process / focus-diagram` | `focus-diagram` |
+
+`第一/第二/第三/最后` 是硬边界，生成器禁止跨边界合并。`但是/另外/因为` 是软边界，用来让换稿视频产生新的中部构图，而不是一直复用卡片墙。
 
 Beat action 必须属于：
 
@@ -197,11 +249,63 @@ type SkillBeatAction =
 |---|---|
 | `startFrame` | 从本 scene 第几帧开始 |
 | `endFrame` | 到本 scene 第几帧结束 |
+| `captionStartIndex` | 绑定哪条字幕开始 |
+| `captionEndIndex` | 绑定哪条字幕结束 |
 | `keyword` | 此刻观众该记住什么词 |
 | `icon` | 这个词对应哪个固定图标 |
 | `action` | 此刻用什么视觉动作强调 |
+| `visualState` | 主体组件应该进入哪个阶段 |
+| `motionPreset` | 节拍层使用哪套入场/强调/退场节奏 |
+| `placement` | Beat 出现在 bottom、body 还是 highlight 区域 |
 
 `detail`、`evidence`、`value` 只能补充语义，不能变成小作文。
+
+`startFrame/endFrame` 由绑定字幕换算而来：
+
+```text
+sceneStartFrame = round(captions[scene.captionRange.startIndex].startMs / 1000 * 30)
+beatStartFrame  = round(captions[beat.captionStartIndex].startMs / 1000 * 30) - sceneStartFrame
+beatEndFrame    = round(captions[beat.captionEndIndex].endMs / 1000 * 30) - sceneStartFrame
+```
+
+新项目中手填帧只作为可读冗余，`compileProject()` 会校验并归一化。误差超过 1 帧必须失败。
+
+## 换稿生成约束
+
+新口播不能从旧样片上“替换 captions/audio”。必须重新生成 Project：
+
+```bash
+npm run project:from-script -- --id new-topic --title "新标题" --script-file /absolute/path/script.txt --out examples/new-topic.json
+```
+
+如果已有句级字幕：
+
+```bash
+npm run project:from-script -- --id new-topic --title "新标题" --captions-file /absolute/path/captions.json --voice-src projects/new-topic/audio/voice.m4a --out examples/new-topic.json
+```
+
+生产目录可以走：
+
+```bash
+npm run production:build-project -- projects/new-topic --family skill-showcase
+```
+
+生成器必须同步写入：
+
+- `scenes[].durationInFrames`
+- `scenes[].captionRange`
+- `scenes[].payload.title/subtitle/headline/body`
+- `scenes[].payload.visualMode`
+- `scenes[].payload.labels/labelIcons/productIcons`
+- `scenes[].payload.productIcon`
+- `scenes[].payload.progressIndex/progressTotal`
+- `scenes[].payload.sourceText`
+- `scenes[].payload.beats[].captionStartIndex/captionEndIndex`
+- `scenes[].payload.beats[].visualState/motionPreset/placement`
+- `captions[]`
+- `audio.voiceAssetId` 和 `assets.voiceover`，如果已有正式配音
+
+`sourceText` 是防污染锚点：每个新稿 scene 的 `sourceText` 必须来自当前 captions/口播。只要 captions 改了而 scene payload 没改，`project:visual-check`、`project:still`、`project:render` 都必须失败。
 
 ## Beat 时间约束
 
@@ -286,6 +390,16 @@ Project 中必须声明：
 - Remotion 只播放音频，不生成音频。
 - 修改语音后必须重新计算 captions 和 scene/beat 时间。
 - 完整成片必须有 AAC 音频流。
+
+生成入口：
+
+```bash
+npm run tts:project -- examples/skill-showcase.json --out tmp/tts-chain-smoke.m4a
+```
+
+该入口只属于渲染前准备阶段：读取 `captions`、调用 Qwen TTS、下载临时 WAV，并用 FFmpeg 合并成 M4A。输出在 `tmp/` 下只能做 smoke；正式替换生产音频时必须写到 `public/` 下，并保持 Project JSON 的 `assets.voiceover.src` 为相对 `public/` 的路径。
+
+当前实测从 captions 直接生成的 Qwen 配音约 `149.920s`，当前样片时间线约 `121.633s`。这说明 TTS 生成链路可用，但不能直接覆盖生产音频；重配音必须同步重算字幕和 Beat 时间，或采用明确的时长适配策略。
 
 ## 图标约束
 

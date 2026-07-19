@@ -3,14 +3,212 @@ import type {CompiledAsset, ProjectDiagnostic} from './assetResolver';
 import {missingVisualAsset, resolveProjectAsset} from './assetResolver';
 import type {ProjectSceneFamily} from './sceneRegistry';
 import {parseProjectScenePayload} from './sceneRegistry';
-import type {ProjectTransition, VideoProject} from './projectSchema';
+import type {ProjectCaptionRange, ProjectTransition, VideoProject} from './projectSchema';
 import {ProjectValidationError} from './projectSchema';
+
+const GOLDEN_PROJECT_ID = 'workbuddy-six-skills-showcase';
+const REQUIRED_GOLDEN_NARRATION_TERMS = [
+  'WorkBuddy',
+  'PPT Master',
+  'HyperFrames',
+  '正文配图',
+];
+
+const compactMeaningText = (value: unknown): string => String(value ?? '')
+  .replace(/\s+/g, '')
+  .replace(/[，。！？、；：,.!?;:《》「」“”"'`~()[\]{}<>|/\\-]/g, '')
+  .toLocaleLowerCase();
+
+const sourceTextIsCoveredByNarration = (sourceText: string, narrationText: string): boolean => {
+  const source = compactMeaningText(sourceText);
+  const narration = compactMeaningText(narrationText);
+  if (source.length < 4 || narration.length < 4) return false;
+  if (narration.includes(source)) return true;
+  const middle = Math.floor(source.length / 2);
+  return [
+    source.slice(0, Math.min(36, source.length)),
+    source.slice(Math.max(0, middle - 18), Math.min(source.length, middle + 18)),
+    source.slice(Math.max(0, source.length - 36)),
+  ].some((anchor) => anchor.length >= 4 && narration.includes(anchor));
+};
+
+const frameForMs = (ms: number, fps: 30 = 30): number => Math.round(ms / 1000 * fps);
+
+type SceneTimingPlan = {
+  captionRange?: ProjectCaptionRange;
+  startFrame: number;
+  endFrame: number;
+  durationInFrames: number;
+};
+
+const orderedProjectCaptions = (project: VideoProject): Caption[] => project.captions
+  .filter((caption) => caption.text.trim().length > 0)
+  .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
+
+const captionRangeFromPayload = (payload: Record<string, unknown>): ProjectCaptionRange | undefined => {
+  const startIndex = payload.captionStartIndex;
+  const endIndex = payload.captionEndIndex;
+  if (typeof startIndex !== 'number' || typeof endIndex !== 'number') return undefined;
+  if (!Number.isInteger(startIndex) || !Number.isInteger(endIndex) || endIndex < startIndex) return undefined;
+  return {startIndex, endIndex};
+};
+
+const resolveSceneTimingPlans = (
+  project: VideoProject,
+  captions: Caption[],
+): SceneTimingPlan[] => {
+  let legacyCursor = 0;
+  const plans = project.scenes.map<SceneTimingPlan>((scene, index) => {
+    const range = scene.captionRange ?? captionRangeFromPayload(scene.payload);
+    if (!range) {
+      const durationInFrames = scene.durationInFrames;
+      const plan = {
+        startFrame: legacyCursor,
+        endFrame: legacyCursor + durationInFrames,
+        durationInFrames,
+      };
+      legacyCursor += durationInFrames;
+      return plan;
+    }
+
+    const startCaption = captions[range.startIndex];
+    const endCaption = captions[range.endIndex];
+    if (!startCaption || !endCaption) {
+      throw new ProjectValidationError(
+        'CAPTION_RANGE_INVALID',
+        `scenes[${index}].captionRange`,
+        `captionRange ${range.startIndex}-${range.endIndex} is outside captions[0..${Math.max(0, captions.length - 1)}]`,
+      );
+    }
+    const startFrame = frameForMs(startCaption.startMs, project.render.fps);
+    const endFrame = frameForMs(endCaption.endMs, project.render.fps);
+    const durationInFrames = endFrame - startFrame;
+    if (durationInFrames <= 0) {
+      throw new ProjectValidationError(
+        'CAPTION_RANGE_INVALID',
+        `scenes[${index}].captionRange`,
+        'captionRange resolves to an empty scene',
+      );
+    }
+    if (Math.abs(durationInFrames - scene.durationInFrames) > 1) {
+      throw new ProjectValidationError(
+        'CAPTION_RANGE_MISMATCH',
+        `scenes[${index}].durationInFrames`,
+        `scene duration must be derived from captionRange; expected ${durationInFrames}, received ${scene.durationInFrames}`,
+      );
+    }
+    legacyCursor = endFrame;
+    return {captionRange: range, startFrame, endFrame, durationInFrames};
+  });
+
+  const rangedCount = plans.filter((plan) => plan.captionRange).length;
+  if (rangedCount > 0 && rangedCount !== plans.length) {
+    throw new ProjectValidationError(
+      'CAPTION_RANGE_INVALID',
+      'scenes',
+      'captionRange must be declared on every scene or omitted from every scene',
+    );
+  }
+  if (rangedCount === plans.length) {
+    plans.forEach((plan, index) => {
+      const previous = plans[index - 1];
+      if (!plan.captionRange) return;
+      if (index === 0 && plan.captionRange.startIndex !== 0) {
+        throw new ProjectValidationError(
+          'CAPTION_RANGE_INVALID',
+          'scenes[0].captionRange.startIndex',
+          'the first scene captionRange must start at caption 0',
+        );
+      }
+      if (previous?.captionRange && plan.captionRange.startIndex !== previous.captionRange.endIndex + 1) {
+        throw new ProjectValidationError(
+          'CAPTION_RANGE_INVALID',
+          `scenes[${index}].captionRange.startIndex`,
+          'scene captionRanges must be continuous and non-overlapping',
+        );
+      }
+      if (previous && plan.startFrame !== previous.endFrame) {
+        throw new ProjectValidationError(
+          'CAPTION_RANGE_MISMATCH',
+          `scenes[${index}].captionRange`,
+          'scene captionRange frame boundary does not align with the previous scene',
+        );
+      }
+    });
+  }
+
+  return plans;
+};
+
+const normalizeSkillShowcaseBeats = (
+  beats: unknown[],
+  sceneIndex: number,
+  sceneDurationInFrames: number,
+  timing: SceneTimingPlan,
+  captions: Caption[],
+): unknown[] => beats.map((beat, beatIndex) => {
+  if (typeof beat !== 'object' || beat === null) return beat;
+  const current = beat as Record<string, unknown>;
+  const captionStartIndex = current.captionStartIndex;
+  const captionEndIndex = current.captionEndIndex;
+  if (typeof captionStartIndex !== 'number' || typeof captionEndIndex !== 'number') return beat;
+  if (!Number.isInteger(captionStartIndex) || !Number.isInteger(captionEndIndex) || captionEndIndex < captionStartIndex) {
+    throw new ProjectValidationError(
+      'BEAT_CAPTION_RANGE_INVALID',
+      `scenes[${sceneIndex}].payload.beats[${beatIndex}]`,
+      'beat captionStartIndex/captionEndIndex must be integer indexes in ascending order',
+    );
+  }
+  if (timing.captionRange && (
+    captionStartIndex < timing.captionRange.startIndex
+    || captionEndIndex > timing.captionRange.endIndex
+  )) {
+    throw new ProjectValidationError(
+      'BEAT_CAPTION_RANGE_INVALID',
+      `scenes[${sceneIndex}].payload.beats[${beatIndex}]`,
+      'beat caption range must stay inside its scene captionRange',
+    );
+  }
+  const startCaption = captions[captionStartIndex];
+  const endCaption = captions[captionEndIndex];
+  if (!startCaption || !endCaption) {
+    throw new ProjectValidationError(
+      'BEAT_CAPTION_RANGE_INVALID',
+      `scenes[${sceneIndex}].payload.beats[${beatIndex}]`,
+      'beat caption range points outside captions',
+    );
+  }
+  const computedStartFrame = Math.max(0, frameForMs(startCaption.startMs) - timing.startFrame);
+  const computedEndFrame = Math.min(sceneDurationInFrames, frameForMs(endCaption.endMs) - timing.startFrame);
+  const startFrame = Number(current.startFrame);
+  const endFrame = Number(current.endFrame);
+  if (Number.isFinite(startFrame) && Math.abs(startFrame - computedStartFrame) > 1) {
+    throw new ProjectValidationError(
+      'BEAT_CAPTION_MISMATCH',
+      `scenes[${sceneIndex}].payload.beats[${beatIndex}].startFrame`,
+      `beat startFrame must be derived from captions[${captionStartIndex}].startMs; expected ${computedStartFrame}, received ${startFrame}`,
+    );
+  }
+  if (Number.isFinite(endFrame) && Math.abs(endFrame - computedEndFrame) > 1) {
+    throw new ProjectValidationError(
+      'BEAT_CAPTION_MISMATCH',
+      `scenes[${sceneIndex}].payload.beats[${beatIndex}].endFrame`,
+      `beat endFrame must be derived from captions[${captionEndIndex}].endMs; expected ${computedEndFrame}, received ${endFrame}`,
+    );
+  }
+  return {
+    ...current,
+    startFrame: computedStartFrame,
+    endFrame: computedEndFrame,
+  };
+});
 
 export type CompiledProjectScene = {
   id: string;
   family: ProjectSceneFamily;
   durationInFrames: number;
   seriesDurationInFrames: number;
+  captionRange?: ProjectCaptionRange;
   transitionOut: ProjectTransition | false;
   payload: Record<string, unknown>;
   assets: CompiledAsset[];
@@ -82,13 +280,68 @@ const compileAudio = (project: VideoProject, diagnostics: ProjectDiagnostic[]): 
 
 export const compileProject = (project: VideoProject): CompiledProject => {
   const diagnostics: ProjectDiagnostic[] = [];
-  const durationInFrames = project.scenes.reduce((total, scene) => total + scene.durationInFrames, 0);
+  const narrationText = [project.title, ...project.captions.map((caption) => caption.text)].join('\n');
+  const orderedCaptions = orderedProjectCaptions(project);
+  const sceneTimingPlans = resolveSceneTimingPlans(project, orderedCaptions);
+  const durationInFrames = sceneTimingPlans.reduce((total, plan) => total + plan.durationInFrames, 0);
+  const isGoldenNarration = (
+    project.projectId === GOLDEN_PROJECT_ID
+    && REQUIRED_GOLDEN_NARRATION_TERMS.every((term) => narrationText.toLocaleLowerCase().includes(term.toLocaleLowerCase()))
+  );
+  if (project.projectId === GOLDEN_PROJECT_ID && !isGoldenNarration) {
+    throw new ProjectValidationError(
+      'VISUAL_CONTRACT_INVALID',
+      'projectId',
+      `${GOLDEN_PROJECT_ID} is reserved for the WorkBuddy golden sample; changed narration must use a new projectId and regenerated scenes`,
+    );
+  }
   const scenes = project.scenes.map<CompiledProjectScene>((scene, index) => {
     const parsed = parseProjectScenePayload(scene.family, scene.payload, `scenes[${index}]`);
-    if (parsed.family === 'skill-showcase' && Array.isArray(parsed.payload.beats)) {
-      parsed.payload.beats.forEach((beat, beatIndex) => {
+    const timing = sceneTimingPlans[index];
+    const sceneDurationInFrames = timing.durationInFrames;
+    let payload = parsed.payload;
+    if (parsed.family === 'skill-showcase') {
+      const beats = Array.isArray(parsed.payload.beats) ? parsed.payload.beats : [];
+      if (beats.length === 0) {
+        throw new ProjectValidationError(
+          'VISUAL_CONTRACT_INVALID',
+          `scenes[${index}].payload.beats`,
+          'skill-showcase scene must declare semantic beats',
+        );
+      }
+      if (!isGoldenNarration) {
+        const sourceText = typeof parsed.payload.sourceText === 'string' ? parsed.payload.sourceText : '';
+        if (compactMeaningText(sourceText).length < 4) {
+          throw new ProjectValidationError(
+            'VISUAL_CONTRACT_INVALID',
+            `scenes[${index}].payload.sourceText`,
+            'changed-script skill-showcase scenes must declare sourceText',
+          );
+        }
+        if (project.captions.length > 0 && !sourceTextIsCoveredByNarration(sourceText, narrationText)) {
+          throw new ProjectValidationError(
+            'VISUAL_CONTRACT_INVALID',
+            `scenes[${index}].payload.sourceText`,
+            'sourceText is not covered by current captions; regenerate scene payload after changing voiceover',
+          );
+        }
+      }
+      const normalizedBeats = normalizeSkillShowcaseBeats(
+        beats,
+        index,
+        sceneDurationInFrames,
+        timing,
+        orderedCaptions,
+      );
+      payload = {
+        ...parsed.payload,
+        captionStartIndex: timing.captionRange?.startIndex ?? parsed.payload.captionStartIndex,
+        captionEndIndex: timing.captionRange?.endIndex ?? parsed.payload.captionEndIndex,
+        beats: normalizedBeats,
+      };
+      normalizedBeats.forEach((beat, beatIndex) => {
         if (typeof beat !== 'object' || beat === null || !('endFrame' in beat)) return;
-        if (typeof beat.endFrame === 'number' && beat.endFrame > scene.durationInFrames) {
+        if (typeof beat.endFrame === 'number' && beat.endFrame > sceneDurationInFrames) {
           throw new ProjectValidationError(
             'SCENE_PAYLOAD_INVALID',
             `scenes[${index}].payload.beats[${beatIndex}].endFrame`,
@@ -98,7 +351,7 @@ export const compileProject = (project: VideoProject): CompiledProject => {
       });
     }
     const transitionOut = index === project.scenes.length - 1 ? false : scene.transition;
-    if (transitionOut && transitionOut.durationInFrames >= project.scenes[index + 1].durationInFrames) {
+    if (transitionOut && transitionOut.durationInFrames >= sceneTimingPlans[index + 1].durationInFrames) {
       throw new ProjectValidationError(
         'TRANSITION_INVALID',
         `scenes[${index}].transition.durationInFrames`,
@@ -120,10 +373,11 @@ export const compileProject = (project: VideoProject): CompiledProject => {
     return {
       id: scene.id,
       family: parsed.family,
-      durationInFrames: scene.durationInFrames,
-      seriesDurationInFrames: scene.durationInFrames + (transitionOut ? transitionOut.durationInFrames : 0),
+      durationInFrames: sceneDurationInFrames,
+      seriesDurationInFrames: sceneDurationInFrames + (transitionOut ? transitionOut.durationInFrames : 0),
+      captionRange: timing.captionRange,
       transitionOut,
-      payload: parsed.payload,
+      payload,
       assets,
     };
   });
