@@ -2,13 +2,13 @@
 
 ## Status
 
-partially_completed: documentation and validation are complete; final Gitee commit/push acceptance is pending.
+completed and accepted
 
 ## Branch and Commit
 
 - Branch: `main`
-- Commit: pending integration commit
-- The release record will identify the pushed integration commit after Gitee accepts it.
+- Integration commit: `9bf460c179ec83051204e82e2ef8b0c888d2626a`
+- Release record: this metadata-only follow-up commit records the successful Gitee push without changing production code.
 
 ## Summary
 
@@ -28,7 +28,7 @@ Every retained document now describes the single Skill Showcase production path.
 - [x] Link integrity: 32 Markdown files checked, zero missing local links.
 - [x] Production checks: typecheck, tests, Project check, Skill gate, tools build, and storyboard artifact contract pass.
 - [x] Visual evidence: Still, nine-scene midpoint sheet, and 20-component sheet directly inspected.
-- [ ] Gitee release: remote preflight passed; commit and push pending.
+- [x] Gitee release: integration commit pushed explicitly and verified on remote `main`.
 
 ## Validation
 
@@ -54,6 +54,8 @@ Results:
 - Console build: pass; Vite reports a non-blocking large-chunk warning.
 - Storyboard artifacts: 11 Cinematic + 9 Hero Track, 20 unique stills.
 - Gitee preflight: `main` is `3d400408534e6e43d58644b4bb0daee3921a6553`, equal to the local base.
+- Gitee push: `3d40040..9bf460c main -> main`.
+- Post-push verification: local and Gitee both resolved to `9bf460c179ec83051204e82e2ef8b0c888d2626a` before this metadata-only release record.
 
 ## Scope Control
 
@@ -68,8 +70,20 @@ Results:
 ## Risks and Follow-Ups
 
 - The console production bundle exceeds Vite's advisory 500 kB chunk threshold; this is a performance warning, not a release blocker.
-- No functional follow-up is required for TC-009 after Gitee synchronization.
+- No functional follow-up is required.
 
 ## Handoff Notes
 
-Complete the integration commit, push only to `git@gitee.com:mango77/remotion.git`, compare Gitee `main` with local `HEAD`, then mark this report and PM state accepted in a release-record commit.
+The repository and Gitee now contain the current-only Skill Showcase production path and documentation. Future sessions start from `.agentdesk/PM_STATE.md` and `kb/00 首页.md`.
+
+## PM Acceptance: TC-009
+
+- Decision: accepted
+- Reviewer: `200-PM`
+- Date: 2026-07-21
+- Evidence reviewed: documentation/link/stale-reference audits, production checks, direct visual inspection, staged scope and secret scans, Gitee preflight/push/post-push verification.
+- Validation accepted: yes
+- Scope drift: none for TC-009; accepted TC-008 consolidation included in the integration release.
+- Contract changes recorded: not applicable; existing contracts documented.
+- Follow-up card: none
+- Notes: GitHub was not pushed. Gitee used the explicit repository URL.

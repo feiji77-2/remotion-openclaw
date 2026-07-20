@@ -5,7 +5,7 @@
 - Role: `208-Docs` + `210-Integrator`
 - Recommended model tier: high
 - Branch: `main`
-- Status: review
+- Status: accepted
 
 ## Goal
 
@@ -67,7 +67,7 @@ Read before editing:
 - [x] The knowledge base covers architecture, Project JSON, all 20 renderer components, console/CLI operations, QA, code map, and release procedure.
 - [x] Local Markdown links resolve and no active documentation points to deleted files.
 - [x] Production validation and storyboard artifact checks pass.
-- [ ] Intended consolidation changes are committed once and pushed explicitly to Gitee `main`.
+- [x] Intended consolidation changes are committed once and pushed explicitly to Gitee `main`.
 - [x] TC-009 report, test log, decisions, contracts, and PM state contain enough truth to resume without chat history.
 
 ## Validation Commands

@@ -22,3 +22,7 @@
 ## 唯一事实源
 
 20 组件目录以 `remotion-video/src/components/ultimate-kit/families/skill-showcase/storyboardContract.json` 为准。Composition 注册以 `remotion-video/src/Root.tsx` 为准，CLI 以两个 `package.json` 为准。
+
+## 发布状态
+
+当前生产链路、全部文档和知识库已由集成提交 `9bf460c` 发布到 Gitee `mango77/remotion` 的 `main`。发布使用显式 Gitee URL，未通过多 push URL 的 `origin`，也未同步 GitHub。

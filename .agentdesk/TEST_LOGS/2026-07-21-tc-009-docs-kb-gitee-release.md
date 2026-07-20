@@ -32,3 +32,11 @@ Directly inspected:
 - Remote `main`: `3d400408534e6e43d58644b4bb0daee3921a6553`
 - Local base before release: same commit.
 - Result: no remote divergence before integration commit.
+
+## Gitee Release
+
+- Integration commit: `9bf460c179ec83051204e82e2ef8b0c888d2626a`.
+- Push command: `git push git@gitee.com:mango77/remotion.git main`.
+- Push result: `3d40040..9bf460c main -> main`.
+- Post-push `ls-remote`: `9bf460c179ec83051204e82e2ef8b0c888d2626a`.
+- GitHub push: not performed.
