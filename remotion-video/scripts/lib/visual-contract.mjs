@@ -32,7 +32,53 @@ const FORBIDDEN_COMPONENT_LITERALS = [
 ];
 
 const PRODUCT_ICON_ROOT = 'public/projects/skill-showcase/product-icons';
+// Project data uses stable semantic icon keys. A few of those keys deliberately
+// point at differently named source SVGs (the same mapping used by the runtime).
+// Keep the visual contract aligned with the renderer so a valid Project is not
+// rejected just because its public asset uses a descriptive filename.
+const PRODUCT_ICON_FILES = {
+  coding: 'karpathy-guidelines',
+  ppt: 'ppt-master',
+  ui: 'ui-skill',
+};
 const FPS = 30;
+const TECH_EXPLAINER_HERO_PRESETS = new Set([
+  'browser-demo',
+  'terminal-run',
+  'code-diff',
+  'config-inspector',
+  'ui-audit',
+  'workflow-trace',
+  'test-report',
+  'asset-gallery',
+  'system-map',
+  'before-after',
+]);
+
+const TECHNICAL_WORKBENCH_LENSES = new Set([
+  'source-diff',
+  'terminal-run',
+  'manifest-resolve',
+  'design-inspector',
+  'rule-counter',
+  'category-index',
+  'live-scan',
+  'snapshot-compare',
+  'repo-signal',
+  'direction-picker',
+  'style-lock',
+  'anchor-map',
+  'deny-list',
+  'skill-gate',
+  'knowledge-vault',
+  'catalog-metrics',
+  'token-assembly',
+  'scenario-switch',
+  'blank-audit',
+  'brand-pack',
+  'brand-style-map',
+  'system-graph',
+]);
 
 const collectStrings = (value, output = []) => {
   if (typeof value === 'string') {
@@ -105,7 +151,8 @@ const isGoldenNarration = (project, narrationText) => (
 
 const assertProductIconExists = (projectRoot, iconId, pathLabel, errors) => {
   if (!iconId) return;
-  const iconPath = path.join(projectRoot, PRODUCT_ICON_ROOT, `${iconId}.svg`);
+  const iconFile = PRODUCT_ICON_FILES[iconId] ?? iconId;
+  const iconPath = path.join(projectRoot, PRODUCT_ICON_ROOT, `${iconFile}.svg`);
   if (!existsSync(iconPath)) {
     errors.push(`${pathLabel}: product icon asset missing at ${path.relative(projectRoot, iconPath)}`);
   }
@@ -150,6 +197,7 @@ const checkSceneCaptionRange = (scene, sceneIndex, captions, errors) => {
 
 const checkBeats = (scene, sceneIndex, errors, {captions = [], requireCaptionBinding = false} = {}) => {
   const beats = asArray(scene?.payload?.beats);
+  const requiresTechnicalHero = scene?.payload?.heroStyle === 'tech-explainer';
   if (beats.length === 0) {
     errors.push(`scenes[${sceneIndex}]: skill-showcase scene must declare beats`);
     return;
@@ -208,8 +256,106 @@ const checkBeats = (scene, sceneIndex, errors, {captions = [], requireCaptionBin
       if (!beat.motionPreset) errors.push(`scenes[${sceneIndex}].payload.beats[${beatIndex}].motionPreset is required`);
       if (!beat.placement) errors.push(`scenes[${sceneIndex}].payload.beats[${beatIndex}].placement is required`);
     }
+    if (requiresTechnicalHero && !TECH_EXPLAINER_HERO_PRESETS.has(beat.heroPreset)) {
+      errors.push(`scenes[${sceneIndex}].payload.beats[${beatIndex}].heroPreset must be a valid technical-explainer preset`);
+    }
+    if (
+      requiresTechnicalHero
+      && beatIndex >= 2
+      && beat.heroPreset === beats[beatIndex - 1]?.heroPreset
+      && beat.heroPreset === beats[beatIndex - 2]?.heroPreset
+    ) {
+      errors.push(`scenes[${sceneIndex}].payload.beats[${beatIndex - 2}..${beatIndex}]: three consecutive beats reuse the same technical hero preset: ${beat.heroPreset}`);
+    }
     previousEnd = beat.endFrame;
   });
+};
+
+const checkTechnicalWorkbench = (scene, sceneIndex, errors) => {
+  if (scene?.payload?.heroStyle !== 'technical-workbench-v2') return;
+  const workbench = scene.payload.workbench;
+  if (!workbench || !Array.isArray(workbench.steps) || workbench.steps.length === 0) {
+    errors.push(`scenes[${sceneIndex}].payload.workbench is required for technical-workbench-v2`);
+    return;
+  }
+  const beats = asArray(scene.payload.beats);
+  const beatIndexes = new Set(beats.map((beat) => beat.captionStartIndex));
+  const seen = new Set();
+  workbench.steps.forEach((step, stepIndex) => {
+    if (!beatIndexes.has(step.captionIndex)) {
+      errors.push(`scenes[${sceneIndex}].payload.workbench.steps[${stepIndex}].captionIndex must bind to a scene beat`);
+    }
+    if (!TECHNICAL_WORKBENCH_LENSES.has(step.lens)) {
+      errors.push(`scenes[${sceneIndex}].payload.workbench.steps[${stepIndex}].lens must be a valid technical workbench lens`);
+    }
+    if (stepIndex > 0 && step.lens === workbench.steps[stepIndex - 1]?.lens) {
+      errors.push(`scenes[${sceneIndex}].payload.workbench.steps[${stepIndex - 1}..${stepIndex}] reuse the same technical workbench lens: ${step.lens}`);
+    }
+    if (seen.has(step.captionIndex)) {
+      errors.push(`scenes[${sceneIndex}].payload.workbench.steps[${stepIndex}].captionIndex must be unique`);
+    }
+    seen.add(step.captionIndex);
+    if (!step.command && asArray(step.before).length === 0 && asArray(step.after).length === 0 && asArray(step.logs).length === 0) {
+      errors.push(`scenes[${sceneIndex}].payload.workbench.steps[${stepIndex}] must declare an observable action payload`);
+    }
+    if (asArray(step.evidence).length === 0) {
+      errors.push(`scenes[${sceneIndex}].payload.workbench.steps[${stepIndex}].evidence must not be empty`);
+    }
+  });
+  for (const [beatIndex, beat] of beats.entries()) {
+    if (!seen.has(beat.captionStartIndex)) {
+      errors.push(`scenes[${sceneIndex}].payload.beats[${beatIndex}] must bind to a technical workbench step`);
+    }
+  }
+};
+
+const checkHeroTrack = (scene, sceneIndex, captions, errors) => {
+  if (scene?.payload?.heroStyle !== 'hero-track-v2') return;
+  const track = scene.payload.heroTrack;
+  const range = scene.captionRange;
+  if (!track || !Array.isArray(track.states)) {
+    errors.push(`scenes[${sceneIndex}].payload.heroTrack is required for hero-track-v2`);
+    return;
+  }
+  if (!range || track.captionStartIndex !== range.startIndex || track.captionEndIndex !== range.endIndex) {
+    errors.push(`scenes[${sceneIndex}].payload.heroTrack must match the scene captionRange`);
+  }
+  const captionCount = range ? range.endIndex - range.startIndex + 1 : 0;
+  if (captionCount >= 3 && (track.states.length < 3 || track.states.length > 6)) {
+    errors.push(`scenes[${sceneIndex}].payload.heroTrack.states must contain 3–6 states for a multi-caption hero track`);
+  }
+  let previousEnd = null;
+  let previousCaptionEnd = null;
+  track.states.forEach((state, stateIndex) => {
+    if (state.endFrame <= state.startFrame || state.startFrame < 0 || state.endFrame > scene.durationInFrames) {
+      errors.push(`scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}]: state frames must stay inside the scene`);
+    }
+    if (previousEnd !== null && state.startFrame !== previousEnd) {
+      errors.push(`scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}]: state frames must be continuous without a hard-cut gap`);
+    }
+    if (previousCaptionEnd !== null && state.captionStartIndex !== previousCaptionEnd + 1) {
+      errors.push(`scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}]: caption ranges must be continuous`);
+    }
+    if (!range || state.captionStartIndex < range.startIndex || state.captionEndIndex > range.endIndex || state.captionEndIndex < state.captionStartIndex) {
+      errors.push(`scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}]: caption range must stay inside the hero track`);
+    } else {
+      const stateText = captionTextForRange(captions, state.captionStartIndex, state.captionEndIndex);
+      if (!sourceTextIsCoveredByNarration(state.detail, stateText)) {
+        errors.push(`scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].detail must be sourced from its bound captions`);
+      }
+      if (asArray(state.evidence).length === 0) {
+        errors.push(`scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].evidence must contain readable visual entities`);
+      }
+      if (state.entityTarget !== undefined && !String(state.entityTarget).trim()) {
+        errors.push(`scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].entityTarget must be a readable entity ID when supplied`);
+      }
+    }
+    previousEnd = state.endFrame;
+    previousCaptionEnd = state.captionEndIndex;
+  });
+  if (track.states[0]?.startFrame !== 0 || track.states.at(-1)?.endFrame !== scene.durationInFrames) {
+    errors.push(`scenes[${sceneIndex}].payload.heroTrack.states must cover the full hero track duration`);
+  }
 };
 
 export const checkVisualContract = (project, {projectRoot = process.cwd()} = {}) => {
@@ -241,6 +387,8 @@ export const checkVisualContract = (project, {projectRoot = process.cwd()} = {})
       previousRange = range;
     }
     checkBeats(scene, sceneIndex, errors, {captions, requireCaptionBinding: !isGolden});
+    checkTechnicalWorkbench(scene, sceneIndex, errors);
+    checkHeroTrack(scene, sceneIndex, captions, errors);
     assertProductIconExists(projectRoot, payload.productIcon, `scenes[${sceneIndex}].payload.productIcon`, errors);
     assertProductIconExists(projectRoot, payload.brandIcon, `scenes[${sceneIndex}].payload.brandIcon`, errors);
     asArray(payload.productIcons).forEach((icon, iconIndex) => {

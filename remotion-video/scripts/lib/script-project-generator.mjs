@@ -4,7 +4,9 @@ import path from 'node:path';
 
 export const FPS = 30;
 
-const PALETTE = ['#20d9e8', '#9a7cff', '#45e28d', '#ffc44d', '#ff5f91', '#5f7dff'];
+// Chapter accents are intentionally lifted for small 9:16 screens. The stage
+// owns darkness; an accent must remain readable above it at a glance.
+const PALETTE = ['#48e7f3', '#ad94ff', '#63f0aa', '#ffd166', '#ff7aa8', '#7e98ff'];
 
 const NUMBERED_CUE = /^(第[一二三四五六七八九十0-9]+个|第[一二三四五六七八九十0-9]+步|首先|然后|接着|最后|压轴|总结|注意)/u;
 const STRUCTURE_CUE = /^(但是|然而|不过|因为|所以|因此|此外|另外)/u;
@@ -206,6 +208,14 @@ export const captionsFromScript = (scriptText, {durationMs = null} = {}) => {
 const parseCaptionInput = (captionsInput) => {
   const rawCaptions = Array.isArray(captionsInput) ? captionsInput : captionsInput?.captions;
   if (!Array.isArray(rawCaptions)) return [];
+  const normalizeConfidence = (value) => {
+    if (value == null) return null;
+    const numeric = Number(value);
+    // Whisper's avg_logprob is negative and is not a 0–1 confidence score.
+    // Keep schema-safe probability values; otherwise explicitly mark confidence
+    // as unavailable rather than inventing a misleading score.
+    return Number.isFinite(numeric) && numeric >= 0 && numeric <= 1 ? numeric : null;
+  };
   return rawCaptions
     .map((caption, index) => {
       const startMs = Math.max(0, Math.round(Number(caption.startMs ?? caption.timestampMs ?? index * 1800)));
@@ -218,11 +228,22 @@ const parseCaptionInput = (captionsInput) => {
         startMs,
         endMs,
         timestampMs: caption.timestampMs == null ? null : Math.max(0, Math.round(Number(caption.timestampMs))),
-        confidence: caption.confidence == null ? 1 : Number(caption.confidence),
+        confidence: normalizeConfidence(caption.confidence),
       };
     })
     .filter((caption) => caption.text && caption.endMs > caption.startMs)
     .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
+};
+
+const alignCaptionsToAudioDuration = (captions, audioDurationMs) => {
+  if (!Number.isFinite(audioDurationMs) || audioDurationMs <= 0 || captions.length === 0) return captions;
+  const lastCaption = captions.at(-1);
+  // Transcribers often end before the container's actual duration because of a
+  // final breath or silence. Preserve the audio instead of truncating the MP4.
+  if (lastCaption.endMs >= audioDurationMs) return captions;
+  return captions.map((caption, index) => index === captions.length - 1
+    ? {...caption, endMs: audioDurationMs}
+    : caption);
 };
 
 const shouldStartNewChunk = (caption, current, chunks) => {
@@ -435,6 +456,221 @@ const beatsForChunk = (chunk, sceneStartFrame, sceneDurationInFrames, sceneIndex
   });
 };
 
+const heroTrackKindForScene = (sceneText, index, totalScenes) => {
+  if (index === 0) return 'overview-matrix';
+  if (index === totalScenes - 1) return 'system-summary';
+  if (/Karpathy|编码原则|无关改动|讲清假设/i.test(sceneText)) return 'rule-compare';
+  if (/Remotion|React|帧画面|MP4/i.test(sceneText)) return 'code-render';
+  if (/PPT Master|PowerPoint|幻灯片|原生对象/i.test(sceneText)) return 'slide-editor';
+  if (/正文配图|配图|素材|写文章/i.test(sceneText)) return 'article-map';
+  if (/HyperFrames|HTML|视频 Agent|视频/i.test(sceneText)) return 'video-agent';
+  if (/UI Skill|设计立场|排版|留白/i.test(sceneText)) return 'design-compare';
+  return 'generic-explainer';
+};
+
+const heroTrackTitleForKind = (kind, fallback, brandName) => ({
+  'overview-matrix': '几个 Skill',
+  'rule-compare': '编码原则',
+  'code-render': 'Remotion',
+  'slide-editor': 'PPT Master',
+  'article-map': '正文配图',
+  'video-agent': 'HyperFrames',
+  'design-compare': 'UI Skill',
+  'system-summary': `装上 Skill，${brandName} 才算好帮手`,
+  'generic-explainer': fallback,
+}[kind] ?? fallback);
+
+const heroTrackSubtitleForKind = (kind, fallback) => ({
+  'overview-matrix': '把 AI 从聊天框变成可执行的工作流',
+  'rule-compare': '先约束，再动手',
+  'code-render': '用 React 写视频，一段代码就是一帧画面',
+  'slide-editor': '不是截图，是可继续编辑的原生对象',
+  'article-map': '先读懂正文，再把判断画出来',
+  'video-agent': '把 HTML 交给 Agent，变成可编辑视频',
+  'design-compare': '不是模板，是一整套设计立场',
+  'system-summary': '六个 Skill 汇聚成可复用能力系统',
+  'generic-explainer': fallback,
+}[kind] ?? fallback);
+
+const HERO_ENTITY_TARGETS = {
+  'overview-matrix': ['skill-01', 'skill-02', 'skill-03', 'skill-04', 'skill-05', 'skill-06'],
+  'rule-compare': ['bad-rule-01', 'bad-rule-02', 'bad-rule-03', 'good-rule-02', 'terminal-verify'],
+  'code-render': ['code-line-01', 'code-line-02', 'frame-track', 'mp4-output'],
+  'slide-editor': ['slide-01', 'shape-object', 'chart-object', 'text-object', 'export-result'],
+  'article-map': ['article-source', 'article-body', 'article-bridge', 'article-action'],
+  'video-agent': ['input-html', 'agent-run', 'render-preview', 'capability-matrix'],
+  'design-compare': ['before-surface', 'type-token', 'space-token', 'color-token', 'system-token'],
+  'system-summary': ['skill-karpathy', 'skill-remotion', 'skill-ppt', 'skill-article', 'skill-hyperframes', 'skill-ui'],
+  'generic-explainer': ['input-node', 'rule-node', 'result-node'],
+};
+
+// The eleven cinematic components are motion language, not replacement hero
+// layouts. A Hero Track keeps one stable technical composition while these
+// short transitions carry the spoken shift into the next state.
+const CINEMATIC_PRESETS = [
+  'kinetic-type', 'split-wipe', 'particle-field', 'orbital-map', 'ui-scan',
+  'material-carousel', 'focus-lock', 'pipeline-flow', 'token-assembly',
+  'surface-morph', 'system-convergence',
+];
+
+const cinematicPresetForState = (text, stateIndex, heroTrackKind, previousPreset) => {
+  const value = String(text ?? '');
+  // Named product tracks carry known technical entities. Their motion must be
+  // chosen from the entity sequence, not from loose keyword coincidence.
+  const productSequences = {
+    'overview-matrix': ['kinetic-type', 'focus-lock', 'system-convergence'],
+    'rule-compare': ['kinetic-type', 'focus-lock', 'split-wipe', 'focus-lock', 'orbital-map'],
+    'code-render': ['kinetic-type', 'focus-lock', 'pipeline-flow', 'surface-morph'],
+    'slide-editor': ['kinetic-type', 'focus-lock', 'particle-field', 'focus-lock', 'pipeline-flow'],
+    'article-map': ['kinetic-type', 'focus-lock', 'pipeline-flow', 'split-wipe', 'surface-morph'],
+    'video-agent': ['kinetic-type', 'pipeline-flow', 'surface-morph', 'orbital-map'],
+    'design-compare': ['split-wipe', 'token-assembly', 'focus-lock', 'material-carousel', 'token-assembly'],
+    'system-summary': ['focus-lock', 'pipeline-flow', 'orbital-map', 'system-convergence'],
+  };
+  const knownSequence = productSequences[heroTrackKind];
+  if (knownSequence) {
+    const preset = knownSequence[Math.min(stateIndex, knownSequence.length - 1)];
+    if (preset !== previousPreset) return preset;
+    return CINEMATIC_PRESETS[(CINEMATIC_PRESETS.indexOf(preset) + 1) % CINEMATIC_PRESETS.length];
+  }
+  let preferred;
+  if (stateIndex === 0) preferred = 'kinetic-type';
+  else if (/对比|不是|而是|之前|之后|默认|不同/i.test(value)) preferred = 'split-wipe';
+  else if (/\d+(?:[.,]\d+)?\s*(?:K|万|亿|%|条|套|种|个)?/i.test(value)) preferred = 'particle-field';
+  else if (/检测|审计|扫描|标记|问题/i.test(value)) preferred = 'ui-scan';
+  else if (/颜色|字体|间距|Token|设计系统|WCAG/i.test(value)) preferred = 'token-assembly';
+  else if (/风格|方向|材质|Swiss|Nordic|Neo/i.test(value)) preferred = 'material-carousel';
+  else if (/锁定|锚定|聚焦|选择|确定/i.test(value)) preferred = 'focus-lock';
+  else if (/流程|路径|输入|输出|接入|穿过|生成/i.test(value)) preferred = 'pipeline-flow';
+  else if (/变成|形变|切换|场景|官网|后台/i.test(value)) preferred = 'surface-morph';
+  else if (/汇聚|总结|收尾|系统|全部|多个|分类|规则/i.test(value)) preferred = heroTrackKind === 'system-summary' ? 'system-convergence' : 'orbital-map';
+  else preferred = CINEMATIC_PRESETS[(stateIndex + CINEMATIC_PRESETS.indexOf(previousPreset || 'kinetic-type') + 1) % CINEMATIC_PRESETS.length];
+  if (preferred !== previousPreset) return preferred;
+  return CINEMATIC_PRESETS[(CINEMATIC_PRESETS.indexOf(preferred) + 1) % CINEMATIC_PRESETS.length];
+};
+
+const heroEntityTargetForState = (kind, stateIndex) => {
+  const targets = HERO_ENTITY_TARGETS[kind] ?? HERO_ENTITY_TARGETS['generic-explainer'];
+  return targets[Math.min(stateIndex, targets.length - 1)];
+};
+
+const heroStatesForChunk = (chunk, sceneStartFrame, sceneDurationInFrames, heroTrackKind) => {
+  const stateCount = Math.min(chunk.length, clamp(Math.ceil(chunk.length / 2), 3, 6));
+  let previousCinematicPreset = '';
+  return Array.from({length: stateCount}, (_, stateIndex) => {
+    const startOffset = Math.floor(stateIndex * chunk.length / stateCount);
+    const endOffset = Math.max(startOffset, Math.floor((stateIndex + 1) * chunk.length / stateCount) - 1);
+    const group = chunk.slice(startOffset, endOffset + 1);
+    const nextStartOffset = Math.floor((stateIndex + 1) * chunk.length / stateCount);
+    const next = chunk[nextStartOffset];
+    const text = group.map((caption) => caption.text).join('');
+    const captionStartIndex = group[0].__captionIndex;
+    const captionEndIndex = group.at(-1).__captionIndex;
+    const label = keywordForText(text, stateIndex);
+    const evidence = meaningfulTokens(text, 4).map((token) => token.slice(0, 48));
+    return {
+      startFrame: stateIndex === 0 ? 0 : Math.max(0, frameForMs(group[0].startMs) - sceneStartFrame),
+      endFrame: stateIndex === stateCount - 1
+        ? sceneDurationInFrames
+        : Math.min(sceneDurationInFrames, frameForMs(next.startMs) - sceneStartFrame),
+      captionStartIndex,
+      captionEndIndex,
+      label,
+      detail: text.slice(0, 118),
+      evidence: evidence.length ? evidence : [label],
+      entityTarget: heroEntityTargetForState(heroTrackKind, stateIndex),
+    };
+  }).map((state, stateIndex, states) => ({
+    ...state,
+    endFrame: Math.max(state.startFrame + 1, stateIndex === states.length - 1 ? sceneDurationInFrames : state.endFrame),
+    cinematicPreset: (() => {
+      const preset = cinematicPresetForState(state.detail, stateIndex, heroTrackKind, previousCinematicPreset);
+      previousCinematicPreset = preset;
+      return preset;
+    })(),
+  }));
+};
+
+const workbenchKindForText = (text, visualMode, isLast) => {
+  if (isLast || /系统|复用|节点|依赖|架构|汇聚|整体/u.test(text)) return 'architecture-workspace';
+  if (/终端|命令行|CLI|shell|npm|pnpm|代码|源码|配置|JSON|YAML|API|参数|变量|安装|构建/i.test(text)) return 'ide-terminal';
+  if (/检测|扫描|标注|问题|错误|毛病|规则|测试|验证|覆盖率|审计/u.test(text)) return 'audit-trace';
+  if (/Prompt|提示词|输入|输出|流程|管线|路径|规避|闸门|生成/u.test(text)) return 'prompt-pipeline';
+  if (/设计|风格|品牌|素材|图标|配色|字体|模板|方向|Token|组件/u.test(text)) return 'design-system-lab';
+  if (visualMode === 'process') return 'prompt-pipeline';
+  if (visualMode === 'metrics') return 'audit-trace';
+  if (visualMode === 'compare') return 'ide-terminal';
+  return 'architecture-workspace';
+};
+
+const ACTION_LABELS = {
+  spotlight: 'inspect target',
+  stamp: 'commit state',
+  trace: 'trace workflow',
+  compare: 'compare states',
+  counter: 'verify metric',
+  stack: 'index evidence',
+  focus: 'focus diagnostic',
+  burst: 'converge system',
+};
+
+const WORKBENCH_LENSES_BY_KIND = {
+  'ide-terminal': ['source-diff', 'terminal-run', 'manifest-resolve', 'design-inspector'],
+  'audit-trace': ['rule-counter', 'category-index', 'live-scan', 'snapshot-compare'],
+  'prompt-pipeline': ['repo-signal', 'direction-picker', 'style-lock', 'anchor-map', 'deny-list', 'skill-gate'],
+  'design-system-lab': ['knowledge-vault', 'catalog-metrics', 'token-assembly', 'scenario-switch', 'blank-audit', 'brand-pack', 'brand-style-map'],
+  'architecture-workspace': ['system-graph', 'anchor-map', 'skill-gate'],
+};
+
+const workbenchForScene = ({sceneText, visualMode, beats, labels, isLast}) => {
+  const kind = workbenchKindForText(sceneText, visualMode, isLast);
+  const filesByKind = {
+    'ide-terminal': ['input.md', 'config.json', 'src/output.tsx', 'report.json'],
+    'audit-trace': ['rules/index.ts', 'src/component.tsx', 'trace.json'],
+    'prompt-pipeline': ['prompt.input', 'skill.contract', 'output.spec'],
+    'design-system-lab': ['tokens/system.json', 'components/index.ts', 'a11y/rules.json'],
+    'architecture-workspace': ['system.graph', 'inputs.json', 'output.contract'],
+  };
+  const steps = beats.map((beat, index) => {
+    const lenses = WORKBENCH_LENSES_BY_KIND[kind] ?? WORKBENCH_LENSES_BY_KIND['architecture-workspace'];
+    const evidenceValues = [beat.value, ...(beat.evidence ?? []), beat.keyword].filter(Boolean);
+    const evidence = [...new Set(evidenceValues)].slice(0, 3).map((value, evidenceIndex) => ({
+      label: evidenceIndex === 0 && beat.value ? 'SCRIPT METRIC' : evidenceIndex === 0 ? 'PRIMARY SIGNAL' : `EVIDENCE ${evidenceIndex + 1}`,
+      value: String(value).slice(0, 48),
+      source: 'script',
+      status: beat.action === 'compare' && evidenceIndex === 0 ? 'fail' : 'info',
+    }));
+    if (evidence.length < 3) evidence.push({label: 'WORKBENCH STATE', value: ACTION_LABELS[beat.action].toUpperCase(), source: 'derived', status: 'pass'});
+    if (evidence.length < 3) evidence.push({label: 'CAPTION BINDING', value: `BEAT ${String(index + 1).padStart(2, '0')}`, source: 'demo', status: 'pass'});
+    const semanticLines = [...new Set([...(beat.evidence ?? []), beat.keyword, ...(labels ?? [])])].slice(0, 5);
+    return {
+      captionIndex: beat.captionStartIndex,
+      lens: lenses[index % lenses.length],
+      objective: beat.detail ?? beat.keyword,
+      actionLabel: ACTION_LABELS[beat.action],
+      command: kind === 'ide-terminal' ? `inspect topic: ${beat.keyword}` : undefined,
+      target: beat.keyword,
+      file: filesByKind[kind][Math.min(index, filesByKind[kind].length - 1)],
+      before: beat.action === 'compare' ? semanticLines.slice(0, 2).map((line) => `before: ${line}`) : undefined,
+      after: semanticLines.map((line) => `${beat.visualState ?? beat.action}: ${line}`),
+      logs: [
+        `caption ${beat.captionStartIndex ?? index} bound`,
+        `${ACTION_LABELS[beat.action]} started`,
+        `${beat.keyword} resolved`,
+        'evidence emitted',
+      ],
+      evidence,
+    };
+  });
+  return {
+    kind,
+    title: `technical workbench / ${kind}`,
+    context: 'caption → action → observable state → evidence',
+    files: filesByKind[kind],
+    steps,
+  };
+};
+
 const labelsForChunk = (text) => {
   const tokens = meaningfulTokens(text, 6);
   if (tokens.length >= 3) return tokens;
@@ -481,9 +717,10 @@ export const buildSkillShowcaseProjectFromScript = ({
   const resolvedProjectId = slugify(projectId || resolvedTitle);
   const audioDurationMs = readAudioDurationMs(projectRoot, voiceSrc);
   const captions = parseCaptionInput(captionsInput);
-  const resolvedCaptions = captions.length
+  const unalignedCaptions = captions.length
     ? captions
     : captionsFromScript(scriptText, {durationMs: audioDurationMs});
+  const resolvedCaptions = alignCaptionsToAudioDuration(unalignedCaptions, audioDurationMs);
   if (!resolvedCaptions.length) {
     throw new Error('[SCRIPT_EMPTY] script text or captions are required');
   }
@@ -493,7 +730,6 @@ export const buildSkillShowcaseProjectFromScript = ({
   const allLabels = labelsForChunk(resolvedCaptions.map((caption) => caption.text).join('')).slice(0, 6);
   const allProductIcons = allLabels.map((label) => productIconForText(label));
   const allLabelIcons = allLabels.map((label, index) => iconForText(label, index));
-
   const scenes = chunks.map((chunk, index) => {
     const sceneText = chunk.map((caption) => caption.text).join('');
     const sceneStartMs = chunk[0].startMs;
@@ -506,16 +742,25 @@ export const buildSkillShowcaseProjectFromScript = ({
     const isFirst = index === 0;
     const isLast = index === chunks.length - 1;
     const visualMode = visualModeForText(sceneText, index, chunks.length);
-    const layoutSignature = layoutSignatureForScene(sceneText, visualMode, index);
+    const heroTrackKind = heroTrackKindForScene(sceneText, index, chunks.length);
+    const layoutSignature = `portrait:hero-track-v2:${heroTrackKind}`;
     const labels = labelsForChunk(sceneText);
     const productIcon = productIconForText(sceneText);
+    const beats = beatsForChunk(chunk, sceneStartFrame, durationInFrames, index, chunks.length);
+    const heroTrack = {
+      kind: heroTrackKind,
+      captionStartIndex,
+      captionEndIndex,
+      states: heroStatesForChunk(chunk, sceneStartFrame, durationInFrames, heroTrackKind),
+    };
     const payload = {
       variant: isFirst ? 'intro' : isLast ? 'outro' : 'generic',
       visualMode,
+      heroStyle: 'hero-track-v2',
       narrativeSignal: dominantNarrativeSignal(sceneText),
       layoutSignature,
-      title: sceneTitleFor(sceneText, index, resolvedTitle),
-      subtitle: labels.slice(0, 3).join(' · ') || resolvedTitle,
+      title: heroTrackTitleForKind(heroTrackKind, sceneTitleFor(sceneText, index, resolvedTitle), resolvedTitle),
+      subtitle: heroTrackSubtitleForKind(heroTrackKind, labels.slice(0, 3).join(' · ') || resolvedTitle),
       brandName: resolvedTitle.slice(0, 32),
       brandIcon: productIcon,
       productIcon,
@@ -534,7 +779,8 @@ export const buildSkillShowcaseProjectFromScript = ({
       captionStartIndex,
       captionEndIndex,
       sourceText: sceneText.slice(0, 800),
-      beats: beatsForChunk(chunk, sceneStartFrame, durationInFrames, index, chunks.length),
+      beats,
+      heroTrack,
     };
     return {
       id: isFirst ? 'intro' : isLast ? 'outro' : `scene-${String(index + 1).padStart(2, '0')}-${slugify(payload.headline, 'topic').slice(0, 24)}`,

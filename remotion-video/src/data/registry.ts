@@ -157,6 +157,16 @@ const FAMILY_STAGE_PRESET: Record<UltimateSceneFamily, UltimateStagePreset> = {
   'spoken-tags': 'data',
   'spoken-code': 'data',
   'spoken-takeaway': 'climax',
+  // ── Swiss (Swiss 极简口播) ────────────────
+  'swiss-title':    'opening',
+  'swiss-question': 'opening',
+  'swiss-list':     'evidence',
+  'swiss-compare':  'climax',
+  'swiss-number':   'data',
+  'swiss-grid':     'data',
+  'swiss-flow':     'data',
+  'swiss-tabular':  'evidence',
+  'swiss-stamp':    'cta',
 };
 
 const STAGE_PRESET_SHELLS: Record<UltimateStagePreset, Required<Pick<FamilyStageConfig, 'showOverlay' | 'showMediaCard' | 'showIconOrbit'>> & {hudMode: UltimateHudMode}> = {
@@ -1013,6 +1023,146 @@ const REGISTRY: Record<UltimateSceneFamily, FamilyEntry> = {
     defaultTransition: {preset: 'fade', durationInFrames: 14},
     stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
   },
+
+  // ── Swiss (Swiss 极简口播 · 反平均审美) ────────────────
+  // 一致视觉语言：白底 #fafafa / 黑字 #0a0a0a / Swiss 红 #d63232 accent /
+  // Helvetica Neue 左对齐粗网格。禁止紫色渐变、禁止毛玻璃、禁止居中堆叠。
+  // stageConfig 全关，family 组件自带白底，不依赖任何舞台外壳。
+  'swiss-title': {
+    family: 'swiss-title',
+    label: 'Swiss Title',
+    description: 'Swiss 极简大标题开场，左对齐粗网格。',
+    semanticTags: ['swiss', 'minimal', 'title', 'opening', '极简', '开场', '瑞士'],
+    requiredFields: ['title'],
+    optionalFields: ['kicker', 'subtitle', 'caption'],
+    defaultAccent: 'orange',
+    timing: {
+      baseDurationFrames: 180, enterFrames: 18, emphasisFrames: 130, exitFrames: 18,
+      staggerFrames: 0, easing: 'ease-out', springPreset: 'smooth', cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 14},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+  'swiss-question': {
+    family: 'swiss-question',
+    label: 'Swiss Question',
+    description: 'Swiss 极简提问钩子，大字提问 + 划掉的反面。',
+    semanticTags: ['swiss', 'question', 'hook', '极简', '提问', '瑞士'],
+    requiredFields: ['question'],
+    optionalFields: ['crossedOut', 'caption'],
+    defaultAccent: 'orange',
+    timing: {
+      baseDurationFrames: 180, enterFrames: 18, emphasisFrames: 120, exitFrames: 18,
+      staggerFrames: 0, easing: 'ease-out', springPreset: 'smooth', cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 14},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+  'swiss-list': {
+    family: 'swiss-list',
+    label: 'Swiss Numbered List',
+    description: 'Swiss 极简编号清单，左对齐竖排，每条编号 + 文本。',
+    semanticTags: ['swiss', 'list', 'rules', '极简', '清单', '规则', '瑞士'],
+    requiredFields: ['items'],
+    optionalFields: ['heading', 'bigNumber'],
+    defaultAccent: 'orange',
+    timing: {
+      baseDurationFrames: 240, enterFrames: 18, emphasisFrames: 180, exitFrames: 18,
+      staggerFrames: 6, easing: 'ease-out', springPreset: 'smooth', cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 14},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+  'swiss-compare': {
+    family: 'swiss-compare',
+    label: 'Swiss Before/After Compare',
+    description: 'Swiss 极简左右 before/after 程序化生成对比，左锚定右默认。',
+    semanticTags: ['swiss', 'compare', 'before-after', '极简', '对比', '瑞士'],
+    requiredFields: ['left', 'right'],
+    optionalFields: ['heading'],
+    defaultAccent: 'orange',
+    timing: {
+      baseDurationFrames: 300, enterFrames: 18, emphasisFrames: 240, exitFrames: 18,
+      staggerFrames: 0, easing: 'ease-out', springPreset: 'smooth', cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 14},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+  'swiss-number': {
+    family: 'swiss-number',
+    label: 'Swiss Big Number',
+    description: 'Swiss 极简巨大数字强调，左对齐 + 单位说明。',
+    semanticTags: ['swiss', 'number', 'metric', '极简', '数字', '强调', '瑞士'],
+    requiredFields: ['number'],
+    optionalFields: ['unit', 'caption'],
+    defaultAccent: 'orange',
+    timing: {
+      baseDurationFrames: 180, enterFrames: 16, emphasisFrames: 130, exitFrames: 16,
+      staggerFrames: 0, easing: 'ease-out', springPreset: 'smooth', cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 14},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+  'swiss-grid': {
+    family: 'swiss-grid',
+    label: 'Swiss Tile Grid',
+    description: 'Swiss 极简 N 格 tile 网格，支持高亮锚定格。用于审美方向/品牌/统计。',
+    semanticTags: ['swiss', 'grid', 'tiles', '极简', '网格', '瑞士'],
+    requiredFields: ['tiles'],
+    optionalFields: ['heading', 'highlightIndex'],
+    defaultAccent: 'orange',
+    timing: {
+      baseDurationFrames: 240, enterFrames: 18, emphasisFrames: 180, exitFrames: 18,
+      staggerFrames: 4, easing: 'ease-out', springPreset: 'smooth', cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 14},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+  'swiss-flow': {
+    family: 'swiss-flow',
+    label: 'Swiss Flow',
+    description: 'Swiss 极简水平流程示意，左→右阶段。',
+    semanticTags: ['swiss', 'flow', 'process', '极简', '流程', '瑞士'],
+    requiredFields: ['steps'],
+    optionalFields: ['heading'],
+    defaultAccent: 'orange',
+    timing: {
+      baseDurationFrames: 240, enterFrames: 18, emphasisFrames: 180, exitFrames: 18,
+      staggerFrames: 8, easing: 'ease-out', springPreset: 'smooth', cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 14},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+  'swiss-tabular': {
+    family: 'swiss-tabular',
+    label: 'Swiss Design Token Table',
+    description: 'Swiss 极简设计系统 token 表（Color/Type/Space/A11y），左对齐表格。',
+    semanticTags: ['swiss', 'design-system', 'tokens', 'table', '极简', '设计系统', '表', '瑞士'],
+    requiredFields: ['rows'],
+    optionalFields: ['heading'],
+    defaultAccent: 'orange',
+    timing: {
+      baseDurationFrames: 300, enterFrames: 18, emphasisFrames: 240, exitFrames: 18,
+      staggerFrames: 5, easing: 'ease-out', springPreset: 'smooth', cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 14},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
+  'swiss-stamp': {
+    family: 'swiss-stamp',
+    label: 'Swiss Closing Stamp',
+    description: 'Swiss 极简印章式收尾，大字主张 + 印章标记。',
+    semanticTags: ['swiss', 'closing', 'stamp', '极简', '收尾', '印章', '瑞士'],
+    requiredFields: ['headline'],
+    optionalFields: ['subhead', 'stamp'],
+    defaultAccent: 'orange',
+    timing: {
+      baseDurationFrames: 360, enterFrames: 20, emphasisFrames: 280, exitFrames: 24,
+      staggerFrames: 0, easing: 'ease-out', springPreset: 'smooth', cameraMotion: 'none',
+    },
+    defaultTransition: {preset: 'fade', durationInFrames: 18},
+    stageConfig: {showOverlay: false, showMediaCard: false, showIconOrbit: false},
+  },
 };
 
 const DEFAULT_BACKDROP_CYCLE = ['particle-grid', 'god-rays', 'dot-grid'] as const satisfies readonly BackdropVariant[];
@@ -1200,6 +1350,17 @@ const RHYTHM_CONTRACTS: Record<UltimateSceneFamily, FamilyRhythmContract> = {
   'spoken-tags': { layer: 'emphasis', staggerGap: 6, revealStiffness: 100, backdropCycle: [] },
   'spoken-code': { layer: 'structure', staggerGap: 0, revealStiffness: 96, backdropCycle: [] },
   'spoken-takeaway': { layer: 'closing', staggerGap: 0, revealStiffness: 96, backdropCycle: [] },
+  // ── Swiss (Swiss 极简口播) RHYTHM_CONTRACTS ────────────────
+  // backdropCycle 全空 — Swiss 白底自带全部背景，不需要舞台 backdrop。
+  'swiss-title':    { layer: 'context',  staggerGap: 0, revealStiffness: 96,  backdropCycle: [] },
+  'swiss-question': { layer: 'context',  staggerGap: 0, revealStiffness: 110, backdropCycle: [] },
+  'swiss-list':     { layer: 'structure', staggerGap: 6, revealStiffness: 120, preferredCameraMotion: 'none', backdropCycle: [] },
+  'swiss-compare':  { layer: 'emphasis', staggerGap: 0, revealStiffness: 110, preferredCameraMotion: 'none', backdropCycle: [] },
+  'swiss-number':   { layer: 'emphasis', staggerGap: 0, revealStiffness: 100, backdropCycle: [] },
+  'swiss-grid':     { layer: 'structure', staggerGap: 4, revealStiffness: 120, preferredCameraMotion: 'none', backdropCycle: [] },
+  'swiss-flow':     { layer: 'structure', staggerGap: 8, revealStiffness: 120, preferredCameraMotion: 'none', backdropCycle: [] },
+  'swiss-tabular':  { layer: 'proof',     staggerGap: 5, revealStiffness: 120, preferredCameraMotion: 'none', backdropCycle: [] },
+  'swiss-stamp':    { layer: 'closing',   staggerGap: 0, revealStiffness: 96,  preferredCameraMotion: 'none', backdropCycle: [] },
 };
 
 // ─── Exports ────────────────────────────────────────────────────────────────

@@ -1,276 +1,67 @@
-# Scene Family 参考
+# Scene Family 参考入口
 
-## 核心 Families (20)
+> 状态：当前有效
+> 定位：帮助选 family，不维护第二份全量注册表。
 
-注册于 `src/data/registry.ts`，使用 `FAMILY_STAGE_PRESET` 映射舞台预设。
+## 1. 先看真源
 
-| Family | 用途 | 动效 | 布局 |
-|--------|------|------|------|
-| hero | 开场标题 | textSlideIn + scaleEmphasis + floatMotion | mediaCard(ambient) + iconOrbit |
-| feature-rail | 特性列表 | staggerSlide + floatMotion | mediaCard(ambient) + iconOrbit |
-| focus | 关键词聚焦 | textSlideIn + scaleEmphasis | iconOrbit + no mediaCard |
-| number-strip | 数字展示 | staggerScale | mediaCard(ambient) + iconOrbit |
-| step-flow | 步骤流程 | staggerSlide + scaleEmphasis | no mediaCard + no iconOrbit |
-| timeline | 时间线 | staggerSlide + scaleEmphasis | mediaCard(ambient) + iconOrbit |
-| compare-board | 对比 | textSlideIn (双方向) | mediaCard(ambient) |
-| terminal | 终端 | staggerSlide | no mediaCard + no iconOrbit |
-| evidence-wall | 证据墙 | staggerScale + pulseAttention | mediaCard(ambient) |
-| architecture-map | 架构图 | staggerScale + floatMotion | mediaCard(ambient) + iconOrbit |
-| tag-matrix | 标签矩阵 | staggerScale + floatMotion | no mediaCard + no iconOrbit |
-| code | 代码 | staggerSlide | mediaCard(ambient) |
-| metrics | 指标 | staggerSlide + scaleEmphasis | mediaCard(frame) + iconOrbit |
-| data-stream | 数据流 | staggerSlide + floatMotion | mediaCard(ambient) |
-| benchmark-chart | 基准对比 | staggerScale + staggerSlide | mediaCard(ambient) |
-| quote-highlight | 引用 | textSlideIn + floatMotion | mediaCard(ambient) + iconOrbit |
-| glossary-term | 术语 | textSlideIn + scaleEmphasis | iconOrbit |
-| cta | 行动号召 | textSlideIn + pulseAttention | mediaCard(ambient) + iconOrbit |
-| memory-graph | 记忆图谱 | → architecture-map 别名 | merged |
-| pipeline-flow | 管道流程 | → step-flow 别名 | merged |
+family 的真实可用状态以源码为准：
 
-## Minimal Families (6)
+| 真源 | 负责什么 |
+|---|---|
+| `src/components/ultimate-kit/project.ts` | TypeScript family 类型 |
+| `src/data/registry.ts` | 名称、语义标签、节奏、默认过渡、stage 配置 |
+| `src/project/sceneRegistry.tsx` | family 到 React 组件的映射和 payload 校验 |
+| `examples/*.json` | 可运行样例 |
 
-抖音风格极简家族，纯色背景，无装饰元素。
+如果文档和源码冲突，以源码为准。新增 family 只改文档没有意义，必须先让 `project:check` 和 still smoke 通过。
 
-| Family | 特点 | 动效 |
-|--------|------|------|
-| minimal-hero | 极简标题，无装饰 | textSlideIn |
-| minimal-step-flow | 极简步骤 | staggerSlide |
-| minimal-tag-matrix | 极简标签 | staggerScale |
-| minimal-number-strip | 极简数字 | scaleEmphasis |
-| minimal-timeline | 极简时间线 | staggerSlide |
-| minimal-compare-board | 极简对比 | textSlideIn |
+## 2. 当前 family 大类
 
-## 家族舞台预设
+| 大类 | 适合内容 | 使用建议 |
+|---|---|---|
+| Ultimate | 技术解释、流程、数据、架构、对比、代码 | 默认结构化视频家族 |
+| Minimal | 极简短视频、纯信息块、低装饰表达 | 用于更轻、更快的视觉节奏 |
+| Spoken | 口播稿驱动的标题、指标、流程、排序、对比、标签、代码和 takeaway | 适合从文案快速生成样片 |
+| Skill Showcase | 长口播、章节化表达、技术讲解 Hero、语义 Beat | 新项目默认用 `tech-explainer` 展示操作证据；旧数据兼容 |
+| Swiss | 白底、左对齐、粗网格、低装饰的极简口播方向 | 适合后续产品化模板实验；每个 swiss-* 都要单独 still 验证 |
 
-| 舞台预设 | 装饰层 | 媒体卡片 | 图标轨道 | HUD 模式 |
-|---------|--------|---------|---------|---------|
-| opening | false | false | true | minimal |
-| data | true | false | false | terminal |
-| evidence | false | true | false | minimal |
-| climax | false | false | false | minimal |
-| cta | false | false | false | minimal |
+不要在文档里手动维护 “当前一共有多少个 family”。需要查时直接看：
 
-## 家族数据规范
-
-### hero
-- **required**: `title`
-- **optional**: `kicker`, `subtitle`, `visualSummary`, `heroMark`, `topLabel`
-- **默认强调色**: cyan
-- **典型帧数**: 90 (enter 20 / emphasis 50 / exit 20)
-- **相机动效**: push-in
-
-### feature-rail
-- **required**: `items`
-- **optional**: `heading`, `subtitle`
-- **默认强调色**: cyan
-- **典型帧数**: 82 (enter 18 / emphasis 48 / exit 16)
-- **相机动效**: pan-x
-
-### focus
-- **required**: `keyword`, `description`
-- **optional**: `eyebrow`, `question`, `diagram`, `kicker`
-- **默认强调色**: cyan
-- **典型帧数**: 72 (enter 16 / emphasis 40 / exit 16)
-- **相机动效**: push-in
-
-### number-strip
-- **required**: `count`
-- **optional**: `items`, `summary`, `heading`
-- **默认强调色**: orange
-- **典型帧数**: 75 (enter 18 / emphasis 42 / exit 15)
-- **相机动效**: zoom-pulse
-
-### step-flow
-- **required**: `steps`
-- **optional**: `items`, `variant`, `stepVariants`
-- **默认强调色**: cyan
-- **典型帧数**: 84 (enter 16 / emphasis 52 / exit 16)
-- **相机动效**: pan-y
-
-### timeline
-- **required**: `items`
-- **optional**: `heading`, `subtitle`
-- **默认强调色**: orange
-- **典型帧数**: 80 (enter 18 / emphasis 46 / exit 16)
-- **相机动效**: pan-y
-
-### compare-board
-- **required**: `rows`
-- **optional**: `leftTitle`, `rightTitle`, `comparisons`, `dataPoints`
-- **默认强调色**: cyan
-- **典型帧数**: 82 (enter 16 / emphasis 50 / exit 16)
-- **相机动效**: pan-x
-
-### terminal
-- **required**: `command`
-- **optional**: `windowTitle`, `outputs`, `note`, `heading`, `filename`, `language`
-- **默认强调色**: cyan
-- **典型帧数**: 75 (enter 14 / emphasis 46 / exit 15)
-- **相机动效**: none
-
-### evidence-wall
-- **required**: `cards`
-- **optional**: `comparisons`, `heading`
-- **默认强调色**: cyan
-- **典型帧数**: 85 (enter 20 / emphasis 48 / exit 17)
-- **相机动效**: pan-y
-
-### architecture-map
-- **required**: `nodes`, `centerTitle`
-- **optional**: `centerDetail`, `layout`, `items`, `heading`
-- **默认强调色**: purple
-- **典型帧数**: 82 (enter 18 / emphasis 48 / exit 16)
-- **相机动效**: drift
-
-### tag-matrix
-- **required**: `tabs`
-- **optional**: `activeTab`, `items`, `heading`
-- **默认强调色**: orange
-- **典型帧数**: 70 (enter 14 / emphasis 40 / exit 16)
-- **相机动效**: pan-x
-
-### code
-- **required**: `lines`
-- **optional**: `filename`, `language`, `heading`, `visualProps`
-- **默认强调色**: cyan
-- **典型帧数**: 78 (enter 14 / emphasis 48 / exit 16)
-- **相机动效**: none
-
-### metrics
-- **required**: `items`
-- **optional**: `dataPoints`, `heading`, `layout`
-- **默认强调色**: cyan
-- **典型帧数**: 76 (enter 16 / emphasis 44 / exit 16)
-- **相机动效**: growth
-
-### data-stream
-- **required**: `items`
-- **optional**: `summary`, `dataPoints`, `heading`
-- **默认强调色**: cyan
-- **典型帧数**: 80 (enter 16 / emphasis 48 / exit 16)
-- **相机动效**: zoom-pulse
-
-### benchmark-chart
-- **required**: `items`
-- **optional**: `primaryLabel`, `secondaryLabel`, `dataPoints`, `heading`
-- **默认强调色**: orange
-- **典型帧数**: 82 (enter 16 / emphasis 50 / exit 16)
-- **相机动效**: push-in
-
-### quote-highlight
-- **required**: `quote`
-- **optional**: `attribution`, `tags`, `heading`, `visualProps`
-- **默认强调色**: orange
-- **典型帧数**: 70 (enter 16 / emphasis 38 / exit 16)
-- **相机动效**: push-in
-
-### glossary-term
-- **required**: `term`, `definition`
-- **optional**: `heading`, `visualProps`
-- **默认强调色**: cyan
-- **典型帧数**: 68 (enter 14 / emphasis 38 / exit 16)
-- **相机动效**: push-in
-
-### cta
-- **required**: `heading`
-- **optional**: `subtitle`, `badge`
-- **默认强调色**: cyan
-- **典型帧数**: 72 (enter 16 / emphasis 40 / exit 16)
-- **相机动效**: push-in
-
-## 动效系统
-
-### 4 层动效架构 (motionGrammar.ts)
-
-```
-Layer 1: camera     — 全局镜头推拉/平移/缩放
-Layer 2: layout     — 按 family 类型决定入场/驻留/退场动画
-Layer 3: foreground — 前景特效（blur/glow/distortion/fog）
-Layer 4: micro      — 微抖动（jitter）
+```bash
+rg -n "family: '" src/data/registry.ts
+rg -n "'swiss-|spoken-|minimal-|skill-showcase|hero'" src/components/ultimate-kit/project.ts
 ```
 
-### 6 种动画原语 (shotArchetypes.ts)
+## 3. 选择策略
 
-1. **useTextSlideIn** — 文字从指定方向滑入 (left/right/up/down)
-   - Spring 弹性 (damping=200, stiffness=280)
-   - 透明度渐显 (0→0.8→1)
-   - 距离: 30px
+| 内容意图 | 优先考虑 |
+|---|---|
+| 开场、标题、观点钩子 | `hero`、`spoken-title`、`minimal-hero`、`swiss-title` |
+| 数字、指标、排名 | `number-strip`、`metrics`、`spoken-metric`、`spoken-ranking`、`swiss-number` |
+| 步骤、链路、流程 | `step-flow`、`pipeline-flow`、`spoken-process`、`swiss-flow` |
+| 左右对比、前后变化 | `compare-board`、`spoken-compare`、`minimal-compare-board`、`swiss-compare` |
+| 代码、命令、schema | `code`、`terminal`、`spoken-code` |
+| 架构、系统、关系 | `architecture-map`、`memory-graph` |
+| 标签、能力矩阵 | `tag-matrix`、`spoken-tags`、`minimal-tag-matrix`、`swiss-grid` |
+| 长口播章节和局部语义事件 | `skill-showcase` |
 
-2. **useScaleEmphasis** — 元素缩放弹入（带 overshoot）
-   - 缩放: fromScale(0.8) → overshoot(1.06) → 0.97 → 1.0
-   - Spring (damping=150, stiffness=260)
+`memory-graph` 和 `pipeline-flow` 是历史别名方向；新增视频优先使用更明确的 `architecture-map` 或 `step-flow`，除非已有样片需要兼容。
 
-3. **usePulseAttention** — 持续脉冲缩放
-   - 正弦波缩放: 1 ± amplitude(0.04)
-   - 周期: 60 帧 (2s @ 30fps)
+## 4. 新增 family 的硬要求
 
-4. **useStaggerSlide** — 列表错峰滑入
-   - 基于 useTextSlideIn，延迟 = index * staggerDelay
-   - 默认 6 帧间隔
+新增或改造 family，至少完成：
 
-5. **useStaggerScale** — 列表错峰缩放
-   - 基于 useScaleEmphasis，延迟 = index * staggerDelay
-   - 默认 6 帧间隔
+1. 类型：`src/components/ultimate-kit/project.ts`。
+2. registry：`src/data/registry.ts`。
+3. 组件：`src/components/ultimate-kit/families/**` 或 `ultimate-kit` 导出。
+4. 映射：`src/project/sceneRegistry.tsx`。
+5. payload 校验：严格 schema 或明确 permissive 原因。
+6. 示例：`examples/*.json`。
+7. 验证：`npm run project:check -- <example>` 和真实 still 输出。
 
-6. **useFloatMotion** — 持续浮动效果
-   - 正弦波 Y 轴浮动: ±6px
-   - 周期: 90 帧 (3s @ 30fps)
+没有组件映射的 family 不能进入 Project JSON。只在 `registry.ts` 里出现不代表可渲染。
 
-### 相机动效预设 (registry.ts)
+## 5. 文档边界
 
-| 预设 | 轴向 | 典型用途 |
-|------|------|----------|
-| drift | Y ±30px | 背景/装饰元素微微浮动 |
-| push-in | scale 1→1.08 | 强调/聚焦/进入感 |
-| pan-x | X -50→0px | 横向扫描 (rail/compare/timeline) |
-| pan-y | Y ±60px | 纵向滚动 (list/evidence-wall) |
-| zoom-pulse | scale 循环 | 数据强调/数字跳动 |
-| growth | scale Y | 柱状图/流程节点/benchmark bar |
-| none | — | 纯静态，无 camera motion |
-
-### 前景特效
-
-| 特效 | 适用家族 | 效果 |
-|------|---------|------|
-| vignette | evidence-wall, memory-graph | 暗角 |
-| blur-edge | architecture-map, pipeline-flow | 边缘模糊 |
-| glow | quote-highlight | 光晕 |
-
-### 8 种过渡手法
-
-| 手法 | 适用场景 |
-|------|---------|
-| fade | 情感柔和过渡 |
-| lift | 新元素从下方滑入 |
-| flash | 强调、节奏感强 |
-| zoom-through | 镜头推入元素内部穿出 |
-| clip | 圆形/多边形生长揭示 |
-| flip | 3D 翻转 |
-| wipe | 有色形状横扫揭示 |
-| dissolve | 场景叠化 |
-
-## 镜头语法系统 (shotGrammar.ts)
-
-### 镜头原型 (ShotArchetype)
-
-| 原型 | 说明 |
-|------|------|
-| lock-on reveal | 信息像被钉住一样出现 |
-| pressure countdown | 数字像子弹一样打出来 |
-| overtake race | 两列数据像在赛跑 |
-| evidence pin | 事实像别针一样钉入画面 |
-| threshold breach | 数字穿膜而出 |
-| aftershock hold | 高潮后画面凝固在那里 |
-| follow focus | 镜头跟随最重要的元素 |
-| compress compare | 把两个东西压在一起比较 |
-| drift reveal | 信息漂移入场 |
-| bullet train | 连续多个数据依次高速轰出 |
-| burst spread | 单点数据爆发成多个子数据 |
-| trace flow | 数据流动画 |
-
-## 别名与迁移
-
-| 旧名称 | 新名称 | 说明 |
-|--------|--------|------|
-| memory-graph | architecture-map | 注册表别名，渲染时自动映射 |
-| pipeline-flow | step-flow | 注册表别名，渲染时自动映射 |
+本页只回答“应该选哪类 family”。具体字段、动画、组件 props 和视觉实现不要复制到这里，直接读源码和示例。

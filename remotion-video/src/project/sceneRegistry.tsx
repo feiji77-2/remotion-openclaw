@@ -67,6 +67,20 @@ import {MinimalNumberStrip} from '../components/ultimate-kit/families/MinimalNum
 import {MinimalTimeline} from '../components/ultimate-kit/families/MinimalTimeline';
 import {MinimalCompareBoard} from '../components/ultimate-kit/families/MinimalCompareBoard';
 
+// ── Swiss family 组件（极简口播 · 反平均审美）────────────────────────────
+
+import {
+  SwissTitle,
+  SwissQuestion,
+  SwissList,
+  SwissCompare,
+  SwissNumber,
+  SwissGrid,
+  SwissFlow,
+  SwissTabular,
+  SwissStamp,
+} from '../components/ultimate-kit/families/swiss';
+
 // ── 公共类型 ────────────────────────────────────────────────────────────
 
 import type {CompiledProject, CompiledProjectScene} from './compileProject';
@@ -116,10 +130,61 @@ const SkillBeatMotionPresetSchema = z.enum([
   'flash-cut',
 ]);
 const SkillBeatPlacementSchema = z.enum(['bottom', 'body', 'highlight']);
+const SkillBeatShotPresetSchema = z.enum([
+  'kinetic-type',
+  'split-wipe',
+  'particle-field',
+  'orbital-map',
+  'ui-scan',
+  'material-carousel',
+  'focus-lock',
+  'pipeline-flow',
+  'token-assembly',
+  'surface-morph',
+  'system-convergence',
+]);
+const SkillBeatHeroPresetSchema = z.enum([
+  'browser-demo',
+  'terminal-run',
+  'code-diff',
+  'config-inspector',
+  'ui-audit',
+  'workflow-trace',
+  'test-report',
+  'asset-gallery',
+  'system-map',
+  'before-after',
+]);
+
+const TechnicalWorkbenchLensSchema = z.enum([
+  'source-diff',
+  'terminal-run',
+  'manifest-resolve',
+  'design-inspector',
+  'rule-counter',
+  'category-index',
+  'live-scan',
+  'snapshot-compare',
+  'repo-signal',
+  'direction-picker',
+  'style-lock',
+  'anchor-map',
+  'deny-list',
+  'skill-gate',
+  'knowledge-vault',
+  'catalog-metrics',
+  'token-assembly',
+  'scenario-switch',
+  'blank-audit',
+  'brand-pack',
+  'brand-style-map',
+  'system-graph',
+]);
 
 const SkillShowcasePayloadSchema = z.object({
   variant: z.enum(['intro', 'overview', 'coding', 'remotion', 'ppt', 'illustration', 'hyperframes', 'ui', 'outro', 'impeccable', 'frontend-design', 'ux-pro', 'cloud-design', 'generic']),
   visualMode: z.enum(['hero', 'grid', 'compare', 'process', 'metrics', 'quote']).optional(),
+  heroStyle: z.enum(['cinematic', 'tech-explainer', 'technical-workbench-v2', 'hero-track-v2']).optional(),
   title: z.string().min(1),
   subtitle: z.string().optional(),
   index: z.string().min(1).max(4).optional(),
@@ -146,6 +211,48 @@ const SkillShowcasePayloadSchema = z.object({
   }).optional(),
   layoutSignature: z.string().min(1).max(64).optional(),
   sourceText: z.string().min(1).max(800).optional(),
+  workbench: z.object({
+    kind: z.enum(['ide-terminal', 'audit-trace', 'prompt-pipeline', 'design-system-lab', 'architecture-workspace']),
+    title: z.string().min(1).max(64),
+    context: z.string().min(1).max(100),
+    files: z.array(z.string().min(1).max(48)).max(8).optional(),
+    steps: z.array(z.object({
+      captionIndex: z.number().int().nonnegative(),
+      lens: TechnicalWorkbenchLensSchema.optional(),
+      objective: z.string().min(1).max(100),
+      actionLabel: z.string().min(1).max(48),
+      command: z.string().min(1).max(100).optional(),
+      target: z.string().min(1).max(64).optional(),
+      file: z.string().min(1).max(64).optional(),
+      before: z.array(z.string().max(100)).max(10).optional(),
+      after: z.array(z.string().max(100)).max(10).optional(),
+      logs: z.array(z.string().min(1).max(100)).max(8).optional(),
+      evidence: z.array(z.object({
+        label: z.string().min(1).max(48),
+        value: z.string().min(1).max(48),
+        source: z.enum(['script', 'derived', 'demo']),
+        status: z.enum(['pass', 'fail', 'info']).optional(),
+      })).min(1).max(6),
+    // A workbench renders one active evidence step at a time. Long spoken
+    // scenes can legitimately contain more than eight caption-bound beats.
+    })).min(1).max(16),
+  }).optional(),
+  heroTrack: z.object({
+    kind: z.enum(['overview-matrix', 'rule-compare', 'code-render', 'slide-editor', 'article-map', 'video-agent', 'design-compare', 'system-summary', 'generic-explainer']),
+    captionStartIndex: z.number().int().nonnegative(),
+    captionEndIndex: z.number().int().nonnegative(),
+    states: z.array(z.object({
+      startFrame: z.number().int().nonnegative(),
+      endFrame: z.number().int().positive(),
+      captionStartIndex: z.number().int().nonnegative(),
+      captionEndIndex: z.number().int().nonnegative(),
+      label: z.string().min(1).max(32),
+      detail: z.string().min(1).max(120),
+      evidence: z.array(z.string().min(1).max(48)).max(5).optional(),
+      entityTarget: z.string().min(1).max(48).optional(),
+      cinematicPreset: SkillBeatShotPresetSchema.optional(),
+    })).min(1).max(6),
+  }).optional(),
   beats: z.array(z.object({
     startFrame: z.number().int().nonnegative(),
     endFrame: z.number().int().positive(),
@@ -157,6 +264,8 @@ const SkillShowcasePayloadSchema = z.object({
     visualState: z.string().min(1).max(48).optional(),
     motionPreset: SkillBeatMotionPresetSchema.optional(),
     placement: SkillBeatPlacementSchema.optional(),
+    shotPreset: SkillBeatShotPresetSchema.optional(),
+    heroPreset: SkillBeatHeroPresetSchema.optional(),
     detail: z.string().min(1).max(60).optional(),
     evidence: z.array(z.string().min(1).max(28)).max(4).optional(),
     value: z.string().min(1).max(18).optional(),
@@ -175,6 +284,97 @@ const SkillShowcasePayloadSchema = z.object({
 
 /** 松散 schema — 允许任何 payload 通过，用于没有严格校验的 family */
 const PermissiveSchema: z.ZodType<Record<string, unknown>> = z.record(z.string(), z.unknown());
+
+// ── Swiss family payload schemas（Swiss 极简口播系列）─────────────────────
+// Swiss scene 的"编号/总页/源/章节"作为可选 meta 字段透传，组件用以渲染顶/底栏。
+// 各 family 的核心字段必填，其余可选。无 accent 字段 — Swiss 用固定克制的红，
+// 不走工程的 accent 色彩机制（也就是拒绝从 payload 传 'purple' 进来）。
+const SwissMetaSchema = z.object({
+  index: z.string().min(1).max(4).optional(),
+  total: z.number().int().positive().max(99).optional(),
+  chapter: z.string().min(1).max(48).optional(),
+  source: z.string().min(1).max(80).optional(),
+}).partial();
+
+const SwissTitlePayloadSchema = SwissMetaSchema.extend({
+  title: z.string().min(1).max(120),
+  kicker: z.string().min(1).max(48).optional(),
+  subtitle: z.string().min(1).max(160).optional(),
+  caption: z.string().min(1).max(160).optional(),
+});
+
+const SwissQuestionPayloadSchema = SwissMetaSchema.extend({
+  question: z.string().min(1).max(120),
+  crossedOut: z.string().min(1).max(120).optional(),
+  caption: z.string().min(1).max(160).optional(),
+});
+
+const SwissListItemSchema = z.union([
+  z.string().min(1),
+  z.object({code: z.string().min(1).max(8), label: z.string().min(1).max(80)}),
+]);
+const SwissListPayloadSchema = SwissMetaSchema.extend({
+  items: z.array(SwissListItemSchema).min(1).max(16),
+  heading: z.string().min(1).max(80).optional(),
+  bigNumber: z.string().min(1).max(8).optional(),
+  bigLabel: z.string().min(1).max(48).optional(),
+});
+
+const SwissCompareSideSchema = z.object({
+  tag: z.string().min(1).max(48).optional(),
+  claim: z.string().min(1).max(80).optional(),
+  bullets: z.array(z.string().min(1).max(40)).max(6).optional(),
+  mock: z.enum(['default-ai', 'swiss-anchored']),
+});
+const SwissComparePayloadSchema = SwissMetaSchema.extend({
+  left: SwissCompareSideSchema.optional(),
+  right: SwissCompareSideSchema.optional(),
+  heading: z.string().min(1).max(80).optional(),
+  sharedPrompt: z.string().min(1).max(120).optional(),
+});
+
+const SwissNumberPayloadSchema = SwissMetaSchema.extend({
+  number: z.string().min(1).max(16),
+  unit: z.string().min(1).max(48).optional(),
+  caption: z.string().min(1).max(160).optional(),
+});
+
+const SwissTileSchema = z.object({
+  code: z.string().min(1).max(8),
+  label: z.string().min(1).max(48),
+  detail: z.string().min(1).max(120).optional(),
+});
+const SwissGridPayloadSchema = SwissMetaSchema.extend({
+  tiles: z.array(SwissTileSchema).min(1).max(9),
+  heading: z.string().min(1).max(80).optional(),
+  highlightIndex: z.number().int().nonnegative().max(8).optional(),
+  columns: z.number().int().positive().max(4).optional(),
+});
+
+const SwissFlowStepSchema = z.object({
+  label: z.string().min(1).max(48),
+  detail: z.string().min(1).max(120).optional(),
+});
+const SwissFlowPayloadSchema = SwissMetaSchema.extend({
+  steps: z.array(SwissFlowStepSchema).min(1).max(6),
+  heading: z.string().min(1).max(80).optional(),
+});
+
+const SwissTabularRowSchema = z.object({
+  code: z.string().min(1).max(8),
+  dimension: z.string().min(1).max(48),
+  tokens: z.array(z.string().min(1).max(32)).min(1).max(8),
+});
+const SwissTabularPayloadSchema = SwissMetaSchema.extend({
+  rows: z.array(SwissTabularRowSchema).min(1).max(8),
+  heading: z.string().min(1).max(80).optional(),
+});
+
+const SwissStampPayloadSchema = SwissMetaSchema.extend({
+  headline: z.string().min(1).max(80),
+  subhead: z.string().min(1).max(160).optional(),
+  stamp: z.string().min(1).max(24).optional(),
+});
 
 // ─── Family → 组件/Schema 注册表 ──────────────────────────────────────
 // 与 registry.ts 的 ALL_FAMILIES 对齐
@@ -227,6 +427,18 @@ const FAMILY_COMPONENT_REGISTRY: Record<string, FamilyRegistration> = {
   'minimal-number-strip': {component: MinimalNumberStrip as unknown as React.ComponentType<Record<string, unknown>>, schema: PermissiveSchema},
   'minimal-timeline':     {component: MinimalTimeline as unknown as React.ComponentType<Record<string, unknown>>, schema: PermissiveSchema},
   'minimal-compare-board': {component: MinimalCompareBoard as unknown as React.ComponentType<Record<string, unknown>>, schema: PermissiveSchema},
+
+  // ── Swiss (Swiss 极简口播 · 反平均审美) family ──
+  // 组件自带白底 #fafafa，盖过 ProjectSceneRegistry 的深色 #05070d 外壳 + 径向光晕。
+  'swiss-title':    {component: SwissTitle    as unknown as React.ComponentType<Record<string, unknown>>, schema: SwissTitlePayloadSchema},
+  'swiss-question': {component: SwissQuestion as unknown as React.ComponentType<Record<string, unknown>>, schema: SwissQuestionPayloadSchema},
+  'swiss-list':     {component: SwissList     as unknown as React.ComponentType<Record<string, unknown>>, schema: SwissListPayloadSchema},
+  'swiss-compare':  {component: SwissCompare  as unknown as React.ComponentType<Record<string, unknown>>, schema: SwissComparePayloadSchema},
+  'swiss-number':   {component: SwissNumber   as unknown as React.ComponentType<Record<string, unknown>>, schema: SwissNumberPayloadSchema},
+  'swiss-grid':     {component: SwissGrid     as unknown as React.ComponentType<Record<string, unknown>>, schema: SwissGridPayloadSchema},
+  'swiss-flow':     {component: SwissFlow     as unknown as React.ComponentType<Record<string, unknown>>, schema: SwissFlowPayloadSchema},
+  'swiss-tabular':  {component: SwissTabular  as unknown as React.ComponentType<Record<string, unknown>>, schema: SwissTabularPayloadSchema},
+  'swiss-stamp':    {component: SwissStamp    as unknown as React.ComponentType<Record<string, unknown>>, schema: SwissStampPayloadSchema},
 };
 
 /** 公开类型 — 与 registry.ts 的 ALL_FAMILIES 对齐 */

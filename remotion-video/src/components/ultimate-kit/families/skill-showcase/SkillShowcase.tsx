@@ -11,9 +11,11 @@ import {
 import {resolveSkillBeats, SUMMARY_ICONS, VARIANT_ICON} from './beatRegistry';
 import {ChapterTransitionOverlay, DeterministicMotionField, SemanticBeatOverlay, SemanticIcon} from './SemanticLayers';
 import {productIconPath, SUMMARY_PRODUCT_ICONS, type ProductIconKey} from './productIcons';
+import {LandscapeSkillShowcase} from './LandscapeSkillShowcase';
+import {PortraitCinematicSkillShowcase} from './PortraitCinematicSkillShowcase';
 import type {SkillIconKey, SkillShowcaseBeat, SkillShowcaseProps, SkillShowcaseVariant} from './types';
 
-export type {SkillBeatAction, SkillIconKey, SkillShowcaseBeat, SkillShowcaseProps, SkillShowcaseVariant} from './types';
+export type {SkillBeatAction, SkillBeatHeroPreset, SkillIconKey, SkillShowcaseBeat, SkillShowcaseHeroStyle, SkillShowcaseProps, SkillShowcaseVariant} from './types';
 
 const FONT = '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Inter, system-ui, sans-serif';
 const MONO = '"SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace';
@@ -1225,10 +1227,72 @@ export const SkillShowcase: React.FC<SkillShowcaseProps> = ({
   progressIndex,
   progressTotal,
   visualMode,
+  heroStyle,
+  layoutSignature,
   beats,
+  workbench,
+  heroTrack,
 }) => {
   const frame = useCurrentFrame();
   const {width, height, fps} = useVideoConfig();
+  if (width > height) {
+    return (
+      <LandscapeSkillShowcase
+        variant={variant}
+        title={title}
+        subtitle={subtitle}
+        index={index}
+        accent={accent}
+        secondaryAccent={secondaryAccent}
+        bullets={bullets}
+        labels={labels}
+        labelIcons={labelIcons}
+        productIcon={productIcon}
+        productIcons={productIcons}
+        brandName={brandName}
+        brandIcon={brandIcon}
+        eyebrow={eyebrow}
+        headline={headline}
+        body={body}
+        footer={footer}
+        progressIndex={progressIndex}
+        progressTotal={progressTotal}
+        visualMode={visualMode}
+        beats={beats}
+      />
+    );
+  }
+  if (heroStyle === 'hero-track-v2' || heroStyle === 'tech-explainer' || heroStyle === 'technical-workbench-v2' || layoutSignature?.startsWith('portrait:cinematic-v4')) {
+    return (
+      <PortraitCinematicSkillShowcase
+        variant={variant}
+        title={title}
+        subtitle={subtitle}
+        index={index}
+        accent={accent}
+        secondaryAccent={secondaryAccent}
+        bullets={bullets}
+        labels={labels}
+        labelIcons={labelIcons}
+        productIcon={productIcon}
+        productIcons={productIcons}
+        brandName={brandName}
+        brandIcon={brandIcon}
+        eyebrow={eyebrow}
+        headline={headline}
+        body={body}
+        footer={footer}
+        progressIndex={progressIndex}
+        progressTotal={progressTotal}
+        visualMode={visualMode}
+        heroStyle={heroStyle}
+        layoutSignature={layoutSignature}
+        beats={beats}
+        workbench={workbench}
+        heroTrack={heroTrack}
+      />
+    );
+  }
   const scale = Math.min(width / 1080, height / 1920);
   const active = progressIndex ?? activeIndexForVariant(variant);
   const resolvedProductIcon = productIcon ?? VARIANT_PRODUCT_ICON[variant];

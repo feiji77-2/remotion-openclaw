@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import fixture from '../../../examples/project.json';
 import designShowcaseFixture from '../../../examples/design-skills-showcase.json';
 import skillShowcaseFixture from '../../../examples/skill-showcase.json';
+import workbenchFixture from '../../../examples/swiss-skill-spoken-v5-workbench.json';
 import {ICON_PACKS, SKILL_ICON_KEYS} from '../../components/ultimate-kit/families/skill-showcase/iconRegistry';
 import {PRODUCT_ICONS} from '../../components/ultimate-kit/families/skill-showcase/productIcons';
 import {compileProject} from '../compileProject';
@@ -159,11 +160,14 @@ describe('compact video project', () => {
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
     const output = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'script-project-test-')), 'project.json');
     const script = [
-      '今天讲一个全新的知识库工作流。',
-      '过去资料散在聊天、文档和截图里，真正复用时经常断掉。',
-      '第一步，把输入统一成主题、来源和结论。',
-      '第二步，把判断拆成可检查的场景和关键词。',
-      '最后，沉淀成可以继续渲染和复盘的项目合同。',
+      '今天先在终端执行知识库安装命令。',
+      '接着修改 JSON 配置和代码参数。',
+      '扫描界面并标注出无障碍问题。',
+      '把默认版本和新版本做前后对比。',
+      '运行测试验证字幕绑定和覆盖率。',
+      '再展开品牌风格、图标和配色素材。',
+      '让输入经过规则管线形成可追踪输出。',
+      '最后，把节点汇聚成可复用的知识库系统。',
     ].join('');
     const result = spawnSync(process.execPath, [
       path.join(root, 'scripts/build-skill-showcase-from-script.mjs'),
@@ -180,6 +184,7 @@ describe('compact video project', () => {
     expect(compiled.scenes.some((scene) => scene.payload.variant === 'generic')).toBe(true);
     expect(JSON.stringify(compiled.scenes.map((scene) => scene.payload))).not.toContain('WorkBuddy');
     expect(compiled.scenes.every((scene) => typeof scene.payload.sourceText === 'string')).toBe(true);
+    expect(compiled.scenes.every((scene) => scene.payload.heroStyle === 'hero-track-v2')).toBe(true);
     expect(compiled.scenes.every((scene) => {
       const sceneBeats = Array.isArray(scene.payload.beats) ? scene.payload.beats : [];
       const lastBeat = sceneBeats[sceneBeats.length - 1];
@@ -187,9 +192,27 @@ describe('compact video project', () => {
     })).toBe(true);
     expect(compiled.scenes.every((scene) => scene.captionRange)).toBe(true);
     expect(compiled.scenes.every((scene) => {
-      const beats = Array.isArray(scene.payload.beats) ? scene.payload.beats : [];
-      return beats.every((beat) => Number.isInteger((beat as {captionStartIndex?: unknown}).captionStartIndex));
+      const track = scene.payload.heroTrack as {
+        captionStartIndex?: number;
+        captionEndIndex?: number;
+        states?: Array<{startFrame?: number; endFrame?: number; captionStartIndex?: number; captionEndIndex?: number; evidence?: string[]; entityTarget?: string; cinematicPreset?: string}>;
+      } | undefined;
+      const range = scene.captionRange;
+      const states = track?.states ?? [];
+      return range
+        && track?.captionStartIndex === range.startIndex
+        && track?.captionEndIndex === range.endIndex
+        && states.length >= Math.min(3, range.endIndex - range.startIndex + 1)
+        && states.length <= 6
+        && states[0]?.startFrame === 0
+        && states[states.length - 1]?.endFrame === scene.durationInFrames
+        && states.every((state) => Array.isArray(state.evidence) && state.evidence.length > 0 && typeof state.entityTarget === 'string' && state.entityTarget.length > 0 && typeof state.cinematicPreset === 'string' && state.cinematicPreset.length > 0)
+        && states.every((state, index) => index === 0 || state.cinematicPreset !== states[index - 1]?.cinematicPreset);
     })).toBe(true);
+    const generatedHeroKinds = compiled.scenes.map((scene) => (scene.payload.heroTrack as {kind?: string})?.kind);
+    expect(new Set(generatedHeroKinds).size).toBeGreaterThanOrEqual(3);
+    const generatedLayouts = compiled.scenes.map((scene) => String(scene.payload.layoutSignature));
+    expect(generatedLayouts.every((layout) => layout.startsWith('portrait:hero-track-v2:'))).toBe(true);
   });
 
   it('does not merge generated scenes across numbered hard boundaries', () => {
@@ -250,12 +273,9 @@ describe('compact video project', () => {
       'spoken-tags',
       'spoken-process',
     ]));
-    expect(payloads.map((payload) => payload.layoutSignature)).toEqual(expect.arrayContaining([
-      'vertical-step-flow',
-      'compare-board',
-      'tag-matrix',
-      'focus-diagram',
-    ]));
+    expect(payloads.map((payload) => payload.layoutSignature).every((layout) => (
+      typeof layout === 'string' && layout.startsWith('portrait:hero-track-v2:')
+    ))).toBe(true);
     expect(new Set(payloads.map((payload) => payload.visualMode).filter(Boolean)).size).toBeGreaterThanOrEqual(3);
   });
 
@@ -275,6 +295,69 @@ describe('compact video project', () => {
     ], {encoding: 'utf8'});
     expect(result.status).toBe(1);
     expect(result.stdout).toContain('three consecutive skill-showcase scenes reuse the same body layout');
+  });
+
+  it('enforces technical hero presets only when the reusable tech-explainer mode is enabled', () => {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'tech-hero-contract-test-'));
+    const missingPath = path.join(directory, 'missing.json');
+    const repeatedPath = path.join(directory, 'repeated.json');
+    const technical = structuredClone(designShowcaseFixture) as typeof designShowcaseFixture;
+    const presetRotation = ['browser-demo', 'terminal-run', 'ui-audit', 'workflow-trace'];
+    technical.scenes.forEach((scene) => {
+      (scene.payload as Record<string, unknown>).heroStyle = 'tech-explainer';
+      const beats = scene.payload.beats as Array<Record<string, unknown>>;
+      beats.forEach((beat, index) => { beat.heroPreset = presetRotation[index % presetRotation.length]; });
+    });
+
+    const missing = structuredClone(technical);
+    delete (missing.scenes[0].payload.beats as Array<Record<string, unknown>>)[0].heroPreset;
+    fs.writeFileSync(missingPath, `${JSON.stringify(missing, null, 2)}\n`, 'utf8');
+    const missingResult = spawnSync(process.execPath, [
+      path.join(root, 'scripts/check-project-visual-contract.mjs'),
+      missingPath,
+    ], {encoding: 'utf8'});
+    expect(missingResult.status).toBe(1);
+    expect(missingResult.stdout).toContain('heroPreset must be a valid technical-explainer preset');
+
+    const repeated = structuredClone(technical);
+    const repeatedBeats = repeated.scenes.find((scene) => scene.payload.beats.length >= 3)?.payload.beats as Array<Record<string, unknown>>;
+    repeatedBeats.slice(0, 3).forEach((beat) => { beat.heroPreset = 'browser-demo'; });
+    fs.writeFileSync(repeatedPath, `${JSON.stringify(repeated, null, 2)}\n`, 'utf8');
+    const repeatedResult = spawnSync(process.execPath, [
+      path.join(root, 'scripts/check-project-visual-contract.mjs'),
+      repeatedPath,
+    ], {encoding: 'utf8'});
+    expect(repeatedResult.status).toBe(1);
+    expect(repeatedResult.stdout).toContain('three consecutive beats reuse the same technical hero preset');
+  });
+
+  it('rejects a V2 workbench that leaves a semantic beat without an evidence step', () => {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+    const output = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-coverage-test-')), 'project.json');
+    const changed = structuredClone(workbenchFixture);
+    changed.scenes[0].payload.workbench.steps.splice(1, 1);
+    fs.writeFileSync(output, `${JSON.stringify(changed, null, 2)}\n`, 'utf8');
+    const result = spawnSync(process.execPath, [
+      path.join(root, 'scripts/check-project-visual-contract.mjs'),
+      output,
+    ], {encoding: 'utf8'});
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('must bind to a technical workbench step');
+  });
+
+  it('rejects a V2 workbench step without a beat-level lens', () => {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+    const output = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-lens-test-')), 'project.json');
+    const changed = structuredClone(workbenchFixture);
+    delete (changed.scenes[0].payload.workbench.steps[0] as {lens?: string}).lens;
+    fs.writeFileSync(output, `${JSON.stringify(changed, null, 2)}\n`, 'utf8');
+    const result = spawnSync(process.execPath, [
+      path.join(root, 'scripts/check-project-visual-contract.mjs'),
+      output,
+    ], {encoding: 'utf8'});
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('lens must be a valid technical workbench lens');
   });
 
   it('rejects changed captions that keep the golden sample project id and old visuals', () => {

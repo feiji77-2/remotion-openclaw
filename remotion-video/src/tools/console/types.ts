@@ -68,7 +68,7 @@ export interface CreateProjectDraft {
   projectId: string;
   title: string;
   orientation: 'portrait' | 'landscape';
-  style: 'swiss' | 'minimal' | 'cinematic' | 'tech';
+  style: 'tech-explainer' | 'cinematic-editorial' | 'swiss-minimal' | 'product-launch';
   spokenScript: string;
   keywords: string;
 }

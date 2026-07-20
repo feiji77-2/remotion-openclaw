@@ -8,7 +8,8 @@ set -euo pipefail
 # End-to-end render verification:
 #   1. Validates the project JSON with `npm run project:check`
 #   2. Checks the output file exists
-#   3. Runs validate-video.sh to verify video specs
+#   3. Reads expected dimensions/FPS from the project JSON
+#   4. Runs validate-video.sh to verify video specs
 #
 # Exit code 0 on success, non-zero on failure.
 # ─────────────────────────────────────────────────────────
@@ -32,7 +33,8 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   echo "Steps:"
   echo "  1. npm run project:check -- --props <project.json>"
   echo "  2. Check output.mp4 exists and is non-empty"
-  echo "  3. scripts/validate-video.sh <output.mp4>"
+  echo "  3. Read expected width/height/fps from project.render"
+  echo "  4. scripts/validate-video.sh <output.mp4> <width> <height> <fps>"
   echo ""
   echo "All arguments are optional; defaults are:"
   echo "  project.json  -> examples/project.json"
@@ -87,7 +89,10 @@ echo ""
 
 # ---- Step 3: Validate video specs ----
 echo "--- Step 3: Video spec validation ---"
-bash "$SCRIPT_DIR/validate-video.sh" "$OUTPUT_MP4"
+EXPECTED_WIDTH="$(jq -r '.render.width // (if .render.orientation == "portrait" then 1080 else 1920 end)' "$PROJECT_JSON")"
+EXPECTED_HEIGHT="$(jq -r '.render.height // (if .render.orientation == "portrait" then 1920 else 1080 end)' "$PROJECT_JSON")"
+EXPECTED_FPS="$(jq -r '.render.fps // 30' "$PROJECT_JSON")"
+bash "$SCRIPT_DIR/validate-video.sh" "$OUTPUT_MP4" "$EXPECTED_WIDTH" "$EXPECTED_HEIGHT" "$EXPECTED_FPS"
 echo ""
 
 # ---- All checks passed ----

@@ -1,6 +1,55 @@
 # 开发代码约束
 
-本文档是当前 Remotion 视频项目的开发规约。它围绕已经跑通的 `skill-showcase` 成品管线制定，不是通用代码风格建议。
+本文档是当前 Remotion 视频项目的长期开发规约。它不是 P1 临时说明，而是覆盖 P0 内核稳定、P1 本地内容生产台、P2 正式产品服务、P3 商业化规模化的全阶段约束。
+
+后续进入 P2/P3 时，不需要重新写一份“P2 约束文档”；只需要在本文件对应阶段小修具体技术选型。除非架构发生根本变化，否则本文档就是唯一开发红线。
+
+## 2026-07-19 当前开发口径
+
+当前只维护一份开发真源：
+
+```text
+/Users/macos/OpenClaw/remotion-generated-video-project
+```
+
+旧副本：
+
+```text
+/Users/macos/remotion/remotion-video
+```
+
+旧副本已经隔离为历史参考，不再作为审查、修复或产品开发对象。任何缺陷、文档或经验从旧副本迁入前，必须在当前真源中重新复核文件是否存在、缺陷是否成立、架构是否匹配。
+
+当前执行阶段是：
+
+```text
+P1-1 本地内容生产台
+```
+
+当前阶段目标不是做正式 SaaS，而是把当前 `tools:studio` 从开发者命令控制台推进到本地单用户内容生产台：
+
+```text
+新建视频项目
+  -> 填文案和基础配置
+  -> 保存 brief/script-pack
+  -> 生成 project.json
+  -> Remotion Player 预览
+  -> still 真渲染
+  -> MP4 render
+  -> 下载产物
+```
+
+执行文档：
+
+```text
+docs/p1-local-content-studio-execution.zh-CN.md
+```
+
+全项目文档入口：
+
+```text
+docs/README.zh-CN.md
+```
 
 当前成品基线：
 
@@ -15,7 +64,24 @@ out/workbuddy-six-skills-showcase-v3.mp4
 新口播/字幕 -> project:from-script -> Project JSON -> visual contract -> compileProject -> UltimateVideoV2 -> SceneTimeline -> skill-showcase -> Caption/Audio -> MP4 -> Verify
 ```
 
-所有后续开发都必须保护这条路径。视觉可以继续变强，特效可以继续变丰富，但不能把项目带回“预览像样、成片不稳、音画不同步、改完没人敢渲”的状态。
+所有后续开发都必须保护这条路径。P1 内容生产台只能把这条路径产品化，不能绕开它。视觉可以继续变强，特效可以继续变丰富，但不能把项目带回“预览像样、成片不稳、音画不同步、改完没人敢渲”的状态。
+
+## 全阶段路线
+
+| 阶段 | 目标 | 核心产物 | 本文约束章节 |
+|---|---|---|---|
+| P0 | 内核稳定化 | 确定性渲染、跨机器可运行、基础组件边界、QA 绿色 | 最高红线、Remotion 动画约束、验收矩阵 |
+| P1 | 本地内容生产台 | `tools:studio` 中完成新建项目、预览、still、render、下载 | P1 本地内容生产台约束 |
+| P2 | 正式产品服务 | `apps/web`、`apps/api`、`workers/render-worker`、数据库、对象存储、队列 | P2 正式产品服务约束 |
+| P3 | 商业化规模化 | 多租户、额度、账单、自动伸缩、运营后台、成本治理 | P3 商业化规模化约束 |
+
+阶段可以重叠开发，但约束不能倒置：
+
+```text
+P2 可以复用 P1 控制台经验，但不能把 P1 本地 server 当正式 API。
+P3 可以扩展 P2 服务，但不能绕过 P2 的鉴权、审计和任务持久化。
+任何阶段都不能破坏 P0 内核确定性。
+```
 
 ## 基准来源
 
@@ -27,7 +93,14 @@ out/workbuddy-six-skills-showcase-v3.mp4
 
 ## 项目不可变目标
 
-当前项目不是一个聊天式视频生成器，也不是一个通用页面模板库。它现在的主目标是：
+当前项目不是一个聊天式视频生成器，也不是一个通用页面模板库。它现在的主目标分两层：
+
+```text
+内核层：把结构化 Project JSON 稳定渲染成完整可播放的视频。
+产品层：让用户通过本地内容生产台创建 Project、预览、渲染和下载。
+```
+
+内核层主目标是：
 
 ```text
 把结构化 Project JSON 稳定渲染成完整可播放的竖屏口播视频。
@@ -42,10 +115,21 @@ out/workbuddy-six-skills-showcase-v3.mp4
 - 关键帧和完整 MP4 使用同一套代码。
 - 最终视频能通过机器检查和人工视觉检查。
 
+产品层必须长期保持：
+
+- 每条内容是一个 `Project / Job / Assets / Artifacts`，不是一个独立代码环境。
+- `projects/<projectId>/` 保存生产合同。
+- `public/projects/<projectId>/` 保存 Remotion 可访问资产。
+- `out/<projectId>*` 保存 still、MP4 和 QA 产物。
+- UI 可以隐藏 Project JSON 细节，但不能绕过 Project JSON。
+- 用户可见错误必须解释到文件、字段、命令或 job 阶段。
+
 ## 最高红线
 
 以下事项没有例外：
 
+- 禁止在 `/Users/macos/remotion/remotion-video` 旧副本中继续开发、审查或修复。
+- 禁止每条内容复制一份 `remotion-video` 工程；每条内容只能新增 Project、资产和产物。
 - 禁止绕过 `VideoProjectSchema`。
 - 禁止在 Remotion render 期间访问 LLM、TTS、搜索、截图服务或不稳定远程 API。
 - 禁止在组件里动态读取本地文件补数据。
@@ -60,6 +144,244 @@ out/workbuddy-six-skills-showcase-v3.mp4
 - 禁止忽略口播结构信号；第一/第二/第三、但是/然而/不过、此外/另外、因为/所以/因此、数字范围词都必须进入 Scene 和 Beat 合同。
 - 禁止把图标当装饰随机配。
 - 禁止顺手删除、重命名或重构无关文件。
+- 禁止让坏 `project.json` 静默 fallback 成默认项目，必须显示 schema diagnostics。
+- 禁止把 `npm run project:still` 的 usage/no-op 输出当成 still smoke 通过。
+- 禁止把未实现的正式 API、数据库、队列、worker 写成当前已存在架构。
+- 禁止把正式 SaaS API、鉴权、多租户、云存储逻辑塞进 `tools-studio-server.mjs`。
+- 禁止 `tools-studio-server.mjs` 暴露到公网；它只能是本地开发 server。
+- 禁止把 `swiss-*` family 开发和内容项目创建混成一个任务；family 是共享能力，project 是内容实例。
+- 禁止维护第二份全量 family 表、schema 表或架构事实表；文档只能链接源码真源。
+- 禁止让一次性计划稿、旧规格或同步清单留在主文档入口中参与开发决策。
+- 禁止新增文档时不声明类型；每份文档必须属于架构、执行、约束、操作、参考或历史之一。
+
+## 阶段约束
+
+### P0 内核稳定化约束
+
+P0 是所有阶段的地基，永远有效。
+
+P0 必须保持：
+
+| 主题 | 必须满足 |
+|---|---|
+| 确定性 | 同一 Project JSON、同一 frame、同一 props，多次渲染结果一致 |
+| 跨机器 | 不能依赖 `/Users/macos/...`、npx cache hash、Playwright 私有缓存路径 |
+| schema | Project JSON 必须通过 `VideoProjectSchema` |
+| 资产 | 本地资产相对 `public/`，远程资产要有产品化安全策略 |
+| still | still smoke 必须真渲染出 PNG |
+| verify | MP4 必须能被 `verify-project-render.mjs` 或对应 QA 解析 |
+
+P0 禁止：
+
+- 渲染期 `Math.random()`、`Date.now()`、timer、CSS animation。
+- 原生 `<img>` 进入 Remotion 成片路径。
+- 空数组、全零值、零时长输入导致 NaN、Infinity 或 RangeError。
+- 工具脚本硬编码本机绝对路径。
+- shell/awk/ffmpeg 参数拼接未校验。
+- 坏 Project JSON 被 UI 静默替换成默认项目。
+
+### P1 本地内容生产台约束
+
+P1-1 只允许围绕本地内容生产台做最小产品闭环：
+
+```text
+tools:studio
+  -> POST /api/projects
+  -> projects/<projectId>/*
+  -> public/projects/<projectId>/*
+  -> production:build-project
+  -> project:check
+  -> Remotion Player preview
+  -> project:still
+  -> project:render
+```
+
+### 本轮允许
+
+| 范围 | 允许做 |
+|---|---|
+| `scripts/tools-studio-server.mjs` | 增加本地 `POST /api/projects`，创建项目目录和 starter 合同 |
+| `src/tools/console/*` | 增加新建项目 UI、文案表单、状态条、错误解释和 job 串联 |
+| `projects/<projectId>/` | 新增 `brief.json`、`script-pack.json`、`asset-pack.json`、`project.json` |
+| `public/projects/<projectId>/` | 新增 `assets/`、`audio/` 等本地素材目录 |
+| `out/` | 输出 still、MP4、QA 产物 |
+| `docs/` | 更新 P1 执行方案、架构边界和验收标准 |
+
+### 本轮不允许
+
+| 范围 | 禁止做 |
+|---|---|
+| 正式 API | 不新增 `apps/api`，不把产品层假装成正式后端 |
+| 数据库 | 不引入 DB schema、migration、ORM |
+| 队列 | 不引入 Redis/BullMQ/cloud queue |
+| 云存储 | 不引入 S3/CDN 上传链路 |
+| 登录/权限 | 不做用户、多租户、团队权限 |
+| LLM/TTS | 不在本轮把生成服务接进 UI 主路径 |
+| Remotion render runtime | 不让 render 期间访问网络、文件系统或生成素材 |
+
+### P1 数据隔离
+
+每条内容必须按 `projectId` 隔离：
+
+```text
+projects/<projectId>/
+public/projects/<projectId>/
+out/<projectId>-*
+```
+
+`projectId` 必须匹配：
+
+```text
+^[A-Za-z0-9._-]{1,96}$
+```
+
+禁止：
+
+- `projectId` 包含 `/`、`\`、`..`、空格或 shell 元字符。
+- `productionPath`、`projectJsonPath`、`outputVideoPath` 由用户自由输入绝对路径。
+- 新项目覆盖已有 `projects/<projectId>`。
+- 新项目写入 `examples/`，除非明确是代码级示例。
+
+### P1 错误解释
+
+用户可见错误必须满足：
+
+| 错误来源 | 必须显示 |
+|---|---|
+| schema | `formatProjectPath(issue.path)` + `issue.message` |
+| command | commandId、退出码、最后日志 |
+| file | 文件路径、读写失败原因 |
+| render | props 路径、输出路径、Remotion/ffmpeg 错误摘要 |
+| asset | assetId、src、required/fallback 状态 |
+
+禁止：
+
+- `catch { return false }` 后 UI 只显示“失败”。
+- schema 失败后 UI 继续展示默认项目且不提示。
+- job 失败后隐藏日志。
+- still/render 没有真实 artifact 却显示成功。
+
+### P2 正式产品服务约束
+
+P2 的目标是把 P1 本地工具升级成可上线服务。P2 可以新增正式产品层，但仍然不能污染 Remotion 内核。
+
+P2 推荐目录：
+
+```text
+apps/
+  web/
+  api/
+workers/
+  render-worker/
+  producer-worker/
+packages/
+  project-contract/
+  render-client/
+remotion-video/
+```
+
+P2 必须满足：
+
+| 主题 | 必须满足 |
+|---|---|
+| API | 正式 API 放在 `apps/api`，不能继续塞进 `tools-studio-server.mjs` |
+| Web | 正式 Web 放在 `apps/web`，可以复用 P1 信息架构，但不能依赖本地文件直写 |
+| Worker | 渲染 worker 放在 `workers/render-worker`，只接收 Project JSON，不接收自然语言需求 |
+| Schema | API、producer worker、render worker 都必须校验 Project JSON |
+| DB | Project、ProjectVersion、Asset、Job、Artifact、QaReport 必须持久化 |
+| Queue | still/render/tts/asset 这类长任务必须进队列，不能阻塞 HTTP 请求 |
+| Storage | 用户素材和渲染产物必须进入对象存储或等效持久存储 |
+| Events | 进度用 SSE/WebSocket/轮询之一，但状态源必须来自持久化 job |
+| Audit | 记录谁创建、修改、渲染、下载 |
+| Security | 所有读写都必须绑定 user/team，不允许路径越权 |
+
+P2 禁止：
+
+- 把 `scripts/tools-studio-server.mjs` 改造成公网服务。
+- API 直接拼 shell 字符串执行任意命令。
+- 用户提交任意 `productionPath`、`projectJsonPath`、`outputVideoPath`。
+- worker 从请求里读取未校验 URL、本地路径或 shell 参数。
+- render worker 访问 LLM、TTS、搜索或截图服务。
+- 数据库里只存自然语言需求、不保存 Project JSON 版本。
+- job 状态只存在内存里。
+- 渲染产物只在 worker 本地，不上传持久存储。
+- API 和 worker 使用两份不同 Project schema。
+
+P2 长任务边界：
+
+```text
+HTTP request
+  -> validate input
+  -> create Job
+  -> enqueue
+  -> return jobId
+Worker
+  -> claim job
+  -> validate Project JSON
+  -> run still/render/qa
+  -> upload artifact
+  -> persist result
+```
+
+P2 Renderer Worker 输入只能是：
+
+```ts
+type RenderJobInput = {
+  jobId: string;
+  projectId: string;
+  versionId: string;
+  projectJson: VideoProject;
+  output: {kind: 'still' | 'video'; frame?: number; format: 'png' | 'mp4'};
+};
+```
+
+Renderer Worker 禁止接收：
+
+- 原始口播稿。
+- LLM prompt。
+- 任意 shell command。
+- 任意本地绝对路径。
+- 未归属当前 team/user 的 asset id。
+
+### P3 商业化规模化约束
+
+P3 的目标是多人、多团队、成本可控、可运营。P3 不能为了规模化牺牲 P0/P2 边界。
+
+P3 必须满足：
+
+| 主题 | 必须满足 |
+|---|---|
+| 多租户 | 所有 Project、Asset、Job、Artifact 必须有 team/user 归属 |
+| 权限 | 创建、编辑、渲染、下载、删除必须有权限检查 |
+| 额度 | LLM、TTS、渲染、存储都要有 quota 或 cost ledger |
+| 账单 | 每个 job 记录 token、音频秒数、渲染帧数、耗时、存储大小 |
+| 自动伸缩 | worker 可以横向扩展，但 job 必须幂等、可重试、可取消 |
+| 观测 | logs、metrics、trace、failure category 必须可查 |
+| 运营后台 | 能查看失败任务、重试任务、用户产物、成本异常 |
+| 数据保留 | 产物、日志、临时文件有明确生命周期 |
+| 合规 | 用户上传文件类型、大小、许可证和可见范围必须受控 |
+
+P3 禁止：
+
+- 为了提速跳过 schema check 或 QA。
+- 为了省成本静默降低输出规格。
+- 为了并发把多个用户 job 混在同一未隔离工作目录。
+- 失败重试产生重复扣费但无记录。
+- 用户删除项目后 artifact 仍公开可访问。
+- 运营后台绕过权限直接暴露用户资产。
+- 把成本估算藏在日志里，不进入结构化数据。
+
+### 阶段切换规则
+
+进入下一阶段前必须满足：
+
+| 从 | 到 | 必须完成 |
+|---|---|---|
+| P0 | P1 | typecheck、test、project:check、still smoke 全绿 |
+| P1 | P2 | 本地新建项目、project.json、Player 预览、still、render、下载闭环跑通 |
+| P2 | P3 | API/DB/Queue/Worker/Storage/Auth/Audit 形成最小闭环 |
+
+如果下一阶段开发暴露前一阶段缺陷，先回补前一阶段，不允许继续堆功能。
 
 ## 开发前必须写清的三件事
 
@@ -71,7 +393,25 @@ out/workbuddy-six-skills-showcase-v3.mp4
 | 改动边界 | 会改哪些文件，不改哪些文件 |
 | 验收标准 | 跑哪些命令，看哪些关键帧，是否需要完整 MP4 |
 
-如果需求没有明确到文件级边界，默认按最小风险路径处理：
+如果需求属于 P1 内容生产台，必须额外回答：
+
+| 判断 | 必须回答 |
+|---|---|
+| 用户路径 | 新建、保存、生成、预览、still、render、下载中的哪一步 |
+| 数据落点 | 写 `projects/<id>`、`public/projects/<id>` 还是 `out/<id>` |
+| 是否长任务 | 是走 `/api/jobs`，不是走同步 endpoint |
+| 错误显示 | Activity Log、右侧面板、modal 还是 job logs |
+
+如果需求没有明确到文件级边界，默认按最小风险路径处理。
+
+内容生产台默认路径：
+
+1. 先改 `src/tools/console` UI。
+2. 不够再改 `scripts/tools-studio-server.mjs` 本地 endpoint。
+3. 再不够才改生产脚本。
+4. 不改 Remotion 内核，除非 Project JSON 已经合法但无法表达目标。
+
+视频内核默认路径：
 
 1. 先改 `examples/skill-showcase.json` 的 payload。
 2. 不够再改 `skill-showcase` family。
@@ -93,6 +433,10 @@ out/workbuddy-six-skills-showcase-v3.mp4
 | `public/projects/skill-showcase/` | 样片本地资产 | 放语音、图标、图片、许可证 | 放临时下载、缓存、绝对路径引用 |
 | `scripts/check-skill-showcase-production.mjs` | 成品守门 | 增加可机器验证的约束 | 只打印 warning 不失败 |
 | `scripts/lib/visual-contract.mjs` | 换稿防污染守门 | 检查 scene payload、Beat 覆盖、产品图标和旧样片词污染 | 允许只换字幕/音频后直接渲染 |
+| `scripts/tools-studio-server.mjs` | 本地内容生产台 server | 本地创建项目、读写安全 JSON、启动白名单 job | 暴露公网、加入正式 SaaS 鉴权/DB/队列 |
+| `src/tools/console/` | 本地内容生产台 UI | 新建项目、编辑文案、显示预览、触发 job、解释错误 | 绕过 schema、吞掉错误、复制 Remotion 工程 |
+| `projects/<projectId>/` | 内容项目生产合同 | 保存 brief/script/asset/project 合同 | 写代码、放 node_modules、放临时缓存 |
+| `public/projects/<projectId>/` | 内容项目静态资产 | 放图片、音频、字体、许可证 | 放绝对路径引用、放远程缓存不标来源 |
 | `docs/` | 长文档和方法文档 | 写完整规约和流程 | 记录过时命令不标注 |
 | `kb/` | 知识库入口 | 保留当前有效知识 | 恢复旧 Workflow 和无关图库 |
 | `out/` | 产物输出 | 放关键帧、联系表、MP4 | 作为运行时输入真源 |
@@ -892,7 +1236,100 @@ npm run skill:verify
 | 改 render script | `skill:gate`、`skill:verify` | 完整重渲染 |
 | 改成品输出 | `skill:render`、`skill:verify` | 抽帧预览 |
 
-成品级完整验收：
+## 2026-07-20 Remotion 编码分镜与图层隔离约束
+
+本节记录 20 组件分镜目录开发中出现的真实错误，属于后续所有口播视频与组件库开发的长期约束，不是单张图片的临时修补。
+
+### “生图”的默认含义
+
+在本项目语境中，用户说“生图、生成分镜图、渲染组件效果图、生成关键帧”，默认含义是：
+
+```text
+Remotion 组件代码
+  -> selectComposition(inputProps)
+  -> renderStill(frame)
+  -> PNG
+  -> FFmpeg Contact Sheet
+```
+
+除非用户明确说“使用 AI 生图、生成式图片、图像模型”，否则禁止调用 `image_gen`、外部图像生成服务或把生成式图片加入组件库。Remotion 编码分镜必须保持可复现、可定位到组件和帧。
+
+### 11+9 分镜目录单一真源
+
+当前 11 个 Motion 镜头与 9 个 Hero 组件的共享合同是：
+
+```text
+src/components/ultimate-kit/families/skill-showcase/storyboardContract.json
+```
+
+该合同固定：
+
+- Composition：`RemotionStoryboardLibrary`
+- 规格：1080×1920、30fps、120 帧
+- 审查帧：第 72 帧
+- 目录：11 Motion + 9 Hero
+- 生成方式：`remotion-code-only`
+- 顶部章节、Hero、Semantic Beat、Caption 四个区域
+
+禁止在渲染脚本里再维护第二份 20 ID 清单。TS 目录、Root Composition 和渲染脚本必须读取同一合同。
+
+### 四层区域与文字职责
+
+固定区域：
+
+| 层 | Y 范围 | 允许内容 | 禁止内容 |
+|---|---:|---|---|
+| Chapter Header / 章节头 | 70–220 | 编号、图标、产品名、短定义 | 完整口播句子 |
+| Hero Visual / 主视觉 | 240–1140 | 真实技术实体、节点、代码、界面、证据标签 | 第二份完整字幕、覆盖核心实体的结论句 |
+| Semantic Beat / 语义节拍 | 1160–1510 | 当前关键词、短结论、数字、对比条 | 复述整句口播、下移进入字幕区 |
+| Caption / 正式字幕 | 1640–1810 | 当前完整口播 | 主视觉说明、镜头标签 |
+
+一句话原则：
+
+```text
+Hero 负责证明，Semantic Beat 负责击打，Caption 负责把话说完整。
+```
+
+主视觉内部不得硬编码第二份完整口播。特别是系统图、汇聚图、环形图的核心节点周围，禁止再放跨越节点的大句子。
+
+### 本轮错误与根因
+
+1. 把“生图”错误理解为 AI 生图，而不是 Remotion `renderStill`。原因是脱离了项目上下文，只按字面选择工具。
+2. 首次批量渲染虽然生成了 20 个文件，但复用了 `index=0` 的 Composition 元数据，导致 20 张内容相同。原因是只在循环外选择一次 Composition。
+3. `SystemConvergenceShot` 在中心系统节点上又硬编码了“装对 Skill，AI 才有立场”，造成文字覆盖节点。原因是 Hero 层承担了本应属于 Semantic Beat / Caption 的叙事职责。
+
+对应永久修复：
+
+- 每个 index 都必须重新执行 `selectComposition({inputProps: {index}})`。
+- 渲染后必须检查 20 张 PNG 尺寸和 SHA-256 唯一性。
+- `SystemConvergenceShot` 中心只保留系统实体、节点和连线。
+- 禁止主视觉重新引入合同列出的完整叙事句。
+
+### 固定命令与审核顺序
+
+```bash
+npm run storyboard:check
+npm run storyboard:render
+node scripts/check-remotion-storyboard-contract.mjs --artifacts
+```
+
+`storyboard:render` 的固定链路是：
+
+```text
+合同检查
+  -> Remotion bundle
+  -> 每张重新 selectComposition
+  -> renderStill 20 张 PNG
+  -> 检查 1080×1920
+  -> 检查 20 张哈希唯一
+  -> 生成 Motion / Hero / 全库接触表
+  -> 再跑 artifact check
+  -> 人工打开接触表审查遮挡、重复和信息层级
+```
+
+机器检查通过不等于视觉交付通过。最后必须人工查看单张原图和接触表，不能只看命令退出码。
+
+## 成品级完整验收
 
 ```bash
 cd remotion-video
@@ -1001,6 +1438,36 @@ const intensity = props.intensity as number;
 
 ## 文档同步约束
 
+### 2026-07-19 文档卫生修复记录
+
+本次修复处理的问题：
+
+- `docs/superpowers/*` 和 `remotion-video/docs/superpowers/*` 中存在旧计划稿、旧规格和超长一次性执行记录，容易被误当成当前架构。
+- `kb/13 全量同步清单.md` 是一次性同步状态，不应长期留在知识库入口。
+- `project-development`、`family-reference`、`video-factory-console-design`、`ultimate-elements-atlas`、`kb/07` 都存在不同程度的重复、过期引用或第二份真源问题。
+- 旧文档还引用过不再适用的 `VideoFactoryConsole.tsx`、`global.css`、旧 adapter 路径和旧 family 范围。
+
+已落地处理：
+
+- 删除旧计划、旧规格和一次性同步清单。
+- 把 `kb/07 开发代码约束.md` 降级为速查入口，完整约束只维护本文件。
+- 把 `family-reference` 改成 family 选择入口，不再维护第二份全量 family 列表。
+- 把 `project-development` 改成内核入口，只链接 schema、compile、registry、composition 真源。
+- 把 `video-factory-console-design` 收敛到 `src/tools/console/*` 和本地 P1 runner，不再描述不存在的旧工具路径。
+- 把 `ultimate-elements-atlas` 收敛为元素地图，不再描述旧 adapter 分配算法。
+- 更新 `docs/README.zh-CN.md` 和 `kb/00 首页.md`，使文档入口只指向当前有效主线。
+
+防复发规则：
+
+1. 新增文档必须先写明定位：架构、执行、约束、操作、参考或历史。
+2. 一次性计划完成后必须删除或归档，不能继续挂在主入口。
+3. 不在文档中复制全量 schema、family 列表、脚本列表或当前架构事实；只写裁决规则和源码链接。
+4. family 可用性以 `src/components/ultimate-kit/project.ts`、`src/data/registry.ts`、`src/project/sceneRegistry.tsx` 为准。
+5. Product/API/DB/Queue/Worker 能力只有落地代码、命令和验收后才能写成“当前事实”。
+6. 文档清理后必须跑 `rg` 检查旧入口和 `git diff --check`。
+7. 删除文档前必须先查引用；删除后必须更新 `docs/README.zh-CN.md`、`kb/00 首页.md` 和相关继续阅读入口。
+8. `kb/` 只能做操作速查，不能覆盖或复制 `docs/` 与源码真源。
+
 以下变化必须同步：
 
 - Project JSON 合同变化。
@@ -1012,9 +1479,12 @@ const intensity = props.intensity as number;
 - 渲染命令变化。
 - 成品基线变化。
 - gate 规则变化。
+- 文档入口、主线架构、family 范围或知识库定位变化。
 
 同步目标：
 
+- `docs/README.zh-CN.md`
+- `docs/documentation-hygiene-audit.zh-CN.md`
 - `docs/skill-showcase-video.zh-CN.md`
 - `docs/development-code-constraints.zh-CN.md`
 - `kb/00 首页.md`
@@ -1024,7 +1494,7 @@ const intensity = props.intensity as number;
 - `kb/06 QA 与调试.md`
 - `kb/07 开发代码约束.md`
 
-知识库只保留当前有效流程，不恢复旧 Workflow、Fast Pipeline、20-family 截图册或无关历史材料。
+知识库只保留当前有效流程，不恢复旧 Workflow、Fast Pipeline、旧控制台 redesign 计划、20-family 截图册或无关历史材料。
 
 ## 提交前评审清单
 

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "composition": {
+    "id": "RemotionStoryboardLibrary",
+    "durationInFrames": 120,
+    "reviewFrame": 72,
+    "width": 1080,
+    "height": 1920,
+    "fps": 30
+  },
+  "zones": {
+    "chapter": {"top": 70, "bottom": 220},
+    "hero": {"top": 240, "bottom": 1140},
+    "semantic": {"top": 1160, "bottom": 1510},
+    "caption": {"top": 1640, "bottom": 1810}
+  },
+  "catalog": {
+    "motion": [
+      "kinetic-type",
+      "split-wipe",
+      "particle-field",
+      "orbital-map",
+      "ui-scan",
+      "material-carousel",
+      "focus-lock",
+      "pipeline-flow",
+      "token-assembly",
+      "surface-morph",
+      "system-convergence"
+    ],
+    "hero": [
+      "overview-matrix",
+      "rule-compare",
+      "code-render",
+      "slide-editor",
+      "article-map",
+      "video-agent",
+      "design-compare",
+      "system-summary",
+      "generic-explainer"
+    ]
+  },
+  "policies": {
+    "imageGeneration": "remotion-code-only",
+    "stillRenderer": "Remotion renderStill",
+    "heroText": "entity-and-evidence-only",
+    "semanticText": "short-claim-only",
+    "captionText": "full-narration-only"
+  },
+  "forbiddenMainVisualLiterals": [
+    "装对 Skill，AI 才有立场",
+    "SKILL INSTALLED / 系统重组"
+  ]
+}

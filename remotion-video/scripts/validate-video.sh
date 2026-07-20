@@ -29,8 +29,17 @@ EXPECTED_WIDTH="${2:-1920}"
 EXPECTED_HEIGHT="${3:-1080}"
 EXPECTED_FPS="${4:-30}"
 
-FPS_MIN=$(awk "BEGIN {printf \"%.1f\", $EXPECTED_FPS - 0.2}")
-FPS_MAX=$(awk "BEGIN {printf \"%.1f\", $EXPECTED_FPS + 0.2}")
+# ---- 数值输入校验（纵深防御）----
+# 之前用 awk "BEGIN {…, $EXPECTED_FPS - 0.2}" 把第4参数直接拼进双引号 awk 程序串，
+# 是潜在的命令注入面（传 '30;system("id")' 可执行任意命令）。这里先白名单只放数字、
+# 再用 awk -v 安全传参，双重消除注入路径。宽/高同样只接受数字。
+if ! [[ "$EXPECTED_WIDTH" =~ ^[0-9]+$ ]] || ! [[ "$EXPECTED_HEIGHT" =~ ^[0-9]+$ ]] || ! [[ "$EXPECTED_FPS" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+  echo "ERROR: expected width/height/fps must be numeric (got width='$EXPECTED_WIDTH' height='$EXPECTED_HEIGHT' fps='$EXPECTED_FPS')" >&2
+  exit 1
+fi
+
+FPS_MIN=$(awk -v fps="$EXPECTED_FPS" 'BEGIN {printf "%.1f", fps - 0.2}')
+FPS_MAX=$(awk -v fps="$EXPECTED_FPS" 'BEGIN {printf "%.1f", fps + 0.2}')
 
 # ---- Help / Usage guard ----
 if [[ "$VIDEO_FILE" == "-h" || "$VIDEO_FILE" == "--help" ]]; then

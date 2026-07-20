@@ -97,7 +97,7 @@ await withPreparedProject(input, async ({project, tempPath, warnings}) => {
         '-frames:v',
         '1',
         '-vf',
-        `scale=360:-1,tile=${cols}x${rows}:padding=8:margin=8:color=0x070a12`,
+        `scale=360:-1,tile=layout=${cols}x${rows}:padding=8:margin=8:color=0x070a12`,
         contactPath,
       ], {stdio: 'pipe'});
     }

@@ -4,6 +4,8 @@
 
 这是一个由单一 Project JSON 驱动的 Remotion 图片与视频渲染器。Codex 负责创建内容和资产引用，仓库只负责校验、编译和渲染。
 
+> 当前唯一开发真源是 `/Users/macos/OpenClaw/remotion-generated-video-project`。不要在 `/Users/macos/remotion/remotion-video` 旧副本中继续审查或开发；副本整合规则见 [仓库副本与文档整合决策](docs/repository-consolidation.zh-CN.md)，文档总入口见 [Remotion OpenClaw 文档总入口](docs/README.zh-CN.md)。
+
 ```text
 Codex 创建 Project JSON
         ↓

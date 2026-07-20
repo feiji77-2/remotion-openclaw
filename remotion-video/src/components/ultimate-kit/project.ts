@@ -64,7 +64,19 @@ export type UltimateSceneFamily =
   | 'spoken-compare'
   | 'spoken-tags'
   | 'spoken-code'
-  | 'spoken-takeaway';
+  | 'spoken-takeaway'
+  // ── Swiss (Swiss 极简口播 · 反平均审美) ───────────────
+  // 白底 #fafafa / 黑字 #0a0a0a / 克制红 accent / Helvetica Neue 左对齐粗网格。
+  // 刻意不叫 spoken-* 以避开 ProjectSceneRegistry 的深色 SpokenAssetLayer 外壳 + 径向光晕。
+  | 'swiss-title'
+  | 'swiss-question'
+  | 'swiss-list'      // 编号清单（如 37 条规则 / 8 个类别）
+  | 'swiss-compare'   // 左右 before/after 对比（程序化生成素材）
+  | 'swiss-number'    // 巨大数字强调（22,000 / 161 / 67 / 57 / 99）
+  | 'swiss-grid'      // N 格方向/品牌 tile 网格（6 审美方向 / 4 品牌 / 4 统计）
+  | 'swiss-flow'      // 流程示意（锚定→稳定输出）
+  | 'swiss-tabular'   // 设计系统 token 表（Color/Type/Space/A11y）
+  | 'swiss-stamp';    // 印章式收尾
 
 export type UltimateTransitionPreset =
   | 'fade'
@@ -635,6 +647,18 @@ const sceneBaseDurations: Record<UltimateSceneFamily, {base: number; max: number
   'spoken-tags': {base: 70, max: 150},
   'spoken-code': {base: 90, max: 240},
   'spoken-takeaway': {base: 70, max: 150},
+  // ── Swiss (Swiss 极简口播) ────────────────
+  // Swiss scene 的实际时长由 project.json 的 durationInFrames 显式决定（口播按秒×30 给）；
+  // 这里的 base/max 只给 estimateUltimateSceneDuration 在缺省兜底、及工具预览用。
+  'swiss-title':    {base: 180, max: 540},
+  'swiss-question': {base: 180, max: 360},
+  'swiss-list':     {base: 240, max: 540},
+  'swiss-compare':  {base: 300, max: 600},
+  'swiss-number':   {base: 180, max: 360},
+  'swiss-grid':     {base: 240, max: 540},
+  'swiss-flow':     {base: 240, max: 420},
+  'swiss-tabular':  {base: 300, max: 600},
+  'swiss-stamp':    {base: 360, max: 720},
 };
 
 export const deriveUltimateSceneSubtitle = (scene: UltimateSceneConfig) => {

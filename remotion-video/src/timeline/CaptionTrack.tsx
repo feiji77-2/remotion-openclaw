@@ -49,8 +49,13 @@ const CaptionPage: React.FC<{
   );
 };
 
-const EditorialCaption: React.FC<{text: string; durationInFrames: number}> = ({text, durationInFrames}) => {
+const EditorialCaption: React.FC<{
+  text: string;
+  durationInFrames: number;
+  orientation: CompiledProject['orientation'];
+}> = ({text, durationInFrames, orientation}) => {
   const frame = useCurrentFrame();
+  const portrait = orientation === 'portrait';
   const fadeIn = interpolate(frame, [0, Math.min(5, durationInFrames - 1)], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
@@ -62,12 +67,16 @@ const EditorialCaption: React.FC<{text: string; durationInFrames: number}> = ({t
     easing: Easing.in(Easing.cubic),
   });
   return (
-    <AbsoluteFill style={{justifyContent: 'flex-end', alignItems: 'center', padding: '0 86px 112px'}}>
+    <AbsoluteFill style={{
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      padding: portrait ? '0 86px 112px' : '0 120px 70px',
+    }}>
       <div style={{
-        maxWidth: 900,
+        maxWidth: portrait ? 900 : 1500,
         padding: '8px 12px 10px',
         color: '#f8fafc',
-        fontSize: 46,
+        fontSize: portrait ? 46 : 42,
         fontWeight: 900,
         lineHeight: 1.35,
         textAlign: 'center',
@@ -104,7 +113,11 @@ export const CaptionTrack: React.FC<{project: CompiledProject}> = ({project}) =>
               durationInFrames={durationInFrames}
               premountFor={Math.min(project.fps, durationInFrames)}
             >
-              <EditorialCaption text={caption.text} durationInFrames={durationInFrames} />
+              <EditorialCaption
+                text={caption.text}
+                durationInFrames={durationInFrames}
+                orientation={project.orientation}
+              />
             </Sequence>
           );
         })}
