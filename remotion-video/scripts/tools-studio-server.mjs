@@ -19,6 +19,7 @@ const STATIC_ROOT_CANDIDATES = [
   path.join(PROJECT_ROOT, 'build', 'tools'),
   path.join(REPO_ROOT, 'build', 'tools'),
 ];
+const PUBLIC_ROOT = path.join(PROJECT_ROOT, 'public');
 const staticRoot = () => STATIC_ROOT_CANDIDATES.find((candidate) => existsSync(path.join(candidate, 'index.html')))
   ?? STATIC_ROOT_CANDIDATES[0];
 const HOST = '127.0.0.1';
@@ -36,6 +37,10 @@ const contentTypes = new Map([
   ['.jpeg', 'image/jpeg'],
   ['.svg', 'image/svg+xml'],
   ['.mp4', 'video/mp4'],
+  ['.m4a', 'audio/mp4'],
+  ['.mp3', 'audio/mpeg'],
+  ['.wav', 'audio/wav'],
+  ['.webm', 'video/webm'],
 ]);
 
 const sendJson = (res, status, value) => {
@@ -118,7 +123,7 @@ const discoverProjects = async () => {
     });
   };
 
-  await addProject('examples/project.json', 'examples', '默认 Project JSON 样片', 'examples-project');
+  await addProject('examples/skill-showcase.json', 'examples', 'Skill Showcase 样片', 'skill-showcase');
 
   const projectsRoot = path.join(PROJECT_ROOT, 'projects');
   if (existsSync(projectsRoot)) {
@@ -178,12 +183,8 @@ const artifactFor = (commandId, project) => {
 
 const commandFor = (commandId, project) => {
   switch (commandId) {
-    case 'scaffold':
-      return ['npm', 'run', 'production:scaffold', '--', project.title, '--link', 'https://example.com', '--id', project.id];
-    case 'production-check':
-      return ['npm', 'run', 'production:check', '--', project.productionPath];
     case 'build-project':
-      return ['npm', 'run', 'production:build-project', '--', project.productionPath];
+      return ['npm', 'run', 'project:from-pack', '--', project.productionPath];
     case 'project-check':
       return ['npm', 'run', 'project:check', '--', project.projectJsonPath];
     case 'project-still':
@@ -268,6 +269,37 @@ const createJob = (body) => {
   return job;
 };
 
+const serveFile = async (req, res, file) => {
+  const stats = await fs.stat(file);
+  const contentType = contentTypes.get(path.extname(file).toLowerCase()) || 'application/octet-stream';
+  const range = req.headers.range?.match(/^bytes=(\d*)-(\d*)$/);
+  if (range) {
+    const start = range[1] ? Number(range[1]) : 0;
+    const end = range[2] ? Math.min(Number(range[2]), stats.size - 1) : stats.size - 1;
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || start >= stats.size) {
+      res.writeHead(416, {'content-range': `bytes */${stats.size}`});
+      res.end();
+      return;
+    }
+    res.writeHead(206, {
+      'content-type': contentType,
+      'content-length': end - start + 1,
+      'content-range': `bytes ${start}-${end}/${stats.size}`,
+      'accept-ranges': 'bytes',
+      'access-control-allow-origin': '*',
+    });
+    createReadStream(file, {start, end}).pipe(res);
+    return;
+  }
+  res.writeHead(200, {
+    'content-type': contentType,
+    'content-length': stats.size,
+    'accept-ranges': 'bytes',
+    'access-control-allow-origin': '*',
+  });
+  createReadStream(file).pipe(res);
+};
+
 const serveArtifact = async (req, res, url) => {
   const rel = safeRelPath(url.searchParams.get('path'), 'artifact path');
   const file = path.join(PROJECT_ROOT, rel);
@@ -275,16 +307,17 @@ const serveArtifact = async (req, res, url) => {
     sendJson(res, 404, {ok: false, error: 'artifact not found'});
     return;
   }
-  res.writeHead(200, {
-    'content-type': contentTypes.get(path.extname(file).toLowerCase()) || 'application/octet-stream',
-    'access-control-allow-origin': '*',
-  });
-  createReadStream(file).pipe(res);
+  await serveFile(req, res, file);
 };
 
 const serveStatic = async (req, res, url) => {
   const STATIC_ROOT = staticRoot();
   const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
+  const publicFile = path.resolve(PUBLIC_ROOT, `.${pathname}`);
+  if (publicFile.startsWith(`${PUBLIC_ROOT}${path.sep}`) && existsSync(publicFile)) {
+    await serveFile(req, res, publicFile);
+    return;
+  }
   const requested = path.normalize(path.join(STATIC_ROOT, pathname));
   const fallback = path.join(STATIC_ROOT, 'index.html');
   const isHtml = pathname === '/index.html' || (requested !== fallback && path.extname(requested).toLowerCase() === '.html');
@@ -306,8 +339,7 @@ const serveStatic = async (req, res, url) => {
     res.end(html);
     return;
   }
-  res.writeHead(200, {'content-type': contentType});
-  createReadStream(file).pipe(res);
+  await serveFile(req, res, file);
 };
 
 const server = http.createServer(async (req, res) => {
@@ -333,7 +365,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const projectId = safeProjectId(body.projectId);
       const title = safeNonEmptyString(body.title, 'title');
-      const orientation = body.orientation === 'landscape' ? 'landscape' : 'portrait';
+      const orientation = 'portrait';
       const spokenScript = safeNonEmptyString(body.spokenScript ?? body.script ?? '', 'spokenScript', 20, 8000);
       const productionPath = `projects/${projectId}`;
       const outputVideoPath = `out/${projectId}.mp4`;
@@ -350,7 +382,12 @@ const server = http.createServer(async (req, res) => {
       await fs.mkdir(path.join(PROJECT_ROOT, 'public', 'projects', projectId, 'audio'), {recursive: true});
 
       // Write production contracts
-      const style = ['swiss', 'minimal', 'cinematic', 'tech'].includes(body.style) ? body.style : 'swiss';
+      const style = [
+        'cyan-tech',
+        'amber-editorial',
+        'red-minimal',
+        'purple-launch',
+      ].includes(body.style) ? body.style : 'cyan-tech';
       const keywords = String(body.keywords ?? '').trim();
       const brief = buildBrief(projectId, title, orientation, style);
       const scriptPack = buildScriptPack(projectId, title, spokenScript, keywords);

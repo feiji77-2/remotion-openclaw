@@ -27,32 +27,6 @@ const labelStyle: React.CSSProperties = {
   textTransform: 'uppercase' as const,
 };
 
-const rowStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 10,
-};
-
-const halfInputStyle: React.CSSProperties = {
-  ...inputStyle,
-  flex: 1,
-};
-
-const radioGroupStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 6,
-};
-
-const radioStyle = (active: boolean): React.CSSProperties => ({
-  padding: '6px 14px',
-  borderRadius: 6,
-  border: `1px solid ${active ? theme.accent.blue : theme.border.default}`,
-  background: active ? `${theme.accent.blue}22` : theme.bg.surface,
-  color: active ? theme.accent.blue : theme.text.muted,
-  fontSize: 10,
-  fontWeight: active ? 600 : 400,
-  cursor: 'pointer',
-});
-
 interface NewProjectModalProps {
   onClose: () => void;
   onCreated: (result: CreateProjectResult) => void;
@@ -63,7 +37,7 @@ const DEFAULT_DRAFT: CreateProjectDraft = {
   projectId: '',
   title: '',
   orientation: 'portrait',
-  style: 'tech-explainer',
+  style: 'cyan-tech',
   spokenScript: '',
   keywords: '',
 };
@@ -156,39 +130,23 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({onClose, onCrea
 
         {/* Form */}
         <div style={{padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14}}>
-          {/* Row: projectId + orientation */}
-          <div style={rowStyle}>
-            <div style={{flex: 1}}>
-              <label style={labelStyle}>项目 ID *</label>
-              <input
-                type="text"
-                style={{
-                  ...halfInputStyle,
-                  borderColor: fieldError.projectId ? theme.accent.red : theme.border.default,
-                }}
-                placeholder="my-first-video"
-                value={draft.projectId}
-                onChange={(e) => updateField('projectId', e.target.value.replace(/[^A-Za-z0-9._-]/g, ''))}
-                maxLength={96}
-                autoFocus
-              />
-              {fieldError.projectId && (
-                <div style={{fontSize: 8, color: theme.accent.red, marginTop: 3}}>{fieldError.projectId}</div>
-              )}
-            </div>
-            <div style={{flex: 1}}>
-              <label style={labelStyle}>画幅</label>
-              <div style={radioGroupStyle}>
-                <div
-                  style={radioStyle(draft.orientation === 'portrait')}
-                  onClick={() => updateField('orientation', 'portrait')}
-                >📱 竖屏</div>
-                <div
-                  style={radioStyle(draft.orientation === 'landscape')}
-                  onClick={() => updateField('orientation', 'landscape')}
-                >🖥 横屏</div>
-              </div>
-            </div>
+          <div>
+            <label style={labelStyle}>项目 ID *</label>
+            <input
+              type="text"
+              style={{
+                ...inputStyle,
+                borderColor: fieldError.projectId ? theme.accent.red : theme.border.default,
+              }}
+              placeholder="my-first-video"
+              value={draft.projectId}
+              onChange={(e) => updateField('projectId', e.target.value.replace(/[^A-Za-z0-9._-]/g, ''))}
+              maxLength={96}
+              autoFocus
+            />
+            {fieldError.projectId && (
+              <div style={{fontSize: 8, color: theme.accent.red, marginTop: 3}}>{fieldError.projectId}</div>
+            )}
           </div>
 
           {/* title */}

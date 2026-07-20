@@ -10,15 +10,8 @@ interface SceneTimelineProps {
   fps: number;
 }
 
-const familyLabel: Record<string, string> = {
-  'spoken-title': '开场', 'spoken-compare': '对比', 'spoken-process': '流程',
-  'spoken-tags': '标签', 'spoken-code': '代码', 'spoken-ranking': '要点',
-  'spoken-takeaway': '结论', 'spoken-metric': '指标',
-  'hero': '开场', 'step-flow': '流程', 'compare-board': '对比',
-  'tag-matrix': '标签', 'code': '代码', 'cta': '结尾',
-  'timeline': '时间线', 'terminal': '终端', 'metrics': '指标',
-  'focus': '聚焦', 'feature-rail': '特性', 'architecture-map': '架构',
-};
+const rendererLabel = (scene: VideoProject['scenes'][number]) =>
+  scene.payload.heroStyle === 'cinematic' ? 'Cinematic' : 'Hero Track';
 
 export const SceneTimeline: React.FC<SceneTimelineProps> = ({project, totalFrames, fps}) => {
   if (project.scenes.length === 0) {
@@ -47,7 +40,7 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({project, totalFrame
         return (
           <div
             key={scene.id}
-            title={`${scene.id} (${familyLabel[scene.family] || scene.family}) ${startSec}s–${endSec}s`}
+            title={`${scene.id} (${rendererLabel(scene)}) ${startSec}s–${endSec}s`}
             style={{
               flex: `0 0 ${Math.max(pct * 4, 2.5)}%`,
               height: 44, borderRadius: 6, padding: '4px 6px',
@@ -60,7 +53,7 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({project, totalFrame
             }}
           >
             <div style={{fontSize: 7, fontWeight: 700, color: accentColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
-              {String(i + 1).padStart(2, '0')} {familyLabel[scene.family] || scene.family}
+              {String(i + 1).padStart(2, '0')} {rendererLabel(scene)}
             </div>
             <div style={{fontSize: 6, color: theme.text.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
               {scene.id}

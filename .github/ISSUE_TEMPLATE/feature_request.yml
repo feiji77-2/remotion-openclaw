@@ -1,15 +1,21 @@
 name: Feature request
-description: Propose a Project contract, scene family, or rendering capability
+description: Propose an improvement within the current Skill Showcase renderer contract
 body:
   - type: textarea
     attributes:
       label: Use case
-      description: Describe the video result that cannot be expressed today.
+      description: Describe which existing Cinematic preset or Hero Track kind should be improved.
     validations:
       required: true
   - type: textarea
     attributes:
       label: Proposed Project JSON
-      description: Show the smallest input shape needed for the capability.
+      description: Show the smallest skill-showcase payload needed for the change.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Existing renderer target
+      description: Name one current Cinematic preset or Hero Track kind to extend; new renderer branches are out of scope.
     validations:
       required: true

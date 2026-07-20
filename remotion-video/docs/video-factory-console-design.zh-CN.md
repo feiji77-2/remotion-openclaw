@@ -1,107 +1,51 @@
-# 本地内容生产台设计约束
+# 本地视频生产控制台开发手册
 
-> 状态：当前有效
-> 范围：`src/tools/console/*`、`scripts/tools-studio-server.mjs`
-> 定位：P1 本地 MVP 原型，不是已上线 Web/API/Worker 产品。
-
-## 1. 产品目标
-
-本地内容生产台只解决一件事：
-
-```text
-创建项目 -> 填写稿件和风格 -> 生成 Project JSON -> still 预览 -> MP4 渲染 -> QA -> 下载/打开产物
-```
-
-它要让非开发用户也能完成一条本地视频生产闭环，但不能把未来的云端能力伪装成当前事实。
-
-## 2. 当前文件边界
-
-| 模块 | 职责 |
-|---|---|
-| `src/tools/console/App.tsx` | 控制台状态和页面组合 |
-| `src/tools/console/NewProjectModal.tsx` | 新建项目入口 |
-| `src/tools/console/LeftPanel.tsx` | 项目列表和项目选择 |
-| `src/tools/console/CenterPanel.tsx` | 当前工作区、稿件、预览、timeline |
-| `src/tools/console/RightPanel.tsx` | QA、命令、文件检查 |
-| `src/tools/console/api.ts` | 浏览器端 API client |
-| `src/tools/console/types.ts` | 控制台数据类型 |
-| `scripts/tools-studio-server.mjs` | 本地 runner/API |
-
-旧路径 `src/tools/VideoFactoryConsole.tsx` 和 `src/tools/global.css` 不再作为当前文档范围。
-
-## 3. 不可变体验
-
-第一屏必须让用户知道：
-
-- 当前选中哪个项目。
-- 下一步该做什么。
-- 是否有 schema、素材、渲染或 QA 错误。
-- 可以运行哪个命令。
-- 产物在哪里。
-
-不要做营销型首页、模板橱窗、大段说明、无反馈按钮或假进度。
-
-## 4. 数据流
-
-```text
-CreateProjectDraft
-  -> POST /api/projects
-  -> brief.json
-  -> script-pack.json
-  -> asset-pack.json
-  -> project.json
-  -> ProjectOption
-```
-
-`project.json` 必须继续通过 `VideoProjectSchema`。控制台可以展示错误，但不能静默把坏项目替换成默认项目。
-
-## 5. 本地命令
-
-在 `remotion-video/` 下执行：
+## 启动
 
 ```bash
-npm run tools:dev
-npm run tools:api
 npm run tools:studio
 ```
 
-渲染相关命令仍走内核脚本：
+地址：`http://127.0.0.1:8787/`
+
+`tools:studio` 先构建 `src/tools/console/index.tsx`，再由 `scripts/tools-studio-server.mjs` 同源提供静态页面和 API。
+
+## 当前模块
+
+| 模块 | 职责 |
+|---|---|
+| `StudioApp.tsx` | 项目、文案、分镜、预览和渲染状态 |
+| `NewProjectModal.tsx` | 创建竖屏 Skill Showcase 项目 |
+| `PreviewCanvas.tsx` | 使用 `UltimateVideoV2` 预览同一 Project JSON |
+| `tools-studio-server.mjs` | 文件 API、任务进程和产物访问 |
+| `starter-project.mjs` | 控制台首次创建时的 Project 生成 |
+| `build-project-from-production.mjs` | pack 再生成，内部复用同一脚本生成器 |
+
+## API
+
+| 方法 | 路径 | 作用 |
+|---|---|---|
+| `GET` | `/api/health` | 执行器健康状态 |
+| `GET` | `/api/projects` | 列出样例和 `projects/` 项目 |
+| `POST` | `/api/projects` | 创建四文件项目包和初始 Project JSON |
+| `GET/POST` | `/api/files` | 读取或保存四类 JSON 文件 |
+| `POST` | `/api/jobs` | 启动 build/check/still/render/verify |
+| `GET` | `/api/jobs/:id` | 查询任务状态 |
+| `GET` | `/api/artifact` | 读取 PNG、MP4 或 JSON 产物 |
+
+控制台只接受竖屏。四种样式卡只改变当前 20 组件的配色和字幕表现，不代表额外 family 或 renderer。
+
+`POST /api/projects` 创建项目时直接生成可校验的 Skill Showcase Project JSON。`build-project` 任务读取同一生产包再调用共享脚本生成器；预览、Still 和 MP4 都消费项目的同一个 `project.json`。
+
+## 验证
 
 ```bash
-npm run project:check -- examples/project.json
-npm run project:still -- examples/project.json --frame 0 --out out/project-f0.png
-npm run project:render -- examples/project.json --out out/project.mp4
+npm run tools:build
+npm run test:e2e
+npm run test:visual-e2e
+npm run test:ui
 ```
 
-## 6. UI 约束
+浏览器测试必须确认控制台实际产生非空的 `1080x1920` Still 和 MP4。任务状态为 `done` 只表示子进程成功，最终画面仍需直接检查。
 
-- 面向生产操作台，不做落地页。
-- 保持三域布局：项目列表、工作区、检查/命令区。
-- 所有按钮必须有真实状态：idle、running、done、failed 或 disabled。
-- 错误必须显示到具体文件、字段、素材或命令。
-- 文案区域、命令区域和预览区域不要互相遮挡。
-- 移动端可以降级为单列任务流，但必须保留核心闭环。
-
-## 7. P1 禁区
-
-- 不引入登录、数据库、队列、对象存储、计费或多租户。
-- 不让 Remotion Composition 直接访问 API。
-- 不在浏览器端拼接任意 shell 命令。
-- 不把本地 runner 写成“生产后端”。
-- 不把未来 Worker、SSE、云渲染写成已存在能力。
-
-## 8. 验收
-
-| 验收 | 标准 |
-|---|---|
-| 新建项目 | 返回 `brief/script-pack/asset-pack/project.json` 四个文件路径 |
-| schema 错误 | UI 能解释字段路径，不静默 fallback |
-| still | 带 Project JSON 参数真实出图 |
-| render | 输出可解码 MP4 |
-| QA | 至少能展示命令结果、exit code、产物路径 |
-
-更完整执行方案见：
-
-```text
-docs/p1-local-content-studio-execution.zh-CN.md
-```
+操作速查见 [控制台与生成命令](<../../kb/04 控制台与生成命令.md>)，视觉判定见 [QA 与视觉验收](<../../kb/05 QA 与视觉验收.md>)。

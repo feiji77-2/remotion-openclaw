@@ -67,8 +67,8 @@ export interface SceneTimeline {
 export interface CreateProjectDraft {
   projectId: string;
   title: string;
-  orientation: 'portrait' | 'landscape';
-  style: 'tech-explainer' | 'cinematic-editorial' | 'swiss-minimal' | 'product-launch';
+  orientation: 'portrait';
+  style: 'cyan-tech' | 'amber-editorial' | 'red-minimal' | 'purple-launch';
   spokenScript: string;
   keywords: string;
 }

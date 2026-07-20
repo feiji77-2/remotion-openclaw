@@ -10,16 +10,8 @@ interface StoryboardWorkspaceProps {
   fps: number;
 }
 
-const familyLabel: Record<string, string> = {
-  'spoken-title': '标题开场', 'spoken-compare': '左右对比', 'spoken-process': '步骤流程',
-  'spoken-tags': '标签矩阵', 'spoken-code': '代码窗口', 'spoken-ranking': '要点排行',
-  'spoken-takeaway': '结论收束', 'spoken-metric': '数据指标',
-  'hero': '英雄开场', 'step-flow': '步骤流程', 'compare-board': '对比面板',
-  'tag-matrix': '标签矩阵', 'code': '代码面板', 'cta': '行动号召',
-  'timeline': '时间线', 'terminal': '终端面板', 'metrics': '指标条',
-  'focus': '聚焦图解', 'feature-rail': '特性卡片', 'architecture-map': '架构图',
-  'evidence-wall': '证据墙', 'benchmark-chart': '基准图', 'quote-highlight': '引用高亮',
-};
+const rendererLabel = (scene: VideoProject['scenes'][number]) =>
+  scene.payload.heroStyle === 'cinematic' ? 'Cinematic' : 'Hero Track';
 
 export const StoryboardWorkspace: React.FC<StoryboardWorkspaceProps> = ({project, totalFrames, fps}) => {
   if (project.scenes.length === 0) {
@@ -69,7 +61,7 @@ export const StoryboardWorkspace: React.FC<StoryboardWorkspaceProps> = ({project
             }}>
               <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3}}>
                 <span style={{fontSize: 10, fontWeight: 700, color: theme.text.primary}}>
-                  {String(i + 1).padStart(2, '0')}. {familyLabel[scene.family] || scene.family}
+                  {String(i + 1).padStart(2, '0')}. {rendererLabel(scene)}
                 </span>
                 <span style={{fontSize: 8, color: theme.text.muted}}>
                   {Math.round(start / fps * 10) / 10}s → {Math.round(end / fps * 10) / 10}s

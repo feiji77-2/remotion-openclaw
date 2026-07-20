@@ -1,38 +1,34 @@
 {
-  "productionId": "examples-project",
-  "title": "未来一年，别再低估别再低估别再低估别再低估codex5.6，真正变化已经开始，真正变化已经开始，真正变化已经开始，真正变化已经开始会先改变这类工作",
+  "productionId": "workbuddy-six-skills-showcase",
+  "title": "装上这 6 个 Skill，WorkBuddy 才算真正的好帮手",
   "primaryLink": "",
   "platform": "douyin",
   "format": {
-    "width": 1920,
-    "height": 1080,
+    "width": 1080,
+    "height": 1920,
     "fps": 30,
     "maxDurationSeconds": 180
   },
-  "audience": [
-    "AI 从业者",
-    "产品经理",
-    "创业者"
-  ],
+  "audience": ["AI 从业者", "产品经理", "创作者"],
   "contentType": "技术教程",
   "tone": "技术布道",
-  "structure": "钩子 -> 痛点 -> 方案 -> 步骤 -> 结论",
+  "structure": "钩子 -> 能力总览 -> 六项能力 -> 结论",
   "visualStyle": {
-    "palette": "蓝绿 AI 感",
+    "presetId": "cyan-tech",
+    "palette": "蓝绿科技感",
+    "captionStyle": "boxed",
+    "showProjectLabel": false,
     "subtitles": "固定字幕样式",
-    "branding": "第一阶段不做强品牌化"
+    "branding": "不做强品牌化"
   },
   "research": {
-    "sourcePriority": [
-      "官方文档/官网",
-      "GitHub/论文/发布页"
-    ],
+    "sourcePriority": ["官方文档", "GitHub", "权威媒体"],
     "socialPolicy": "只当线索，不当证据"
   },
   "viewpointCandidates": [
     {
       "id": "view-1",
-      "claim": "AI Agent 真正改变的是工作流所有权，不只是生成内容。",
+      "claim": "把六种可执行能力装进 WorkBuddy，它才不只是聊天框。",
       "whyItMatters": "作为本片主观点。"
     }
   ],

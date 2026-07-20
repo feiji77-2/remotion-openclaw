@@ -20,11 +20,10 @@
     "project:check": "npm --prefix remotion-video run project:check --",
     "project:still": "npm --prefix remotion-video run project:still --",
     "project:render": "npm --prefix remotion-video run project:render --",
-    "project:import": "npm --prefix remotion-video run project:import --",
     "project:from-script": "npm --prefix remotion-video run project:from-script --",
     "test": "npm --prefix remotion-video run test",
     "typecheck": "npm --prefix remotion-video run typecheck",
     "build": "npm --prefix remotion-video run build",
-    "release:check": "npm run test && npm run typecheck && npm run project:check -- examples/project.json && npm --prefix remotion-video run release:render && npm --prefix remotion-video run release:verify"
+    "release:check": "npm run test && npm run typecheck && npm run project:check -- examples/skill-showcase.json && npm --prefix remotion-video run release:render && npm --prefix remotion-video run release:verify"
   }
 }

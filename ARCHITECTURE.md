@@ -1,23 +1,31 @@
 # Architecture
 
-## Data flow
-
 ```text
-Project JSON
-  -> VideoProjectSchema
-  -> compileProject()
-  -> UltimateVideoV2
-  -> PNG / MP4
+script / timed captions / console pack
+  -> scripts/lib/script-project-generator.mjs
+  -> examples or projects/<id>/project.json
+  -> src/project/projectSchema.ts
+  -> src/project/compileProject.ts
+  -> src/compositions/v2/UltimateVideoV2.tsx
+  -> src/project/sceneRegistry.tsx
+  -> SkillShowcase.tsx
+     -> PortraitCinematicSkillShowcase.tsx (11 presets)
+     -> HeroTrackV2.tsx (9 kinds)
 ```
 
-`scenes[]` is the only public duration source. The compiler validates family payloads, resolves asset references, clamps captions, builds audio tracks, and adds transition overlap compensation internally.
+`scenes[].durationInFrames` is the render duration source. Generated projects also bind captions, scene ranges, semantic beats, and Hero Track states to the same timeline.
 
-## Boundaries
+The console uses the same generator through `scripts/tools-studio-server.mjs`; it does not maintain a separate renderer or schema.
 
-- `src/project`: public schema, deterministic compiler, asset resolver, scene registry.
-- `src/compositions/v2`: Remotion Composition and metadata calculation.
-- `src/timeline`: scene, caption, audio, and global overlay rendering.
-- `src/components/ultimate-kit`: reusable visual components.
-- `scripts/project-*`: local CLI entrypoints.
+## Runtime Boundaries
 
-Search, LLM calls, image generation, and TTS are external preparation concerns. There is no application server, queue, worker, or workflow skill runtime.
+- `Root.tsx` registers `UltimateVideoV2` and `RemotionStoryboardLibrary` only.
+- `sceneRegistry.tsx` accepts `skill-showcase` only.
+- `skillShowcaseRouting.ts` resolves `cinematic` or `hero-track-v2` only.
+- `PortraitCinematicSkillShowcase.tsx` owns 11 Cinematic presets.
+- `HeroTrackV2.tsx` owns 9 Hero Track kinds.
+- `storyboardContract.json` is the acceptance catalog for all 20 visuals.
+
+`payload.variant` selects content semantics and default mappings; it is not a renderer boundary. `RemotionStoryboardLibrary` renders catalog evidence and does not create a second production path.
+
+The maintained operational map is [kb/06 当前代码地图.md](<kb/06 当前代码地图.md>).

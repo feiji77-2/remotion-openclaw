@@ -1,18 +1,21 @@
 # Contributing
 
-## Development flow
+All production changes must stay inside the current Skill Showcase contract.
 
-1. Use `remotion-video/examples/project.json` as the public contract example.
-2. Keep `scenes[]` as the only duration source.
-3. Add or change scene families through `src/project/sceneRegistry.tsx` with a Zod payload schema.
-4. Follow `remotion:remotion-best-practices` for Remotion code.
-5. Run the complete verification set before submitting changes.
+Before submitting a change, run:
 
 ```bash
-npm test
 npm run typecheck
-npm run project:check -- examples/project.json
-npm run project:still -- examples/project.json --frame 30 --scale 0.25
+npm test
+npm run project:check -- examples/skill-showcase.json
+npm --prefix remotion-video run skill:gate
+npm --prefix remotion-video run storyboard:check
+npm --prefix remotion-video run storyboard:render
+git diff --check
 ```
 
-Do not add server APIs, queues, workflow steps, provider calls, or a second project contract to the render path.
+Do not add another scene family, Remotion Composition, or renderer branch. Extend one of the 11 Cinematic presets or 9 Hero Track kinds and update the storyboard contract and visual evidence together.
+
+Open the rendered Still and relevant contact sheet before describing a visual change as accepted. Exit codes prove executable contracts, not composition quality.
+
+Architecture, commands, contracts, or visual IDs changed by a contribution must be synchronized across `docs/`, `remotion-video/docs/`, `kb/`, and `.agentdesk/`. See the [release playbook](<kb/07 变更与发布 Playbook.md>).

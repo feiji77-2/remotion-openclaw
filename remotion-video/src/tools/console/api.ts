@@ -5,6 +5,12 @@ import {VideoProjectSchema, formatProjectPath} from '../../project/projectSchema
 import type {VideoProject} from '../../project/projectSchema';
 import {DEFAULT_VIDEO_PROJECT} from '../../compositions/v2/defaultProject';
 
+declare global {
+  interface Window {
+    __VIDEO_FACTORY_PORT__?: number;
+  }
+}
+
 /**
  * 加载已保存 Project JSON 的结果。
  *

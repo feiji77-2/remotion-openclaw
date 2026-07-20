@@ -10,7 +10,7 @@ import type {
 } from './types';
 import {
   checkHealth, loadProjects, loadStudioFile, saveFile,
-  startJob, pollJob, normalizeLoadedProject, cloneProject, filePathFor,
+  startJob, pollJob, normalizeLoadedProject, cloneProject, filePathFor, runnerBaseUrl,
 } from './api';
 import {StudioShell} from './StudioShell';
 import {PreviewCanvas} from './PreviewCanvas';
@@ -31,8 +31,8 @@ import './index.css';
 const nowTime = () => new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'});
 
 const FALLBACK: ProjectOption = {
-  id: 'examples-project', title: '默认样片', productionPath: 'examples',
-  projectJsonPath: 'examples/project.json', outputVideoPath: 'out/examples-project.mp4',
+  id: 'skill-showcase', title: 'Skill Showcase 样片', productionPath: 'examples',
+  projectJsonPath: 'examples/skill-showcase.json', outputVideoPath: 'out/workbuddy-six-skills-showcase-v3.mp4',
 };
 
 const defaultScriptFor = (project: VideoProject): DraftScript => {
@@ -62,7 +62,7 @@ export const StudioApp: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [lastSavedDraft, setLastSavedDraft] = useState('');
-  const [styleId, setStyleId] = useState<StylePresetId>('tech-explainer');
+  const [styleId, setStyleId] = useState<StylePresetId>('cyan-tech');
 
   const compiled = useMemo(() => {
     try { return {project: compileProject(project), error: null as string | null}; }
@@ -139,8 +139,8 @@ export const StudioApp: React.FC = () => {
       setJobs((j) => ({...j, [result.job.id]: job}));
       if (job.status === 'running') { setTimeout(poll, 900); return; }
       if (job.status === 'done') {
-        if (job.artifact?.kind === 'image' && job.artifact.url) setStillUrl(`http://127.0.0.1:8787${job.artifact.url}`);
-        if (job.artifact?.kind === 'video' && job.artifact.url) setVideoUrl(`http://127.0.0.1:8787${job.artifact.url}`);
+        if (job.artifact?.kind === 'image' && job.artifact.url) setStillUrl(`${runnerBaseUrl()}${job.artifact.url}`);
+        if (job.artifact?.kind === 'video' && job.artifact.url) setVideoUrl(`${runnerBaseUrl()}${job.artifact.url}`);
         if (commandId === 'build-project') {
           await refreshContracts(selectedProject);
           setStepStatus((s) => ({...s, storyboard: 'done'}));

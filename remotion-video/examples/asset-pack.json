@@ -1,10 +1,9 @@
 {
-  "productionId": "examples-project",
-  "publicPathPrefix": "examples",
+  "productionId": "workbuddy-six-skills-showcase",
+  "publicPathPrefix": "projects/skill-showcase",
   "strategy": {
-    "missingAssetPolicy": "用 Logo + 解释型图表降级，并提醒补图",
-    "diagramPolicy": "根据文案自动选择流程图、对比图、三步图、架构图、数据图或时间线",
-    "sourceScreenshotPolicy": "只截关键段落"
+    "missingAssetPolicy": "使用现有 20 组件的文字和图标表达",
+    "sourceScreenshotPolicy": "只使用明确登记的本地资产"
   },
   "assets": [],
   "sceneAssetPlan": {},

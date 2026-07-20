@@ -9,13 +9,13 @@
     "fps": 30
   },
   "zones": {
-    "chapter": {"top": 70, "bottom": 220},
-    "hero": {"top": 240, "bottom": 1140},
-    "semantic": {"top": 1160, "bottom": 1510},
-    "caption": {"top": 1640, "bottom": 1810}
+    "chapter": { "top": 70, "bottom": 220 },
+    "hero": { "top": 240, "bottom": 1140 },
+    "semantic": { "top": 1160, "bottom": 1510 },
+    "caption": { "top": 1640, "bottom": 1810 }
   },
   "catalog": {
-    "motion": [
+    "cinematic": [
       "kinetic-type",
       "split-wipe",
       "particle-field",

@@ -1,15 +1,4 @@
-/**
- * SceneTimeline.tsx — 场景时间线渲染
- *
- * 主渲染路径：TransitionSeries + ProjectSceneRegistry
- *
- * DirectorScore 接入点（高级编排方案）：
- *   1. compileProject 返回 CompiledProject.directorScore?: DirectorScore
- *   2. 此组件检查 compiledProject.directorScore 是否存在
- *   3. 如有，调用 scoreToSequences() → DirectorScoreOrchestrator
- *   4. 如无，使用当前 TransitionSeries 路径（默认）
- *   详见 DirectorScoreOrchestrator.tsx
- */
+/** Scene timeline for the single ProjectSceneRegistry render path. */
 
 import React from 'react';
 import {Sequence} from 'remotion';

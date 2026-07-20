@@ -1,28 +1,27 @@
-# Codex Remotion Project
+# Remotion Skill Showcase Video Factory
 
-[简体中文](README.md) | English
+This repository contains one production path:
 
-A Remotion image and video renderer driven by one Project JSON contract. Codex prepares content and asset references; the repository validates, compiles, and renders them.
+```text
+console / project:from-script
+  -> skill-showcase Project JSON
+  -> VideoProjectSchema / compileProject
+  -> UltimateVideoV2
+  -> 11 Cinematic + 9 Hero Track
+  -> Still / MP4 / QA / Verify
+```
 
 ```bash
 npm run setup
-npm run project:check -- examples/project.json
-npm run project:still -- examples/project.json --frame 30
-npm run project:render -- examples/project.json --out out/project.mp4
+npm run project:check -- examples/skill-showcase.json
+npm run project:still -- examples/skill-showcase.json --frame 60 --out out/skill-showcase-still.png
+npm run project:render -- examples/skill-showcase.json --out out/skill-showcase.mp4
 ```
 
-The example is `remotion-video/examples/project.json`. The main composition is `UltimateVideoV2`, fixed to `1920x1080 / 30fps` in the first version.
+The production contract is portrait `1080x1920 / 30fps`, accepts only the `skill-showcase` scene family, and routes scenes through `cinematic` or `hero-track-v2`.
 
-The render path does not depend on OpenClaw skills, APIs, workers, queues, or a Step 1-8 workflow. See [the development guide](remotion-video/docs/project-development.zh-CN.md) for the schema and supported scene families.
+The 11 Cinematic presets and 9 Hero Track kinds are two modes inside that one renderer path. `payload.variant` is content semantics, not a third visual system; the golden sample's nine scenes are sample structure, not the component catalog.
 
-## Verification
+Only two Remotion compositions are registered: `UltimateVideoV2` for Project JSON output and `RemotionStoryboardLibrary` for the 20-component acceptance board. Automated checks do not replace direct inspection of the rendered Still, contact sheets, and MP4.
 
-```bash
-npm test
-npm run typecheck
-npm run release:check
-```
-
-## License
-
-MIT
+See the [documentation index](docs/README.zh-CN.md) and [current knowledge base](<kb/00 首页.md>).

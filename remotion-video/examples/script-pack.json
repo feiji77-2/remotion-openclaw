@@ -1,10 +1,10 @@
 {
-  "productionId": "examples-project",
-  "title": "未来一年，别再低估别再低估别再低估别再低估codex5.6，真正变化已经开始，真正变化已经开始，真正变化已经开始，真正变化已经开始会先改变这类工作",
-  "hook": "先用一句反常识开场，让观众意识到工作流正在变化。",
-  "selectedViewpoint": "AI Agent 真正改变的是工作流所有权，不只是生成内容。",
-  "pain": "过去我们花很多时间不是在创造，而是在推动流程、催进度、对齐状态。",
-  "solution": "把目标、上下文和验收标准交给 Agent，让它自己组织步骤并交付结果。",
-  "spokenScript": "先用一句反常识开场，让观众意识到工作流正在变化。\n\n过去我们花很多时间不是在创造，而是在推动流程、催进度、对齐状态。\n\n把目标、上下文和验收标准交给 Agent，让它自己组织步骤并交付结果。\n\n第一步，写清楚目标和观众，让系统知道这条视频到底要说服谁。\n\n第二步，冻结标题、口播和分镜，不要一边渲染一边漂移。\n\n第三步，先生成关键帧验收，再进入完整 MP4 渲染。\n\n所以未来的视频生产，不是从命令开始，而是从选题、文案和验收标准开始。",
-  "keywords": "未来一年，别再低估别再低估别再低估别再低估codex5.6，真正变化已经开始，真正变化已经开始，真正变化已经开始，真正变化已经开始会先改变这类工作，工作流，自动化，效率"
+  "productionId": "workbuddy-six-skills-showcase",
+  "title": "装上这 6 个 Skill，WorkBuddy 才算真正的好帮手",
+  "hook": "很多人用 WorkBuddy 只会聊天，装上这几个 Skill，它才算真正的好帮手。",
+  "selectedViewpoint": "把六种可执行能力装进 WorkBuddy，它才不只是聊天框。",
+  "pain": "只会聊天的 AI 无法稳定完成代码、设计、演示和视频交付。",
+  "solution": "用六个 Skill 覆盖编码、视频、PPT、配图、Agent 视频和 UI 设计。",
+  "spokenScript": "很多人用 WorkBuddy 只会聊天，装上这几个 Skill，它才算真正的好帮手。第一套是按 Karpathy 观点整理的编码原则，让 AI 先讲清假设，只做必要改动，改完自己验证。第二个是 Remotion，用写网页的方式写视频，再把 React 代码渲染成片。第三个是 PPT Master，生成的形状、图表和连接线都能继续编辑。第四个负责正文配图，先理解判断和比喻，再生成与文章一致的插画。第五个是 HyperFrames，把 HTML 变成适合 AI Agent 使用的视频。最后是一套 UI Skill，用排版、留白和配色规范提升页面质量。六种能力装进 WorkBuddy，它就不只是聊天框，而是一条能真正交付的工作流。",
+  "keywords": "WorkBuddy,Karpathy,Remotion,PPT Master,HyperFrames,UI Skill"
 }

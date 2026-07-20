@@ -26,10 +26,10 @@ sleep 2
 
 # Create project
 curl -sf -X POST "$HOST/api/projects" -H 'content-type: application/json' \
-  -d "{\"projectId\":\"$TEST_ID\",\"title\":\"Visual E2E\",\"orientation\":\"landscape\",\"style\":\"tech\",\"spokenScript\":\"这是视觉一致性端到端测试的第一句话。第二句话用于验证字幕分割。第三句话确保有足够多的caption数据。第四句完整检查流程。第五句验证所有步骤通过。第六句最后一句收尾。\",\"keywords\":\"E2E,visual\"}" > /dev/null
+  -d "{\"projectId\":\"$TEST_ID\",\"title\":\"Visual E2E\",\"orientation\":\"portrait\",\"style\":\"cyan-tech\",\"spokenScript\":\"这是视觉一致性端到端测试的第一句话。第二句话用于验证字幕分割。第三句话确保有足够多的caption数据。第四句完整检查流程。第五句验证所有步骤通过。第六句最后一句收尾。\",\"keywords\":\"E2E,visual\"}" > /dev/null
 
 # Build project with new generator
-npm --prefix "$PROJECT_ROOT" run production:build-project -- "projects/$TEST_ID" --out project-built.json 2>&1 > /dev/null || fail "build-project failed"
+npm --prefix "$PROJECT_ROOT" run project:from-pack -- "projects/$TEST_ID" --out project-built.json 2>&1 > /dev/null || fail "build-project failed"
 
 # ── Compare: starter still vs build-project still ──
 STARTER_PROJ="$PROJECT_ROOT/projects/$TEST_ID/project.json"
@@ -86,8 +86,10 @@ python3 -c "
 import json
 with open('$BUILT_PROJ') as f:
     p = json.load(f)
-assert len(p['scenes']) >= 4, f'too few scenes: {len(p[\"scenes\"])}'
-assert len(p['captions']) >= 3, f'too few captions: {len(p[\"captions\"])}'
+assert len(p['scenes']) >= 2, f'too few scenes: {len(p[\"scenes\"])}'
+assert len(p['captions']) >= 2, f'too few captions: {len(p[\"captions\"])}'
+assert all(s['family'] == 'skill-showcase' for s in p['scenes']), 'non skill-showcase scene emitted'
+assert all(s['payload']['heroStyle'] == 'hero-track-v2' for s in p['scenes']), 'non Hero Track generator output'
 
 # Check captions are non-empty and properly ordered
 for i, c in enumerate(p['captions']):

@@ -31,7 +31,7 @@ export const theme = {
     red: '#ef4444',
     purple: '#8b5cf6',
   },
-  // Energy colors (DirectorScore)
+  // Renderer accent colors
   energy: {
     explosive: '#ef4444',
     high: '#f97316',
