@@ -14,8 +14,6 @@
 | [当前状态](documentation-status-2026-07-21.zh-CN.md) | 仓库收敛结果 |
 | [知识库首页](<../kb/00 首页.md>) | 当前架构、操作、QA、代码地图和发布手册 |
 
-知识库同步的固定 Obsidian 目标是 Vault ID `0eb4e308bcd29e3e`，根目录 `/Users/macos/dan-koe-brain`，项目目录 `/Users/macos/dan-koe-brain/remotion-product-image/kb/`。仓库 `kb/` 与该目录的文件清单和哈希一致后，才能标记同步完成。
-
 ## 当前事实源
 
 ```text

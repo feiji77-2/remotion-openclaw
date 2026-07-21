@@ -32,17 +32,6 @@ git diff --check
 - `kb/` 中受影响的操作知识。
 - `.agentdesk/CONTRACTS.md`、`DECISIONS.md`、`PM_STATE.md`、任务报告与测试日志。
 
-## Obsidian 同步
-
-“知识库已同步”必须同时满足：
-
-1. 仓库 `kb/` 已更新并进入 Gitee 发布提交。
-2. 同一内容已精确镜像到 Vault ID `0eb4e308bcd29e3e` 的 `/Users/macos/dan-koe-brain/remotion-product-image/kb/`。
-3. 两边文件清单一致，逐文件 SHA-256 一致。
-4. 不修改 Vault 内 `remotion-product-image` 子仓库中 `kb/**` 之外的用户改动。
-
-仅更新仓库 `kb/` 不能称为 Obsidian 同步完成。
-
 ## Gitee 发布
 
 当前 `origin` 配置可能包含多个 push URL。为了只发布到 Gitee，禁止使用含糊的 `git push origin main`，应显式执行：

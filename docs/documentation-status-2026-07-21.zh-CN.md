@@ -26,5 +26,3 @@
 ## 发布状态
 
 当前生产链路、全部文档和知识库已由集成提交 `9bf460c` 发布到 Gitee `mango77/remotion` 的 `main`。发布使用显式 Gitee URL，未通过多 push URL 的 `origin`，也未同步 GitHub。
-
-当前 8 页知识库也已精确镜像到 Obsidian Vault ID `0eb4e308bcd29e3e` 的 `/Users/macos/dan-koe-brain/remotion-product-image/kb/`。源端和目标端文件数均为 8，checksum dry-run 零差异，逐文件 SHA-256 一致。
