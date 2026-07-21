@@ -24,6 +24,8 @@
 ## Documentation
 
 - Root docs, `docs/`, `remotion-video/docs/`, `kb/`, and `.agentdesk` must describe the same production path.
+- The interactive console, local API/jobs, product UX contracts, browser E2E, and their canonical manual are part of the production path even when they are not imported by the Remotion root.
+- Cleanup must evaluate user and product reachability, not only render-time import reachability; relevant product rules are merged into `remotion-video/docs/video-factory-console-design.zh-CN.md` before any superseded plan is removed.
 - `payload.variant` is documented as content semantics, never as another renderer.
 - `storyboardContract.json` is the only 20-component catalog.
 - Historical renderer documentation and local knowledge-base workspace state are not retained.

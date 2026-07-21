@@ -5,7 +5,7 @@
 | 文档 | 内容 |
 |---|---|
 | [项目开发手册](../remotion-video/docs/project-development.zh-CN.md) | Project JSON、Schema、编译与 CLI |
-| [本地视频生产控制台](../remotion-video/docs/video-factory-console-design.zh-CN.md) | 控制台、API、文件和任务合同 |
+| [本地视频生产控制台](../remotion-video/docs/video-factory-console-design.zh-CN.md) | 产品目标、六步交互、状态机、API、加速、验收和云端边界 |
 | [Skill Showcase 成片](../remotion-video/docs/skill-showcase-video.zh-CN.md) | 当前黄金样片与验收命令 |
 | [视频制作流程关系图谱](video-production-relationship-map.zh-CN.md) | 从选题、口播到 20 组件、QA 和 MP4 的全局介绍 |
 | [开发代码约束](../remotion-video/docs/development-code-constraints.zh-CN.md) | 禁止分叉和验收规则 |

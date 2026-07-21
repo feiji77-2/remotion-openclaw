@@ -2,9 +2,9 @@
 
 ## 2026-07-21: One Executable Video Path
 
-The repository retains only the Skill Showcase production path with 11 Cinematic presets and 9 Hero Track kinds. The console is an authoring surface for the same Project JSON generator, not a separate renderer.
+The repository retains one end-to-end Skill Showcase production path. That path starts at the interactive console or script input, continues through the shared Project JSON generator and 11 Cinematic + 9 Hero Track renderer, and ends at preview, QA, Verify, and delivery. The console is the product control plane for the same generator, not a disposable demo or a separate renderer.
 
-Source, scripts, fixtures, assets, snapshots, caches, and documentation that cannot participate in this path are removed. Real local project inputs remain preserved even when they predate the current schema.
+Source, scripts, fixtures, assets, snapshots, caches, and documentation that cannot participate in either the product control plane or render plane are removed. Relevance cannot be decided from `Root.tsx` imports alone. Real local project inputs remain preserved even when they predate the current schema.
 
 ## ADR-20260721-002: Current-Only Knowledge and Explicit Gitee Release
 
