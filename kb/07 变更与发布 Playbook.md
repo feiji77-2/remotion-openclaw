@@ -27,7 +27,7 @@ git diff --check
 架构、合同或命令变化时同时更新：
 
 - 根目录 `README.md`、`README.en.md`、`ARCHITECTURE.md`、`CONTRIBUTING.md`。
-- `docs/` 总入口、状态和 20 组件关系图。
+- `docs/` 总入口、状态和视频制作流程关系图谱。
 - `remotion-video/docs/` 中受影响的开发手册。
 - `kb/` 中受影响的操作知识。
 - `.agentdesk/CONTRACTS.md`、`DECISIONS.md`、`PM_STATE.md`、任务报告与测试日志。

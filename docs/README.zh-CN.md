@@ -7,7 +7,7 @@
 | [项目开发手册](../remotion-video/docs/project-development.zh-CN.md) | Project JSON、Schema、编译与 CLI |
 | [本地视频生产控制台](../remotion-video/docs/video-factory-console-design.zh-CN.md) | 控制台、API、文件和任务合同 |
 | [Skill Showcase 成片](../remotion-video/docs/skill-showcase-video.zh-CN.md) | 当前黄金样片与验收命令 |
-| [20 组件关系图](video-production-relationship-map.zh-CN.md) | 11 Cinematic + 9 Hero Track 对照 |
+| [视频制作流程关系图谱](video-production-relationship-map.zh-CN.md) | 从选题、口播到 20 组件、QA 和 MP4 的全局介绍 |
 | [开发代码约束](../remotion-video/docs/development-code-constraints.zh-CN.md) | 禁止分叉和验收规则 |
 | [Scene family 参考](../remotion-video/docs/family-reference.zh-CN.md) | 唯一 `skill-showcase` family |
 | [内容生产包](../remotion-video/docs/personal-ip-video-pipeline.zh-CN.md) | brief/script/asset pack 到 Project JSON |

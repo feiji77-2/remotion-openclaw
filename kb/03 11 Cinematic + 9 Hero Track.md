@@ -2,40 +2,53 @@
 
 20 个主视觉组件共享同一个 `skill-showcase` scene family，并由 `resolveSkillShowcaseRenderPlan()` 二选一。它们不是两条生产链路。
 
-## 使用指南图谱
+## 全局制作关系图谱
 
 ```mermaid
-flowchart TB
-  A[口播语义事件] --> B{作用范围}
-  B -->|章节主体持续表达| H{Hero Track 内容结构}
-  B -->|Beat 局部强调或转场| C{Cinematic 强调意图}
+flowchart TD
+  A["Idea / 选题<br/>这条视频要讲什么"] --> B["Script / 口播文案<br/>主播真正要说的内容"]
+  B --> C["Voiceover / 配音<br/>决定真实声音和总时长"]
+  B --> D["Timed Captions / 时间字幕<br/>每句话何时开始和结束"]
+  C --> D
+  B --> E["Console Pack / 控制台生产包<br/>brief + script + assets"]
 
-  C -->|文字重音| C01[01 kinetic-type]
-  C -->|前后或左右对比| C02[02 split-wipe]
-  C -->|数量聚合或扩散| C03[03 particle-field]
-  C -->|关系与环绕结构| C04[04 orbital-map]
-  C -->|扫描审计或定位| C05[05 ui-scan]
-  C -->|素材与候选方向| C06[06 material-carousel]
-  C -->|锁定关键实体| C07[07 focus-lock]
-  C -->|输入流程与输出| C08[08 pipeline-flow]
-  C -->|Token 或模块组装| C09[09 token-assembly]
-  C -->|界面或场景形变| C10[10 surface-morph]
-  C -->|系统收束与结论| C11[11 system-convergence]
+  D --> F["Shared Generator / 共享生成器<br/>buildSkillShowcaseProjectFromScript"]
+  E --> F
+  F --> G["Project JSON / 唯一渲染输入<br/>Scene + Caption + Audio + Assets"]
 
-  H -->|多能力总览| H12[12 overview-matrix]
-  H -->|规则与反例| H13[13 rule-compare]
-  H -->|代码到渲染结果| H14[14 code-render]
-  H -->|可编辑幻灯片| H15[15 slide-editor]
-  H -->|文章正文与配图| H16[16 article-map]
-  H -->|HTML 到 Agent 视频| H17[17 video-agent]
-  H -->|UI 前后与 Token| H18[18 design-compare]
-  H -->|多能力系统总结| H19[19 system-summary]
-  H -->|通用输入规则结果| H20[20 generic-explainer]
+  G --> H["VideoProjectSchema / 基础合同<br/>字段、类型、路径、规格"]
+  H --> I["compileProject / 编译合同<br/>时间、字幕、资产和边界"]
+  I --> J["Scene Timeline / 章节时间线"]
+  I --> K["Caption + Audio / 字幕和音频时间线"]
+
+  J --> L["resolveSkillShowcaseRenderPlan<br/>唯一主视觉路由"]
+  L --> M["Cinematic / 电影化节拍<br/>11 个 shotPreset"]
+  L --> N["Hero Track / 章节主视觉<br/>9 个 kind + states"]
+  M --> O["SkillShowcase / 场景渲染"]
+  N --> O
+
+  O --> P["UltimateVideoV2 / 成片合成<br/>Scene + Caption + Audio"]
+  K --> P
+  M --> S["RemotionStoryboardLibrary<br/>组件验收 Composition"]
+  N --> S
+
+  P --> Q["Still / 关键帧"]
+  P --> R["9 Scene Contact Sheet<br/>黄金样片章节总览"]
+  P --> U["MP4 / 最终成片"]
+  S --> T["20 Component Contact Sheet<br/>11 Cinematic + 9 Hero Track"]
+
+  Q --> V["Visual QA / 直接看画面<br/>空白、裁切、遮挡、重复"]
+  R --> V
+  T --> V
+  U --> W["Verify / 媒体核验<br/>H.264 + AAC + 帧数 + 时长"]
+
+  V --> X["Feedback Loop / 反馈迭代"]
+  W --> X
+  X --> B
+  X --> L
 ```
 
-- Cinematic：设置 `payload.heroStyle = "cinematic"`，并在 `beats[].shotPreset` 选择 01-11。
-- Hero Track：设置 `payload.heroStyle = "hero-track-v2"`，并在 `heroTrack.kind` 选择 12-20。
-- `payload.heroTrack` 存在时路由优先进入 Hero Track；不要同时把两套模式当作并行主画面。
+完整术语和沟通说明位于仓库 `docs/video-production-relationship-map.zh-CN.md`。
 
 ## Cinematic 11
 
