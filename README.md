@@ -53,4 +53,4 @@ npm run tools:studio
 - 真实本地项目输入位于 `remotion-video/projects/`，不会被清理脚本删除。
 - 自动化通过后仍必须直接检查真实 Still、接触表或 MP4。
 
-文档入口见 [docs/README.zh-CN.md](docs/README.zh-CN.md)，操作知识见 [kb/00 首页.md](<kb/00 首页.md>)。
+文档入口见 [docs/README.zh-CN.md](docs/README.zh-CN.md)，操作知识见 [kb/00 首页.md](<kb/00 首页.md>)。知识库同步还必须镜像到 Obsidian Vault ID `0eb4e308bcd29e3e` 的 `/Users/macos/dan-koe-brain/remotion-product-image/kb/`。

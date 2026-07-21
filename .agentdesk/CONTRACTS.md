@@ -28,6 +28,10 @@
 - `storyboardContract.json` is the only 20-component catalog.
 - Historical renderer documentation and local knowledge-base workspace state are not retained.
 - Visual pass language requires direct inspection of the relevant rendered artifact.
+- "同步知识库" always includes the registered Obsidian Vault ID `0eb4e308bcd29e3e` at `/Users/macos/dan-koe-brain`.
+- The Remotion knowledge target inside that Vault is `/Users/macos/dan-koe-brain/remotion-product-image/kb/`.
+- Repository `kb/` is the source; the Obsidian target is an exact current-only mirror. Sync is incomplete until both inventories and file hashes match.
+- The nested `remotion-product-image` worktree may contain unrelated user changes; knowledge sync may modify only its `kb/**` path unless separately authorized.
 
 ## Release
 
