@@ -1,31 +1,47 @@
 # 文档总入口
 
-当前文档与 `kb/` 只描述一条生产链路，不保留退役版本说明。
+这是仓库唯一的详细文档入口。根 [README.md](../README.md) 说明使用方式，根 [ARCHITECTURE.md](../ARCHITECTURE.md) 说明真实架构，本目录只保留当前代码仍然支持的项目逻辑。
+
+已删除的 `.agentdesk/`、`kb/`、`remotion-video/docs/` 是历史并行文档系统，不再作为当前真源。需要追溯本次清理，见 [archive/CLEANUP-LOG.md](archive/CLEANUP-LOG.md)。
+
+## 当前权威文档
 
 | 文档 | 内容 |
 |---|---|
-| [项目开发手册](../remotion-video/docs/project-development.zh-CN.md) | Project JSON、Schema、编译与 CLI |
-| [本地视频生产控制台](../remotion-video/docs/video-factory-console-design.zh-CN.md) | 产品目标、六步交互、状态机、API、加速、验收和云端边界 |
-| [Skill Showcase 成片](../remotion-video/docs/skill-showcase-video.zh-CN.md) | 当前黄金样片与验收命令 |
-| [视频制作流程关系图谱](video-production-relationship-map.zh-CN.md) | 从选题、口播到 20 组件、QA 和 MP4 的全局介绍 |
-| [开发代码约束](../remotion-video/docs/development-code-constraints.zh-CN.md) | 禁止分叉和验收规则 |
-| [Scene family 参考](../remotion-video/docs/family-reference.zh-CN.md) | 唯一 `skill-showcase` family |
-| [内容生产包](../remotion-video/docs/personal-ip-video-pipeline.zh-CN.md) | brief/script/asset pack 到 Project JSON |
-| [当前状态](documentation-status-2026-07-21.zh-CN.md) | 仓库收敛结果 |
-| [知识库首页](<../kb/00 首页.md>) | 当前架构、操作、QA、代码地图和发布手册 |
+| [介绍](INTRO.zh-CN.md) | 口播、caption、beat、lens、shot、Hero、字幕、QA 的基本关系 |
+| [生产守则与禁止清单](PRODUCTION-GUARDRAILS.zh-CN.md) | 当前唯一禁止清单、扩展准入、记忆库冲突处理 |
+| [清理记录](archive/CLEANUP-LOG.md) | 本次删除、合并和禁止事项记录 |
 
 ## 当前事实源
 
 ```text
 控制台 / project:from-script
+  -> scripts/lib/script-project-generator.mjs
   -> skill-showcase Project JSON
-  -> VideoProjectSchema / compileProject
+  -> VideoProjectSchema
+  -> compileProject
   -> UltimateVideoV2
-  -> 11 Cinematic + 9 Hero Track
+  -> sceneRegistry.tsx
+  -> SkillShowcase
+  -> cinematic / hero-track-v2
   -> Still / MP4 / QA / Verify
 ```
 
-`payload.variant` 是内容语义字段，不是另一套视觉组件；黄金样片 9 个 scene 的接触表是成片证据，也不是组件目录。20 个主视觉组件的唯一目录是 `storyboardContract.json`。
+## 当前口播驱动合同
+
+```text
+captionIndex
+  -> beat
+  -> lens
+  -> shot
+  -> HeroTrackV2 / TechnicalShotHero
+```
+
+- 顶部主视觉区展示实操证据。
+- 中下方语义节拍区强调当前结论。
+- 底部字幕区展示完整口播。
+
+`11 Cinematic + 9 Hero Track` 是当前已验收主视觉 catalog，不是未来扩展上限。10 种 `HeroTrackState.shot.kind` 是 `hero-track-v2` 内部导演镜头语法，不是新增组件库。
 
 ## 标准验证
 
@@ -33,8 +49,8 @@
 npm run typecheck
 npm test
 npm run project:check -- examples/skill-showcase.json
-npm --prefix remotion-video run skill:gate
-npm --prefix remotion-video run storyboard:render
+npm run project:visual-check -- examples/skill-showcase.json
+npm run project:still -- examples/skill-showcase.json --frame 60 --out out/skill-showcase-still.png
 ```
 
-自动化成功不代表视觉审核通过。最终必须直接打开 Still、9 场景中点接触表和 20 组件接触表。
+自动化成功不代表视觉审核通过。最终仍要直接查看真实 Still、Storyboard 接触表或 MP4。
