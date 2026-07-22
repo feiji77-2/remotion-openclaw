@@ -34,6 +34,56 @@ const SkillBeatShotPresetSchema = z.enum([
   "surface-morph",
   "system-convergence",
 ]);
+const HeroShotKindSchema = z.enum([
+  "browser-demo",
+  "terminal-execution",
+  "code-diff",
+  "config-check",
+  "interface-audit",
+  "flow-trace",
+  "test-report",
+  "asset-library",
+  "system-map",
+  "before-after",
+]);
+const HeroLensSchema = z
+  .object({
+    key: z.string().min(1).max(48),
+    objective: z.string().min(1).max(120),
+    actionLabel: z.string().min(1).max(48),
+    signal: z.string().min(1).max(48),
+    evidenceType: z.string().min(1).max(48),
+  })
+  .strict();
+const HeroShotSchema = z
+  .object({
+    kind: HeroShotKindSchema,
+    environment: z.string().min(1).max(48),
+    target: z.string().min(1).max(80),
+    before: z.string().min(1).max(80).optional(),
+    after: z.string().min(1).max(80).optional(),
+    command: z.string().min(1).max(80).optional(),
+    path: z.string().min(1).max(80).optional(),
+    log: z.string().min(1).max(100).optional(),
+    metric: z.string().min(1).max(32).optional(),
+    status: z.string().min(1).max(40).optional(),
+    evidence: z.array(z.string().min(1).max(64)).min(1).max(5),
+  })
+  .strict();
+const SceneEditorSchema = z
+  .object({
+    componentId: z.string().min(1).max(64),
+    source: z.enum(["project", "hyperframes"]).optional(),
+    sourceComponentId: z.string().min(1).max(64).optional(),
+    rendererComponentId: z.string().min(1).max(64).optional(),
+    componentLabel: z.string().min(1).max(80).optional(),
+    componentCategory: z.string().min(1).max(32).optional(),
+    orientation: z.enum(["portrait", "landscape"]).optional(),
+    backgroundPreset: z.string().min(1).max(64).optional(),
+    blocks: z.array(z.enum(["background", "component", "caption"])).max(3).optional(),
+    updatedAt: z.string().min(1).max(64).optional(),
+  })
+  .strict();
 
 const SkillShowcasePayloadSchema = z
   .object({
@@ -85,6 +135,7 @@ const SkillShowcasePayloadSchema = z
       .optional(),
     layoutSignature: z.string().min(1).max(64).optional(),
     sourceText: z.string().min(1).max(800).optional(),
+    sceneEditor: SceneEditorSchema.optional(),
     heroTrack: z
       .object({
         kind: z.enum([
@@ -113,11 +164,13 @@ const SkillShowcasePayloadSchema = z
                 evidence: z.array(z.string().min(1).max(48)).max(5).optional(),
                 entityTarget: z.string().min(1).max(48).optional(),
                 cinematicPreset: SkillBeatShotPresetSchema.optional(),
+                lens: HeroLensSchema.optional(),
+                shot: HeroShotSchema.optional(),
               })
               .strict(),
           )
           .min(1)
-          .max(6),
+          .max(24),
       })
       .strict()
       .optional(),

@@ -3,6 +3,55 @@ import {createTikTokStyleCaptions, type TikTokPage} from '@remotion/captions';
 import {AbsoluteFill, Easing, interpolate, Sequence, useCurrentFrame} from 'remotion';
 import type {CompiledProject} from '../project/compileProject';
 
+const compactLength = (value: string) => value.replace(/\s+/g, '').length;
+
+const splitCaptionForDisplay = (value: string, maxChars: number): string[] => {
+  const normalized = String(value ?? '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return [];
+  if (compactLength(normalized) <= maxChars) return [normalized];
+  const parts = normalized
+    .split(/(?<=[，,、。！？!?；;：:])\s*/u)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const chunks: string[] = [];
+  let current = '';
+  const pushChunk = (candidate: string) => {
+    const text = candidate.trim();
+    if (!text) return;
+    if (compactLength(text) <= maxChars + 6) {
+      chunks.push(text);
+      return;
+    }
+    for (let index = 0; index < text.length; index += maxChars) {
+      chunks.push(text.slice(index, index + maxChars).trim());
+    }
+  };
+  for (const part of parts.length ? parts : [normalized]) {
+    const next = current ? `${current}${part}` : part;
+    if (compactLength(next) <= maxChars) {
+      current = next;
+      continue;
+    }
+    pushChunk(current);
+    current = '';
+    pushChunk(part);
+  }
+  pushChunk(current);
+  return chunks.length ? chunks : [normalized.slice(0, maxChars)];
+};
+
+const captionTextForFrame = (
+  text: string,
+  frame: number,
+  durationInFrames: number,
+  orientation: CompiledProject['orientation'],
+) => {
+  const chunks = splitCaptionForDisplay(text, orientation === 'portrait' ? 30 : 46);
+  if (chunks.length <= 1) return chunks[0] ?? '';
+  const progress = Math.max(0, Math.min(0.999, frame / Math.max(1, durationInFrames)));
+  return chunks[Math.floor(progress * chunks.length)] ?? chunks[0] ?? '';
+};
+
 const CaptionPage: React.FC<{
   page: TikTokPage;
   fps: number;
@@ -13,6 +62,11 @@ const CaptionPage: React.FC<{
   const frame = useCurrentFrame();
   const currentMs = page.startMs + frame / fps * 1000;
   const editorial = style === 'editorial';
+  const pageText = page.tokens.map((token) => token.text).join('');
+  const durationInFrames = Math.max(1, Math.round(page.durationMs / 1000 * fps));
+  const displayText = captionTextForFrame(pageText, frame, durationInFrames, orientation);
+  const shouldChunk = compactLength(pageText) > (orientation === 'portrait' ? 36 : 58);
+  const displayLength = compactLength(shouldChunk ? displayText : pageText);
   return (
     <AbsoluteFill style={{
       justifyContent: 'flex-end',
@@ -27,20 +81,23 @@ const CaptionPage: React.FC<{
           border: editorial ? 'none' : '1px solid rgba(255,255,255,0.14)',
           boxShadow: editorial ? 'none' : '0 12px 34px rgba(0,0,0,0.36)',
           color: '#f8fafc',
-          fontSize: editorial && orientation === 'portrait' ? 46 : 42,
+          fontSize: editorial && orientation === 'portrait'
+            ? 46
+            : orientation === 'portrait'
+              ? displayLength > 30 ? 34 : displayLength > 22 ? 38 : 42
+              : displayLength > 58 ? 34 : 42,
           fontWeight: editorial ? 900 : 800,
-          lineHeight: 1.35,
+          lineHeight: 1.3,
           textAlign: 'center',
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
+          maxHeight: orientation === 'portrait' ? 176 : 150,
+          overflow: 'hidden',
           textShadow: editorial ? '0 3px 9px rgba(0,0,0,0.96), 0 0 22px rgba(0,0,0,0.72)' : undefined,
         }}
       >
-        {page.tokens.map((token, index) => (
-          <span
-            key={`${token.fromMs}-${index}`}
-            style={{color: currentMs >= token.fromMs && currentMs < token.toMs ? accent : '#f8fafc'}}
-          >
+        {shouldChunk ? <span style={{color: accent}}>{displayText}</span> : page.tokens.map((token, index) => (
+          <span key={`${token.fromMs}-${index}`} style={{color: currentMs >= token.fromMs && currentMs < token.toMs ? accent : '#f8fafc'}}>
             {token.text}
           </span>
         ))}
@@ -56,6 +113,8 @@ const EditorialCaption: React.FC<{
 }> = ({text, durationInFrames, orientation}) => {
   const frame = useCurrentFrame();
   const portrait = orientation === 'portrait';
+  const displayText = captionTextForFrame(text, frame, durationInFrames, orientation);
+  const displayLength = compactLength(displayText);
   const fadeIn = interpolate(frame, [0, Math.min(5, durationInFrames - 1)], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
@@ -76,9 +135,9 @@ const EditorialCaption: React.FC<{
         maxWidth: portrait ? 900 : 1500,
         padding: '8px 12px 10px',
         color: '#f8fafc',
-        fontSize: portrait ? 46 : 42,
+        fontSize: portrait ? displayLength > 30 ? 38 : displayLength > 22 ? 42 : 46 : displayLength > 46 ? 36 : 42,
         fontWeight: 900,
-        lineHeight: 1.35,
+        lineHeight: 1.28,
         textAlign: 'center',
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
@@ -86,7 +145,7 @@ const EditorialCaption: React.FC<{
         opacity: fadeIn * fadeOut,
         transform: `translateY(${interpolate(fadeIn, [0, 1], [10, 0])}px)`,
       }}>
-        {text}
+        {displayText}
       </div>
     </AbsoluteFill>
   );

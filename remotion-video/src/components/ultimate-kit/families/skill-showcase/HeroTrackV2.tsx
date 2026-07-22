@@ -1,6 +1,6 @@
 import React from 'react';
 import {AbsoluteFill, Easing, interpolate} from 'remotion';
-import type {HeroTrack, HeroTrackState} from './types';
+import type {HeroTrack, HeroLens, HeroShot, HeroTrackState} from './types';
 import {PORTRAIT_COLOR_THEME} from './portraitColorTheme';
 
 const FONT = '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Inter, system-ui, sans-serif';
@@ -162,6 +162,115 @@ const SystemSummary: React.FC<{state: HeroTrackState; accent: string; secondary:
 
 const GenericExplainer: React.FC<{state: HeroTrackState; accent: string; secondary: string; p: number}> = ({state, accent, secondary, p}) => <TrackShell label={state.label} detail={state.detail} accent={accent} p={p}><div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 18, marginTop: 90}}>{['输入', '规则', '结果'].map((label, index) => <div key={label} style={{height: 340, padding: 24, border: `1px solid ${index === 1 ? accent : '#334055'}`, background: index === 1 ? `${accent}12` : '#0b111c', opacity: interpolate(p, [index * .12, .32 + index * .12], [0, 1], clamp)}}><div style={{fontFamily: MONO, color: index === 1 ? accent : '#8c98aa'}}>0{index + 1} / {label}</div><div style={{marginTop: 55, color: '#fff', fontSize: 25, lineHeight: 1.2, fontWeight: 950}}>{(state.evidence?.[index] ?? state.label)}</div></div>)}</div></TrackShell>;
 
+const compact = (value: string | undefined, max = 42) => {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+};
+
+const ShotFrame: React.FC<{shot: HeroShot; lens?: HeroLens; accent: string; secondary: string; p: number; children: React.ReactNode}> = ({shot, lens, accent, secondary, p, children}) => {
+  const evidence = shot.evidence.length ? shot.evidence : [shot.target];
+  return <div style={{position: 'absolute', left: 34, right: 34, top: 24, bottom: 24, display: 'grid', gridTemplateRows: '74px minmax(0,1fr)', border: `1px solid ${accent}66`, background: 'rgba(6,10,16,.78)', boxShadow: `0 24px 70px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.05)`, overflow: 'hidden'}}>
+    <div style={{display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 230px', alignItems: 'center', gap: 18, padding: '0 22px', borderBottom: '1px solid rgba(255,255,255,.09)', background: 'rgba(8,13,22,.82)'}}>
+      <div>
+        <div style={{display: 'flex', alignItems: 'center', gap: 10, fontFamily: MONO, color: accent, fontSize: 12, fontWeight: 950, letterSpacing: 1.1}}><span>{shot.environment}</span><span style={{color: 'rgba(255,255,255,.28)'}}>/</span><span>{lens?.actionLabel ?? shot.kind}</span></div>
+        <div style={{marginTop: 8, color: 'rgba(255,255,255,.72)', fontSize: 17, lineHeight: 1.18, fontWeight: 800}}>{compact(lens?.objective, 66)}</div>
+      </div>
+      <div style={{fontFamily: MONO, color: 'rgba(255,255,255,.52)', fontSize: 11, textAlign: 'right'}}>{lens?.evidenceType ?? 'evidence'}<br/><span style={{color: secondary}}>target: {compact(shot.target, 28)}</span></div>
+    </div>
+    <div style={{display: 'grid', gridTemplateColumns: '205px minmax(0, 1fr)', minHeight: 0}}>
+      <div style={{borderRight: '1px solid rgba(255,255,255,.09)', padding: '20px 15px', background: 'rgba(255,255,255,.025)'}}>
+        {evidence.slice(0, 5).map((item, index) => {
+          const shown = interpolate(p, [index * .1, .28 + index * .1], [0, 1], {...clamp, easing: ease});
+          return <div key={`${item}-${index}`} style={{position: 'relative', minHeight: 50, marginBottom: 11, padding: '9px 10px 9px 14px', borderLeft: `4px solid ${index === 0 ? accent : 'rgba(255,255,255,.18)'}`, background: index === 0 ? `${accent}16` : 'rgba(255,255,255,.04)', color: index === 0 ? '#fff' : 'rgba(255,255,255,.62)', fontSize: 13, lineHeight: 1.22, fontWeight: 850, opacity: shown, transform: `translateX(${interpolate(shown, [0, 1], [18, 0], clamp)}px)`}}>
+            <div style={{fontFamily: MONO, color: index === 0 ? accent : 'rgba(255,255,255,.34)', fontSize: 10, marginBottom: 4}}>EVIDENCE {String(index + 1).padStart(2, '0')}</div>
+            {compact(item, 34)}
+          </div>;
+        })}
+      </div>
+      <div style={{position: 'relative', minHeight: 0, padding: 20}}>{children}</div>
+    </div>
+  </div>;
+};
+
+const LineRows: React.FC<{items: string[]; accent: string; p: number; danger?: boolean}> = ({items, accent, p, danger = false}) => <div style={{display: 'grid', gap: 10}}>
+  {items.map((item, index) => {
+    const shown = interpolate(p, [index * .08, .34 + index * .08], [0, 1], {...clamp, easing: ease});
+    return <div key={`${item}-${index}`} style={{height: 38, display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', background: index === items.length - 1 ? `${accent}18` : 'rgba(255,255,255,.045)', borderLeft: `4px solid ${index === items.length - 1 ? accent : danger && index === 0 ? '#ff6b88' : 'rgba(255,255,255,.16)'}`, color: index === items.length - 1 ? '#fff' : 'rgba(255,255,255,.68)', fontFamily: MONO, fontSize: 13, opacity: shown, transform: `translateY(${interpolate(shown, [0, 1], [14, 0], clamp)}px)`}}><span style={{color: 'rgba(255,255,255,.32)'}}>{String(index + 1).padStart(2, '0')}</span>{item}</div>;
+  })}
+</div>;
+
+const TechnicalShotHero: React.FC<{state: HeroTrackState; accent: string; secondary: string; p: number}> = ({state, accent, secondary, p}) => {
+  const shot = state.shot;
+  if (!shot) return null;
+  const sweep = interpolate(p, [0, 1], [0, 1], {...clamp, easing: ease});
+  const metric = shot.metric ?? '100%';
+  const body = (() => {
+    if (shot.kind === 'browser-demo') {
+      return <div style={{display: 'grid', gridTemplateColumns: '1fr 250px', gap: 14, height: '100%'}}>
+        <div style={{border: '1px solid rgba(255,255,255,.12)', background: '#f7f8fb', color: '#111827', overflow: 'hidden'}}>
+          <div style={{height: 38, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', borderBottom: '1px solid #d6dce6', fontFamily: MONO, fontSize: 11}}><span style={{width: 9, height: 9, borderRadius: 99, background: '#ff6b88'}} /><span style={{width: 9, height: 9, borderRadius: 99, background: '#ffd166'}} /><span style={{width: 9, height: 9, borderRadius: 99, background: '#63f0aa'}} /><span style={{marginLeft: 12, color: '#687386'}}>/preview/{compact(state.label, 18)}</span></div>
+          <div style={{padding: 24}}><div style={{height: 42, width: '58%', background: '#151923'}} /><div style={{height: 12, width: '72%', marginTop: 18, background: '#cdd4df'}} /><div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 28}}>{[0, 1, 2, 3].map((item) => <div key={item} style={{height: 86, border: item === 1 ? `3px solid ${accent}` : '1px solid #d6dce6', background: item === 1 ? `${accent}18` : '#fff', boxShadow: item === 1 ? `0 0 ${30 * sweep}px ${accent}55` : undefined}} />)}</div></div>
+        </div>
+        <div style={{border: '1px solid rgba(255,255,255,.12)', background: '#101827', padding: 13, fontFamily: MONO}}><div style={{color: secondary, fontSize: 11, fontWeight: 950}}>DEVTOOLS / DOM</div><LineRows items={['<main data-state="loading">', '<button aria-busy="false">', '<section data-ready="true">']} accent={accent} p={p} /></div>
+      </div>;
+    }
+    if (shot.kind === 'terminal-execution') {
+      return <div style={{height: '100%', border: '1px solid rgba(255,255,255,.12)', background: '#070b11', padding: 22, fontFamily: MONO}}>
+        <div style={{color: accent, fontSize: 13}}>$ {shot.command ?? 'npm run verify'}</div>
+        <LineRows items={[`project: ${compact(state.label, 24)}`, shot.log ?? 'running checks...', 'done in 3.2s', 'exit code 0']} accent={accent} p={p} />
+        <div style={{position: 'absolute', left: 42, right: 42, bottom: 34, height: 8, background: 'rgba(255,255,255,.1)'}}><div style={{height: '100%', width: `${interpolate(sweep, [0, 1], [12, 100], clamp)}%`, background: `linear-gradient(90deg, ${secondary}, ${accent})`}} /></div>
+      </div>;
+    }
+    if (shot.kind === 'code-diff') {
+      return <div style={{display: 'grid', gridTemplateColumns: '155px 1fr', gap: 14, height: '100%', fontFamily: MONO}}>
+        <div style={{border: '1px solid rgba(255,255,255,.1)', background: '#0a111c', padding: 14, color: 'rgba(255,255,255,.62)', fontSize: 12}}>{['src', 'components', compact(shot.path ?? 'change.ts', 18), 'tests'].map((item, index) => <div key={item} style={{padding: '8px 6px', background: index === 2 ? `${accent}18` : 'transparent', color: index === 2 ? '#fff' : undefined}}>{item}</div>)}</div>
+        <div style={{border: '1px solid rgba(255,255,255,.1)', background: '#0b111b', padding: 16}}><LineRows items={[shot.before ?? '- reuse cached video URL', shot.after ?? '+ attach artifact version key', '+ render uses current project state']} accent={accent} p={p} danger /></div>
+      </div>;
+    }
+    if (shot.kind === 'config-check') {
+      return <div style={{display: 'grid', gridTemplateColumns: '1fr 230px', gap: 14, height: '100%'}}>
+        <div style={{border: '1px solid rgba(255,255,255,.1)', background: '#0b111b', padding: 18, fontFamily: MONO}}><div style={{color: secondary, fontSize: 12}}>{shot.path ?? 'config.json'}</div><LineRows items={['"semanticBeat": "caption-bound"', '"hero": "operation-evidence"', '"cachePolicy": "versioned"']} accent={accent} p={p} /></div>
+        <div style={{border: `1px solid ${accent}66`, background: `${accent}12`, padding: 18}}><div style={{fontFamily: MONO, color: accent, fontSize: 12}}>CHECK</div><div style={{marginTop: 34, color: '#fff', fontSize: 28, lineHeight: 1.1, fontWeight: 950}}>rules loaded</div><div style={{marginTop: 20, color: 'rgba(255,255,255,.62)', fontSize: 15, lineHeight: 1.35}}>配置变更被重新读取，画面合同进入当前渲染。</div></div>
+      </div>;
+    }
+    if (shot.kind === 'interface-audit') {
+      return <div style={{display: 'grid', gridTemplateColumns: '1fr 260px', gap: 14, height: '100%'}}>
+        <div style={{position: 'relative', border: '1px solid rgba(255,255,255,.1)', background: '#f2f5f8', padding: 22}}><div style={{height: 56, background: '#141923'}} /><div style={{height: 88, marginTop: 22, border: `4px solid ${accent}`, background: `${accent}18`, boxShadow: `0 0 ${34 * sweep}px ${accent}55`}} /><div style={{height: 52, marginTop: 16, background: '#dbe2eb'}} /><div style={{position: 'absolute', left: 42, right: 42, top: `${interpolate(sweep, [0, 1], [70, 230], clamp)}px`, height: 3, background: `linear-gradient(90deg, transparent, ${accent}, transparent)`}} /></div>
+        <div style={{border: '1px solid rgba(255,255,255,.12)', background: '#101827', padding: 14}}><div style={{fontFamily: MONO, color: secondary, fontSize: 12}}>INSPECTOR</div><LineRows items={['issue: stale render', 'component: preview canvas', 'status: fixed']} accent={accent} p={p} danger /></div>
+      </div>;
+    }
+    if (shot.kind === 'flow-trace') {
+      const nodes = shot.evidence.slice(0, 3);
+      return <div style={{position: 'relative', height: '100%', border: '1px solid rgba(255,255,255,.1)', background: '#0b111b', overflow: 'hidden'}}>
+        <svg viewBox="0 0 620 330" style={{position: 'absolute', inset: 0, width: '100%', height: '100%'}}><path d="M115 165 C230 70 390 70 505 165" fill="none" stroke={accent} strokeWidth="4" strokeDasharray={`${interpolate(sweep, [0, 1], [0, 520], clamp)} 560`} /><path d="M115 165 C230 260 390 260 505 165" fill="none" stroke={secondary} strokeWidth="3" strokeDasharray={`${interpolate(sweep, [0, 1], [0, 520], clamp)} 560`} opacity=".78" /></svg>
+        {nodes.map((node, index) => <div key={`${node}-${index}`} style={{position: 'absolute', left: [40, 250, 460][index], top: index === 1 ? 102 : 142, width: 140, height: 76, display: 'grid', placeItems: 'center', border: `2px solid ${index === Math.min(2, Math.floor(sweep * 3)) ? accent : 'rgba(255,255,255,.16)'}`, background: index === Math.min(2, Math.floor(sweep * 3)) ? `${accent}18` : 'rgba(255,255,255,.04)', color: '#fff', fontSize: 17, fontWeight: 900, textAlign: 'center'}}>{compact(node, 14)}</div>)}
+      </div>;
+    }
+    if (shot.kind === 'test-report') {
+      return <div style={{display: 'grid', gridTemplateColumns: '250px 1fr', gap: 14, height: '100%'}}>
+        <div style={{border: `1px solid ${accent}66`, background: `${accent}12`, padding: 22}}><div style={{fontFamily: MONO, color: accent, fontSize: 12}}>RESULT</div><div style={{marginTop: 28, color: '#fff', fontSize: textFit(metric, 72, 50), lineHeight: .9, fontWeight: 950}}>{metric}</div><div style={{marginTop: 20, color: 'rgba(255,255,255,.62)', fontSize: 15}}>assertions passing</div></div>
+        <div style={{border: '1px solid rgba(255,255,255,.1)', background: '#0b111b', padding: 18, fontFamily: MONO}}><LineRows items={['script-project-generator.test', 'studio-backend.test', shot.log ?? 'all checks passed']} accent={accent} p={p} /></div>
+      </div>;
+    }
+    if (shot.kind === 'asset-library') {
+      return <div style={{height: '100%', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12}}>
+        {Array.from({length: 6}).map((_, index) => <div key={index} style={{position: 'relative', padding: 14, border: `1px solid ${index === 2 ? accent : 'rgba(255,255,255,.12)'}`, background: index === 2 ? `${accent}16` : 'rgba(255,255,255,.045)', opacity: interpolate(p, [index * .06, .25 + index * .06], [.3, 1], clamp)}}><div style={{height: 78, background: [accent, secondary, '#ffd166'][index % 3], opacity: .2 + index * .04}} /><div style={{marginTop: 12, color: '#fff', fontSize: 15, fontWeight: 900}}>{compact(shot.evidence[index % shot.evidence.length], 16)}</div>{index === 2 ? <div style={{position: 'absolute', inset: -1, border: `3px solid ${accent}`, boxShadow: `0 0 ${28 * sweep}px ${accent}55`}} /> : null}</div>)}
+      </div>;
+    }
+    if (shot.kind === 'system-map') {
+      const nodes = ['Prompt', 'Skill', 'Lens', 'Shot', 'Renderer', 'MP4'];
+      return <div style={{position: 'relative', height: '100%', border: '1px solid rgba(255,255,255,.1)', background: '#0b111b'}}>
+        <svg viewBox="0 0 620 330" style={{position: 'absolute', inset: 0, width: '100%', height: '100%'}}>{nodes.slice(1).map((_, index) => <line key={index} x1={90 + index * 90} y1={165} x2={180 + index * 90} y2={165} stroke={index % 2 ? secondary : accent} strokeWidth="3" strokeDasharray={`${interpolate(sweep, [index * .08, .34 + index * .08], [0, 120], clamp)} 140`} />)}</svg>
+        {nodes.map((node, index) => <div key={node} style={{position: 'absolute', left: 34 + index * 92, top: 127, width: 78, height: 78, display: 'grid', placeItems: 'center', borderRadius: 10, border: `1px solid ${index <= Math.floor(sweep * nodes.length) ? accent : 'rgba(255,255,255,.16)'}`, background: index <= Math.floor(sweep * nodes.length) ? `${accent}18` : 'rgba(255,255,255,.045)', color: '#fff', fontFamily: MONO, fontSize: 11, fontWeight: 950}}>{node}</div>)}
+      </div>;
+    }
+    return <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, height: '100%'}}>
+      {[['BEFORE', shot.before ?? shot.evidence[0] ?? '旧状态', '#ff6b88'], ['AFTER', shot.after ?? shot.evidence[1] ?? '新状态', accent]].map(([label, text, color], index) => <div key={label} style={{position: 'relative', padding: 22, border: `1px solid ${color}88`, background: `${color}14`, overflow: 'hidden'}}><div style={{fontFamily: MONO, color, fontSize: 12, fontWeight: 950}}>{label}</div><div style={{marginTop: 48, color: '#fff', fontSize: 27, lineHeight: 1.12, fontWeight: 950}}>{compact(text, 36)}</div><div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: `${index === 0 ? interpolate(sweep, [0, 1], [100, 22], clamp) : interpolate(sweep, [0, 1], [0, 100], clamp)}%`, background: index === 0 ? 'rgba(0,0,0,.26)' : `${accent}10`, pointerEvents: 'none'}} /></div>)}
+    </div>;
+  })();
+  return <TrackShell label={state.label} detail={state.detail} accent={accent} p={p}><ShotFrame shot={shot} lens={state.lens} accent={accent} secondary={secondary} p={p}>{body}</ShotFrame></TrackShell>;
+};
+
 type MotionAnchor = {x: number; y: number; width: number; height: number};
 const entityAnchor = (kind: HeroTrack['kind'], target: string): MotionAnchor => {
   if (kind === 'rule-compare') return target.startsWith('bad-') ? {x: 44, y: 105, width: 340, height: 62} : target.startsWith('good-') ? {x: 476, y: 105, width: 340, height: 62} : {x: 30, y: 680, width: 800, height: 130};
@@ -204,7 +313,8 @@ export const HeroTrackV2: React.FC<{frame: number; track: HeroTrack; accent: str
   // selected entity changes after the opening has established the layout.
   const p = stateIndex === 0 ? stateP : 1;
   const common = {state, accent, secondary, p, stateIndex, target: state.entityTarget ?? ''};
-  const visual = track.kind === 'overview-matrix' ? <OverviewMatrix {...common} />
+  const visual = state.shot ? <TechnicalShotHero state={state} accent={accent} secondary={secondary} p={stateP} />
+    : track.kind === 'overview-matrix' ? <OverviewMatrix {...common} />
     : track.kind === 'rule-compare' ? <RuleCompare {...common} />
       : track.kind === 'code-render' ? <CodeRender {...common} />
         : track.kind === 'slide-editor' ? <SlideEditor {...common} />
@@ -213,5 +323,8 @@ export const HeroTrackV2: React.FC<{frame: number; track: HeroTrack; accent: str
               : track.kind === 'design-compare' ? <DesignCompare {...common} />
                 : track.kind === 'system-summary' ? <SystemSummary {...common} brandName={brandName} />
                   : <GenericExplainer {...common} />;
-  return <AbsoluteFill>{visual}<EntityBoundMotion track={track} state={state} accent={accent} secondary={secondary} p={stateP} /></AbsoluteFill>;
+  return <AbsoluteFill>
+    {visual}
+    {state.shot ? null : <EntityBoundMotion track={track} state={state} accent={accent} secondary={secondary} p={stateP} />}
+  </AbsoluteFill>;
 };

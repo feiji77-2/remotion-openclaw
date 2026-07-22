@@ -13,6 +13,7 @@
     "project:check": "node scripts/project-check.mjs",
     "project:visual-check": "node scripts/check-project-visual-contract.mjs",
     "project:still": "node scripts/project-still.mjs",
+    "project:scene-stills": "node scripts/render-scene-stills.mjs",
     "project:qa-sheet": "node scripts/project-qa-sheet.mjs",
     "project:render": "node scripts/project-render.mjs",
     "project:from-script": "node scripts/build-skill-showcase-from-script.mjs",

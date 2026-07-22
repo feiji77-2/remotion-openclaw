@@ -67,6 +67,18 @@ const HERO_TRACK_KINDS = new Set([
   "system-summary",
   "generic-explainer",
 ]);
+const HERO_SHOT_KINDS = new Set([
+  "browser-demo",
+  "terminal-execution",
+  "code-diff",
+  "config-check",
+  "interface-audit",
+  "flow-trace",
+  "test-report",
+  "asset-library",
+  "system-map",
+  "before-after",
+]);
 
 const collectStrings = (value, output = []) => {
   if (typeof value === "string") {
@@ -397,10 +409,10 @@ const checkHeroTrack = (scene, sceneIndex, captions, errors) => {
   const captionCount = range ? range.endIndex - range.startIndex + 1 : 0;
   if (
     captionCount >= 3 &&
-    (track.states.length < 3 || track.states.length > 6)
+    (track.states.length < 3 || track.states.length > 24)
   ) {
     errors.push(
-      `scenes[${sceneIndex}].payload.heroTrack.states must contain 3–6 states for a multi-caption hero track`,
+      `scenes[${sceneIndex}].payload.heroTrack.states must contain 3–24 states for a multi-caption hero track`,
     );
   }
   let previousEnd = null;
@@ -469,6 +481,51 @@ const checkHeroTrack = (scene, sceneIndex, captions, errors) => {
           `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].cinematicPreset must be one of the 11 Cinematic presets`,
         );
       }
+      if (state.lens !== undefined) {
+        if (!state.lens || typeof state.lens !== "object") {
+          errors.push(
+            `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].lens must be an object`,
+          );
+        } else if (
+          !String(state.lens.objective ?? "").trim() ||
+          !String(state.lens.actionLabel ?? "").trim()
+        ) {
+          errors.push(
+            `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].lens must declare objective and actionLabel`,
+          );
+        }
+      }
+      if (state.shot !== undefined) {
+        if (!state.shot || typeof state.shot !== "object") {
+          errors.push(
+            `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].shot must be an object`,
+          );
+        } else {
+          if (!HERO_SHOT_KINDS.has(state.shot.kind)) {
+            errors.push(
+              `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].shot.kind must be one of the 10 technical Hero shot kinds`,
+            );
+          }
+          if (asArray(state.shot.evidence).length === 0) {
+            errors.push(
+              `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].shot.evidence must contain operation evidence`,
+            );
+          }
+          if (
+            !String(state.shot.environment ?? "").trim() ||
+            !String(state.shot.target ?? "").trim()
+          ) {
+            errors.push(
+              `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].shot must declare environment and target`,
+            );
+          }
+        }
+      }
+      if (state.shot !== undefined && state.lens === undefined) {
+        errors.push(
+          `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}] with a technical shot must also declare a lens`,
+        );
+      }
     }
     previousEnd = state.endFrame;
     previousCaptionEnd = state.captionEndIndex;
@@ -479,6 +536,14 @@ const checkHeroTrack = (scene, sceneIndex, captions, errors) => {
   ) {
     errors.push(
       `scenes[${sceneIndex}].payload.heroTrack.states must cover the full hero track duration`,
+    );
+  }
+  if (
+    track.states[0]?.captionStartIndex !== track.captionStartIndex ||
+    track.states.at(-1)?.captionEndIndex !== track.captionEndIndex
+  ) {
+    errors.push(
+      `scenes[${sceneIndex}].payload.heroTrack.states must cover the full hero track caption range`,
     );
   }
 };

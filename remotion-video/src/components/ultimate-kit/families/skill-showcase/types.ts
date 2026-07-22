@@ -70,6 +70,40 @@ export type SkillBeatShotPreset =
 
 export type SkillShowcaseHeroStyle = "cinematic" | "hero-track-v2";
 
+export type HeroShotKind =
+  | "browser-demo"
+  | "terminal-execution"
+  | "code-diff"
+  | "config-check"
+  | "interface-audit"
+  | "flow-trace"
+  | "test-report"
+  | "asset-library"
+  | "system-map"
+  | "before-after";
+
+export type HeroLens = {
+  key: string;
+  objective: string;
+  actionLabel: string;
+  signal: string;
+  evidenceType: string;
+};
+
+export type HeroShot = {
+  kind: HeroShotKind;
+  environment: string;
+  target: string;
+  before?: string;
+  after?: string;
+  command?: string;
+  path?: string;
+  log?: string;
+  metric?: string;
+  status?: string;
+  evidence: string[];
+};
+
 export type HeroTrackKind =
   | "overview-matrix"
   | "rule-compare"
@@ -93,6 +127,10 @@ export type HeroTrackState = {
   entityTarget?: string;
   /** Motion transition selected from the cinematic visual library. */
   cinematicPreset?: SkillBeatShotPreset;
+  /** Semantic contract: what this spoken beat is trying to explain. */
+  lens?: HeroLens;
+  /** Director shot: how the top Hero area shows concrete operation evidence. */
+  shot?: HeroShot;
 };
 
 export type HeroTrack = {
@@ -146,6 +184,18 @@ export interface SkillShowcaseProps {
   captionStartIndex?: number;
   captionEndIndex?: number;
   sourceText?: string;
+  sceneEditor?: {
+    componentId: string;
+    source?: "project" | "hyperframes";
+    sourceComponentId?: string;
+    rendererComponentId?: string;
+    componentLabel?: string;
+    componentCategory?: string;
+    orientation?: "portrait" | "landscape";
+    backgroundPreset?: string;
+    blocks?: Array<"background" | "component" | "caption">;
+    updatedAt?: string;
+  };
   beats?: SkillShowcaseBeat[];
   heroTrack?: HeroTrack;
 }

@@ -18,6 +18,7 @@
     "clean": "npm --prefix remotion-video run clean:runtime && node -e \"require('node:fs').rmSync('remotion-video/out',{recursive:true,force:true})\"",
     "dev": "npm --prefix remotion-video run dev",
     "project:check": "npm --prefix remotion-video run project:check --",
+    "project:visual-check": "npm --prefix remotion-video run project:visual-check --",
     "project:still": "npm --prefix remotion-video run project:still --",
     "project:render": "npm --prefix remotion-video run project:render --",
     "project:from-script": "npm --prefix remotion-video run project:from-script --",

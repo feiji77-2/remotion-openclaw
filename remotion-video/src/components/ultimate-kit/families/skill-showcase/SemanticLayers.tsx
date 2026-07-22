@@ -142,7 +142,7 @@ const ActionFrame: React.FC<{
         <div style={{display: 'flex', alignItems: 'center', gap: 22}}>
           <SemanticIcon icon={beat.icon} color={accent} size={46} />
           <div>
-            <div style={{color: accent, fontSize: 14, fontWeight: 950}}>VOICE HIT / LOCKED</div>
+            <div style={{color: accent, fontSize: 14, fontWeight: 950}}>关键提示</div>
             <div style={{...sharedKeyword, marginTop: 8}}>{beat.keyword}</div>
           </div>
         </div>
@@ -172,7 +172,7 @@ const ActionFrame: React.FC<{
         <div style={{fontSize: 112, lineHeight: 0.8, fontWeight: 950, color: accent}}>{beat.value ?? '100%'}</div>
         <div>
           <div style={{...sharedKeyword, fontSize: 40}}>{beat.keyword}</div>
-          <div style={{marginTop: 12, color: 'rgba(255,255,255,0.52)', fontSize: 17, fontWeight: 800}}>FRAME-LOCKED EVIDENCE</div>
+          <div style={{marginTop: 12, color: 'rgba(255,255,255,0.52)', fontSize: 17, fontWeight: 800}}>数据提示</div>
         </div>
       </div>
     );
@@ -223,7 +223,7 @@ const ActionFrame: React.FC<{
           <SemanticIcon icon={beat.icon} color={accent} size={50} />
         </div>
         <div>
-          <div style={{color: accent, fontSize: 15, fontWeight: 950}}>FOCUS / KEY CLAIM</div>
+          <div style={{color: accent, fontSize: 15, fontWeight: 950}}>核心判断</div>
           <div style={{...sharedKeyword, marginTop: 10}}>{beat.keyword}</div>
           {evidence.length ? <div style={{marginTop: 12, color: 'rgba(255,255,255,0.56)', fontSize: 19, fontWeight: 800}}>{evidence.join(' · ')}</div> : null}
         </div>

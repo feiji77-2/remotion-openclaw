@@ -168,6 +168,8 @@ const KNOWN_PRODUCT_RULES = [
 ];
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const CAPTION_SOFT_LIMIT = 28;
+const CAPTION_HARD_LIMIT = 34;
 
 const narrativeSignalForText = (text) =>
   NARRATIVE_SIGNAL_RULES.find((rule) => rule.pattern.test(text)) ?? null;
@@ -192,9 +194,44 @@ const sentenceFallbackSplit = (text) => {
   const compact = text.trim();
   if (!compact) return [];
   const chunks = [];
-  for (let index = 0; index < compact.length; index += 42) {
-    chunks.push(compact.slice(index, index + 42));
+  for (let index = 0; index < compact.length; index += CAPTION_SOFT_LIMIT) {
+    chunks.push(compact.slice(index, index + CAPTION_SOFT_LIMIT));
   }
+  return chunks;
+};
+
+const appendCaptionPart = (parts, candidate) => {
+  const text = String(candidate ?? "").trim();
+  if (!text) return;
+  if (compactLength(text) <= CAPTION_HARD_LIMIT) {
+    parts.push(text);
+    return;
+  }
+  parts.push(...sentenceFallbackSplit(text));
+};
+
+const splitLongSentence = (sentence) => {
+  const compact = String(sentence ?? "").trim();
+  if (!compact) return [];
+  if (compactLength(compact) <= CAPTION_HARD_LIMIT) return [compact];
+  const minorParts = compact
+    .split(/(?<=[，,、：:])\s*/u)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (minorParts.length <= 1) return sentenceFallbackSplit(compact);
+  const chunks = [];
+  let current = "";
+  for (const part of minorParts) {
+    const next = current ? `${current}${part}` : part;
+    if (compactLength(next) <= CAPTION_SOFT_LIMIT) {
+      current = next;
+      continue;
+    }
+    appendCaptionPart(chunks, current);
+    current = "";
+    appendCaptionPart(chunks, part);
+  }
+  appendCaptionPart(chunks, current);
   return chunks;
 };
 
@@ -207,14 +244,14 @@ export const splitSentences = (scriptText) => {
   if (!normalized) return [];
   const sentences = normalized
     .split(/(?<=[。！？!?；;])\s*/u)
-    .map((part) => part.trim())
+    .flatMap(splitLongSentence)
     .filter(Boolean);
   return sentences.length > 1 ? sentences : sentenceFallbackSplit(normalized);
 };
 
 const estimateSentenceMs = (text) => {
   const chars = compactLength(text);
-  return clamp(Math.round((chars / 5.2) * 1000), 1200, 7200);
+  return clamp(Math.round((chars / 5.2) * 1000), 1100, 4400);
 };
 
 const readAudioDurationMs = (projectRoot, voiceSrc) => {
@@ -551,6 +588,203 @@ const placementForAction = (action) => {
 const placementForText = (text, action) =>
   narrativeSignalForText(text)?.placement ?? placementForAction(action);
 
+const TECH_SHOT_KINDS = [
+  "browser-demo",
+  "terminal-execution",
+  "code-diff",
+  "config-check",
+  "interface-audit",
+  "flow-trace",
+  "test-report",
+  "asset-library",
+  "system-map",
+  "before-after",
+];
+
+const SHOT_META = {
+  "browser-demo": {
+    environment: "Browser + DevTools",
+    target: "viewport / DOM",
+    actionLabel: "浏览器实操",
+    evidenceType: "DOM 状态",
+    objective: "展示页面与 DOM 的真实变化",
+  },
+  "terminal-execution": {
+    environment: "Terminal + CI",
+    target: "stdout / process",
+    actionLabel: "终端执行",
+    evidenceType: "命令输出",
+    objective: "证明命令执行并产生结果",
+  },
+  "code-diff": {
+    environment: "IDE + Diff",
+    target: "changed file / diff hunk",
+    actionLabel: "代码差异",
+    evidenceType: "代码行",
+    objective: "展示改动文件的行级变化",
+  },
+  "config-check": {
+    environment: "Config Inspector",
+    target: "config file / rule switch",
+    actionLabel: "配置检查",
+    evidenceType: "配置状态",
+    objective: "确认配置或规则已经生效",
+  },
+  "interface-audit": {
+    environment: "Browser + Inspector",
+    target: "component / issue row",
+    actionLabel: "界面审计",
+    evidenceType: "DOM 状态",
+    objective: "定位并审计界面问题",
+  },
+  "flow-trace": {
+    environment: "Trace + Flow",
+    target: "node graph / path",
+    actionLabel: "流程追踪",
+    evidenceType: "流程节点",
+    objective: "把输入、处理和输出串成链路",
+  },
+  "test-report": {
+    environment: "Test Runner",
+    target: "test summary / assertions",
+    actionLabel: "测试报告",
+    evidenceType: "测试断言",
+    objective: "用测试结果证明修复有效",
+  },
+  "asset-library": {
+    environment: "Asset Library",
+    target: "library grid / selected item",
+    actionLabel: "素材库",
+    evidenceType: "素材条目",
+    objective: "从素材库里挑出匹配资源",
+  },
+  "system-map": {
+    environment: "Architecture Workspace",
+    target: "module graph / relation map",
+    actionLabel: "系统图",
+    evidenceType: "关系图",
+    objective: "说明 Prompt、Skill 与 Renderer 的关系",
+  },
+  "before-after": {
+    environment: "Split Compare",
+    target: "before / after split",
+    actionLabel: "前后对照",
+    evidenceType: "截图差异",
+    objective: "把旧状态和新状态并排对照",
+  },
+};
+
+const shotKindForText = (text, action, captionIndex, stateIndex, heroTrackKind) => {
+  const value = String(text ?? "");
+  if (/系统图|架构|Prompt|Skill|Token|设计系统|模块|关系图/i.test(value)) return "system-map";
+  if (/浏览器|DevTools|DOM|页面|viewport|web/i.test(value)) return "browser-demo";
+  if (/终端|命令|npm|pnpm|yarn|shell|CI|执行|构建|安装|运行/i.test(value)) return "terminal-execution";
+  if (/diff|Diff|git|代码行|文件变更|修改|删除|新增|patch|\bPR\b/i.test(value)) return "code-diff";
+  if (/配置|JSON|YAML|AGENTS|env|环境变量|规则|开关|参数/i.test(value)) return "config-check";
+  if (/审计|检查器|Inspector|定位|扫描|标红|问题|按钮|无障碍|A11y/i.test(value)) return "interface-audit";
+  if (/流程|链路|步骤|输入|输出|追踪|trace|流转|路径/i.test(value)) return "flow-trace";
+  if (/测试|断言|通过|失败|回归|复检|coverage|验证/i.test(value)) return "test-report";
+  if (/素材库|组件库|动画|模板|资源|素材|library/i.test(value)) return "asset-library";
+  if (/对比|前后|之前|之后|旧.*新|不是.*而是|左边|右边|VS|变化/i.test(value)) return "before-after";
+  if (action === "compare") return "before-after";
+  if (action === "counter") return /测试|断言|通过|失败/i.test(value) ? "test-report" : "system-map";
+  if (action === "trace") return heroTrackKind === "video-agent" ? "browser-demo" : "flow-trace";
+  if (action === "stack") return "asset-library";
+  if (action === "focus") return /检查|审计|定位|规则|配置/.test(value) ? "interface-audit" : "config-check";
+  if (action === "stamp") return "config-check";
+  return TECH_SHOT_KINDS[(captionIndex + stateIndex) % TECH_SHOT_KINDS.length];
+};
+
+const lensForText = (text, shotKind, action, captionIndex) => {
+  const meta = SHOT_META[shotKind];
+  const signal = narrativeSignalForText(text);
+  return {
+    key: `${shotKind}:${captionIndex}`,
+    objective: String(text ?? "").trim().slice(0, 72) || meta.objective,
+    actionLabel: meta.actionLabel,
+    signal: signal?.key ?? action,
+    evidenceType: meta.evidenceType,
+  };
+};
+
+const shotEvidenceForText = (text, shotKind, action) => {
+  const value = String(text ?? "").trim();
+  const tokenList = meaningfulTokens(value, 4);
+  const number = beatValueForText(value);
+  if (shotKind === "browser-demo") return [tokenList[0] ?? "页面", "DOM 已更新", "截图差异"];
+  if (shotKind === "terminal-execution") return [commandForText(value), "stdout: ok", "exit code 0"];
+  if (shotKind === "code-diff") return ["- old line", "+ new line", tokenList[0] ?? "diff hunk"];
+  if (shotKind === "config-check") return [configPathForText(value), "rule enabled", "config reloaded"];
+  if (shotKind === "interface-audit") return ["Inspector 面板", "问题行高亮", "DOM 状态更新"];
+  if (shotKind === "flow-trace") return [tokenList[0] ?? "输入", tokenList[1] ?? "处理", tokenList[2] ?? "输出"];
+  if (shotKind === "test-report") return [number ? `${number} 断言` : "test suite", "0 failed", "CI green"];
+  if (shotKind === "asset-library") return [tokenList[0] ?? "素材", tokenList[1] ?? "标签", "已选中"];
+  if (shotKind === "system-map") return [tokenList[0] ?? "Prompt", tokenList[1] ?? "Skill", tokenList[2] ?? "Renderer"];
+  if (shotKind === "before-after") {
+    const halves = value.split(/[，,。；;、：:\n]+/u).map((item) => item.trim()).filter(Boolean);
+    return [halves[0] ?? "Before", halves[1] ?? "After", "Evidence"];
+  }
+  return tokenList.length ? tokenList : [action || "evidence"];
+};
+
+const commandForText = (text) => {
+  if (/install|安装/i.test(text)) return "npm install";
+  if (/build|构建|生成/i.test(text)) return "npm run build";
+  if (/test|测试|断言/i.test(text)) return "npm test";
+  if (/lint|检查/i.test(text)) return "npm run lint";
+  return "npm run verify";
+};
+
+const configPathForText = (text) => {
+  if (/AGENTS/i.test(text)) return "AGENTS.md";
+  if (/Prompt|Skill/i.test(text)) return "prompt.json";
+  if (/Token|设计系统|规则/i.test(text)) return "tokens.json";
+  return "config.json";
+};
+
+const shotForText = (text, shotKind, action, captionIndex, stateIndex) => {
+  const meta = SHOT_META[shotKind];
+  const evidence = shotEvidenceForText(text, shotKind, action);
+  const number = beatValueForText(text);
+  const value = String(text ?? "").trim();
+  const beforeAfter = value.match(/(.+?)[，,。；;]*?(?:不是|而是|变成|变为|变成了|之后|之前)(.+)/u);
+  const browserTarget = /浏览器|DevTools|DOM|页面/i.test(value) ? "viewport / DOM" : meta.target;
+  return {
+    kind: shotKind,
+    environment: meta.environment,
+    target: browserTarget,
+    before: shotKind === "before-after" ? (beforeAfter?.[1]?.trim().slice(0, 40) ?? evidence[0]) : undefined,
+    after: shotKind === "before-after" ? (beforeAfter?.[2]?.trim().slice(0, 40) ?? evidence[1]) : undefined,
+    command: shotKind === "terminal-execution" ? commandForText(value) : undefined,
+    path:
+      shotKind === "code-diff"
+        ? `src/${slugify(keywordForText(value, captionIndex), "change")}.ts`
+        : shotKind === "config-check"
+          ? configPathForText(value)
+          : shotKind === "asset-library"
+            ? "assets/library"
+            : shotKind === "system-map"
+              ? "architecture.map"
+              : undefined,
+    log:
+      shotKind === "test-report"
+        ? `${number ? `${number} 断言` : "test suite"} · 0 failed`
+        : shotKind === "interface-audit"
+          ? "Inspector flagged the current issue"
+          : shotKind === "flow-trace"
+            ? "input -> rule -> output"
+            : undefined,
+    metric:
+      shotKind === "test-report"
+        ? number ?? "100%"
+        : shotKind === "browser-demo" || shotKind === "before-after"
+          ? "1 screenshot diff"
+          : undefined,
+    status: "active",
+    evidence,
+  };
+};
+
 const visualStateForText = (text, action, captionIndex) => {
   if (/左边|右边|默认|之后|之前|不同结果|不是.*是/u.test(text))
     return "compare";
@@ -624,32 +858,6 @@ const heroTrackKindForScene = (sceneText, index, totalScenes) => {
   if (/UI Skill|设计立场|排版|留白/i.test(sceneText)) return "design-compare";
   return "generic-explainer";
 };
-
-const heroTrackTitleForKind = (kind, fallback, brandName) =>
-  ({
-    "overview-matrix": "能力总览",
-    "rule-compare": "规则对比",
-    "code-render": "代码渲染",
-    "slide-editor": "可编辑演示",
-    "article-map": "内容与配图",
-    "video-agent": "视频生成",
-    "design-compare": "设计对比",
-    "system-summary": `${brandName} · 系统总结`,
-    "generic-explainer": fallback,
-  })[kind] ?? fallback;
-
-const heroTrackSubtitleForKind = (kind, fallback) =>
-  ({
-    "overview-matrix": "把 AI 从聊天框变成可执行的工作流",
-    "rule-compare": "先约束，再动手",
-    "code-render": "把代码、执行过程和输出放进同一画面",
-    "slide-editor": "把内容组织成可继续编辑的演示对象",
-    "article-map": "先读懂正文，再把判断画出来",
-    "video-agent": "让输入经过 Agent 生成可验证的视频输出",
-    "design-compare": "不是模板，是一整套设计立场",
-    "system-summary": "把输入、规则和结果收束成可复用系统",
-    "generic-explainer": fallback,
-  })[kind] ?? fallback;
 
 const HERO_ENTITY_TARGETS = {
   "overview-matrix": [
@@ -833,66 +1041,65 @@ const heroStatesForChunk = (
   sceneStartFrame,
   sceneDurationInFrames,
   heroTrackKind,
+  sceneIndex,
+  totalScenes,
 ) => {
-  const stateCount = Math.min(
-    chunk.length,
-    clamp(Math.ceil(chunk.length / 2), 3, 6),
-  );
   let previousCinematicPreset = "";
-  return Array.from({ length: stateCount }, (_, stateIndex) => {
-    const startOffset = Math.floor((stateIndex * chunk.length) / stateCount);
-    const endOffset = Math.max(
-      startOffset,
-      Math.floor(((stateIndex + 1) * chunk.length) / stateCount) - 1,
+  let previousEnd = 0;
+  return chunk.map((caption, stateIndex, statesSource) => {
+    const text = caption.text;
+    const captionIndex = Number.isInteger(caption.__captionIndex)
+      ? caption.__captionIndex
+      : stateIndex;
+    const action = actionForText(
+      text,
+      sceneIndex,
+      stateIndex,
+      sceneIndex === totalScenes - 1,
     );
-    const group = chunk.slice(startOffset, endOffset + 1);
-    const nextStartOffset = Math.floor(
-      ((stateIndex + 1) * chunk.length) / stateCount,
+    const shotKind = shotKindForText(
+      text,
+      action,
+      captionIndex,
+      stateIndex,
+      heroTrackKind,
     );
-    const next = chunk[nextStartOffset];
-    const text = group.map((caption) => caption.text).join("");
-    const captionStartIndex = group[0].__captionIndex;
-    const captionEndIndex = group.at(-1).__captionIndex;
+    const shot = shotForText(text, shotKind, action, captionIndex, stateIndex);
+    const next = statesSource[stateIndex + 1];
     const label = keywordForText(text, stateIndex);
-    const evidence = meaningfulTokens(text, 4).map((token) =>
-      token.slice(0, 48),
+    let startFrame =
+      stateIndex === 0
+        ? 0
+        : Math.max(0, frameForMs(caption.startMs) - sceneStartFrame);
+    let endFrame =
+      stateIndex === statesSource.length - 1 || !next
+        ? sceneDurationInFrames
+        : Math.min(sceneDurationInFrames, frameForMs(next.startMs) - sceneStartFrame);
+    if (stateIndex > 0 && startFrame - previousEnd > 6) startFrame = previousEnd;
+    startFrame = clamp(startFrame, 0, Math.max(0, sceneDurationInFrames - 1));
+    endFrame = clamp(endFrame, startFrame + 1, sceneDurationInFrames);
+    previousEnd = endFrame;
+    const preset = cinematicPresetForState(
+      text,
+      stateIndex,
+      heroTrackKind,
+      previousCinematicPreset,
     );
+    previousCinematicPreset = preset;
     return {
-      startFrame:
-        stateIndex === 0
-          ? 0
-          : Math.max(0, frameForMs(group[0].startMs) - sceneStartFrame),
-      endFrame:
-        stateIndex === stateCount - 1
-          ? sceneDurationInFrames
-          : Math.min(
-              sceneDurationInFrames,
-              frameForMs(next.startMs) - sceneStartFrame,
-            ),
-      captionStartIndex,
-      captionEndIndex,
+      startFrame,
+      endFrame,
+      captionStartIndex: captionIndex,
+      captionEndIndex: captionIndex,
       label,
       detail: text.slice(0, 118),
-      evidence: evidence.length ? evidence : [label],
+      evidence: shot.evidence.map((item) => item.slice(0, 48)),
       entityTarget: heroEntityTargetForState(heroTrackKind, stateIndex),
+      cinematicPreset: preset,
+      lens: lensForText(text, shotKind, action, captionIndex),
+      shot,
     };
-  }).map((state, stateIndex, states) => ({
-    ...state,
-    endFrame: Math.max(
-      state.startFrame + 1,
-      stateIndex === states.length - 1 ? sceneDurationInFrames : state.endFrame,
-    ),
-    cinematicPreset: (() => {
-      const preset = cinematicPresetForState(
-        state.detail,
-        stateIndex,
-        heroTrackKind,
-        previousCinematicPreset,
-      );
-      previousCinematicPreset = preset;
-      return preset;
-    })(),
-  }));
+  });
 };
 
 const labelsForChunk = (text) => {
@@ -912,6 +1119,40 @@ const layoutSignatureForScene = (sceneText, visualMode, index) => {
   if (visualMode === "process")
     return index % 2 === 0 ? "vertical-step-flow" : "focus-diagram";
   return index % 2 === 0 ? "icon-grid" : "tag-matrix";
+};
+
+const BODY_LAYOUT_FALLBACKS = [
+  "vertical-step-flow",
+  "metric-strip",
+  "tag-matrix",
+  "compare-board",
+  "focus-diagram",
+  "icon-grid",
+  "quote-close",
+];
+
+const nonRepeatingBodyLayoutForScene = (
+  sceneText,
+  visualMode,
+  index,
+  previousLayouts,
+) => {
+  const preferred = layoutSignatureForScene(sceneText, visualMode, index);
+  if (
+    previousLayouts.length < 2 ||
+    previousLayouts.at(-1) !== preferred ||
+    previousLayouts.at(-2) !== preferred
+  ) {
+    return preferred;
+  }
+  return (
+    BODY_LAYOUT_FALLBACKS.find(
+      (layout) =>
+        layout !== preferred &&
+        layout !== previousLayouts.at(-1) &&
+        layout !== previousLayouts.at(-2),
+    ) ?? preferred
+  );
 };
 
 const dominantNarrativeSignal = (sceneText) => {
@@ -966,6 +1207,7 @@ export const buildSkillShowcaseProjectFromScript = ({
   const allLabelIcons = allLabels.map((label, index) =>
     iconForText(label, index),
   );
+  const bodyLayoutSignatures = [];
   const scenes = chunks.map((chunk, index) => {
     const sceneText = chunk.map((caption) => caption.text).join("");
     const sceneStartMs = chunk[0].startMs;
@@ -983,7 +1225,14 @@ export const buildSkillShowcaseProjectFromScript = ({
       index,
       chunks.length,
     );
-    const layoutSignature = `portrait:hero-track-v2:${heroTrackKind}`;
+    const bodyLayoutSignature = nonRepeatingBodyLayoutForScene(
+      sceneText,
+      visualMode,
+      index,
+      bodyLayoutSignatures,
+    );
+    bodyLayoutSignatures.push(bodyLayoutSignature);
+    const layoutSignature = `portrait:hero-track-v2:${bodyLayoutSignature}`;
     const labels = labelsForChunk(sceneText);
     const productIcon = productIconForText(sceneText);
     const beats = beatsForChunk(
@@ -1002,6 +1251,8 @@ export const buildSkillShowcaseProjectFromScript = ({
         sceneStartFrame,
         durationInFrames,
         heroTrackKind,
+        index,
+        chunks.length,
       ),
     };
     const payload = {
@@ -1010,15 +1261,8 @@ export const buildSkillShowcaseProjectFromScript = ({
       heroStyle: "hero-track-v2",
       narrativeSignal: dominantNarrativeSignal(sceneText),
       layoutSignature,
-      title: heroTrackTitleForKind(
-        heroTrackKind,
-        sceneTitleFor(sceneText, index, resolvedTitle),
-        resolvedTitle,
-      ),
-      subtitle: heroTrackSubtitleForKind(
-        heroTrackKind,
-        labels.slice(0, 3).join(" · ") || resolvedTitle,
-      ),
+      title: sceneTitleFor(sceneText, index, resolvedTitle),
+      subtitle: sceneText.slice(0, 92),
       brandName: resolvedTitle.slice(0, 32),
       brandIcon: productIcon,
       productIcon,

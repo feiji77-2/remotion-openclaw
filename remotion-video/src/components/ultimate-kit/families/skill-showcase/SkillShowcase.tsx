@@ -18,7 +18,7 @@ export type {
  * Production entry for the skill-showcase family.
  *
  * The renderer has exactly two visual implementations:
- * - HeroTrackV2, with nine stable technical compositions.
+ * - HeroTrackV2, with nine legacy compositions plus state-level technical shots.
  * - CinematicShot, with eleven motion presets.
  *
  * Variant payloads without an explicit style are deterministically mapped to

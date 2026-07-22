@@ -240,6 +240,8 @@ describe("compact video project", () => {
                 evidence?: string[];
                 entityTarget?: string;
                 cinematicPreset?: string;
+                lens?: { objective?: string; actionLabel?: string };
+                shot?: { kind?: string; evidence?: string[] };
               }>;
             }
           | undefined;
@@ -250,9 +252,12 @@ describe("compact video project", () => {
           track?.captionStartIndex === range.startIndex &&
           track?.captionEndIndex === range.endIndex &&
           states.length >= Math.min(3, range.endIndex - range.startIndex + 1) &&
-          states.length <= 6 &&
+          states.length <= 24 &&
           states[0]?.startFrame === 0 &&
           states[states.length - 1]?.endFrame === scene.durationInFrames &&
+          states[0]?.captionStartIndex === track.captionStartIndex &&
+          states[states.length - 1]?.captionEndIndex ===
+            track.captionEndIndex &&
           states.every(
             (state) =>
               Array.isArray(state.evidence) &&
@@ -260,7 +265,14 @@ describe("compact video project", () => {
               typeof state.entityTarget === "string" &&
               state.entityTarget.length > 0 &&
               typeof state.cinematicPreset === "string" &&
-              state.cinematicPreset.length > 0,
+              state.cinematicPreset.length > 0 &&
+              typeof state.lens?.objective === "string" &&
+              state.lens.objective.length > 0 &&
+              typeof state.lens?.actionLabel === "string" &&
+              state.lens.actionLabel.length > 0 &&
+              typeof state.shot?.kind === "string" &&
+              Array.isArray(state.shot.evidence) &&
+              state.shot.evidence.length > 0,
           ) &&
           states.every(
             (state, index) =>
