@@ -29,6 +29,7 @@ video-pipeline-view/player-app/.vite/
 # Runtime artifacts
 .claude/
 .superpowers/
+.lark-product-preview/
 .render-props.json
 remotion-video/.superpowers/
 remotion-video/.render-props.json
@@ -40,6 +41,8 @@ remotion-video/public/runtime/*
 remotion-video/public/voice/*
 remotion-video/runtime/
 remotion-video/scripts/public/
+remotion-video/design-mocks/
+remotion-video/public/style-samples/
 !remotion-video/public/assets/.gitkeep
 !remotion-video/public/jobs/.gitkeep
 !remotion-video/public/runtime/.gitkeep
