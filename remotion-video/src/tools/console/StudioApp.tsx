@@ -1,273 +1,587 @@
-// src/tools/console/StudioApp.tsx
-// R1: 产品级视频生产台 — 主状态管理
-import React, {useEffect, useMemo, useState, useCallback} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {compileProject} from '../../project/compileProject';
 import type {VideoProject} from '../../project/projectSchema';
 import {DEFAULT_VIDEO_PROJECT} from '../../compositions/v2/defaultProject';
-import type {
-  ProjectOption, RunnerStatus, ContractKey, StudioFile, RunnerJob,
-  ActivityEvent, DraftScript,
-} from './types';
+import {STYLE_PRESETS, type StylePresetId} from '../../styles/video-gen/style-presets';
 import {
-  checkHealth, loadProjects, loadStudioFile, saveFile,
-  startJob, pollJob, normalizeLoadedProject, cloneProject, filePathFor, runnerBaseUrl,
+  artifactUrl, checkHealth, cloneProject, createProject, filePathFor, loadJobs, loadProjectState,
+  loadProjects, loadRemoteComponentLibrary, loadSceneStillsManifest, loadStudioFile, normalizeLoadedProject, pollJob, retryJob, saveFile, startJob, StudioApiError,
 } from './api';
-import {StudioShell} from './StudioShell';
-import {PreviewCanvas} from './PreviewCanvas';
-import {ProductionStepper, defaultStepStatus} from './ProductionStepper';
-import type {StepId} from './ProductionStepper';
-import {ScriptWorkspace} from './ScriptWorkspace';
-import {StoryboardWorkspace} from './StoryboardWorkspace';
-import {RenderWorkspace} from './RenderWorkspace';
-import {SceneTimeline} from './SceneTimeline';
+import {ComponentLibraryWorkspace} from './ComponentLibraryWorkspace';
+import {ComponentPreviewCanvas} from './ComponentPreviewCanvas';
+import {CopyWorkshop} from './CopyWorkshop';
 import {DeveloperDrawer} from './DeveloperDrawer';
 import {NewProjectModal} from './NewProjectModal';
-import type {CreateProjectResult} from './types';
+import {PreviewCanvas} from './PreviewCanvas';
+import {ProductionStepper, type StepId, type StepStatus} from './ProductionStepper';
+import {RenderWorkspace} from './RenderWorkspace';
+import {SceneTimeline} from './SceneTimeline';
+import {ScriptWorkspace} from './ScriptWorkspace';
+import {sceneTitle} from './scene-labels';
+import {StoryboardFrameCanvas} from './StoryboardFrameCanvas';
+import {StoryboardWorkspace} from './StoryboardWorkspace';
+import {StudioShell} from './StudioShell';
 import {StyleCard} from './StyleCard';
-import {STYLE_PRESETS, type StylePresetId} from '../../styles/video-gen/style-presets';
-import {theme} from './theme';
+import {VideoLibrary} from './VideoLibrary';
+import type {ActivityEvent, ContractKey, DraftScript, ProjectOption, ProjectState, RunnerJob, RunnerStatus, SceneStillsManifest, StudioFile, Tone} from './types';
+import type {ComponentLibraryItem} from './component-library-model';
+import {LOCAL_SCENE_COMPONENTS} from './component-library-model';
+import {invalidateProductionArtifacts, navigationState, requestCopyTransfer, usesSceneTimeline, usesWideEditor, type PendingCopyTransfer} from './workflow-model';
 import './index.css';
 
-const nowTime = () => new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'});
+const FALLBACK: ProjectOption = {id: 'skill-showcase', title: 'Skill Showcase 样片', productionPath: 'examples', projectJsonPath: 'examples/skill-showcase.json', outputVideoPath: 'out/workbuddy-six-skills-showcase-v3.mp4'};
+const SELECTED_PROJECT_STORAGE_KEY = 'video-factory:selected-project-id:v2';
+const contractKeys: ContractKey[] = ['brief.json', 'script-pack.json', 'asset-pack.json', 'project.json'];
+const scriptKey = (draft: DraftScript) => [draft.topic, draft.hook, draft.viewpoint, draft.pain, draft.solution, draft.selectedTitle, draft.script, draft.keywords].join('\u0001');
+const now = () => new Date().toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'});
+const recordOf = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+const stringOf = (value: unknown, fallback = '') => typeof value === 'string' ? value : fallback;
+const styleIdOf = (value: unknown): StylePresetId => STYLE_PRESETS.some((style) => style.id === value) ? value as StylePresetId : 'cyan-tech';
+const projectTimestamp = (option: ProjectOption) => Number(option.id.match(/^video-(\d+)/)?.[1] || 0);
+const componentLayoutSignature = (componentId: string) => `library:${componentId.replace(/[^a-z0-9:_-]/gi, '-').slice(0, 54)}`;
+const preferredWritableProject = (items: ProjectOption[]) => [...items]
+  .filter((item) => item.productionPath.startsWith('projects/'))
+  .sort((left, right) => projectTimestamp(right) - projectTimestamp(left) || right.id.localeCompare(left.id))[0] || null;
 
-const FALLBACK: ProjectOption = {
-  id: 'skill-showcase', title: 'Skill Showcase 样片', productionPath: 'examples',
-  projectJsonPath: 'examples/skill-showcase.json', outputVideoPath: 'out/workbuddy-six-skills-showcase-v3.mp4',
-};
-
-const defaultScriptFor = (project: VideoProject): DraftScript => {
+const draftFrom = (project: VideoProject, brief: unknown, scriptPack: unknown): DraftScript => {
+  const script = recordOf(scriptPack);
   const first = project.scenes[0]?.payload ?? {};
-  const title = String(first.title ?? project.title ?? '');
-  const captionText = project.captions.map((c) => c.text).join('');
+  const title = stringOf(script.title, stringOf(first.title, project.title));
   return {
-    topic: project.title || title, hook: '', viewpoint: '', pain: '', solution: '',
-    selectedTitle: title, titles: [title], script: captionText, keywords: '',
+    topic: stringOf(recordOf(brief).title, title), hook: stringOf(script.hook), viewpoint: stringOf(script.selectedViewpoint), pain: stringOf(script.pain), solution: stringOf(script.solution),
+    selectedTitle: title, titles: [title], script: stringOf(script.spokenScript, project.captions.map((caption) => caption.text).join('')), keywords: stringOf(script.keywords),
   };
 };
 
 export const StudioApp: React.FC = () => {
+  const [screen, setScreen] = useState<'studio' | 'library'>('studio');
   const [runnerStatus, setRunnerStatus] = useState<RunnerStatus>('checking');
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [selectedProject, setSelectedProject] = useState<ProjectOption>(FALLBACK);
   const [currentStep, setCurrentStep] = useState<StepId>('script');
-  const [stepStatus, setStepStatus] = useState(defaultStepStatus);
   const [project, setProject] = useState<VideoProject>(() => cloneProject(DEFAULT_VIDEO_PROJECT));
-  const [draft, setDraft] = useState<DraftScript>(() => defaultScriptFor(DEFAULT_VIDEO_PROJECT));
   const [files, setFiles] = useState<Record<ContractKey, StudioFile | null>>({'brief.json': null, 'script-pack.json': null, 'asset-pack.json': null, 'project.json': null});
-  const [jobs, setJobs] = useState<Record<string, RunnerJob>>({});
-  const [stillUrl, setStillUrl] = useState<string | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [activity, setActivity] = useState<ActivityEvent[]>([]);
-  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+  const [draft, setDraft] = useState<DraftScript>(() => draftFrom(DEFAULT_VIDEO_PROJECT, null, null));
   const [lastSavedDraft, setLastSavedDraft] = useState('');
-  const [styleId, setStyleId] = useState<StylePresetId>('cyan-tech');
+  const [copyText, setCopyText] = useState('');
+  const [savedCopyText, setSavedCopyText] = useState('');
+  const [copySavedAt, setCopySavedAt] = useState<string | null>(null);
+  const [copySaving, setCopySaving] = useState(false);
+  const [pendingCopyTransfer, setPendingCopyTransfer] = useState<PendingCopyTransfer | null>(null);
+  const [savedStyleId, setSavedStyleId] = useState<StylePresetId>('cyan-tech');
+  const [candidateStyleId, setCandidateStyleId] = useState<StylePresetId | null>(null);
+  const [state, setState] = useState<ProjectState | null>(null);
+  const [sceneStills, setSceneStills] = useState<SceneStillsManifest | null>(null);
+  const [jobs, setJobs] = useState<RunnerJob[]>([]);
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [remoteComponents, setRemoteComponents] = useState<ComponentLibraryItem[]>([]);
+  const [componentLibraryLoading, setComponentLibraryLoading] = useState(false);
+  const [componentLibraryWarning, setComponentLibraryWarning] = useState<string | null>(null);
+  const [selectedComponentId, setSelectedComponentId] = useState(LOCAL_SCENE_COMPONENTS[0]?.id || null);
+  const [selectedScene, setSelectedScene] = useState(0);
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [sceneEditSaving, setSceneEditSaving] = useState(false);
+  const [issue, setIssue] = useState<{title: string; diagnostics: RunnerJob['diagnostics']}>({title: '', diagnostics: []});
+  const openNewProject = useCallback(() => { setScreen('studio'); setShowNewProjectModal(true); }, []);
 
   const compiled = useMemo(() => {
     try { return {project: compileProject(project), error: null as string | null}; }
-    catch (e) { return {project: null, error: e instanceof Error ? e.message : String(e)}; }
+    catch (error) { return {project: null, error: error instanceof Error ? error.message : String(error)}; }
   }, [project]);
+  const totalFrames = project.scenes.reduce((sum, scene) => sum + scene.durationInFrames, 0);
+  const writable = selectedProject.productionPath.startsWith('projects/');
+  const draftDirty = scriptKey(draft) !== lastSavedDraft;
+  const styleDirty = candidateStyleId !== null && candidateStyleId !== savedStyleId;
+  const productionInputsDirty = draftDirty || styleDirty;
+  const activeJob = state?.activeJob || jobs.find((job) => job.status === 'running') || null;
+  const previewStage = state?.stages.sceneStills?.status ? state.stages.sceneStills : state?.stages.preview;
+  const videoVersion = [state?.stages.render.finishedAt, state?.updatedAt].filter(Boolean).join(':') || null;
+  const videoUrl = state?.stages.render.status === 'current' && state.stages.render.path ? artifactUrl(state.stages.render.path, videoVersion) : null;
+  const recentRenderJob = jobs.find((job) => job.commandId === 'render-verify') || null;
+  const componentLibrary = useMemo(() => [...LOCAL_SCENE_COMPONENTS, ...remoteComponents], [remoteComponents]);
+  const selectedComponent = useMemo(() => componentLibrary.find((component) => component.id === selectedComponentId) || componentLibrary[0] || null, [componentLibrary, selectedComponentId]);
 
-  const totalFrames = project.scenes.reduce((t, s) => t + s.durationInFrames, 0);
-
-  const draftDirty = useMemo(() => {
-    if (!files['brief.json']?.exists && !files['script-pack.json']?.exists) return true;
-    return [draft.topic, draft.hook, draft.viewpoint, draft.pain, draft.solution, draft.selectedTitle, ...draft.titles, draft.script, draft.keywords].join('|||') !== lastSavedDraft;
-  }, [draft, files, lastSavedDraft]);
-
-  const pushActivity = useCallback((text: string, tone: 'info'|'success'|'warning'|'danger' = 'info') => {
-    setActivity((a) => [{id: `${Date.now()}`, time: nowTime(), tone, text}, ...a].slice(0, 12));
+  const pushActivity = useCallback((text: string, tone: Tone = 'info') => {
+    setActivity((items) => [{id: `${Date.now()}-${Math.random()}`, time: now(), tone, text}, ...items].slice(0, 12));
   }, []);
 
-  const refreshContracts = useCallback(async (opt: ProjectOption) => {
-    const keys: ContractKey[] = ['brief.json', 'script-pack.json', 'asset-pack.json', 'project.json'];
-    const entries = await Promise.all(keys.map(async (k) => [k, await loadStudioFile(filePathFor(opt, k))] as const));
-    setFiles(Object.fromEntries(entries) as Record<ContractKey, StudioFile>);
-    const norm = normalizeLoadedProject(entries.find(([k]) => k === 'project.json')?.[1].data);
-    setProject(norm.project);
-    const d = defaultScriptFor(norm.project);
-    setDraft(d);
-    setLastSavedDraft([d.topic, d.hook, d.viewpoint, d.pain, d.solution, d.selectedTitle, ...d.titles, d.script, d.keywords].join('|||'));
-    if (!norm.ok) pushActivity('项目 JSON 校验失败，已回退默认。', 'danger');
-    else pushActivity(`已载入 ${opt.title}`, 'success');
-  }, [pushActivity]);
+  const markProductionArtifactsStale = useCallback(() => {
+    setSceneStills(null);
+    setState((current) => {
+      if (!current) return current;
+      return {...current, deliveryReady: false, stages: {
+        project: {...current.stages.project, status: 'stale'},
+        preview: {...current.stages.preview, status: 'stale'},
+        sceneStills: current.stages.sceneStills
+          ? {...current.stages.sceneStills, status: 'stale'}
+          : {status: 'stale'},
+        render: {...current.stages.render, status: 'stale'},
+        verify: {...current.stages.verify, status: 'stale'},
+      }};
+    });
+  }, []);
 
-  const selectProject = useCallback(async (opt: ProjectOption) => {
-    setSelectedProject(opt); setStillUrl(null); setVideoUrl(null); setCurrentStep('script');
-    await refreshContracts(opt);
-  }, [refreshContracts]);
+  const rememberProjectId = useCallback((projectId: string) => {
+    try { window.localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, projectId); }
+    catch { /* Local storage is optional; selection still works in memory. */ }
+  }, []);
 
-  const saveScript = useCallback(async () => {
-    setSaving(true);
+  const refreshState = useCallback(async (option = selectedProject) => {
     try {
-      const payloads: Array<[string, unknown]> = [
-        [filePathFor(selectedProject, 'brief.json'), {
-          productionId: selectedProject.id, title: draft.topic || selectedProject.id,
-          primaryLink: '', platform: 'douyin',
-          format: {width: project.render.width, height: project.render.height, fps: 30, maxDurationSeconds: 180},
-          audience: ['AI 从业者'], contentType: '技术教程', tone: '技术布道',
-          structure: '开场 -> 痛点 -> 方案 -> 步骤 -> 结论',
-          visualStyle: {palette: '蓝绿科技感', captionStyle: project.render.captionStyle, showProjectLabel: true, subtitles: '固定', branding: '不做'},
-          research: {sourcePriority: [], socialPolicy: '只当线索'},
-          viewpointCandidates: [{id: 'v1', claim: draft.viewpoint || '核心观点', whyItMatters: ''}],
-          selectedViewpointId: 'v1',
-        }],
-        [filePathFor(selectedProject, 'script-pack.json'), {
-          productionId: selectedProject.id, title: draft.selectedTitle || draft.topic,
-          hook: draft.hook, selectedViewpoint: draft.viewpoint, pain: draft.pain || '',
-          solution: draft.solution || '', spokenScript: draft.script, keywords: draft.keywords,
-        }],
-      ];
-      for (const [p, d] of payloads) { if (!await saveFile(p, d)) throw new Error(`save failed: ${p}`); }
-      setLastSavedDraft([draft.topic, draft.hook, draft.viewpoint, draft.pain, draft.solution, draft.selectedTitle, ...draft.titles, draft.script, draft.keywords].join('|||'));
-      setStepStatus((s) => ({...s, script: 'done'}));
-      pushActivity('文案已保存', 'success');
-    } catch (e) { pushActivity(`保存失败: ${e}`, 'danger'); }
-    finally { setSaving(false); }
-  }, [draft, selectedProject, project, pushActivity]);
+      const next = await loadProjectState(option.id);
+      setState(next);
+      if (next.stages.sceneStills?.status === 'current') setSceneStills(await loadSceneStillsManifest(next.stages.sceneStills.path));
+      else setSceneStills(null);
+    }
+    catch { setState(null); setSceneStills(null); }
+  }, [selectedProject]);
 
-  const runCommand = useCallback(async (commandId: string, label: string) => {
-    if (runnerStatus !== 'online') { pushActivity('执行器离线', 'danger'); return; }
-    if (commandId === 'build-project') await saveScript();
-    const result = await startJob(commandId, label, selectedProject);
-    if (!result) { pushActivity('任务启动失败', 'danger'); return; }
-    setJobs((j) => ({...j, [result.job.id]: result.job}));
-    pushActivity(`已启动: ${label}`, 'info');
-    const poll = async () => {
-      const job = await pollJob(result.job.id);
-      setJobs((j) => ({...j, [result.job.id]: job}));
-      if (job.status === 'running') { setTimeout(poll, 900); return; }
-      if (job.status === 'done') {
-        if (job.artifact?.kind === 'image' && job.artifact.url) setStillUrl(`${runnerBaseUrl()}${job.artifact.url}`);
-        if (job.artifact?.kind === 'video' && job.artifact.url) setVideoUrl(`${runnerBaseUrl()}${job.artifact.url}`);
-        if (commandId === 'build-project') {
-          await refreshContracts(selectedProject);
-          setStepStatus((s) => ({...s, storyboard: 'done'}));
-        } else if (commandId === 'project-still') setStepStatus((s) => ({...s, preview: 'done'}));
-        else if (commandId === 'project-render') setStepStatus((s) => ({...s, render: 'done', deliver: 'done'}));
-        pushActivity(`${label} 完成`, 'success');
-      } else pushActivity(`${label} 失败`, 'danger');
+  const refreshProject = useCallback(async (option: ProjectOption) => {
+    const [entries, copyFile] = await Promise.all([
+      Promise.all(contractKeys.map(async (key) => [key, await loadStudioFile(filePathFor(option, key))] as const)),
+      option.productionPath.startsWith('projects/')
+        ? loadStudioFile(`${option.productionPath}/copy-draft.json`)
+        : Promise.resolve({path: 'examples/copy-draft.json', exists: false, data: null} as StudioFile),
+    ]);
+    const nextFiles = Object.fromEntries(entries) as Record<ContractKey, StudioFile>;
+    const normalized = normalizeLoadedProject(nextFiles['project.json'].data);
+    const nextDraft = draftFrom(normalized.project, nextFiles['brief.json'].data, nextFiles['script-pack.json'].data);
+    const nextStyle = styleIdOf(recordOf(nextFiles['brief.json'].data).visualStyle && recordOf(recordOf(nextFiles['brief.json'].data).visualStyle).presetId);
+    const copyData = recordOf(copyFile.data);
+    const nextCopyText = stringOf(copyData.text);
+    const nextCopySavedAt = stringOf(copyData.savedAt) || null;
+    setFiles(nextFiles); setProject(normalized.project); setDraft(nextDraft); setLastSavedDraft(scriptKey(nextDraft)); setSavedStyleId(nextStyle); setCandidateStyleId(null); setSelectedScene(0);
+    setCopyText(nextCopyText); setSavedCopyText(nextCopyText); setCopySavedAt(nextCopySavedAt); setPendingCopyTransfer(null);
+    if (!normalized.ok) setIssue({title: 'Project JSON 未通过 Schema 校验', diagnostics: normalized.diagnostics.map((item) => ({...item, phase: 'load', path: item.path}))});
+    await Promise.all([refreshState(option), loadJobs(option.id).then(setJobs).catch(() => setJobs([]))]);
+  }, [refreshState]);
+
+  const selectProject = useCallback(async (option: ProjectOption) => {
+    setSelectedProject(option); setCurrentStep('script'); setIssue({title: '', diagnostics: []});
+    rememberProjectId(option.id);
+    await refreshProject(option);
+    pushActivity(`已切换至 ${option.title}`, 'success');
+  }, [pushActivity, refreshProject, rememberProjectId]);
+
+  const refreshBuiltProject = useCallback(async (option: ProjectOption): Promise<ProjectOption> => {
+    const items = await loadProjects().catch(() => []);
+    if (items.length > 0) setProjects(items);
+    const nextOption = items.find((item) => item.id === option.id) || option;
+    setSelectedProject(nextOption);
+    rememberProjectId(nextOption.id);
+    await refreshProject(nextOption);
+    return nextOption;
+  }, [refreshProject, rememberProjectId]);
+
+  const saveCopyDraft = useCallback(async () => {
+    if (!writable || !copyText.trim()) return;
+    const savedAt = new Date().toISOString();
+    try {
+      setCopySaving(true);
+      await saveFile(`${selectedProject.productionPath}/copy-draft.json`, {text: copyText, savedAt});
+      setSavedCopyText(copyText); setCopySavedAt(savedAt); setPendingCopyTransfer(null);
+      pushActivity('创作草稿已保存', 'success');
+    } catch (error) {
+      const apiError = error as StudioApiError;
+      setIssue({title: apiError.message || '草稿保存失败', diagnostics: apiError.diagnostics || []});
+    } finally {
+      setCopySaving(false);
+    }
+  }, [copyText, pushActivity, selectedProject.productionPath, writable]);
+
+  const saveSceneEdit = useCallback(async (sceneIndex: number, payload: Record<string, unknown>) => {
+    if (!writable) {
+      setIssue({title: '样例项目不可编辑分镜', diagnostics: []});
+      return;
+    }
+    const scene = project.scenes[sceneIndex];
+    if (!scene) {
+      setIssue({title: '当前分镜不存在', diagnostics: []});
+      return;
+    }
+    const nextProject = cloneProject(project);
+    nextProject.scenes[sceneIndex] = {...scene, payload};
+    try {
+      setSceneEditSaving(true);
+      const saved = await saveFile(filePathFor(selectedProject, 'project.json'), nextProject);
+      setProject(nextProject);
+      setFiles((current) => ({...current, 'project.json': saved}));
+      markProductionArtifactsStale();
+      await refreshState(selectedProject);
+      pushActivity(`分镜 ${String(sceneIndex + 1).padStart(2, '0')} 修改已保存`, 'success');
+    } catch (error) {
+      const apiError = error as StudioApiError;
+      setIssue({title: apiError.message || '分镜保存失败', diagnostics: apiError.diagnostics || []});
+      pushActivity(apiError.message || '分镜保存失败', 'danger');
+    } finally {
+      setSceneEditSaving(false);
+    }
+  }, [markProductionArtifactsStale, project, pushActivity, refreshState, selectedProject, writable]);
+
+  const applyComponentToScene = useCallback(async (component: ComponentLibraryItem) => {
+    const sceneIndex = project.scenes.length > 0 ? Math.min(Math.max(selectedScene, 0), project.scenes.length - 1) : 0;
+    const scene = project.scenes[sceneIndex];
+    if (!scene) {
+      setIssue({title: '当前没有可应用组件的分镜', diagnostics: []});
+      return;
+    }
+    const previousEditor = recordOf(scene.payload.sceneEditor);
+    const nextPayload = {
+      ...scene.payload,
+      variant: component.renderer.variant,
+      visualMode: component.renderer.visualMode,
+      heroStyle: component.renderer.heroStyle,
+      title: stringOf(scene.payload.title, sceneTitle(scene)),
+      subtitle: stringOf(scene.payload.subtitle, stringOf(scene.payload.body, component.description)).slice(0, 120),
+      body: stringOf(scene.payload.body, stringOf(scene.payload.subtitle, component.description)).slice(0, 120),
+      accent: stringOf(scene.payload.accent, component.source === 'hyperframes' ? '#d9642a' : '#2e6b63'),
+      layoutSignature: componentLayoutSignature(component.id),
+      sceneEditor: {
+        ...previousEditor,
+        componentId: component.id,
+        source: component.source,
+        sourceComponentId: component.sourceId,
+        rendererComponentId: component.renderer.componentId,
+        componentLabel: component.label,
+        componentCategory: component.category,
+        orientation: component.orientation,
+        blocks: ['background', 'component', 'caption'],
+        updatedAt: new Date().toISOString(),
+      },
     };
-    setTimeout(poll, 900);
-  }, [runnerStatus, saveScript, selectedProject, pushActivity, refreshContracts]);
+    await saveSceneEdit(sceneIndex, nextPayload);
+    pushActivity(`组件 ${component.label} 已应用到分镜 ${String(sceneIndex + 1).padStart(2, '0')}`, 'success');
+  }, [project, pushActivity, saveSceneEdit, selectedScene]);
 
-  const handleCreateProject = useCallback(async (result: CreateProjectResult) => {
-    setShowNewProjectModal(false);
-    const loaded = await loadProjects();
-    if (loaded.length > 0) { setProjects(loaded); const c = loaded.find((p) => p.id === result.project.id); if (c) await selectProject(c); }
-    pushActivity('项目已创建', 'success');
-  }, [selectProject, pushActivity]);
+  const prepareCopyTransfer = useCallback(() => {
+    try {
+      setPendingCopyTransfer(requestCopyTransfer({savedText: savedCopyText, savedAt: copySavedAt}));
+      pushActivity('草稿已准备转入口播文案', 'info');
+    } catch (error) {
+      setIssue({title: error instanceof Error ? error.message : '请先保存草稿', diagnostics: []});
+    }
+  }, [copySavedAt, pushActivity, savedCopyText]);
 
-  // Init
+  const changeStep = useCallback((nextStep: StepId) => {
+    if (nextStep === currentStep) return;
+    if (currentStep === 'copy' && pendingCopyTransfer) {
+      const confirmed = window.confirm('将已保存草稿替换为当前口播文案？现有分镜、预览和成片状态将需要重新生成。');
+      if (!confirmed) return;
+      setDraft((current) => ({
+        ...current,
+        script: pendingCopyTransfer.text,
+        hook: pendingCopyTransfer.text.slice(0, 120),
+      }));
+      setPendingCopyTransfer(null);
+      setSceneStills(null);
+      setState((current) => {
+        if (!current) return current;
+        const invalid = invalidateProductionArtifacts({
+          projectStatus: current.stages.project.status,
+          previewStatus: current.stages.preview.status,
+          sceneStillsStatus: current.stages.sceneStills?.status,
+          renderStatus: current.stages.render.status,
+          verifyStatus: current.stages.verify.status,
+          deliveryReady: current.deliveryReady,
+        });
+        return {...current, deliveryReady: invalid.deliveryReady, stages: {
+          project: {...current.stages.project, status: invalid.projectStatus},
+          preview: {...current.stages.preview, status: invalid.previewStatus},
+          sceneStills: current.stages.sceneStills
+            ? {...current.stages.sceneStills, status: invalid.sceneStillsStatus || 'stale'}
+            : {status: invalid.sceneStillsStatus || 'stale'},
+          render: {...current.stages.render, status: invalid.renderStatus},
+          verify: {...current.stages.verify, status: invalid.verifyStatus},
+        }};
+      });
+      setCurrentStep('script');
+      pushActivity('草稿已转入口播文案，请确认并保存', 'warning');
+      return;
+    }
+    setCurrentStep(nextStep);
+  }, [currentStep, pendingCopyTransfer, pushActivity]);
+
+  const buildInputs = useCallback(() => {
+    const previousBrief = recordOf(files['brief.json']?.data);
+    const previousVisualStyle = recordOf(previousBrief.visualStyle);
+    const brief = {
+      ...previousBrief,
+      productionId: selectedProject.id,
+      title: draft.topic || draft.selectedTitle || selectedProject.title,
+      visualStyle: {...previousVisualStyle, presetId: candidateStyleId ?? savedStyleId},
+      viewpointCandidates: [{id: 'v1', claim: draft.viewpoint || '核心观点', whyItMatters: ''}], selectedViewpointId: 'v1',
+    };
+    const previousScript = recordOf(files['script-pack.json']?.data);
+    const scriptPack = {...previousScript, productionId: selectedProject.id, title: draft.selectedTitle || draft.topic, hook: draft.hook, selectedViewpoint: draft.viewpoint, pain: draft.pain, solution: draft.solution, spokenScript: draft.script, keywords: draft.keywords};
+    return [{path: filePathFor(selectedProject, 'brief.json'), data: brief}, {path: filePathFor(selectedProject, 'script-pack.json'), data: scriptPack}];
+  }, [candidateStyleId, draft, files, savedStyleId, selectedProject]);
+
+  const waitForTerminalJob = useCallback(async (started: RunnerJob) => {
+    let next = started;
+    while (next.status === 'running') {
+      await new Promise((resolve) => window.setTimeout(resolve, 900));
+      next = await pollJob(started.id);
+      setJobs((items) => [next, ...items.filter((item) => item.id !== next.id)]);
+      await refreshState(started.project);
+    }
+    await refreshState(started.project);
+    return next;
+  }, [refreshState]);
+
+  const ensureBuiltProject = useCallback(async (
+    option: ProjectOption,
+    {label, saveInputs}: {label: string; saveInputs: boolean},
+  ): Promise<{ok: true; project: ProjectOption} | {ok: false; job: RunnerJob}> => {
+    const build = await startJob('build-check', label, option, saveInputs ? buildInputs() : undefined);
+    setJobs((items) => [build.job, ...items.filter((item) => item.id !== build.job.id)]);
+    pushActivity(`${label}已启动`, 'info');
+    const finishedBuild = await waitForTerminalJob(build.job);
+    if (finishedBuild.status !== 'done') return {ok: false, job: finishedBuild};
+    const nextProject = await refreshBuiltProject(finishedBuild.project);
+    pushActivity('分镜结构已更新', 'success');
+    return {ok: true, project: nextProject};
+  }, [buildInputs, pushActivity, refreshBuiltProject, waitForTerminalJob]);
+
+  const followJob = useCallback(async (started: RunnerJob, commandId: string) => {
+    const next = await waitForTerminalJob(started);
+    setWorking(false);
+    if (next.status === 'done') {
+      if (commandId === 'build-check') { await refreshBuiltProject(started.project); setCurrentStep('storyboard'); }
+      pushActivity(`${started.label}完成`, 'success');
+    } else {
+      setIssue({title: `${started.label}失败`, diagnostics: next.diagnostics});
+      pushActivity(`${started.label}失败`, 'danger');
+    }
+  }, [pushActivity, refreshBuiltProject, waitForTerminalJob]);
+
+  const runSceneStills = useCallback(async () => {
+    if (runnerStatus !== 'online') { setIssue({title: '本地执行器未启动', diagnostics: []}); return; }
+    try {
+      setWorking(true); setIssue({title: '', diagnostics: []});
+      let projectForStills = selectedProject;
+      if (writable && (productionInputsDirty || state?.stages.project.status !== 'current')) {
+        const built = await ensureBuiltProject(selectedProject, {
+          label: productionInputsDirty ? '保存并更新分镜' : '更新分镜结构',
+          saveInputs: productionInputsDirty,
+        });
+        if (!built.ok) {
+          setIssue({title: productionInputsDirty ? '保存并更新分镜失败' : '更新分镜结构失败', diagnostics: built.job.diagnostics});
+          pushActivity('更新分镜结构失败', 'danger');
+          setWorking(false);
+          return;
+        }
+        projectForStills = built.project;
+      }
+      const stills = await startJob('project-scene-stills', '生成分镜画面', projectForStills);
+      setJobs((items) => [stills.job, ...items.filter((item) => item.id !== stills.job.id)]);
+      pushActivity('生成分镜画面已启动', 'info');
+      const finishedStills = await waitForTerminalJob(stills.job);
+      setWorking(false);
+      if (finishedStills.status === 'done') {
+        await refreshState(projectForStills);
+        pushActivity('分镜画面完成', 'success');
+      } else {
+        setIssue({title: '生成分镜画面失败', diagnostics: finishedStills.diagnostics});
+        pushActivity('生成分镜画面失败', 'danger');
+      }
+    } catch (error) {
+      setWorking(false);
+      const apiError = error as StudioApiError;
+      setIssue({title: apiError.message || '任务无法启动', diagnostics: apiError.diagnostics || []});
+      pushActivity(apiError.message || '任务无法启动', 'danger');
+    }
+  }, [ensureBuiltProject, productionInputsDirty, pushActivity, refreshState, runnerStatus, selectedProject, state?.stages.project.status, waitForTerminalJob, writable]);
+
+  const runJob = useCallback(async (commandId: 'build-check' | 'project-scene-stills' | 'render-verify', label: string, includeInputs = false) => {
+    if (runnerStatus !== 'online') { setIssue({title: '本地执行器未启动', diagnostics: []}); return; }
+    try {
+      setWorking(true); setIssue({title: '', diagnostics: []});
+      let projectForCommand = selectedProject;
+      let shouldIncludeInputs = includeInputs;
+      if (commandId === 'render-verify' && writable && (productionInputsDirty || state?.stages.project.status !== 'current')) {
+        const built = await ensureBuiltProject(selectedProject, {
+          label: productionInputsDirty ? '保存并更新分镜' : '更新分镜结构',
+          saveInputs: productionInputsDirty,
+        });
+        if (!built.ok) {
+          setWorking(false);
+          setIssue({title: productionInputsDirty ? '保存并更新分镜失败' : '更新分镜结构失败', diagnostics: built.job.diagnostics});
+          pushActivity('生成最终视频已停止：分镜未更新', 'danger');
+          return;
+        }
+        projectForCommand = built.project;
+        shouldIncludeInputs = false;
+      }
+      const result = await startJob(commandId, label, projectForCommand, shouldIncludeInputs ? buildInputs() : undefined);
+      if (shouldIncludeInputs) {
+        setSceneStills(null);
+        setState((current) => {
+          if (!current) return current;
+          const invalid = invalidateProductionArtifacts({
+            projectStatus: current.stages.project.status,
+            previewStatus: current.stages.preview.status,
+            sceneStillsStatus: current.stages.sceneStills?.status,
+            renderStatus: current.stages.render.status,
+            verifyStatus: current.stages.verify.status,
+            deliveryReady: current.deliveryReady,
+          });
+          return {...current, deliveryReady: invalid.deliveryReady, stages: {
+            project: {...current.stages.project, status: invalid.projectStatus},
+            preview: {...current.stages.preview, status: invalid.previewStatus},
+            sceneStills: current.stages.sceneStills
+              ? {...current.stages.sceneStills, status: invalid.sceneStillsStatus || 'stale'}
+              : {status: invalid.sceneStillsStatus || 'stale'},
+            render: {...current.stages.render, status: invalid.renderStatus},
+            verify: {...current.stages.verify, status: invalid.verifyStatus},
+          }};
+        });
+      }
+      setJobs((items) => [result.job, ...items.filter((item) => item.id !== result.job.id)]);
+      pushActivity(`${label}已启动`, 'info');
+      void followJob(result.job, commandId);
+    } catch (error) {
+      setWorking(false);
+      const apiError = error as StudioApiError;
+      setIssue({title: apiError.message || '任务无法启动', diagnostics: apiError.diagnostics || []});
+      pushActivity(apiError.message || '任务无法启动', 'danger');
+    }
+  }, [buildInputs, ensureBuiltProject, followJob, productionInputsDirty, pushActivity, runnerStatus, selectedProject, state?.stages.project.status, writable]);
+
+  const retry = useCallback(async (job: RunnerJob) => {
+    try {
+      setWorking(true); const result = await retryJob(job.id); setJobs((items) => [result.job, ...items]); void followJob(result.job, result.job.commandId);
+    } catch (error) { setWorking(false); const apiError = error as StudioApiError; setIssue({title: apiError.message, diagnostics: apiError.diagnostics}); }
+  }, [followJob]);
+
   useEffect(() => {
-    let c = false;
-    const tick = async () => { const s = await checkHealth(); if (!c) setRunnerStatus(s); };
-    tick(); const iv = window.setInterval(tick, 5000);
-    return () => { c = true; window.clearInterval(iv); };
+    let cancelled = false;
+    const health = async () => { const result = await checkHealth(); if (!cancelled) setRunnerStatus(result); };
+    void health(); const interval = window.setInterval(() => void health(), 5000);
+    return () => { cancelled = true; window.clearInterval(interval); };
   }, []);
   useEffect(() => {
-    let c = false;
-    if (!initialized && runnerStatus === 'online') {
-      (async () => {
-        const l = await loadProjects();
-        if (c) return;
-        if (l.length > 0) { setProjects(l); setSelectedProject(l[0]); await refreshContracts(l[0]); }
-        setInitialized(true);
+    if (runnerStatus !== 'online') return;
+    let cancelled = false;
+    setComponentLibraryLoading(true);
+    setComponentLibraryWarning(null);
+    void loadRemoteComponentLibrary()
+      .then((result) => {
+        if (cancelled) return;
+        setRemoteComponents(result.components);
+        if (!result.available) setComponentLibraryWarning(`未找到 HyperFrames 动效库：${result.sourceRoot}`);
+        else if (result.warning) setComponentLibraryWarning(result.warning);
+      })
+      .catch((error) => {
+        if (!cancelled) setComponentLibraryWarning(error instanceof Error ? error.message : '组件库同步失败');
+      })
+      .finally(() => { if (!cancelled) setComponentLibraryLoading(false); });
+    return () => { cancelled = true; };
+  }, [runnerStatus]);
+  useEffect(() => {
+    if (runnerStatus !== 'online') return;
+    void loadProjects().then(async (items) => {
+      setProjects(items);
+      const storedId = (() => {
+        try { return window.localStorage.getItem(SELECTED_PROJECT_STORAGE_KEY) || ''; }
+        catch { return ''; }
       })();
-    }
-    return () => { c = true; };
-  }, [runnerStatus, initialized, refreshContracts]);
+      const target = items.find((item) => item.id === storedId) || preferredWritableProject(items) || items.find((item) => item.id === selectedProject.id) || items[0];
+      if (target) { setSelectedProject(target); rememberProjectId(target.id); await refreshProject(target); }
+    });
+  // Initial connection only. Selection is handled by selectProject.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runnerStatus]);
+  useEffect(() => {
+    if (!activeJob) return;
+    const interval = window.setInterval(() => { void refreshState(); void loadJobs(selectedProject.id).then(setJobs).catch(() => undefined); }, 2000);
+    return () => window.clearInterval(interval);
+  }, [activeJob, refreshState, selectedProject.id]);
 
-  const hasProject = !!selectedProject;
+  const newProjectModal = showNewProjectModal ? <NewProjectModal
+    onClose={() => setShowNewProjectModal(false)}
+    onCreated={async (result) => {
+      setShowNewProjectModal(false);
+      setScreen('studio');
+      const items = await loadProjects();
+      setProjects(items);
+      const next = items.find((item) => item.id === result.project.id);
+      if (next) await selectProject(next);
+      pushActivity('项目已创建，等待更新分镜', 'success');
+    }}
+    onError={(message) => setIssue({title: message, diagnostics: []})}
+  /> : null;
 
-  return (
-    <>
-      <StudioShell
-        header={
-          <div style={{height: '100%', display: 'flex', alignItems: 'center', padding: '0 18px', gap: 12}}>
-            <div style={{width: 28, height: 28, borderRadius: 7, background: `linear-gradient(135deg, ${theme.accent.blue}, ${theme.accent.indigo})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#fff', fontWeight: 800}}>V</div>
-            <span style={{fontWeight: 700, fontSize: 13, color: theme.text.primary}}>Video Studio</span>
-            <div style={{flex: 1}} />
-            <select value={selectedProject.projectJsonPath} onChange={(e) => { const n = projects.find((p) => p.projectJsonPath === e.target.value); if (n) selectProject(n); }} style={{background: theme.bg.surface, color: theme.text.primary, border: `1px solid ${theme.border.default}`, borderRadius: 5, padding: '4px 10px', fontSize: 10, outline: 'none'}}>
-              {projects.map((p) => <option key={p.projectJsonPath} value={p.projectJsonPath}>{p.title}</option>)}
-            </select>
-            <div style={{display: 'flex', alignItems: 'center', gap: 5, background: `${runnerStatus === 'online' ? theme.accent.green : theme.accent.red}14`, borderRadius: 20, padding: '2px 10px'}}>
-              <span style={{width: 6, height: 6, borderRadius: '50%', background: runnerStatus === 'online' ? theme.accent.green : theme.accent.red}} />
-              <span style={{fontSize: 9, color: runnerStatus === 'online' ? theme.accent.green : theme.accent.red}}>{runnerStatus === 'online' ? '已连接' : '离线'}</span>
-            </div>
-          </div>
-        }
-        stepper={<ProductionStepper currentStep={currentStep} onStepClick={(s) => setCurrentStep(s)} status={stepStatus} />}
-        preview={<PreviewCanvas compiled={compiled} project={project} stillUrl={stillUrl} />}
-        workspace={
-          <>
-            {currentStep === 'script' && <ScriptWorkspace draft={draft} onSetDraft={setDraft} onSave={saveScript} saving={saving} hasProject={hasProject} />}
-            {(currentStep === 'style' || currentStep === 'preview') && (
-              <div style={{padding: '16px 18px', height: '100%', overflow: 'auto'}}>
-                <div style={{marginBottom: 16}}>
-                  <h2 style={{margin: 0, fontSize: 13, fontWeight: 700, color: theme.text.primary}}>
-                    {currentStep === 'style' ? '🎨 选择风格' : '▶ 预览'}
-                  </h2>
-                  <p style={{margin: '4px 0 0', fontSize: 9, color: theme.text.muted}}>
-                    {currentStep === 'style' ? '选择一种视觉风格，影响配色、字幕样式和动效。' : '点击生成关键帧查看视频效果。'}
-                  </p>
-                </div>
-                {currentStep === 'style' ? (
-                  <>
-                    <StyleCard presets={STYLE_PRESETS} selected={styleId} onSelect={(id) => { setStyleId(id as StylePresetId); setStepStatus((s) => ({...s, style: 'done'})); }} />
-                    <button
-                      onClick={() => setCurrentStep('storyboard')}
-                      style={{
-                        width: '100%', marginTop: 14, padding: '10px 0', borderRadius: 8, border: 'none',
-                        background: `linear-gradient(135deg, ${theme.accent.blue}, ${theme.accent.indigo})`,
-                        color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                      }}
-                    >
-                      确认风格，进入分镜
-                    </button>
-                  </>
-                ) : (
-                  <div style={{
-                    padding: 16, borderRadius: 6, textAlign: 'center',
-                    background: theme.bg.surface, border: `1px solid ${theme.border.subtle}`,
-                    fontSize: 10, color: theme.text.muted,
-                  }}>
-                    点击下方「生成关键帧」查看视频预览效果。
-                  </div>
-                )}
-              </div>
-            )}
-            {currentStep === 'storyboard' && <StoryboardWorkspace project={project} totalFrames={totalFrames} fps={project.render.fps} />}
-            {(currentStep === 'render' || currentStep === 'deliver') && (
-              <RenderWorkspace compiled={compiled} stillUrl={stillUrl} videoUrl={videoUrl} onRunCommand={runCommand} runnerOnline={runnerStatus === 'online'} totalFrames={totalFrames} fps={project.render.fps} sceneCount={project.scenes.length} />
-            )}
-          </>
-        }
-        timeline={<SceneTimeline project={project} totalFrames={totalFrames} fps={project.render.fps} />}
-        drawer={<DeveloperDrawer jobs={jobs} activity={activity} />}
-      />
+  if (screen === 'library') {
+    return <><VideoLibrary onBack={() => setScreen('studio')} onOpenProject={(projectId) => { const next = projects.find((item) => item.id === projectId); if (next) void selectProject(next); setScreen('studio'); }} />{newProjectModal}</>;
+  }
 
-      {/* Floating new project button */}
-      <button
-        onClick={() => setShowNewProjectModal(true)}
-        style={{
-          position: 'fixed', left: 77, top: 64, zIndex: 50,
-          padding: '6px 14px', borderRadius: 20, border: `1px dashed ${theme.border.accent}`,
-          background: `${theme.accent.blue}0d`, color: theme.accent.blue,
-          fontSize: 10, fontWeight: 700, cursor: 'pointer',
-        }}
-      >
-        + 新建视频
-      </button>
+  const stepStatus: Record<StepId, StepStatus> = {
+    copy: copyText !== savedCopyText ? 'draft' : copySavedAt ? 'current' : 'missing',
+    script: working && activeJob?.commandId === 'build-check' ? 'running' : draftDirty ? 'draft' : 'current',
+    style: styleDirty ? 'draft' : 'current', storyboard: working && activeJob?.commandId === 'build-check' ? 'running' : state?.stages.project.status || 'missing',
+    preview: working && activeJob?.commandId === 'project-scene-stills' ? 'running' : previewStage?.status || 'missing',
+    render: working && activeJob?.commandId === 'render-verify' ? 'running' : state?.stages.render.status || 'missing',
+    deliver: state?.deliveryReady ? 'ready' : state?.stages.verify.status || 'missing',
+    components: 'current',
+  };
+  const navigation = navigationState({
+    hasProject: Boolean(selectedProject.id),
+    scriptReady: draft.script.trim().length >= 20 && !productionInputsDirty,
+    styleReady: !styleDirty,
+    projectStatus: state?.stages.project.status || 'missing',
+    previewStatus: previewStage?.status || 'missing',
+    renderStatus: state?.stages.render.status || 'missing',
+    verifyStatus: state?.stages.verify.status || 'missing',
+  });
+  const showSceneTimeline = usesSceneTimeline(currentStep);
+  const wideWorkspace = usesWideEditor(currentStep);
+  const previewLabel = currentStep === 'storyboard'
+    ? '当前分镜画面'
+    : currentStep === 'components'
+      ? '组件预览'
+      : '视频预览';
+  const preview = wideWorkspace
+    ? undefined
+    : currentStep === 'components'
+      ? <ComponentPreviewCanvas component={selectedComponent} projectTitle={selectedProject.title} />
+      : currentStep === 'storyboard'
+        ? <StoryboardFrameCanvas
+            project={project}
+            projectTitle={selectedProject.title}
+            selectedScene={selectedScene}
+            sceneStills={sceneStills}
+            state={state}
+            activeJob={activeJob}
+            fps={project.render.fps}
+          />
+        : <PreviewCanvas compiled={compiled} project={project} state={state} selectedScene={selectedScene} projectTitle={selectedProject.title} videoUrl={videoUrl} />;
 
-      {showNewProjectModal && (
-        <NewProjectModal
-          onClose={() => setShowNewProjectModal(false)}
-          onCreated={handleCreateProject}
-          onError={(msg) => pushActivity(msg, 'danger')}
-        />
-      )}
-    </>
-  );
+  return <>
+    <StudioShell
+      header={<div className="header-content">
+        <div className="product-lockup"><span className="product-mark">VF</span><span>Video Factory</span><small>AI 视频生产台</small></div>
+        <div className="header-project"><span>当前项目</span><select aria-label="当前项目" value={selectedProject.projectJsonPath} onChange={(event) => { const next = projects.find((item) => item.projectJsonPath === event.target.value); if (next) void selectProject(next); }}>{projects.map((item) => <option key={item.projectJsonPath} value={item.projectJsonPath}>{item.title}</option>)}</select></div>
+        <div className={`runner-status is-${runnerStatus}`}><i /><span>{runnerStatus === 'online' ? '执行器在线' : runnerStatus === 'checking' ? '连接执行器' : '执行器离线'}</span></div>
+        <div className="header-actions"><button className="new-project" type="button" onClick={openNewProject}>+ 新建视频</button></div>
+      </div>}
+      stepper={<ProductionStepper currentStep={currentStep} onStepClick={changeStep} onOpenVideoLibrary={() => setScreen('library')} status={stepStatus} navigation={navigation} />}
+      preview={preview}
+      previewLabel={previewLabel}
+      workspace={<>
+        {issue.title && <section className="issue-panel"><div><strong>{issue.title}</strong>{issue.diagnostics.slice(0, 2).map((diagnostic, index) => <p key={`${diagnostic.code}-${index}`}>{diagnostic.path ? `${diagnostic.path}: ` : ''}{diagnostic.message}</p>)}</div><button type="button" onClick={() => setIssue({title: '', diagnostics: []})}>关闭</button></section>}
+        {currentStep === 'copy' && <CopyWorkshop projectTitle={selectedProject.title} text={copyText} savedText={savedCopyText} savedAt={copySavedAt} writable={writable} saving={copySaving} transferPending={Boolean(pendingCopyTransfer)} onChange={setCopyText} onSave={() => void saveCopyDraft()} onTransfer={prepareCopyTransfer} />}
+        {currentStep === 'script' && <ScriptWorkspace draft={draft} dirty={draftDirty} writable={writable} saving={working} onSetDraft={setDraft} onBuild={() => void runJob('build-check', '保存并更新分镜', true)} />}
+        {currentStep === 'style' && <div className="workspace-panel style-workspace"><div className="workspace-heading"><div><span className="workspace-kicker">02 / 视觉系统</span><h1>风格</h1></div><span className={`state-chip ${styleDirty ? 'is-stale' : 'is-current'}`}>{styleDirty ? '待应用' : '已应用'}</span></div><p className="workspace-copy">风格只定义色彩、字体、节奏和版式规则，不播放项目镜头。确认应用后才会重新生成分镜结构。</p>{!writable && <div className="notice notice--neutral">样例项目为只读输入。</div>}<StyleCard presets={STYLE_PRESETS} candidate={candidateStyleId} applied={savedStyleId} disabled={!writable} onSelect={setCandidateStyleId} /><button className="primary-action" type="button" disabled={!writable || working || !styleDirty} onClick={() => void runJob('build-check', '应用风格并更新分镜', true)}>{working ? '正在应用风格' : styleDirty ? '应用候选风格' : candidateStyleId === savedStyleId ? '当前风格已应用' : '先选择一个风格'}</button></div>}
+        {currentStep === 'storyboard' && <StoryboardWorkspace project={project} fps={project.render.fps} selectedScene={selectedScene} state={state} sceneStills={sceneStills} runnerOnline={runnerStatus === 'online'} busy={Boolean(activeJob)} writable={writable} saving={sceneEditSaving} onSaveScene={saveSceneEdit} onRenderSceneStills={() => void runSceneStills()} />}
+        {currentStep === 'render' && <RenderWorkspace mode="render" state={state} videoUrl={videoUrl} runnerOnline={runnerStatus === 'online'} activeJob={activeJob} recentJob={recentRenderJob} onRun={(command) => void runJob(command, '生成最终视频')} totalFrames={totalFrames} fps={project.render.fps} sceneCount={project.scenes.length} />}
+        {currentStep === 'deliver' && <RenderWorkspace mode="deliver" state={state} videoUrl={videoUrl} runnerOnline={runnerStatus === 'online'} activeJob={activeJob} recentJob={recentRenderJob} onRun={(command) => void runJob(command, '生成最终视频')} totalFrames={totalFrames} fps={project.render.fps} sceneCount={project.scenes.length} />}
+        {currentStep === 'components' && <ComponentLibraryWorkspace components={componentLibrary} loading={componentLibraryLoading} warning={componentLibraryWarning} selectedId={selectedComponent?.id || null} selectedScene={selectedScene} project={project} writable={writable} saving={sceneEditSaving} onSelect={setSelectedComponentId} onApply={(component) => void applyComponentToScene(component)} />}
+      </>}
+      timeline={showSceneTimeline ? <SceneTimeline project={project} totalFrames={totalFrames} fps={project.render.fps} selectedScene={selectedScene} sceneStills={sceneStills} stillsRendering={activeJob?.commandId === 'project-scene-stills'} onSelectScene={setSelectedScene} /> : undefined}
+      wideWorkspace={wideWorkspace}
+      drawer={<DeveloperDrawer jobs={jobs} activity={activity} onRetry={(job) => void retry(job)} />}
+    />
+    {newProjectModal}
+  </>;
 };

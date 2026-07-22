@@ -12,20 +12,78 @@ import {
   buildScriptPack,
   buildAssetPack,
 } from './lib/starter-project.mjs';
+import {
+  StudioHttpError,
+  assertContractFilePath,
+  assertProjectPathContract,
+  artifactForCommand,
+  artifactSignature,
+  assertJobCanStart,
+  atomicWriteJson,
+  commandStepsFor,
+  computeFingerprints,
+  computeProjectState,
+  diagnosticForFailure,
+  extractLastJsonObject,
+  isPathInside,
+  isTerminalJob,
+  loadPersistedJobs,
+  loadProjectStateRecord,
+  loadVideoLibraryRecords,
+  markVideoVerification,
+  normalizeBoundedString,
+  normalizeProjectId,
+  normalizeSafeRelPath,
+  persistJobs,
+  recordRenderedVideo,
+  resolveArtifactFile,
+  resolveRuntimeRoot,
+  saveProjectStateRecord,
+} from './lib/studio-backend.mjs';
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = path.resolve(PROJECT_ROOT, '..');
+const HYPERFRAMES_ROOT = path.resolve(process.env.HYPERFRAMES_LIBRARY_DIR || path.join(process.env.HOME || '/Users/macos', 'Downloads', 'hyperframes-motion-动效库'));
 const STATIC_ROOT_CANDIDATES = [
   path.join(PROJECT_ROOT, 'build', 'tools'),
   path.join(REPO_ROOT, 'build', 'tools'),
 ];
 const PUBLIC_ROOT = path.join(PROJECT_ROOT, 'public');
+const RUNTIME_ROOT = resolveRuntimeRoot(PROJECT_ROOT, process.env.VIDEO_FACTORY_RUNTIME_DIR || 'runtime/studio');
+const JOBS_FILE = path.join(RUNTIME_ROOT, 'jobs.json');
+const VIDEO_LIBRARY_FILE = path.join(RUNTIME_ROOT, 'video-library.json');
 const staticRoot = () => STATIC_ROOT_CANDIDATES.find((candidate) => existsSync(path.join(candidate, 'index.html')))
   ?? STATIC_ROOT_CANDIDATES[0];
 const HOST = '127.0.0.1';
 const PORT = Number(process.env.VIDEO_FACTORY_PORT || 8787);
-const jobs = new Map();
-const editableJsonFiles = new Set(['brief.json', 'script-pack.json', 'asset-pack.json', 'project.json']);
+const restoredJobs = await loadPersistedJobs(JOBS_FILE);
+const jobs = new Map(restoredJobs.map((job) => [job.id, job]));
+let persistChain = Promise.resolve();
+let persistTimer = null;
+const editableInputFiles = new Set(['brief.json', 'script-pack.json', 'asset-pack.json']);
+const MAX_JSON_BODY_BYTES = 2 * 1024 * 1024;
+
+const persistJobState = () => {
+  persistChain = persistChain
+    .catch(() => undefined)
+    .then(() => persistJobs(JOBS_FILE, jobs));
+  return persistChain;
+};
+const libraryLock = {chain: Promise.resolve()};
+const withLibraryLock = (operation) => {
+  libraryLock.chain = libraryLock.chain.catch(() => undefined).then(operation);
+  return libraryLock.chain;
+};
+
+const schedulePersistJobState = () => {
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    void persistJobState().catch((error) => console.error('[studio] failed to persist jobs:', error));
+  }, 120);
+};
+
+if (restoredJobs.length > 0) await persistJobState();
 
 const contentTypes = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -37,6 +95,7 @@ const contentTypes = new Map([
   ['.jpeg', 'image/jpeg'],
   ['.svg', 'image/svg+xml'],
   ['.mp4', 'video/mp4'],
+  ['.mov', 'video/quicktime'],
   ['.m4a', 'audio/mp4'],
   ['.mp3', 'audio/mpeg'],
   ['.wav', 'audio/wav'],
@@ -55,51 +114,34 @@ const sendJson = (res, status, value) => {
 
 const readJson = async (req) => {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > MAX_JSON_BODY_BYTES) {
+      throw new StudioHttpError(413, 'request_too_large', `JSON body exceeds ${MAX_JSON_BODY_BYTES} bytes`);
+    }
+    chunks.push(chunk);
+  }
   const body = Buffer.concat(chunks).toString('utf8');
-  return body ? JSON.parse(body) : {};
-};
-
-const safeRelPath = (value, label) => {
-  const text = String(value ?? '').trim();
-  if (!text || path.isAbsolute(text) || text.includes('\\') || text.split('/').includes('..')) {
-    throw new Error(`${label} must be a safe relative path`);
+  if (!body) return {};
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new StudioHttpError(400, 'malformed_json', 'Request body must be valid JSON');
   }
-  if (!/^[A-Za-z0-9._~!$&'()+,;=@%\-/]+$/.test(text) || text.includes('//')) {
-    throw new Error(`${label} must be a safe relative path`);
-  }
-  return text;
 };
 
-const safeJsonRelPath = (value, label = 'file path') => {
-  const rel = safeRelPath(value, label);
-  const basename = path.basename(rel);
-  if (!editableJsonFiles.has(basename)) {
-    throw new Error(`${label} must target one of: ${[...editableJsonFiles].join(', ')}`);
-  }
-  return rel;
+const normalizeProject = (raw) => {
+  const project = {
+    id: normalizeProjectId(raw?.id),
+    title: String(raw?.title || raw?.id || 'Video Project').slice(0, 120),
+    productionPath: normalizeSafeRelPath(raw?.productionPath, 'productionPath'),
+    projectJsonPath: normalizeSafeRelPath(raw?.projectJsonPath, 'projectJsonPath'),
+    outputVideoPath: normalizeSafeRelPath(raw?.outputVideoPath, 'outputVideoPath'),
+  };
+  assertProjectPathContract(project);
+  return project;
 };
-
-const safeProjectId = (value) => {
-  const text = String(value ?? '').trim();
-  if (!/^[A-Za-z0-9._-]{1,96}$/.test(text)) throw new Error('projectId is invalid');
-  return text;
-};
-
-const safeNonEmptyString = (value, label, minLen = 1, maxLen = 200) => {
-  const text = String(value ?? '').trim();
-  if (text.length < minLen) throw new Error(`${label} is required (min ${minLen} chars)`);
-  if (text.length > maxLen) throw new Error(`${label} is too long (max ${maxLen} chars)`);
-  return text;
-};
-
-const normalizeProject = (raw) => ({
-  id: safeProjectId(raw?.id),
-  title: String(raw?.title || raw?.id || 'Video Project').slice(0, 120),
-  productionPath: safeRelPath(raw?.productionPath, 'productionPath'),
-  projectJsonPath: safeRelPath(raw?.projectJsonPath, 'projectJsonPath'),
-  outputVideoPath: safeRelPath(raw?.outputVideoPath, 'outputVideoPath'),
-});
 
 const titleFromProjectJson = async (projectJsonPath, fallback) => {
   try {
@@ -131,7 +173,7 @@ const discoverProjects = async () => {
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       let id;
-      try { id = safeProjectId(entry.name); } catch { continue; }
+      try { id = normalizeProjectId(entry.name); } catch { continue; }
       const productionPath = `projects/${entry.name}`;
       await addProject(`${productionPath}/project.json`, productionPath, entry.name, id);
     }
@@ -141,8 +183,8 @@ const discoverProjects = async () => {
 };
 
 const readStudioFile = async (rel) => {
-  const file = path.join(PROJECT_ROOT, rel);
-  if (!file.startsWith(PROJECT_ROOT)) throw new Error('file path escaped project root');
+  const file = path.resolve(PROJECT_ROOT, rel);
+  if (!isPathInside(PROJECT_ROOT, file)) throw new Error('file path escaped project root');
   if (!existsSync(file)) return {path: rel, exists: false, data: null};
   try {
     return {
@@ -161,111 +203,473 @@ const readStudioFile = async (rel) => {
 };
 
 const writeStudioFile = async (rel, data) => {
-  const file = path.join(PROJECT_ROOT, rel);
-  if (!file.startsWith(PROJECT_ROOT)) throw new Error('file path escaped project root');
-  await fs.mkdir(path.dirname(file), {recursive: true});
-  await fs.writeFile(file, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  const file = path.resolve(PROJECT_ROOT, rel);
+  if (!isPathInside(PROJECT_ROOT, file)) throw new Error('file path escaped project root');
+  await atomicWriteJson(file, data);
   return readStudioFile(rel);
 };
 
-const artifactFor = (commandId, project) => {
-  if (commandId === 'project-still') {
-    return {kind: 'image', path: `out/${project.id}-frame-30.png`};
-  }
-  if (commandId === 'project-render') {
-    return {kind: 'video', path: project.outputVideoPath};
-  }
-  if (commandId === 'build-project' || commandId === 'project-check') {
-    return {kind: 'json', path: project.projectJsonPath};
-  }
-  return null;
-};
-
-const commandFor = (commandId, project) => {
-  switch (commandId) {
-    case 'build-project':
-      return ['npm', 'run', 'project:from-pack', '--', project.productionPath];
-    case 'project-check':
-      return ['npm', 'run', 'project:check', '--', project.projectJsonPath];
-    case 'project-still':
-      return ['npm', 'run', 'project:still', '--', project.projectJsonPath, '--frame', '30', '--out', `out/${project.id}-frame-30.png`];
-    case 'project-render':
-      return ['npm', 'run', 'project:render', '--', project.projectJsonPath, '--out', project.outputVideoPath];
-    case 'project-verify':
-      return [process.execPath, 'scripts/verify-project-render.mjs', '--props', project.projectJsonPath, '--video', project.outputVideoPath];
-    default:
-      throw new Error(`Unsupported commandId: ${commandId}`);
+const publicArtifact = (artifact) => {
+  if (!artifact) return artifact;
+  try {
+    const {rel, file} = resolveArtifactFile(PROJECT_ROOT, artifact.path);
+    if (!isPathInside(PROJECT_ROOT, file) || !existsSync(file)) return {...artifact, path: rel};
+    return {...artifact, path: rel, url: `/api/artifact?path=${encodeURIComponent(rel)}`};
+  } catch {
+    return {...artifact, url: null};
   }
 };
 
 const publicJob = (job) => ({
   id: job.id,
   commandId: job.commandId,
+  workflowId: job.workflowId,
   label: job.label,
   command: job.command,
   status: job.status,
+  project: job.project,
+  projectId: job.project?.id ?? null,
+  currentStep: job.currentStep,
+  steps: job.steps,
   logs: job.logs.slice(-220),
   exitCode: job.exitCode,
   error: job.error,
-  artifact: job.artifact && existsSync(path.join(PROJECT_ROOT, job.artifact.path))
-    ? {...job.artifact, url: `/api/artifact?path=${encodeURIComponent(job.artifact.path)}`}
-    : job.artifact,
+  diagnostics: job.diagnostics ?? [],
+  retryOf: job.retryOf ?? null,
+  artifact: publicArtifact(job.artifact),
   startedAt: job.startedAt,
   finishedAt: job.finishedAt,
+  updatedAt: job.updatedAt ?? job.finishedAt ?? job.startedAt ?? null,
 });
+
+const publicVideoRecord = (record) => ({...record, playbackUrl: record.playbackUrl, downloadUrl: record.downloadAllowed ? `/api/video-library/${encodeURIComponent(record.id)}/download` : null});
+
+const hyperframesVariableTypes = new Set(['string', 'number', 'color', 'enum', 'boolean']);
+
+const orientationFromSize = (size) => {
+  const [width, height] = String(size || '').split(/[×x]/).map((part) => Number(part.trim()));
+  if (Number.isFinite(width) && Number.isFinite(height) && height > width) return 'portrait';
+  return 'landscape';
+};
+
+const boundedText = (value, fallback = '', max = 220) => String(value ?? fallback).trim().slice(0, max);
+
+const normalizeHyperframesPreviewPath = (value) => {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  if (/^(https?:|data:|blob:)/i.test(value)) return null;
+  const rel = value.split('?')[0].replace(/^\/+/, '');
+  if (!rel.startsWith('renders/') || rel.includes('\\') || rel.split('/').includes('..')) return null;
+  return rel;
+};
+
+const normalizeHyperframesVariable = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const id = boundedText(value.id, '', 64);
+  const type = hyperframesVariableTypes.has(value.type) ? value.type : 'string';
+  if (!id) return null;
+  const variable = {
+    id,
+    type,
+    label: boundedText(value.label, id, 80) || id,
+  };
+  if (typeof value.hidden === 'boolean') variable.hidden = value.hidden;
+  if (['string', 'color', 'enum'].includes(type) && value.default != null) variable.default = String(value.default).slice(0, 220);
+  if (type === 'number' && Number.isFinite(Number(value.default))) variable.default = Number(value.default);
+  if (type === 'boolean' && typeof value.default === 'boolean') variable.default = value.default;
+  if (type === 'enum' && Array.isArray(value.options)) {
+    variable.options = value.options
+      .map((option) => ({
+        value: boundedText(option?.value, '', 80),
+        label: boundedText(option?.label, option?.value, 80),
+      }))
+      .filter((option) => option.value);
+  }
+  return variable;
+};
+
+const readHyperframesSchema = async (templatePath) => {
+  try {
+    const html = await fs.readFile(path.join(templatePath, 'index.html'), 'utf8');
+    const match = html.match(/data-composition-variables='([^']+)'/s) || html.match(/data-composition-variables="([^"]+)"/s);
+    if (!match) return [];
+    const parsed = JSON.parse(match[1]);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalizeHyperframesVariable).filter(Boolean).slice(0, 32);
+  } catch {
+    return [];
+  }
+};
+
+const hyperframesCategory = (template) => {
+  const text = `${template.id} ${template.name} ${template.description} ${template.category} ${(template.tags || []).join(' ')}`.toLowerCase();
+  if (/transition|转场|wipe|morph|reveal/.test(text)) return '转场';
+  if (/effect|visual|particle|glitch|特效|背景|background|orbit|rays/.test(text)) return '特效';
+  if (/caption|subtitle|kicker|lower-third|字幕|文字/.test(text)) return '字幕';
+  if (/code|terminal|代码|命令|日志/.test(text)) return '代码';
+  if (/chart|number|metric|gauge|rank|stat|数据|数字|kpi|柱状图|折线|趋势|增长/.test(text)) return '数据';
+  if (/flow|step|timeline|process|流程|步骤|链路/.test(text)) return '流程';
+  if (/compare|before|after|split|duel|对比/.test(text)) return '对比';
+  if (/ui|product|image|showcase|界面|产品|演示/.test(text)) return '界面';
+  if (/title|headline|opening|hero|标题|开场|结论/.test(text)) return '标题';
+  return '推荐';
+};
+
+const hyperframesRenderer = (template, category) => {
+  const text = `${template.id} ${template.name} ${template.description} ${(template.tags || []).join(' ')}`.toLowerCase();
+  if (category === '代码') return {componentId: 'code-panel', variant: 'remotion', visualMode: 'process', heroStyle: 'hero-track-v2'};
+  if (category === '流程') return {componentId: 'process-steps', variant: 'generic', visualMode: 'process', heroStyle: 'hero-track-v2'};
+  if (category === '对比') return {componentId: 'compare-split', variant: 'frontend-design', visualMode: 'compare', heroStyle: 'hero-track-v2'};
+  if (category === '数据') return {componentId: 'data-proof', variant: 'generic', visualMode: 'metrics', heroStyle: 'hero-track-v2'};
+  if (category === '界面') return {componentId: 'product-surface', variant: 'ui', visualMode: 'hero', heroStyle: 'hero-track-v2'};
+  if (category === '字幕' || /quote|caption|subtitle/.test(text)) return {componentId: 'quote-focus', variant: 'generic', visualMode: 'quote', heroStyle: 'cinematic'};
+  if (/matrix|tag|grid/.test(text)) return {componentId: 'keyword-matrix', variant: 'overview', visualMode: 'grid', heroStyle: 'hero-track-v2'};
+  return {componentId: 'hero-title', variant: 'intro', visualMode: 'hero', heroStyle: 'hero-track-v2'};
+};
+
+const loadHyperframesComponentLibrary = async () => {
+  const catalogPath = path.join(HYPERFRAMES_ROOT, 'catalog.json');
+  if (!existsSync(catalogPath)) {
+    return {
+      ok: true,
+      available: false,
+      sourceRoot: HYPERFRAMES_ROOT,
+      version: null,
+      components: [],
+      warning: 'HyperFrames catalog.json not found',
+    };
+  }
+  const catalog = JSON.parse(await fs.readFile(catalogPath, 'utf8'));
+  const templates = Array.isArray(catalog.templates) ? catalog.templates : [];
+  const components = await Promise.all(templates.map(async (template) => {
+    const sourceId = boundedText(template.id, '', 64);
+    if (!sourceId) return null;
+    const previewPath = normalizeHyperframesPreviewPath(template.preview);
+    const category = hyperframesCategory(template);
+    const renderer = hyperframesRenderer(template, category);
+    const templatePath = path.join(HYPERFRAMES_ROOT, boundedText(template.path, `templates/${sourceId}`, 180));
+    return {
+      id: `hf:${sourceId}`,
+      sourceId,
+      source: 'hyperframes',
+      label: boundedText(template.name, sourceId, 80) || sourceId,
+      description: boundedText(template.description, '来自 HyperFrames 的参数化动效模板。', 220),
+      category,
+      orientation: orientationFromSize(template.size),
+      size: boundedText(template.size, '1920×1080', 24) || '1920×1080',
+      duration: Number.isFinite(Number(template.duration)) ? Number(template.duration) : null,
+      tags: Array.isArray(template.tags) ? template.tags.map((tag) => boundedText(tag, '', 30)).filter(Boolean).slice(0, 8) : [],
+      formats: Array.isArray(template.formats) ? template.formats.map((format) => boundedText(format, '', 12)).filter(Boolean).slice(0, 5) : ['mp4'],
+      previewUrl: previewPath ? `/api/component-library/asset?path=${encodeURIComponent(previewPath)}` : null,
+      previewKind: previewPath ? 'video' : 'mock',
+      status: template.status === 'ready' ? 'ready' : 'draft',
+      renderer,
+      schema: await readHyperframesSchema(templatePath),
+    };
+  }));
+  return {
+    ok: true,
+    available: true,
+    sourceRoot: HYPERFRAMES_ROOT,
+    version: catalog.version ?? null,
+    components: components.filter(Boolean),
+  };
+};
 
 const appendLog = (job, chunk) => {
   const text = chunk.toString('utf8');
+  job.updatedAt = new Date().toISOString();
   for (const line of text.split(/\r?\n/)) {
     if (line.trim()) job.logs.push(line);
   }
   if (job.logs.length > 500) job.logs.splice(0, job.logs.length - 500);
+  schedulePersistJobState();
 };
 
-const createJob = (body) => {
-  const project = normalizeProject(body.project);
-  const commandId = String(body.commandId || '');
-  const label = String(body.label || commandId);
-  const cmdArray = commandFor(commandId, project);
-  const command = cmdArray[0];
-  const args = cmdArray.slice(1);
-  const artifact = artifactFor(commandId, project);
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const job = {
-    id,
-    commandId,
-    label,
-    command: [command, ...args].join(' '),
-    status: 'running',
-    logs: [],
-    artifact,
-    exitCode: null,
-    error: null,
-    startedAt: new Date().toISOString(),
-    finishedAt: null,
-  };
-  jobs.set(id, job);
+const normalizeInputFiles = (value, commandId, project) => {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > editableInputFiles.size) {
+    throw new StudioHttpError(400, 'invalid_input_files', `files must contain at most ${editableInputFiles.size} input contracts`);
+  }
+  if (value.length > 0 && commandId !== 'build-check') {
+    throw new StudioHttpError(400, 'invalid_input_files', 'files can only be saved by the build-check workflow');
+  }
+  const seen = new Set();
+  return value.map((entry) => {
+    const rel = assertContractFilePath(entry?.path, {label: 'input file path', writable: true});
+    const basename = path.basename(rel);
+    const expected = `${project.productionPath}/${basename}`;
+    if (!editableInputFiles.has(basename) || rel !== expected) {
+      throw new StudioHttpError(400, 'invalid_input_files', `input file path must target ${project.productionPath}/{brief.json,script-pack.json,asset-pack.json}`);
+    }
+    if (seen.has(rel)) throw new StudioHttpError(400, 'invalid_input_files', `duplicate input file: ${rel}`);
+    if (!entry.data || typeof entry.data !== 'object' || Array.isArray(entry.data)) {
+      throw new StudioHttpError(400, 'invalid_input_files', `${basename} data must be a JSON object`);
+    }
+    seen.add(rel);
+    return {path: rel, data: entry.data};
+  });
+};
 
+const writeInputFiles = async (files) => {
+  const originals = await Promise.all(files.map(async (entry) => {
+    const file = path.join(PROJECT_ROOT, entry.path);
+    try {
+      return {file, existed: true, content: await fs.readFile(file)};
+    } catch (error) {
+      if (error?.code === 'ENOENT') return {file, existed: false, content: null};
+      throw error;
+    }
+  }));
+  try {
+    for (const entry of files) await atomicWriteJson(path.join(PROJECT_ROOT, entry.path), entry.data);
+  } catch (error) {
+    await Promise.all(originals.map(async (original) => {
+      if (original.existed) await fs.writeFile(original.file, original.content);
+      else await fs.rm(original.file, {force: true});
+    }));
+    throw error;
+  }
+};
+
+const runProcessStep = (job, step) => new Promise((resolve) => {
+  const [command, ...args] = step.command;
+  let settled = false;
+  let spawnError = null;
+  const finish = (result) => {
+    if (settled) return;
+    settled = true;
+    resolve(result);
+  };
+  appendLog(job, `$ ${step.command.join(' ')}`);
   const child = spawn(command, args, {
     cwd: PROJECT_ROOT,
     env: process.env,
     shell: false,
   });
-  appendLog(job, `$ ${job.command}`);
   child.stdout.on('data', (chunk) => appendLog(job, chunk));
   child.stderr.on('data', (chunk) => appendLog(job, chunk));
   child.on('error', (error) => {
-    job.status = 'failed';
-    job.error = error.message;
-    job.finishedAt = new Date().toISOString();
+    spawnError = error;
     appendLog(job, error.message);
+    finish({exitCode: null, error});
   });
-  child.on('close', (code) => {
-    job.exitCode = code;
-    job.status = code === 0 ? 'done' : 'failed';
-    job.finishedAt = new Date().toISOString();
-    appendLog(job, code === 0 ? '[studio] task completed' : `[studio] task failed with exit code ${code}`);
-  });
+  child.on('close', (code) => finish({exitCode: code, error: spawnError}));
+});
+
+const successMarker = async (job) => {
+  const fingerprints = await computeFingerprints(PROJECT_ROOT, job.project);
+  const finishedAt = new Date().toISOString();
+  const marker = {...fingerprints, jobId: job.id, commandId: job.commandId, workflowId: job.workflowId, finishedAt};
+  const current = await loadProjectStateRecord(RUNTIME_ROOT, job.project.id);
+  const next = {...current};
+
+  if (job.commandId === 'build-project') {
+    next.buildCheck = null;
+    next.preview = null;
+    next.sceneStills = null;
+    next.render = null;
+    next.verify = null;
+  }
+  if (job.commandId === 'project-check') {
+    next.projectCheck = marker;
+  }
+  if (job.commandId === 'build-check') {
+    next.buildCheck = marker;
+    next.preview = null;
+    next.sceneStills = null;
+    next.render = null;
+    next.verify = null;
+  }
+  if (job.commandId === 'project-still') {
+    next.preview = {
+      ...marker,
+      artifactSignature: await artifactSignature(path.join(PROJECT_ROOT, `out/${job.project.id}-frame-30.png`)),
+    };
+  }
+  if (job.commandId === 'project-scene-stills') {
+    next.sceneStills = {
+      ...marker,
+      artifactSignature: await artifactSignature(path.join(PROJECT_ROOT, `out/${job.project.id}-scene-stills/manifest.json`)),
+    };
+  }
+  if (job.commandId === 'project-render') {
+    next.render = {
+      ...marker,
+      artifactSignature: await artifactSignature(path.join(PROJECT_ROOT, job.project.outputVideoPath)),
+    };
+    next.verify = null;
+  }
+  if (job.commandId === 'project-verify' || job.commandId === 'render-verify') {
+    const signature = await artifactSignature(path.join(PROJECT_ROOT, job.project.outputVideoPath));
+    const result = extractLastJsonObject(job.logs);
+    next.render = {...marker, artifactSignature: signature};
+    next.verify = {...marker, artifactSignature: signature, result};
+  }
+  return saveProjectStateRecord(RUNTIME_ROOT, job.project.id, next);
+};
+
+const failJob = async (job, step, {exitCode = null, error = null, diagnostic = null} = {}) => {
+  const finishedAt = new Date().toISOString();
+  step.status = 'failed';
+  step.exitCode = exitCode;
+  step.error = error?.message ?? diagnostic?.message ?? `Step ${step.id} failed`;
+  step.finishedAt = finishedAt;
+  job.status = 'failed';
+  job.exitCode = exitCode;
+  job.error = step.error;
+  job.finishedAt = finishedAt;
+  job.updatedAt = finishedAt;
+  job.currentStep = step.id;
+  job.diagnostics.push(diagnostic ?? diagnosticForFailure({phase: step.id, logs: job.logs, error}));
+  if (step.id === 'verify' && job.artifact?.kind === 'video') {
+    await withLibraryLock(() => markVideoVerification({file: VIDEO_LIBRARY_FILE, sourceJobId: job.id, ok: false, failureMessage: step.error}));
+  }
+  appendLog(job, exitCode == null ? `[studio] ${step.id} failed` : `[studio] ${step.id} failed with exit code ${exitCode}`);
+  await persistJobState();
+};
+
+const executeJob = async (job, inputFiles) => {
+  for (const step of job.steps) {
+    step.status = 'running';
+    step.startedAt = new Date().toISOString();
+    job.currentStep = step.id;
+    job.updatedAt = step.startedAt;
+    await persistJobState();
+
+    if (step.kind === 'save-inputs') {
+      try {
+        await writeInputFiles(inputFiles);
+        step.status = 'done';
+        step.exitCode = 0;
+        step.finishedAt = new Date().toISOString();
+        job.updatedAt = step.finishedAt;
+        appendLog(job, `[studio] saved ${inputFiles.length} input contract(s)`);
+      } catch (error) {
+        await failJob(job, step, {
+          error,
+          diagnostic: {level: 'error', code: 'input_save_failed', phase: step.id, path: null, message: error instanceof Error ? error.message : String(error)},
+        });
+        return;
+      }
+      continue;
+    }
+
+    let result;
+    try {
+      result = await runProcessStep(job, step);
+    } catch (error) {
+      await failJob(job, step, {error});
+      return;
+    }
+    step.exitCode = result.exitCode;
+    step.finishedAt = new Date().toISOString();
+    if (result.error || result.exitCode !== 0) {
+      await failJob(job, step, result);
+      return;
+    }
+    step.status = 'done';
+    job.updatedAt = step.finishedAt;
+    appendLog(job, `[studio] ${step.id} completed`);
+    if (step.id === 'render' && job.artifact?.kind === 'video') {
+      await withLibraryLock(() => recordRenderedVideo({file: VIDEO_LIBRARY_FILE, projectRoot: PROJECT_ROOT, project: job.project, sourceJobId: job.id, createdAt: job.startedAt}));
+    }
+    if (step.id === 'verify' && job.artifact?.kind === 'video') {
+      await withLibraryLock(() => markVideoVerification({file: VIDEO_LIBRARY_FILE, sourceJobId: job.id, ok: true}));
+    }
+  }
+
+  try {
+    await successMarker(job);
+  } catch (error) {
+    const stateStep = {
+      id: 'persist-state',
+      label: 'Persist Project State',
+      kind: 'internal',
+      command: null,
+      status: 'running',
+      exitCode: null,
+      error: null,
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+    };
+    job.steps.push(stateStep);
+    await failJob(job, stateStep, {
+      error,
+      diagnostic: {level: 'error', code: 'state_persist_failed', phase: 'persist-state', path: null, message: error instanceof Error ? error.message : String(error)},
+    });
+    return;
+  }
+
+  job.status = 'done';
+  job.currentStep = null;
+  job.exitCode = 0;
+  job.finishedAt = new Date().toISOString();
+  job.updatedAt = job.finishedAt;
+  appendLog(job, '[studio] task completed');
+  await persistJobState();
+};
+
+const createJob = async (body, {retryOf = null} = {}) => {
+  const project = normalizeProject(body.project);
+  const commandId = String(body.commandId || '');
+  const inputFiles = normalizeInputFiles(body.files, commandId, project);
+
+  assertJobCanStart(jobs, project.id);
+  if (commandId === 'render-verify') {
+    const record = await loadProjectStateRecord(RUNTIME_ROOT, project.id);
+    const state = await computeProjectState(PROJECT_ROOT, project, record);
+    if (state.stages.project.status !== 'current') {
+      throw new StudioHttpError(409, 'project_not_checked', 'Project must pass build-check before render-verify', [{
+        level: 'error',
+        code: 'project_not_checked',
+        phase: 'preflight',
+        path: project.projectJsonPath,
+        message: 'Run build-check for the current inputs and renderer before rendering the deliverable MP4.',
+      }]);
+    }
+  }
+  assertJobCanStart(jobs, project.id);
+
+  const processSteps = commandStepsFor(commandId, project, process.execPath);
+  const steps = inputFiles.length > 0
+    ? [{
+      id: 'save-inputs',
+      label: 'Save Input Contracts',
+      kind: 'save-inputs',
+      command: null,
+      status: 'pending',
+      exitCode: null,
+      error: null,
+      startedAt: null,
+      finishedAt: null,
+    }, ...processSteps]
+    : processSteps;
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const command = processSteps.map((step) => step.command.join(' ')).join(' && ');
+  const startedAt = new Date().toISOString();
+  const job = {
+    id,
+    commandId,
+    workflowId: commandId === 'build-check' || commandId === 'render-verify' ? commandId : null,
+    label: String(body.label || commandId).slice(0, 160),
+    command,
+    project,
+    status: 'running',
+    currentStep: steps[0]?.id ?? null,
+    steps,
+    logs: [],
+    diagnostics: [],
+    artifact: artifactForCommand(commandId, project),
+    exitCode: null,
+    error: null,
+    retryOf,
+    startedAt,
+    finishedAt: null,
+    updatedAt: startedAt,
+  };
+  jobs.set(id, job);
+  await persistJobState();
+  void executeJob(job, inputFiles);
   return job;
 };
 
@@ -288,6 +692,10 @@ const serveFile = async (req, res, file) => {
       'accept-ranges': 'bytes',
       'access-control-allow-origin': '*',
     });
+    if (req.method === 'HEAD') {
+      res.end();
+      return;
+    }
     createReadStream(file, {start, end}).pipe(res);
     return;
   }
@@ -297,14 +705,37 @@ const serveFile = async (req, res, file) => {
     'accept-ranges': 'bytes',
     'access-control-allow-origin': '*',
   });
+  if (req.method === 'HEAD') {
+    res.end();
+    return;
+  }
   createReadStream(file).pipe(res);
 };
 
 const serveArtifact = async (req, res, url) => {
-  const rel = safeRelPath(url.searchParams.get('path'), 'artifact path');
-  const file = path.join(PROJECT_ROOT, rel);
-  if (!file.startsWith(PROJECT_ROOT) || !existsSync(file)) {
+  const {file} = resolveArtifactFile(PROJECT_ROOT, url.searchParams.get('path'));
+  if (!existsSync(file)) {
     sendJson(res, 404, {ok: false, error: 'artifact not found'});
+    return;
+  }
+  res.setHeader('cache-control', 'no-store, max-age=0, must-revalidate');
+  res.setHeader('pragma', 'no-cache');
+  await serveFile(req, res, file);
+};
+
+const serveComponentLibraryAsset = async (req, res, url) => {
+  const rel = normalizeHyperframesPreviewPath(url.searchParams.get('path'));
+  if (!rel) {
+    sendJson(res, 403, {ok: false, code: 'component_asset_forbidden', error: 'component preview path must target HyperFrames renders/'});
+    return;
+  }
+  const file = path.resolve(HYPERFRAMES_ROOT, rel);
+  if (!isPathInside(HYPERFRAMES_ROOT, file)) {
+    sendJson(res, 403, {ok: false, code: 'component_asset_forbidden', error: 'component preview path escaped HyperFrames root'});
+    return;
+  }
+  if (!existsSync(file)) {
+    sendJson(res, 404, {ok: false, code: 'component_asset_missing', error: 'component preview asset not found'});
     return;
   }
   await serveFile(req, res, file);
@@ -314,14 +745,14 @@ const serveStatic = async (req, res, url) => {
   const STATIC_ROOT = staticRoot();
   const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
   const publicFile = path.resolve(PUBLIC_ROOT, `.${pathname}`);
-  if (publicFile.startsWith(`${PUBLIC_ROOT}${path.sep}`) && existsSync(publicFile)) {
+  if (isPathInside(PUBLIC_ROOT, publicFile) && publicFile !== PUBLIC_ROOT && existsSync(publicFile)) {
     await serveFile(req, res, publicFile);
     return;
   }
   const requested = path.normalize(path.join(STATIC_ROOT, pathname));
   const fallback = path.join(STATIC_ROOT, 'index.html');
   const isHtml = pathname === '/index.html' || (requested !== fallback && path.extname(requested).toLowerCase() === '.html');
-  const file = requested.startsWith(STATIC_ROOT) && existsSync(requested) ? requested : fallback;
+  const file = isPathInside(STATIC_ROOT, requested) && existsSync(requested) ? requested : fallback;
   if (!existsSync(file)) {
     sendJson(res, 404, {
       ok: false,
@@ -354,19 +785,39 @@ const server = http.createServer(async (req, res) => {
     }
     const url = new URL(req.url || '/', `http://${HOST}:${PORT}`);
     if (url.pathname === '/api/health') {
-      sendJson(res, 200, {ok: true, cwd: PROJECT_ROOT, jobs: jobs.size});
+      sendJson(res, 200, {
+        ok: true,
+        cwd: PROJECT_ROOT,
+        jobs: jobs.size,
+        runningJobs: [...jobs.values()].filter((job) => job.status === 'running').length,
+        persistence: path.relative(PROJECT_ROOT, JOBS_FILE),
+      });
       return;
     }
     if (url.pathname === '/api/projects' && req.method === 'GET') {
       sendJson(res, 200, {ok: true, projects: await discoverProjects()});
       return;
     }
+    const projectStateMatch = url.pathname.match(/^\/api\/projects\/([^/]+)\/state$/);
+    if (projectStateMatch && req.method === 'GET') {
+      const projectId = normalizeProjectId(decodeURIComponent(projectStateMatch[1]));
+      const project = (await discoverProjects()).find((candidate) => candidate.id === projectId);
+      if (!project) {
+        sendJson(res, 404, {ok: false, code: 'project_not_found', error: `Project ${projectId} not found`});
+        return;
+      }
+      const record = await loadProjectStateRecord(RUNTIME_ROOT, projectId);
+      const state = await computeProjectState(PROJECT_ROOT, project, record);
+      const activeJob = [...jobs.values()].find((job) => job.project?.id === projectId && job.status === 'running');
+      sendJson(res, 200, {ok: true, state: {...state, activeJob: activeJob ? publicJob(activeJob) : null}});
+      return;
+    }
     if (url.pathname === '/api/projects' && req.method === 'POST') {
       const body = await readJson(req);
-      const projectId = safeProjectId(body.projectId);
-      const title = safeNonEmptyString(body.title, 'title');
+      const projectId = normalizeProjectId(body.projectId);
+      const title = normalizeBoundedString(body.title, 'title');
       const orientation = 'portrait';
-      const spokenScript = safeNonEmptyString(body.spokenScript ?? body.script ?? '', 'spokenScript', 20, 8000);
+      const spokenScript = normalizeBoundedString(body.spokenScript ?? body.script ?? '', 'spokenScript', 20, 8000);
       const productionPath = `projects/${projectId}`;
       const outputVideoPath = `out/${projectId}.mp4`;
 
@@ -422,19 +873,84 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (url.pathname === '/api/files' && req.method === 'GET') {
-      const rel = safeJsonRelPath(url.searchParams.get('path'));
+      const rel = assertContractFilePath(url.searchParams.get('path'));
       sendJson(res, 200, {ok: true, file: await readStudioFile(rel)});
       return;
     }
     if (url.pathname === '/api/files' && req.method === 'POST') {
       const body = await readJson(req);
-      const rel = safeJsonRelPath(body.path);
+      const rel = assertContractFilePath(body.path, {writable: true});
       sendJson(res, 200, {ok: true, file: await writeStudioFile(rel, body.data)});
       return;
     }
+    if (url.pathname === '/api/jobs' && req.method === 'GET') {
+      const projectId = url.searchParams.get('projectId');
+      if (projectId) normalizeProjectId(projectId);
+      const requestedLimit = Number(url.searchParams.get('limit') || 50);
+      const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 200) : 50;
+      const matching = [...jobs.values()]
+        .filter((job) => !projectId || job.project?.id === projectId)
+        .sort((left, right) => String(right.startedAt).localeCompare(String(left.startedAt)))
+        .slice(0, limit)
+        .map(publicJob);
+      sendJson(res, 200, {ok: true, jobs: matching});
+      return;
+    }
+    if (url.pathname === '/api/video-library' && req.method === 'GET') {
+      const records = await withLibraryLock(() => loadVideoLibraryRecords(VIDEO_LIBRARY_FILE));
+      const available = records.filter((record) => {
+        try {
+          return existsSync(resolveArtifactFile(PROJECT_ROOT, record.videoPath).file);
+        } catch {
+          return false;
+        }
+      });
+      sendJson(res, 200, {ok: true, records: available.map(publicVideoRecord)});
+      return;
+    }
+    if (url.pathname === '/api/component-library' && req.method === 'GET') {
+      sendJson(res, 200, await loadHyperframesComponentLibrary());
+      return;
+    }
+    if (url.pathname === '/api/component-library/asset' && (req.method === 'GET' || req.method === 'HEAD')) {
+      await serveComponentLibraryAsset(req, res, url);
+      return;
+    }
+    const videoDownloadMatch = url.pathname.match(/^\/api\/video-library\/([^/]+)\/download$/);
+    if (videoDownloadMatch && req.method === 'GET') {
+      const recordId = decodeURIComponent(videoDownloadMatch[1]);
+      const records = await withLibraryLock(() => loadVideoLibraryRecords(VIDEO_LIBRARY_FILE));
+      const record = records.find((item) => item.id === recordId);
+      if (!record) { sendJson(res, 404, {ok: false, code: 'video_not_found', error: '视频记录不存在'}); return; }
+      if (!record.downloadAllowed || record.status !== 'downloadable') { sendJson(res, 403, {ok: false, code: 'download_not_ready', error: record.failureMessage || '视频尚未通过文件检查'}); return; }
+      const project = (await discoverProjects()).find((item) => item.id === record.projectId);
+      if (!project) { sendJson(res, 404, {ok: false, code: 'project_not_found', error: '项目不存在'}); return; }
+      const state = await computeProjectState(PROJECT_ROOT, project, await loadProjectStateRecord(RUNTIME_ROOT, record.projectId));
+      if (!state.deliveryReady) { sendJson(res, 403, {ok: false, code: 'delivery_not_ready', error: '当前项目尚未满足交付条件'}); return; }
+      await serveFile(req, res, resolveArtifactFile(PROJECT_ROOT, record.videoPath).file);
+      return;
+    }
     if (url.pathname === '/api/jobs' && req.method === 'POST') {
-      const job = createJob(await readJson(req));
+      const job = await createJob(await readJson(req));
       sendJson(res, 202, {ok: true, job: publicJob(job)});
+      return;
+    }
+    const retryMatch = url.pathname.match(/^\/api\/jobs\/([^/]+)\/retry$/);
+    if (retryMatch && req.method === 'POST') {
+      const original = jobs.get(retryMatch[1]);
+      if (!original) {
+        sendJson(res, 404, {ok: false, code: 'job_not_found', error: 'job not found'});
+        return;
+      }
+      if (!isTerminalJob(original)) {
+        throw new StudioHttpError(409, 'job_not_terminal', `Job ${original.id} is still running`);
+      }
+      const retried = await createJob({
+        commandId: original.commandId,
+        label: `${original.label} (retry)`,
+        project: original.project,
+      }, {retryOf: original.id});
+      sendJson(res, 202, {ok: true, job: publicJob(retried)});
       return;
     }
     const jobMatch = url.pathname.match(/^\/api\/jobs\/([^/]+)$/);
@@ -449,7 +965,13 @@ const server = http.createServer(async (req, res) => {
     }
     await serveStatic(req, res, url);
   } catch (error) {
-    sendJson(res, 400, {ok: false, error: error instanceof Error ? error.message : String(error)});
+    const status = error instanceof StudioHttpError ? error.status : 400;
+    sendJson(res, status, {
+      ok: false,
+      code: error instanceof StudioHttpError ? error.code : 'invalid_request',
+      error: error instanceof Error ? error.message : String(error),
+      diagnostics: error instanceof StudioHttpError ? error.diagnostics : [],
+    });
   }
 });
 

@@ -9,12 +9,15 @@ TEST_ID="console-e2e-$(date +%H%M%S)"
 TEST_DIR="$PROJECT_ROOT/projects/$TEST_ID"
 
 cleanup() {
-  rm -rf "$TEST_DIR" "$PROJECT_ROOT/public/projects/$TEST_ID" "$PROJECT_ROOT/out/$TEST_ID"* 2>/dev/null || true
-  if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null || true; fi
+  if [ -n "${SERVER_PID:-}" ]; then
+    kill "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+  fi
+  rm -rf "$TEST_DIR" "$PROJECT_ROOT/public/projects/$TEST_ID" "$PROJECT_ROOT/out/$TEST_ID"* "$PROJECT_ROOT/runtime/e2e-$TEST_ID" 2>/dev/null || true
 }
 trap cleanup EXIT
 
-VIDEO_FACTORY_PORT=$PORT node "$PROJECT_ROOT/scripts/tools-studio-server.mjs" &
+VIDEO_FACTORY_PORT=$PORT VIDEO_FACTORY_RUNTIME_DIR="runtime/e2e-$TEST_ID" node "$PROJECT_ROOT/scripts/tools-studio-server.mjs" &
 SERVER_PID=$!
 for _ in $(seq 1 30); do
   curl -sf "$HOST/api/health" >/dev/null 2>&1 && break
@@ -37,6 +40,145 @@ node --input-type=module -e '
   if (project.render.width !== 1080 || project.render.height !== 1920 || project.render.orientation !== "portrait") throw new Error("portrait contract mismatch");
   if (!project.scenes.length || !project.scenes.every((scene) => scene.family === "skill-showcase" && scene.payload.heroStyle === "hero-track-v2")) throw new Error("renderer contract mismatch");
 ' "$TEST_DIR/project.json"
+
+node --input-type=module - "$HOST" "$TEST_ID" <<'NODE'
+const [base, id] = process.argv.slice(2);
+const project = {
+  id,
+  title: '控制台主链路验证',
+  productionPath: `projects/${id}`,
+  projectJsonPath: `projects/${id}/project.json`,
+  outputVideoPath: `out/${id}.mp4`,
+};
+
+const request = async (pathname, options = {}) => {
+  const response = await fetch(`${base}${pathname}`, options);
+  const payload = await response.json();
+  return {status: response.status, payload};
+};
+const post = (pathname, body) => request(pathname, {
+  method: 'POST',
+  headers: {'content-type': 'application/json'},
+  body: JSON.stringify(body),
+});
+const startJob = async (commandId, target = project) => {
+  const result = await post('/api/jobs', {commandId, label: `E2E ${commandId}`, project: target});
+  if (result.status !== 202 || !result.payload?.job?.id) throw new Error(`${commandId} did not start: ${JSON.stringify(result)}`);
+  return result.payload.job;
+};
+const pollJob = async (jobId, timeoutMs = 180000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const result = await request(`/api/jobs/${jobId}`);
+    if (result.status === 200 && result.payload.job.status !== 'running') return result.payload.job;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  throw new Error(`job ${jobId} timed out`);
+};
+
+const prematureRender = await post('/api/jobs', {commandId: 'render-verify', label: 'premature render', project});
+if (prematureRender.status !== 409 || prematureRender.payload.code !== 'project_not_checked') {
+  throw new Error(`render preflight gate failed: ${JSON.stringify(prematureRender)}`);
+}
+
+const standaloneCheck = await pollJob((await startJob('project-check')).id);
+if (standaloneCheck.status !== 'done') throw new Error(`standalone project-check failed: ${JSON.stringify(standaloneCheck)}`);
+const renderAfterStandaloneCheck = await post('/api/jobs', {commandId: 'render-verify', label: 'still premature render', project});
+if (renderAfterStandaloneCheck.status !== 409 || renderAfterStandaloneCheck.payload.code !== 'project_not_checked') {
+  throw new Error(`standalone project-check unlocked render-verify: ${JSON.stringify(renderAfterStandaloneCheck)}`);
+}
+
+const missingProject = {
+  ...project,
+  id: `${id}-missing`,
+  productionPath: `projects/${id}-missing`,
+  projectJsonPath: `projects/${id}-missing/project.json`,
+  outputVideoPath: `out/${id}-missing.mp4`,
+};
+const failedBuild = await pollJob((await startJob('build-check', missingProject)).id);
+if (failedBuild.status !== 'failed' || failedBuild.steps[0].status !== 'failed' || failedBuild.steps[1].status !== 'pending') {
+  throw new Error(`build-check did not stop at the failed build step: ${JSON.stringify(failedBuild)}`);
+}
+if (!failedBuild.diagnostics?.some((diagnostic) => diagnostic.code === 'command_failed' || diagnostic.code === 'file_missing')) {
+  throw new Error(`build-check did not expose structured diagnostics: ${JSON.stringify(failedBuild)}`);
+}
+
+const built = await pollJob((await startJob('build-check')).id);
+if (built.status !== 'done' || built.steps.map((step) => step.status).join(',') !== 'done,done') {
+  throw new Error(`build-check workflow failed: ${JSON.stringify(built)}`);
+}
+const afterBuild = await request(`/api/projects/${id}/state`);
+if (afterBuild.status !== 200 || afterBuild.payload.state.stages.project.status !== 'current' || afterBuild.payload.state.deliveryReady !== false) {
+  throw new Error(`project freshness is incorrect after build-check: ${JSON.stringify(afterBuild)}`);
+}
+
+const retriedStart = await post(`/api/jobs/${built.id}/retry`, {});
+if (retriedStart.status !== 202 || retriedStart.payload.job.retryOf !== built.id) {
+  throw new Error(`job retry contract failed: ${JSON.stringify(retriedStart)}`);
+}
+const retried = await pollJob(retriedStart.payload.job.id);
+if (retried.status !== 'done') throw new Error(`retried build-check failed: ${JSON.stringify(retried)}`);
+
+const stillStart = await startJob('project-still');
+const conflicting = await post('/api/jobs', {commandId: 'project-check', label: 'must conflict', project});
+if (conflicting.status !== 409 || conflicting.payload.code !== 'project_busy') {
+  throw new Error(`same-project concurrency gate failed: ${JSON.stringify(conflicting)}`);
+}
+const still = await pollJob(stillStart.id);
+if (still.status !== 'done') throw new Error(`still job failed: ${JSON.stringify(still)}`);
+const afterStill = await request(`/api/projects/${id}/state`);
+if (afterStill.payload.state.stages.preview.status !== 'current') {
+  throw new Error(`preview freshness is incorrect: ${JSON.stringify(afterStill)}`);
+}
+
+const delivered = await pollJob((await startJob('render-verify')).id, 300000);
+if (delivered.status !== 'done' || delivered.steps.map((step) => step.status).join(',') !== 'done,done') {
+  throw new Error(`render-verify workflow failed: ${JSON.stringify(delivered)}`);
+}
+const afterDelivery = await request(`/api/projects/${id}/state`);
+if (
+  afterDelivery.status !== 200
+  || afterDelivery.payload.state.stages.render.status !== 'current'
+  || afterDelivery.payload.state.stages.verify.status !== 'current'
+  || afterDelivery.payload.state.deliveryReady !== true
+) {
+  throw new Error(`delivery readiness is incorrect after render-verify: ${JSON.stringify(afterDelivery)}`);
+}
+
+const listed = await request(`/api/jobs?projectId=${id}&limit=20`);
+if (listed.status !== 200 || !listed.payload.jobs.some((job) => job.id === still.id)) {
+  throw new Error(`job listing contract failed: ${JSON.stringify(listed)}`);
+}
+const malformed = await request('/api/jobs', {
+  method: 'POST',
+  headers: {'content-type': 'application/json'},
+  body: '{',
+});
+if (malformed.status !== 400 || malformed.payload.code !== 'malformed_json') {
+  throw new Error(`malformed JSON contract failed: ${JSON.stringify(malformed)}`);
+}
+
+const forbiddenFileRead = await request('/api/files?path=src/project.json');
+if (forbiddenFileRead.status !== 403 || forbiddenFileRead.payload.code !== 'contract_file_forbidden') {
+  throw new Error(`contract file read guard failed: ${JSON.stringify(forbiddenFileRead)}`);
+}
+
+const readonlyExampleWrite = await post('/api/files', {path: 'examples/skill-showcase.json', data: {ok: false}});
+if (readonlyExampleWrite.status !== 403 || readonlyExampleWrite.payload.code !== 'readonly_contract_file') {
+  throw new Error(`read-only example guard failed: ${JSON.stringify(readonlyExampleWrite)}`);
+}
+
+const forbiddenArtifact = await request('/api/artifact?path=package.json');
+if (forbiddenArtifact.status !== 403 || forbiddenArtifact.payload.code !== 'artifact_forbidden') {
+  throw new Error(`artifact allowlist guard failed: ${JSON.stringify(forbiddenArtifact)}`);
+}
+
+const badOutputProject = {...project, outputVideoPath: 'package.json'};
+const badOutput = await post('/api/jobs', {commandId: 'project-render', label: 'bad output path', project: badOutputProject});
+if (badOutput.status !== 400 || badOutput.payload.code !== 'invalid_project_paths') {
+  throw new Error(`job project path guard failed: ${JSON.stringify(badOutput)}`);
+}
+NODE
 
 cd "$PROJECT_ROOT"
 npm run project:check -- "projects/$TEST_ID/project.json" >/dev/null

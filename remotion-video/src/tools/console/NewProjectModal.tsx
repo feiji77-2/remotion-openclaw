@@ -1,259 +1,48 @@
-// src/tools/console/NewProjectModal.tsx
-import React, {useState, useCallback} from 'react';
-import {theme} from './theme';
-import type {CreateProjectDraft, CreateProjectResult, CreateProjectError} from './types';
+import React, {useCallback, useState} from 'react';
 import {createProject} from './api';
-import {StyleCard} from './StyleCard';
-import {STYLE_PRESETS, type StylePresetId} from '../../styles/video-gen/style-presets';
+import {buildCreateProjectDraft, createProjectFieldErrors, validateNewProjectInput} from './new-project-model';
+import type {CreateProjectError, CreateProjectResult, NewProjectInput} from './types';
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: theme.bg.surface,
-  color: theme.text.primary,
-  border: `1px solid ${theme.border.default}`,
-  borderRadius: 6,
-  padding: '10px 12px',
-  fontSize: 11,
-  outline: 'none',
-  boxSizing: 'border-box',
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 9,
-  fontWeight: 600,
-  color: theme.text.secondary,
-  marginBottom: 4,
-  display: 'block',
-  textTransform: 'uppercase' as const,
-};
-
-interface NewProjectModalProps {
-  onClose: () => void;
-  onCreated: (result: CreateProjectResult) => void;
-  onError: (message: string) => void;
-}
-
-const DEFAULT_DRAFT: CreateProjectDraft = {
-  projectId: '',
-  title: '',
-  orientation: 'portrait',
-  style: 'cyan-tech',
-  spokenScript: '',
-  keywords: '',
-};
-
-const projectIdHint = '仅支持字母、数字、._-，最多 96 字符';
-const spokenScriptHint = '至少 20 字，将用于生成字幕和初始分镜';
+interface NewProjectModalProps { onClose: () => void; onCreated: (result: CreateProjectResult) => void; onError: (message: string) => void; }
+const initialInput: NewProjectInput = {title: '', spokenScript: ''};
 
 export const NewProjectModal: React.FC<NewProjectModalProps> = ({onClose, onCreated, onError}) => {
-  const [draft, setDraft] = useState<CreateProjectDraft>({...DEFAULT_DRAFT});
+  const [input, setInput] = useState<NewProjectInput>(initialInput);
   const [submitting, setSubmitting] = useState(false);
-  const [fieldError, setFieldError] = useState<Record<string, string>>({});
-
-  const updateField = useCallback(<K extends keyof CreateProjectDraft>(key: K, value: CreateProjectDraft[K]) => {
-    setDraft((prev) => ({...prev, [key]: value}));
-    setFieldError((prev) => { const next = {...prev}; delete next[key]; return next; });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const update = useCallback(<K extends keyof NewProjectInput>(key: K, value: NewProjectInput[K]) => {
+    setInput((current) => ({...current, [key]: value}));
+    setErrors((current) => { const next = {...current}; delete next[key]; return next; });
   }, []);
-
-  const validate = useCallback((): boolean => {
-    const errors: Record<string, string> = {};
-    if (!/^[A-Za-z0-9._-]{1,96}$/.test(draft.projectId)) {
-      errors.projectId = projectIdHint;
-    }
-    if (!draft.title.trim()) {
-      errors.title = '标题是必填的';
-    }
-    if (draft.spokenScript.trim().length < 20) {
-      errors.spokenScript = spokenScriptHint;
-    }
-    setFieldError(errors);
-    return Object.keys(errors).length === 0;
-  }, [draft]);
-
-  const handleSubmit = useCallback(async () => {
+  const validate = useCallback(() => {
+    const next = validateNewProjectInput(input);
+    setErrors(next); return Object.keys(next).length === 0;
+  }, [input]);
+  const submit = useCallback(async () => {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      const result = await createProject(draft);
-      onCreated(result);
-    } catch (error) {
-      const err = error as CreateProjectError | Error;
-      onError('error' in err ? err.error : err.message);
-      setSubmitting(false);
+      const draft = buildCreateProjectDraft(input, {
+        now: Date.now(),
+        random: Math.random().toString(36).slice(2),
+      });
+      onCreated(await createProject(draft));
     }
-  }, [draft, validate, onCreated, onError]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && e.ctrlKey) handleSubmit();
-    if (e.key === 'Escape') onClose();
-  }, [handleSubmit, onClose]);
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 200,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(5,7,13,0.75)',
-        backdropFilter: 'blur(6px)',
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        style={{
-          width: 520,
-          maxHeight: '90vh',
-          overflow: 'auto',
-          background: theme.bg.elevated,
-          border: `1px solid ${theme.border.subtle}`,
-          borderRadius: 12,
-          boxShadow: `0 12px 48px rgba(0,0,0,0.5), 0 0 0 1px ${theme.border.subtle}`,
-          padding: 0,
-        }}
-      >
-        {/* Header */}
-        <div style={{
-          padding: '18px 22px 14px',
-          borderBottom: `1px solid ${theme.border.subtle}`,
-        }}>
-          <h2 style={{margin: 0, fontSize: 14, fontWeight: 700, color: theme.text.primary}}>
-            新建视频项目
-          </h2>
-          <p style={{margin: '4px 0 0', fontSize: 10, color: theme.text.muted}}>
-            填写基本信息后，生产台会创建项目结构并生成初始分镜。
-          </p>
-        </div>
-
-        {/* Form */}
-        <div style={{padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14}}>
-          <div>
-            <label style={labelStyle}>项目 ID *</label>
-            <input
-              type="text"
-              style={{
-                ...inputStyle,
-                borderColor: fieldError.projectId ? theme.accent.red : theme.border.default,
-              }}
-              placeholder="my-first-video"
-              value={draft.projectId}
-              onChange={(e) => updateField('projectId', e.target.value.replace(/[^A-Za-z0-9._-]/g, ''))}
-              maxLength={96}
-              autoFocus
-            />
-            {fieldError.projectId && (
-              <div style={{fontSize: 8, color: theme.accent.red, marginTop: 3}}>{fieldError.projectId}</div>
-            )}
-          </div>
-
-          {/* title */}
-          <div>
-            <label style={labelStyle}>标题 *</label>
-            <input
-              type="text"
-              style={{
-                ...inputStyle,
-                borderColor: fieldError.title ? theme.accent.red : theme.border.default,
-              }}
-              placeholder="视频标题（将显示在开场画面）"
-              value={draft.title}
-              onChange={(e) => updateField('title', e.target.value)}
-              maxLength={200}
-            />
-            {fieldError.title && (
-              <div style={{fontSize: 8, color: theme.accent.red, marginTop: 3}}>{fieldError.title}</div>
-            )}
-          </div>
-
-          {/* style — 视觉卡片选择器 (Stage C) */}
-          <div>
-            <label style={labelStyle}>风格</label>
-            <StyleCard
-              presets={STYLE_PRESETS}
-              selected={draft.style}
-              onSelect={(id) => updateField('style', id as StylePresetId)}
-            />
-          </div>
-
-          {/* keywords */}
-          <div>
-            <label style={labelStyle}>关键词</label>
-            <input
-              type="text"
-              style={inputStyle}
-              placeholder="AI, 工作流, 效率"
-              value={draft.keywords}
-              onChange={(e) => updateField('keywords', e.target.value)}
-            />
-          </div>
-
-          {/* spokenScript */}
-          <div>
-            <label style={labelStyle}>口播稿 *</label>
-            <textarea
-              style={{
-                ...inputStyle,
-                minHeight: 120,
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                borderColor: fieldError.spokenScript ? theme.accent.red : theme.border.default,
-              }}
-              placeholder={'粘贴口播稿……\n\n例如：\n你有没有发现，过去我们花很多时间不是在创造，而是在推动流程？\n新工具的价值，是把输入、处理和输出变成一条可重复的链路。'}
-              value={draft.spokenScript}
-              onChange={(e) => updateField('spokenScript', e.target.value)}
-            />
-            <div style={{fontSize: 8, color: fieldError.spokenScript ? theme.accent.red : theme.text.muted, marginTop: 3}}>
-              {fieldError.spokenScript || `${draft.spokenScript.length} 字 — ${spokenScriptHint}`}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div style={{
-          padding: '14px 22px',
-          borderTop: `1px solid ${theme.border.subtle}`,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: 8,
-        }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 18px',
-              borderRadius: 6,
-              border: `1px solid ${theme.border.default}`,
-              background: theme.bg.surface,
-              color: theme.text.secondary,
-              fontSize: 10,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            取消
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            style={{
-              padding: '8px 24px',
-              borderRadius: 6,
-              border: 'none',
-              background: submitting
-                ? theme.bg.surface
-                : `linear-gradient(135deg, ${theme.accent.blue}, ${theme.accent.indigo})`,
-              color: submitting ? theme.text.muted : '#fff',
-              fontSize: 10,
-              fontWeight: 700,
-              cursor: submitting ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {submitting ? '创建中…' : '创建项目'}
-          </button>
-        </div>
+    catch (error) {
+      const known = error as CreateProjectError & Error;
+      const next = createProjectFieldErrors(known.error || known.message || '创建项目失败');
+      setErrors(next); onError(next.form || next.spokenScript || '创建项目失败'); setSubmitting(false);
+    }
+  }, [input, onCreated, onError, validate]);
+  return <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="project-modal" role="dialog" aria-modal="true" aria-labelledby="new-project-title">
+      <header><span>新生产任务</span><h2 id="new-project-title">新建视频</h2><p>先放入口播文案。创建后可以继续调整内容，再选择风格和生成分镜。</p></header>
+      <div className="project-modal__body">
+        {errors.form && <div className="notice notice--error">{errors.form}</div>}
+        <label className="form-field"><span>口播文案 *</span><textarea autoFocus rows={10} value={input.spokenScript} placeholder="粘贴或输入完整口播文案，至少 20 个字。" onChange={(event) => update('spokenScript', event.target.value)} />{errors.spokenScript ? <em>{errors.spokenScript}</em> : <small>{input.spokenScript.trim().length} 字 / 至少 20 字</small>}</label>
+        <label className="form-field"><span>视频标题 <small>可选</small></span><input value={input.title} placeholder="留空时从口播第一句话生成" maxLength={120} onChange={(event) => update('title', event.target.value)} />{errors.title && <em>{errors.title}</em>}</label>
       </div>
-    </div>
-  );
+      <footer><button className="secondary-action" type="button" onClick={onClose}>取消</button><button className="primary-action project-modal__create" type="button" disabled={submitting} onClick={() => void submit()}>{submitting ? '正在创建' : '创建并进入口播文案'}</button></footer>
+    </section>
+  </div>;
 };
