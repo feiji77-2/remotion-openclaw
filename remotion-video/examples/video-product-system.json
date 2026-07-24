@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 2,
+  "metadata": {
+    "projectId": "video-product-system-demo",
+    "title": "数据驱动的视频产品底座",
+    "language": "zh-CN",
+    "aspectRatio": "9:16",
+    "platform": "internal",
+    "targetDurationSec": 18,
+    "theme": "Remotion 产品系统"
+  },
+  "narrative": {
+    "arc": "proof-led",
+    "hook": "视频系统不能只靠一条漂亮样片成立。",
+    "context": "真正可持续的底座要把叙事、媒介、节奏和运动都变成数据。",
+    "turningPoint": "先规划场景职责，再选择 renderer，而不是让字幕直接命中模板。",
+    "proof": [
+      {
+        "claim": "同一段内容可以生成不同视觉版本",
+        "evidenceIds": ["variant-proof"]
+      },
+      {
+        "claim": "motion preset 描述使用动机和禁用场景",
+        "evidenceIds": ["motion-proof"]
+      }
+    ],
+    "payoff": "最终输出的是可批量生产的视频产品系统。",
+    "cta": "用 schema 驱动下一轮真实项目回归。"
+  },
+  "visual": {
+    "tone": "tech",
+    "density": "medium",
+    "pacing": "fast",
+    "motionIntensity": "high",
+    "colorStrategy": "dual-accent",
+    "accent": "#4be3c1",
+    "secondaryAccent": "#ff7aa8"
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "intent": "hook",
+      "block": "HookScene",
+      "message": {
+        "primary": "漂亮样片不是产品系统",
+        "secondary": "底座要能反复生成、反复变体、反复验收。",
+        "keywords": ["叙事", "媒介", "节奏"]
+      },
+      "medium": "text",
+      "emphasis": [
+        {"text": "不是单条 demo", "level": 3, "reason": "contrast"}
+      ],
+      "layout": {"density": "low", "focus": "center", "safeArea": "standard"},
+      "motion": {"presetIds": ["maskReveal", "kineticCaption", "pushIn"], "intensity": "high", "transition": "matchCut"},
+      "durationFrames": 120
+    },
+    {
+      "id": "context",
+      "intent": "context",
+      "block": "StatementScene",
+      "message": {
+        "primary": "先表达导演意图，再选择画面组件",
+        "secondary": "schema 需要描述 hook、proof、payoff、媒介类型、信息密度和运动强度。",
+        "keywords": ["scene intent", "visual tone", "motion intensity"]
+      },
+      "medium": "text",
+      "emphasis": [
+        {"text": "scene intent", "level": 2, "reason": "claim"},
+        {"text": "visual tone", "level": 2, "reason": "claim"},
+        {"text": "motion intensity", "level": 2, "reason": "claim"}
+      ],
+      "layout": {"density": "medium", "focus": "split", "safeArea": "standard"},
+      "motion": {"presetIds": ["staggeredWords", "parallaxDrift", "highlightSweep"], "intensity": "medium", "transition": "panelShift"}
+    },
+    {
+      "id": "proof",
+      "intent": "proof",
+      "block": "EvidenceScene",
+      "message": {
+        "primary": "preset 本身也要有产品语义",
+        "secondary": "每个 preset 都声明使用场景、参数、duration、easing、组合方式和禁用条件。",
+        "keywords": ["duration", "easing", "composeWith"]
+      },
+      "medium": "data",
+      "emphasis": [
+        {"text": "24 个 motion presets", "level": 3, "reason": "number"},
+        {"text": "6 个 motion families", "level": 2, "reason": "claim"}
+      ],
+      "layout": {"density": "high", "focus": "split", "safeArea": "standard"},
+      "motion": {"presetIds": ["numberCount", "focusLock", "depthShift"], "intensity": "high", "transition": "cameraMove"}
+    },
+    {
+      "id": "process",
+      "intent": "process",
+      "block": "ProcessScene",
+      "message": {
+        "primary": "三层组件各司其职",
+        "secondary": "primitives 管几何，scene blocks 管叙事场景，templates 管节奏编排。",
+        "keywords": ["primitives", "scene blocks", "composition templates"]
+      },
+      "medium": "text",
+      "emphasis": [
+        {"text": "Frame / Stack / Grid", "level": 1, "reason": "claim"},
+        {"text": "EvidenceScene / ContrastScene", "level": 2, "reason": "claim"},
+        {"text": "ProductNarrative", "level": 3, "reason": "claim"}
+      ],
+      "layout": {"density": "medium", "focus": "timeline", "safeArea": "standard"},
+      "motion": {"presetIds": ["lineWipe", "panelShift", "assetStack"], "intensity": "medium", "transition": "directionalWipe"}
+    },
+    {
+      "id": "contrast",
+      "intent": "contrast",
+      "block": "ContrastScene",
+      "message": {
+        "primary": "从模板命中转向导演规划",
+        "secondary": "不是 caption 直接打到 renderer，而是 narrative planner 先决定场景职责。",
+        "keywords": ["旧链路", "新链路"]
+      },
+      "medium": "text",
+      "emphasis": [
+        {"text": "caption -> component", "level": 2, "reason": "risk"},
+        {"text": "intent -> block -> renderer", "level": 3, "reason": "claim"}
+      ],
+      "layout": {"density": "medium", "focus": "split", "safeArea": "standard"},
+      "motion": {"presetIds": ["directionalWipe", "snap", "highlightSweep"], "intensity": "punchy", "transition": "matchCut"}
+    },
+    {
+      "id": "payoff",
+      "intent": "payoff",
+      "block": "SummaryScene",
+      "message": {
+        "primary": "目标是持续生产能力",
+        "secondary": "同一套 schema 可以生成不同主题、长度、比例、节奏和视觉版本。",
+        "keywords": ["批量生成", "多变体", "可验收"]
+      },
+      "medium": "text",
+      "emphasis": [
+        {"text": "持续生产", "level": 3, "reason": "claim"}
+      ],
+      "layout": {"density": "low", "focus": "center", "safeArea": "caption-heavy"},
+      "motion": {"presetIds": ["pullBack", "quoteBuild", "highlightSweep"], "intensity": "medium", "transition": "cameraMove"}
+    }
+  ],
+  "assets": {
+    "variant-proof": {
+      "kind": "json",
+      "src": "projects/video-product-system/variant-proof.json",
+      "role": "proof",
+      "required": false
+    },
+    "motion-proof": {
+      "kind": "json",
+      "src": "projects/video-product-system/motion-proof.json",
+      "role": "proof",
+      "required": false
+    }
+  },
+  "variants": [
+    {
+      "id": "editorial",
+      "label": "Editorial Explainer",
+      "template": "editorial-explainer",
+      "visual": {
+        "tone": "editorial",
+        "density": "medium",
+        "pacing": "medium",
+        "motionIntensity": "medium",
+        "colorStrategy": "editorial-contrast",
+        "accent": "#f6d365",
+        "secondaryAccent": "#69d2e7"
+      }
+    },
+    {
+      "id": "product-proof",
+      "label": "Product Proof Film",
+      "template": "product-proof",
+      "visual": {
+        "tone": "commercial",
+        "density": "high",
+        "pacing": "fast",
+        "motionIntensity": "high",
+        "colorStrategy": "dual-accent",
+        "accent": "#4be3c1",
+        "secondaryAccent": "#ff7aa8"
+      }
+    },
+    {
+      "id": "data-insight",
+      "label": "Data Insight Video",
+      "template": "data-insight",
+      "visual": {
+        "tone": "tech",
+        "density": "high",
+        "pacing": "punchy",
+        "motionIntensity": "punchy",
+        "colorStrategy": "dual-accent",
+        "accent": "#48e7f3",
+        "secondaryAccent": "#a78bfa"
+      }
+    }
+  ]
+}

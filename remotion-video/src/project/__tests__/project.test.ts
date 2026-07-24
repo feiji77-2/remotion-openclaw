@@ -11,6 +11,7 @@ import {
 } from "../../components/ultimate-kit/families/skill-showcase/iconRegistry";
 import { compileProject } from "../compileProject";
 import { VideoProjectSchema } from "../projectSchema";
+import { VisualDirectorSchema, VisualSystemSchema } from "../visualPlan";
 
 const project = () =>
   VideoProjectSchema.parse(structuredClone(skillShowcaseFixture));
@@ -189,6 +190,23 @@ describe("compact video project", () => {
       JSON.parse(fs.readFileSync(output, "utf8")),
     );
     const compiled = compileProject(generated);
+    expect(generated.visualSystem).toMatchObject({
+      variant: expect.stringMatching(/^(cinematic-tech|editorial-lightcut|product-console)$/),
+      pacing: expect.stringMatching(/^(fast|balanced|explainer)$/),
+      platform: "portrait",
+    });
+    expect(VisualSystemSchema.parse(generated.visualSystem)).toEqual(generated.visualSystem);
+    expect(compiled.visualSystem).toEqual(generated.visualSystem);
+    const compiledDirectors = compiled.scenes.flatMap((scene) =>
+      (
+        (scene.payload.heroTrack as {states?: Array<{director?: unknown}>} | undefined)
+          ?.states ?? []
+      ).map((state) => state.director),
+    );
+    expect(compiledDirectors.length).toBeGreaterThan(0);
+    for (const director of compiledDirectors) {
+      expect(VisualDirectorSchema.parse(director)).toEqual(director);
+    }
     expect(compiled.projectId).toBe("knowledge-workflow-script");
     expect(
       compiled.scenes.every((scene) => scene.family === "skill-showcase"),
@@ -242,6 +260,13 @@ describe("compact video project", () => {
                 cinematicPreset?: string;
                 lens?: { objective?: string; actionLabel?: string };
                 shot?: { kind?: string; evidence?: string[] };
+                director?: {
+                  scenePrimitive?: string;
+                  layoutSignature?: string;
+                  motionPreset?: string;
+                  transitionPreset?: string;
+                  density?: string;
+                };
               }>;
             }
           | undefined;
@@ -272,7 +297,12 @@ describe("compact video project", () => {
               state.lens.actionLabel.length > 0 &&
               typeof state.shot?.kind === "string" &&
               Array.isArray(state.shot.evidence) &&
-              state.shot.evidence.length > 0,
+              state.shot.evidence.length > 0 &&
+              state.director?.layoutSignature === scene.payload.layoutSignature &&
+              typeof state.director?.scenePrimitive === "string" &&
+              typeof state.director?.motionPreset === "string" &&
+              typeof state.director?.transitionPreset === "string" &&
+              typeof state.director?.density === "string",
           ) &&
           states.every(
             (state, index) =>
@@ -365,7 +395,7 @@ describe("compact video project", () => {
     );
     const script = [
       "今天讲一个全新的设计流程。",
-      "第一步，把需求排成编号路径。",
+      "首先按三步路径推进：第一步收集需求，第二步编号排序，最后交付路线。",
       "但是旧方案和新方案要明确对比。",
       "另外把规则、颜色、字体等等展开成标签。",
       "因为输入输出要形成链路。",

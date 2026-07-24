@@ -1,6 +1,58 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vitest';
 import {buildSkillShowcaseProjectFromScript} from '../script-project-generator.mjs';
 import {assertVisualContract} from '../visual-contract.mjs';
+
+const TEST_ROOT = path.dirname(fileURLToPath(import.meta.url));
+const REMOTION_ROOT = path.resolve(TEST_ROOT, '../../..');
+const FIXTURE_ROOT = path.join(TEST_ROOT, 'fixtures');
+const VISUAL_DIVERSITY_FIXTURES = [
+  'visual-diversity-tech',
+  'visual-diversity-product',
+  'visual-diversity-knowledge',
+];
+
+const maxConsecutiveRun = (values) => {
+  let maxRun = 0;
+  let currentRun = 0;
+  let previous = null;
+  for (const value of values) {
+    currentRun = value === previous ? currentRun + 1 : 1;
+    previous = value;
+    maxRun = Math.max(maxRun, currentRun);
+  }
+  return maxRun;
+};
+
+const copyPackFixture = (fixtureName) => {
+  const source = path.join(FIXTURE_ROOT, fixtureName);
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), `${fixtureName}-`));
+  for (const file of ['brief.json', 'script-pack.json', 'asset-pack.json']) {
+    fs.copyFileSync(path.join(source, file), path.join(target, file));
+  }
+  return target;
+};
+
+const buildProjectFromPackFixture = (fixtureName) => {
+  const packDir = copyPackFixture(fixtureName);
+  const output = path.join(packDir, 'project.json');
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.join(REMOTION_ROOT, 'scripts/build-project-from-production.mjs'),
+      packDir,
+      '--out',
+      'project.json',
+    ],
+    {cwd: REMOTION_ROOT, encoding: 'utf8'},
+  );
+  expect(result.status, result.stderr || result.stdout).toBe(0);
+  return JSON.parse(fs.readFileSync(output, 'utf8'));
+};
 
 describe('buildSkillShowcaseProjectFromScript', () => {
   it('does not pass Whisper avg_logprob through as a Project confidence value', () => {
@@ -34,7 +86,7 @@ describe('buildSkillShowcaseProjectFromScript', () => {
       maxScenes: 6,
     });
 
-    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).not.toThrow();
+    expect(() => assertVisualContract(project, {projectRoot: REMOTION_ROOT})).not.toThrow();
     const layouts = project.scenes.map((scene) => String(scene.payload.layoutSignature));
     for (let index = 2; index < layouts.length; index += 1) {
       expect([layouts[index - 2], layouts[index - 1], layouts[index]]).not.toEqual([
@@ -65,7 +117,7 @@ describe('buildSkillShowcaseProjectFromScript', () => {
       maxScenes: 10,
     });
 
-    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).not.toThrow();
+    expect(() => assertVisualContract(project, {projectRoot: REMOTION_ROOT})).not.toThrow();
     const states = project.scenes.flatMap((scene) => scene.payload.heroTrack.states);
     const shotKinds = states.map((state) => state.shot?.kind);
 
@@ -110,7 +162,7 @@ describe('buildSkillShowcaseProjectFromScript', () => {
       maxScenes: 1,
     });
 
-    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).not.toThrow();
+    expect(() => assertVisualContract(project, {projectRoot: REMOTION_ROOT})).not.toThrow();
     expect(project.scenes).toHaveLength(1);
     const states = project.scenes[0].payload.heroTrack.states;
     expect(states).toHaveLength(captions.length);
@@ -133,7 +185,7 @@ describe('buildSkillShowcaseProjectFromScript', () => {
       maxScenes: 1,
     });
 
-    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).not.toThrow();
+    expect(() => assertVisualContract(project, {projectRoot: REMOTION_ROOT})).not.toThrow();
     const beats = project.scenes[0].payload.beats;
     expect(beats[1]).toMatchObject({
       captionStartIndex: 1,
@@ -161,7 +213,7 @@ describe('buildSkillShowcaseProjectFromScript', () => {
       maxScenes: 1,
     });
 
-    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).not.toThrow();
+    expect(() => assertVisualContract(project, {projectRoot: REMOTION_ROOT})).not.toThrow();
     expect(project.captions).toEqual([
       expect.objectContaining({text: '。第一句建立主题。', startMs: 0, endMs: 1150}),
       expect.objectContaining({text: '第二句解释原因。', startMs: 1150, endMs: 2140}),
@@ -185,7 +237,7 @@ describe('buildSkillShowcaseProjectFromScript', () => {
     });
     project.scenes[0].payload.heroTrack.states.pop();
 
-    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).toThrow(
+    expect(() => assertVisualContract(project, {projectRoot: REMOTION_ROOT})).toThrow(
       'payload.heroTrack.states must cover the full hero track caption range',
     );
   });
@@ -206,9 +258,9 @@ describe('buildSkillShowcaseProjectFromScript', () => {
       componentLabel: 'HyperFrames Metric Pulse',
     };
 
-    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).not.toThrow();
+    expect(() => assertVisualContract(project, {projectRoot: REMOTION_ROOT})).not.toThrow();
     project.scenes[0].payload.title = 'HyperFrames Metric Pulse';
-    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).toThrow(
+    expect(() => assertVisualContract(project, {projectRoot: REMOTION_ROOT})).toThrow(
       'stale golden-sample term not present in narration: HyperFrames',
     );
   });
@@ -225,11 +277,67 @@ describe('buildSkillShowcaseProjectFromScript', () => {
     expect(project.scenes[0].payload.productIcon).toBe('remotion');
     expect(project.scenes[0].payload.brandIcon).toBe('remotion');
     expect(project.scenes[0].payload.productIcons).toContain('remotion');
-    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).not.toThrow();
+    expect(() => assertVisualContract(project, {projectRoot: REMOTION_ROOT})).not.toThrow();
 
     project.scenes[0].payload.headline = 'Remotion';
-    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).toThrow(
+    expect(() => assertVisualContract(project, {projectRoot: REMOTION_ROOT})).toThrow(
       'stale golden-sample term not present in narration: Remotion',
     );
+  });
+
+  it('keeps from-pack multi-domain fixtures matched and visually diverse', () => {
+    const projects = VISUAL_DIVERSITY_FIXTURES.map(buildProjectFromPackFixture);
+    const allComponents = [];
+    const allLayouts = [];
+    const allVariants = [];
+    const allScenePrimitives = [];
+    const allMotionPresets = [];
+    const allTransitionPresets = [];
+
+    for (const project of projects) {
+      expect(() => assertVisualContract(project, {projectRoot: REMOTION_ROOT})).not.toThrow();
+      const entries = project.visualPlan?.entries ?? [];
+      expect(entries.length).toBeGreaterThan(0);
+      const components = entries.map((entry) => entry.componentId);
+      const resolutions = entries.map((entry) => entry.resolution);
+      const diagnostics = entries.flatMap((entry) => entry.diagnostics ?? []);
+      const layouts = project.scenes.map((scene) => String(scene.payload.layoutSignature));
+      const heroTrackKinds = project.scenes.map((scene) => String(scene.payload.heroTrack.kind));
+      const directors = entries.map((entry) => entry.director);
+
+      expect(project.visualSystem).toMatchObject({
+        variant: expect.stringMatching(/^(cinematic-tech|editorial-lightcut|product-console)$/),
+        pacing: expect.stringMatching(/^(fast|balanced|explainer)$/),
+        platform: 'portrait',
+      });
+      expect(project.scenes.every((scene) => JSON.stringify(scene.payload.visualSystem) === JSON.stringify(project.visualSystem))).toBe(true);
+      expect(components).not.toContain('generic-explainer');
+      expect(heroTrackKinds).not.toContain('generic-explainer');
+      expect(resolutions.every((resolution) => resolution === 'matched')).toBe(true);
+      expect(diagnostics.some((diagnostic) => diagnostic.level === 'error')).toBe(false);
+      expect(maxConsecutiveRun(components)).toBeLessThanOrEqual(2);
+      expect(layouts.every((layout) => layout.startsWith('portrait:hero-track-v2:'))).toBe(true);
+      expect(directors.every((director) => director?.layoutSignature?.startsWith('portrait:hero-track-v2:'))).toBe(true);
+      expect(directors.every((director) => ['low', 'medium', 'high'].includes(director?.density))).toBe(true);
+      expect(new Set(components).size).toBeGreaterThanOrEqual(10);
+      expect(new Set(layouts).size).toBeGreaterThanOrEqual(6);
+      expect(new Set(directors.map((director) => director?.scenePrimitive)).size).toBeGreaterThanOrEqual(4);
+      expect(new Set(directors.map((director) => director?.motionPreset)).size).toBeGreaterThanOrEqual(4);
+      expect(new Set(directors.map((director) => director?.transitionPreset)).size).toBeGreaterThanOrEqual(2);
+
+      allComponents.push(...components);
+      allLayouts.push(...layouts);
+      allVariants.push(project.visualSystem.variant);
+      allScenePrimitives.push(...directors.map((director) => director.scenePrimitive));
+      allMotionPresets.push(...directors.map((director) => director.motionPreset));
+      allTransitionPresets.push(...directors.map((director) => director.transitionPreset));
+    }
+
+    expect(new Set(allVariants)).toEqual(new Set(['cinematic-tech', 'product-console', 'editorial-lightcut']));
+    expect(new Set(allComponents).size).toBeGreaterThanOrEqual(18);
+    expect(new Set(allLayouts).size).toBeGreaterThanOrEqual(6);
+    expect(new Set(allScenePrimitives).size).toBeGreaterThanOrEqual(6);
+    expect(new Set(allMotionPresets).size).toBeGreaterThanOrEqual(6);
+    expect(new Set(allTransitionPresets).size).toBeGreaterThanOrEqual(4);
   });
 });

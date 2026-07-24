@@ -9,11 +9,27 @@
       "category": "界面",
       "orientation": "portrait",
       "size": "1080x1920",
-      "compatibleIntents": ["browser-interaction"],
-      "compatibleShotKinds": ["browser-demo"],
-      "requiredData": ["shot.environment", "shot.target", "shot.evidence"],
-      "motionCapability": ["viewport-reveal", "dom-highlight", "cursor-focus"],
-      "styleCapability": ["browser-chrome", "media-led", "high-contrast"],
+      "compatibleIntents": [
+        "browser-interaction"
+      ],
+      "compatibleShotKinds": [
+        "browser-demo"
+      ],
+      "requiredData": [
+        "shot.environment",
+        "shot.target",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "viewport-reveal",
+        "dom-highlight",
+        "cursor-focus"
+      ],
+      "styleCapability": [
+        "browser-chrome",
+        "media-led",
+        "high-contrast"
+      ],
       "productionReady": true
     },
     {
@@ -24,11 +40,26 @@
       "category": "代码",
       "orientation": "portrait",
       "size": "1080x1920",
-      "compatibleIntents": ["command-execution"],
-      "compatibleShotKinds": ["terminal-execution"],
-      "requiredData": ["shot.command", "shot.evidence"],
-      "motionCapability": ["command-type", "log-reveal", "status-pulse"],
-      "styleCapability": ["terminal", "monospace", "operation-evidence"],
+      "compatibleIntents": [
+        "command-execution"
+      ],
+      "compatibleShotKinds": [
+        "terminal-execution"
+      ],
+      "requiredData": [
+        "shot.command",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "command-type",
+        "log-reveal",
+        "status-pulse"
+      ],
+      "styleCapability": [
+        "terminal",
+        "monospace",
+        "operation-evidence"
+      ],
       "productionReady": true
     },
     {
@@ -39,11 +70,26 @@
       "category": "代码",
       "orientation": "portrait",
       "size": "1080x1920",
-      "compatibleIntents": ["code-change"],
-      "compatibleShotKinds": ["code-diff"],
-      "requiredData": ["shot.path", "shot.evidence"],
-      "motionCapability": ["diff-wipe", "line-focus", "change-count"],
-      "styleCapability": ["editor", "diff", "monospace"],
+      "compatibleIntents": [
+        "code-change"
+      ],
+      "compatibleShotKinds": [
+        "code-diff"
+      ],
+      "requiredData": [
+        "shot.path",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "diff-wipe",
+        "line-focus",
+        "change-count"
+      ],
+      "styleCapability": [
+        "editor",
+        "diff",
+        "monospace"
+      ],
       "productionReady": true
     },
     {
@@ -54,11 +100,26 @@
       "category": "代码",
       "orientation": "portrait",
       "size": "1080x1920",
-      "compatibleIntents": ["configuration"],
-      "compatibleShotKinds": ["config-check"],
-      "requiredData": ["shot.path", "shot.evidence"],
-      "motionCapability": ["row-reveal", "value-confirm", "status-pulse"],
-      "styleCapability": ["inspector", "configuration", "operation-evidence"],
+      "compatibleIntents": [
+        "configuration"
+      ],
+      "compatibleShotKinds": [
+        "config-check"
+      ],
+      "requiredData": [
+        "shot.path",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "row-reveal",
+        "value-confirm",
+        "status-pulse"
+      ],
+      "styleCapability": [
+        "inspector",
+        "configuration",
+        "operation-evidence"
+      ],
       "productionReady": true
     },
     {
@@ -69,11 +130,26 @@
       "category": "界面",
       "orientation": "portrait",
       "size": "1080x1920",
-      "compatibleIntents": ["interface-audit"],
-      "compatibleShotKinds": ["interface-audit"],
-      "requiredData": ["shot.target", "shot.evidence"],
-      "motionCapability": ["scan", "issue-focus", "status-transition"],
-      "styleCapability": ["inspector", "issue-list", "high-contrast"],
+      "compatibleIntents": [
+        "interface-audit"
+      ],
+      "compatibleShotKinds": [
+        "interface-audit"
+      ],
+      "requiredData": [
+        "shot.target",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "scan",
+        "issue-focus",
+        "status-transition"
+      ],
+      "styleCapability": [
+        "inspector",
+        "issue-list",
+        "high-contrast"
+      ],
       "productionReady": true
     },
     {
@@ -84,11 +160,25 @@
       "category": "流程",
       "orientation": "portrait",
       "size": "1080x1920",
-      "compatibleIntents": ["process-flow"],
-      "compatibleShotKinds": ["flow-trace"],
-      "requiredData": ["shot.evidence"],
-      "motionCapability": ["path-draw", "node-activate", "handoff"],
-      "styleCapability": ["process-map", "semantic-nodes", "directional"],
+      "compatibleIntents": [
+        "process-flow"
+      ],
+      "compatibleShotKinds": [
+        "flow-trace"
+      ],
+      "requiredData": [
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "path-draw",
+        "node-activate",
+        "handoff"
+      ],
+      "styleCapability": [
+        "process-map",
+        "semantic-nodes",
+        "directional"
+      ],
       "productionReady": true
     },
     {
@@ -99,11 +189,26 @@
       "category": "数据",
       "orientation": "portrait",
       "size": "1080x1920",
-      "compatibleIntents": ["verification"],
-      "compatibleShotKinds": ["test-report"],
-      "requiredData": ["shot.metric", "shot.evidence"],
-      "motionCapability": ["count-up", "suite-reveal", "pass-confirm"],
-      "styleCapability": ["test-runner", "metrics", "operation-evidence"],
+      "compatibleIntents": [
+        "verification"
+      ],
+      "compatibleShotKinds": [
+        "test-report"
+      ],
+      "requiredData": [
+        "shot.metric",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "count-up",
+        "suite-reveal",
+        "pass-confirm"
+      ],
+      "styleCapability": [
+        "test-runner",
+        "metrics",
+        "operation-evidence"
+      ],
       "productionReady": true
     },
     {
@@ -114,11 +219,25 @@
       "category": "界面",
       "orientation": "portrait",
       "size": "1080x1920",
-      "compatibleIntents": ["asset-selection"],
-      "compatibleShotKinds": ["asset-library"],
-      "requiredData": ["shot.evidence"],
-      "motionCapability": ["grid-reveal", "selection-focus", "metadata-slide"],
-      "styleCapability": ["asset-grid", "selection-state", "media-led"],
+      "compatibleIntents": [
+        "asset-selection"
+      ],
+      "compatibleShotKinds": [
+        "asset-library"
+      ],
+      "requiredData": [
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "grid-reveal",
+        "selection-focus",
+        "metadata-slide"
+      ],
+      "styleCapability": [
+        "asset-grid",
+        "selection-state",
+        "media-led"
+      ],
       "productionReady": true
     },
     {
@@ -129,11 +248,25 @@
       "category": "流程",
       "orientation": "portrait",
       "size": "1080x1920",
-      "compatibleIntents": ["system-architecture"],
-      "compatibleShotKinds": ["system-map"],
-      "requiredData": ["shot.evidence"],
-      "motionCapability": ["graph-build", "edge-trace", "node-focus"],
-      "styleCapability": ["architecture-map", "semantic-nodes", "directional"],
+      "compatibleIntents": [
+        "system-architecture"
+      ],
+      "compatibleShotKinds": [
+        "system-map"
+      ],
+      "requiredData": [
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "graph-build",
+        "edge-trace",
+        "node-focus"
+      ],
+      "styleCapability": [
+        "architecture-map",
+        "semantic-nodes",
+        "directional"
+      ],
       "productionReady": true
     },
     {
@@ -144,11 +277,26 @@
       "category": "对比",
       "orientation": "portrait",
       "size": "1080x1920",
-      "compatibleIntents": ["comparison"],
-      "compatibleShotKinds": ["before-after"],
-      "requiredData": ["shot.before", "shot.after"],
-      "motionCapability": ["split-wipe", "before-dim", "after-reveal"],
-      "styleCapability": ["split-layout", "comparison", "high-contrast"],
+      "compatibleIntents": [
+        "comparison"
+      ],
+      "compatibleShotKinds": [
+        "before-after"
+      ],
+      "requiredData": [
+        "shot.before",
+        "shot.after"
+      ],
+      "motionCapability": [
+        "split-wipe",
+        "before-dim",
+        "after-reveal"
+      ],
+      "styleCapability": [
+        "split-layout",
+        "comparison",
+        "high-contrast"
+      ],
       "productionReady": true
     },
     {
@@ -159,11 +307,26 @@
       "category": "数据",
       "orientation": "portrait",
       "size": "1080x1920",
-      "compatibleIntents": ["metric"],
-      "compatibleShotKinds": ["metric-highlight"],
-      "requiredData": ["shot.metric", "shot.evidence"],
-      "motionCapability": ["count-up", "scale-settle", "context-reveal"],
-      "styleCapability": ["editorial-number", "metrics", "strong-hierarchy"],
+      "compatibleIntents": [
+        "metric"
+      ],
+      "compatibleShotKinds": [
+        "metric-highlight"
+      ],
+      "requiredData": [
+        "shot.metric",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "count-up",
+        "scale-settle",
+        "context-reveal"
+      ],
+      "styleCapability": [
+        "editorial-number",
+        "metrics",
+        "strong-hierarchy"
+      ],
       "productionReady": true
     },
     {
@@ -174,11 +337,513 @@
       "category": "标题",
       "orientation": "portrait",
       "size": "1080x1920",
-      "compatibleIntents": ["concept-explanation", "opening", "conclusion"],
-      "compatibleShotKinds": ["concept-explainer"],
-      "requiredData": ["shot.evidence", "lens.objective"],
-      "motionCapability": ["type-reveal", "keyword-focus", "evidence-rise"],
-      "styleCapability": ["editorial-type", "semantic-evidence", "strong-hierarchy"],
+      "compatibleIntents": [
+        "concept-explanation",
+        "opening",
+        "conclusion"
+      ],
+      "compatibleShotKinds": [
+        "concept-explainer"
+      ],
+      "requiredData": [
+        "shot.evidence",
+        "lens.objective"
+      ],
+      "motionCapability": [
+        "type-reveal",
+        "keyword-focus",
+        "evidence-rise"
+      ],
+      "styleCapability": [
+        "editorial-type",
+        "semantic-evidence",
+        "strong-hierarchy"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "product-showcase",
+      "rendererId": "product-showcase",
+      "label": "产品展示",
+      "description": "以真实产品或作品媒体为唯一主视觉。",
+      "category": "界面",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "product-showcase"
+      ],
+      "compatibleShotKinds": [
+        "product-showcase"
+      ],
+      "requiredData": [
+        "shot.target",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "media-reveal",
+        "focus-zoom"
+      ],
+      "styleCapability": [
+        "media-led",
+        "single-focus"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "editor-canvas",
+      "rendererId": "editor-canvas",
+      "label": "编辑画布",
+      "description": "展示可编辑对象与画布层级。",
+      "category": "界面",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "editor-canvas"
+      ],
+      "compatibleShotKinds": [
+        "editor-canvas"
+      ],
+      "requiredData": [
+        "shot.target",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "object-enter",
+        "object-focus"
+      ],
+      "styleCapability": [
+        "canvas",
+        "editable-objects"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "article-illustration",
+      "rendererId": "article-illustration",
+      "label": "文章插画",
+      "description": "将文章判断与插画或隐喻图形关联。",
+      "category": "标题",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "article-illustration"
+      ],
+      "compatibleShotKinds": [
+        "article-illustration"
+      ],
+      "requiredData": [
+        "shot.target",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "draw-reveal",
+        "illustration-rise"
+      ],
+      "styleCapability": [
+        "editorial",
+        "illustration"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "timeline-story",
+      "rendererId": "timeline-story",
+      "label": "时间线叙事",
+      "description": "以单轴阶段线表达版本、过程与进展。",
+      "category": "流程",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "timeline-story"
+      ],
+      "compatibleShotKinds": [
+        "timeline-story"
+      ],
+      "requiredData": [
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "timeline-progress",
+        "node-settle"
+      ],
+      "styleCapability": [
+        "chronology",
+        "single-axis"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "quote-callout",
+      "rendererId": "quote-callout",
+      "label": "观点引述",
+      "description": "以单句主张表达问题、判断或结论。",
+      "category": "标题",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "quote-callout"
+      ],
+      "compatibleShotKinds": [
+        "quote-callout"
+      ],
+      "requiredData": [
+        "lens.objective",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "line-reveal",
+        "keyword-emphasis"
+      ],
+      "styleCapability": [
+        "editorial-type",
+        "single-focus"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "checklist-progress",
+      "rendererId": "checklist-progress",
+      "label": "清单进度",
+      "description": "逐项呈现原则、能力或完成过程。",
+      "category": "流程",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "checklist-progress"
+      ],
+      "compatibleShotKinds": [
+        "checklist-progress"
+      ],
+      "requiredData": [
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "item-confirm",
+        "progress-step"
+      ],
+      "styleCapability": [
+        "checklist",
+        "vertical"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "radial-explainer",
+      "rendererId": "radial-explainer",
+      "label": "径向拆解",
+      "description": "从中心概念向外展开关键要素。",
+      "category": "流程",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "radial-explainer"
+      ],
+      "compatibleShotKinds": [
+        "radial-explainer"
+      ],
+      "requiredData": [
+        "shot.target",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "radial-expand",
+        "orbit-settle"
+      ],
+      "styleCapability": [
+        "radial",
+        "concept-map"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "media-compare",
+      "rendererId": "media-compare",
+      "label": "媒体对比",
+      "description": "用同对象的两份真实媒体或语义对照表达差异。",
+      "category": "对比",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "media-compare"
+      ],
+      "compatibleShotKinds": [
+        "media-compare"
+      ],
+      "requiredData": [
+        "shot.before",
+        "shot.after"
+      ],
+      "motionCapability": [
+        "mask-reveal",
+        "split-compare"
+      ],
+      "styleCapability": [
+        "media-compare",
+        "split-layout"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "overview-matrix",
+      "rendererId": "overview-matrix",
+      "label": "能力总览",
+      "description": "多能力矩阵，顺序点亮各模块状态。",
+      "category": "总览",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "overview"
+      ],
+      "compatibleShotKinds": [
+        "overview-matrix"
+      ],
+      "requiredData": [
+        "shot.target",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "grid-reveal",
+        "sequential-focus"
+      ],
+      "styleCapability": [
+        "matrix",
+        "capability-grid",
+        "high-contrast"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "rule-compare",
+      "rendererId": "rule-compare",
+      "label": "规则对比",
+      "description": "展示正反对照的规则、原则或约束差异。",
+      "category": "对比",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "rule-compare"
+      ],
+      "compatibleShotKinds": [
+        "rule-compare"
+      ],
+      "requiredData": [
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "split-reveal",
+        "rule-confirm",
+        "flip"
+      ],
+      "styleCapability": [
+        "split-layout",
+        "comparison",
+        "semantic-diff"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "code-render",
+      "rendererId": "code-render",
+      "label": "代码渲染",
+      "description": "展示代码到帧/成品的管线转译过程。",
+      "category": "代码",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "code-render"
+      ],
+      "compatibleShotKinds": [
+        "code-render"
+      ],
+      "requiredData": [
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "code-type",
+        "frame-reveal",
+        "pipeline-flow"
+      ],
+      "styleCapability": [
+        "editor",
+        "monospace",
+        "pipeline"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "slide-editor",
+      "rendererId": "slide-editor",
+      "label": "幻灯片编辑",
+      "description": "展示幻灯片中可编辑的原生对象和选区移动。",
+      "category": "界面",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "slide-editor"
+      ],
+      "compatibleShotKinds": [
+        "slide-editor"
+      ],
+      "requiredData": [
+        "shot.target",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "object-select",
+        "focus-move",
+        "format-reveal"
+      ],
+      "styleCapability": [
+        "editor",
+        "slide-canvas",
+        "editable-objects"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "article-map",
+      "rendererId": "article-map",
+      "label": "文章映射",
+      "description": "将文章判断映射为图像，通过路径连接来源、正文与行动。",
+      "category": "流程",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "article-map"
+      ],
+      "compatibleShotKinds": [
+        "article-map"
+      ],
+      "requiredData": [
+        "shot.target",
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "path-draw",
+        "node-activate",
+        "output-reveal"
+      ],
+      "styleCapability": [
+        "process-map",
+        "editorial",
+        "semantic-nodes"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "video-agent",
+      "rendererId": "video-agent",
+      "label": "视频代理",
+      "description": "展示 HTML 到视频的输入-预览-交付接力流程。",
+      "category": "流程",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "video-agent"
+      ],
+      "compatibleShotKinds": [
+        "video-agent"
+      ],
+      "requiredData": [
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "input-reveal",
+        "preview-focus",
+        "delivery-handoff"
+      ],
+      "styleCapability": [
+        "pipeline",
+        "media-led",
+        "process-map"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "design-compare",
+      "rendererId": "design-compare",
+      "label": "设计对比",
+      "description": "展示设计 token 与页面变化，参数影响展开。",
+      "category": "对比",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "design-token"
+      ],
+      "compatibleShotKinds": [
+        "design-compare"
+      ],
+      "requiredData": [
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "token-reveal",
+        "surface-compare",
+        "property-expand"
+      ],
+      "styleCapability": [
+        "split-layout",
+        "design-system",
+        "comparison"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "system-summary",
+      "rendererId": "system-summary",
+      "label": "系统汇总",
+      "description": "多模块收束，从中心向外汇聚各子系统节点。",
+      "category": "总览",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "system-summary"
+      ],
+      "compatibleShotKinds": [
+        "system-summary"
+      ],
+      "requiredData": [
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "graph-build",
+        "edge-trace",
+        "center-converge"
+      ],
+      "styleCapability": [
+        "architecture-map",
+        "radial",
+        "concept-map"
+      ],
+      "productionReady": true
+    },
+    {
+      "componentId": "evidence-replay",
+      "rendererId": "evidence-replay",
+      "label": "证据回放",
+      "description": "输入-操作-结果的纵向证据轨迹，依次定格展示。",
+      "category": "流程",
+      "orientation": "portrait",
+      "size": "1080x1920",
+      "compatibleIntents": [
+        "evidence-replay"
+      ],
+      "compatibleShotKinds": [
+        "evidence-replay"
+      ],
+      "requiredData": [
+        "shot.evidence"
+      ],
+      "motionCapability": [
+        "step-reveal",
+        "frame-freeze",
+        "sequence-play"
+      ],
+      "styleCapability": [
+        "chronology",
+        "evidence-led",
+        "high-contrast"
+      ],
       "productionReady": true
     }
   ]

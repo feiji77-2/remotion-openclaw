@@ -7,7 +7,7 @@ import { PRODUCT_ICON_KEYS } from "../components/ultimate-kit/families/skill-sho
 import type { CompiledAsset } from "./assetResolver";
 import type { CompiledProject, CompiledProjectScene } from "./compileProject";
 import { ProjectValidationError, formatProjectPath } from "./projectSchema";
-import { HeroLensSchema, HeroShotSchema } from "./visualPlan";
+import { HeroLensSchema, HeroShotSchema, VisualDirectorSchema, VisualSystemSchema } from "./visualPlan";
 
 const SkillIconSchema = z.enum(SKILL_ICON_KEYS);
 const ProductIconSchema = z.enum(PRODUCT_ICON_KEYS);
@@ -72,6 +72,8 @@ const SkillShowcasePayloadSchema = z
     visualMode: z
       .enum(["hero", "grid", "compare", "process", "metrics", "quote"])
       .optional(),
+    visualSystem: VisualSystemSchema.optional(),
+    director: VisualDirectorSchema.optional(),
     heroStyle: z.enum(["cinematic", "hero-track-v2"]).optional(),
     title: z.string().min(1),
     subtitle: z.string().optional(),
@@ -113,7 +115,6 @@ const SkillShowcasePayloadSchema = z
           "video-agent",
           "design-compare",
           "system-summary",
-          "generic-explainer",
         ]),
         captionStartIndex: z.number().int().nonnegative(),
         captionEndIndex: z.number().int().nonnegative(),
@@ -134,6 +135,7 @@ const SkillShowcasePayloadSchema = z
                 shot: HeroShotSchema.optional(),
                 componentId: z.string().min(1).max(64).optional(),
                 componentProps: z.record(z.string(), z.unknown()).optional(),
+                director: VisualDirectorSchema.optional(),
                 intent: z.record(z.string(), z.unknown()).optional(),
                 visualPlanEntryId: z.string().min(1).max(96).optional(),
                 resolution: z.enum(["matched", "fallback", "error"]).optional(),
@@ -287,7 +289,8 @@ export const ProjectSceneRegistry: React.FC<{
     <AbsoluteFill
       data-scene-id={scene.id}
       data-family={scene.family}
-      style={{ overflow: "hidden", background: "#05070d", color: "#f8fafc" }}
+      data-shared-background="enforced"
+      style={{ overflow: "hidden", color: "#f8fafc" }}
     >
       <SceneAsset assets={scene.assets} accent={accent} />
       <SkillShowcase

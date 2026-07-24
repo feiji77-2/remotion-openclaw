@@ -1,5 +1,5 @@
 import type {VideoProject} from '../../project/projectSchema';
-import type {ComponentLibraryItem} from './component-library-model';
+import type {CompositionTemplateItem} from './component-library-model';
 
 export type RunnerStatus = 'checking' | 'online' | 'offline';
 export type JobStatus = 'running' | 'done' | 'failed';
@@ -215,7 +215,7 @@ export interface ComponentLibraryResponse {
   sourceRoot: string;
   version: number | string | null;
   warning?: string;
-  components: ComponentLibraryItem[];
+  components: CompositionTemplateItem[];
 }
 
 export interface ErrorResponse {

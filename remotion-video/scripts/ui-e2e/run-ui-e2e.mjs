@@ -85,6 +85,9 @@ const cleanup = async () => {
     await fs.rm(path.join(projectRoot, 'public', 'projects', projectId), {recursive: true, force: true});
     await fs.rm(path.join(projectRoot, 'out', projectId + '-frame-30.png'), {force: true});
     await fs.rm(path.join(projectRoot, 'out', projectId + '-scene-stills'), {recursive: true, force: true});
+    await fs.rm(path.join(projectRoot, 'out', projectId + '-qa'), {recursive: true, force: true});
+    await fs.rm(path.join(projectRoot, 'out', projectId + '-component-report.json'), {force: true});
+    await fs.rm(path.join(projectRoot, 'out', projectId + '-verify.json'), {force: true});
     await fs.rm(path.join(projectRoot, 'out', projectId + '.mp4'), {force: true});
   }
   await fs.rm(path.join(projectRoot, runtimeRel), {recursive: true, force: true});
@@ -384,33 +387,17 @@ const main = async () => {
     assert(selectedState.timelineDetail.includes('01 /'), 'selected scene did not sync to timeline detail');
   });
 
-  await run('T10b component library separates production renderers from preview-only assets', async () => {
+  await run('T10b component library exposes only production renderers', async () => {
     const library = await apiGet('/api/component-library');
     assert(library.status === 200 && library.json?.available, 'component library unavailable');
-    const productionComponents = library.json.components.filter((component) => component.source === 'project');
-    const hyperframesComponents = library.json.components.filter((component) => component.source === 'hyperframes');
-    assert(productionComponents.length >= 12, 'production component descriptors were not loaded');
-    assert(productionComponents.every((component) => component.productionReady === true && component.renderer?.componentId), 'production components were not exposed as renderers');
-    assert(hyperframesComponents.every((component) => component.productionReady === false && component.renderer === null), 'HyperFrames preview was exposed as productionReady');
+    assert(typeof library.json.sourceRoot === 'string' && 'version' in library.json, 'component library metadata missing');
+    assert(library.json.components.length === 29, `component library must expose exactly the 29 production composition templates, received ${library.json.components.length}`);
+    assert(library.json.components.every((component) => component.compositionId && component.productionReady === true && component.previewUrl === null), 'component library exposed a non-production contract item');
+    assert(library.json.components.every((component) => !('source' in component) && !('previewKind' in component) && !('renderer' in component)), 'component library exposed legacy candidate or renderer fields');
     assert(await clickByText(page, '组件库'), 'component library navigation missing');
     assert(await waitWorkspaceHeading(page, '组件库'), 'component library workspace missing');
-    if (hyperframesComponents.length > 0) {
-      const previewCandidate = hyperframesComponents[0];
-      assert(await clickByText(page, '全量'), 'full component scope missing');
-      assert(await clickByText(page, previewCandidate.orientation === 'landscape' ? '横屏' : '竖屏'), 'preview component orientation filter missing');
-      assert(await clickByText(page, previewCandidate.category), 'preview component category filter missing');
-      const selectedRemote = await page.evaluate((sourceId) => {
-        const tile = [...document.querySelectorAll('.component-result')].find((item) =>
-          item.textContent.includes('HyperFrames') && item.textContent.includes(sourceId)
-        );
-        if (!tile) return false;
-        tile.click();
-        return true;
-      }, previewCandidate.label);
-      assert(selectedRemote, 'no HyperFrames preview component found');
-      const applyState = await page.$eval('.component-applybar__action', (button) => ({disabled: button.disabled, text: button.textContent.trim()}));
-      assert(applyState.disabled && applyState.text === '仅供候选预览', 'preview-only component could be applied to production');
-    }
+    assert(await page.$('.component-production-preview'), 'production component preview missing');
+    assert(!(await clickByText(page, '全量')), 'legacy all component scope is still visible');
     const saved = (await apiGet('/api/files?path=' + encodeURIComponent('projects/' + projectId + '/project.json'))).json?.file?.data;
     assert(!saved?.scenes?.some((scene) => scene.assetIds?.some((id) => String(id).startsWith('hyperframes-'))), 'preview asset leaked into production project');
   });
@@ -453,6 +440,10 @@ const main = async () => {
       assert(record?.status === 'downloadable' && record.downloadAllowed, 'downloadable library record missing');
       const download = await apiGet(record.downloadUrl);
       assert(download.status === 200, 'protected download rejected');
+      assert(await clickProductionStepWhenEnabled(page, '交付', 30000), 'deliver navigation did not unlock');
+      await page.waitForSelector('.delivery-evidence', {visible: true, timeout: 30000});
+      const evidenceText = await page.$eval('.delivery-evidence', (element) => element.textContent || '');
+      assert(evidenceText.includes('Verify JSON') && evidenceText.includes('Component Report') && evidenceText.includes('QA Contact Sheet'), 'delivery evidence links missing');
     });
   } else {
     pass('T12 render skipped by SKIP_RENDER');

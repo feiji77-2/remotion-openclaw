@@ -79,9 +79,9 @@ export const assertStoryboardContract = ({ projectRoot }) => {
     composition.reviewFrame >= composition.durationInFrames
   )
     fail("reviewFrame must be inside the composition");
-  if (cinematic.length !== 11 || hero.length !== 9 || ids.length !== 20)
+  if (cinematic.length !== 11 || hero.length !== 8 || ids.length !== 19)
     fail(
-      `catalog must contain 11 Cinematic + 9 Hero Track, received ${cinematic.length} + ${hero.length}`,
+      `catalog must contain 11 Cinematic + 8 Hero Track, received ${cinematic.length} + ${hero.length}`,
     );
   if (new Set(ids).size !== ids.length) fail("catalog IDs must be unique");
 

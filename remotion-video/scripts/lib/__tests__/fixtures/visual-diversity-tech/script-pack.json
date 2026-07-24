@@ -1,0 +1,6 @@
+{
+  "productionId": "visual-diversity-tech",
+  "title": "技术教程多样性样例",
+  "spokenScript": "今天用一个真实技术流程说明如何把页面问题修到可交付。第一步，浏览器打开控制台，DevTools 里 DOM 状态从 loading 变成 ready。第二步，终端执行 npm run build，CI 输出通过并留下日志。第三步，打开 git diff，删除旧逻辑，新增缓存版本参数。第四步，配置 JSON 里把审计开关保持 enabled，schema 校验也通过。第五步，界面检查器定位到按钮没有响应，问题行被高亮。第六步，流程从口播输入进入分镜生成，再输出 Remotion 项目。第七步，测试报告显示 37 条断言全部通过，失败数量保持 0。第八步，组件库只选匹配动画和素材，不再乱塞模板。第九步，系统图把 Prompt、Skill、registry 和 renderer 关系连起来。第十步，证据回放逐步定格输入、操作和结果。最后前后对照旧画面和新画面，新版本立即接管。",
+  "keywords": "技术教程 DOM CI diff 配置 测试 组件库"
+}

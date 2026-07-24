@@ -3,7 +3,7 @@ import type {
   ProjectOption, ProjectState, RunnerJob, RunnerStatus, SceneStillsManifest, StudioFile,
   UploadedAudioAsset, VideoLibraryRecord,
 } from './types';
-import type {ComponentLibraryItem} from './component-library-model';
+import type {CompositionTemplateItem} from './component-library-model';
 import {VideoProjectSchema, formatProjectPath} from '../../project/projectSchema';
 import type {VideoProject} from '../../project/projectSchema';
 import {DEFAULT_VIDEO_PROJECT} from '../../compositions/v2/defaultProject';
@@ -126,7 +126,7 @@ export interface RemoteComponentLibraryResult {
   sourceRoot: string;
   version: number | string | null;
   warning?: string;
-  components: ComponentLibraryItem[];
+  components: CompositionTemplateItem[];
 }
 
 export async function loadRemoteComponentLibrary(): Promise<RemoteComponentLibraryResult> {
@@ -136,10 +136,7 @@ export async function loadRemoteComponentLibrary(): Promise<RemoteComponentLibra
     sourceRoot: payload.sourceRoot,
     version: payload.version,
     warning: payload.warning,
-    components: payload.components.map((component) => ({
-      ...component,
-      previewUrl: component.previewUrl ? new URL(component.previewUrl, runnerBase()).toString() : null,
-    })),
+    components: payload.components,
   };
 }
 

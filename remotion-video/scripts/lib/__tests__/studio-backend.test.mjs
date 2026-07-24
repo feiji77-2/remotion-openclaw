@@ -91,7 +91,30 @@ describe('studio workflow commands', () => {
       '--asr-out',
       'projects/demo/asr.json',
     ]);
-    expect(commandStepsFor('render-verify', project).map((step) => step.id)).toEqual(['render', 'verify']);
+    expect(commandStepsFor('render-verify', project).map((step) => step.id)).toEqual(['render', 'component-report', 'qa-sheet', 'verify']);
+    expect(commandStepsFor('render-verify', project)[1].command).toEqual([
+      'npm',
+      'run',
+      'project:component-report',
+      '--',
+      '--props',
+      'projects/demo/project.json',
+      '--out',
+      'out/demo-component-report.json',
+    ]);
+    expect(commandStepsFor('render-verify', project)[2].command).toEqual([
+      'npm',
+      'run',
+      'project:qa-sheet',
+      '--',
+      'projects/demo/project.json',
+      '--out-dir',
+      'out/demo-qa',
+      '--render',
+      '--scale=0.25',
+      '--max-beats',
+      '1',
+    ]);
     expect(commandStepsFor('build-check-audio', project).map((step) => step.id)).toEqual(['build', 'align-captions', 'rebuild', 'check']);
     expect(commandStepsFor('project-scene-stills', project).map((step) => step.id)).toEqual(['scene-stills']);
     expect(buildCheckSteps.every((step) => Array.isArray(step.command))).toBe(true);

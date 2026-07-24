@@ -1,0 +1,707 @@
+{
+  "schemaVersion": 2,
+  "metadata": {
+    "projectId": "visual-diversity-knowledge",
+    "title": "知识讲解多样性样例",
+    "language": "zh-CN",
+    "aspectRatio": "9:16",
+    "platform": "internal",
+    "targetDurationSec": 53,
+    "theme": "knowledge:知识讲解多样性样例"
+  },
+  "narrative": {
+    "arc": "data-insight",
+    "hook": "这节知识讲解用学习方法解释为什么很多笔记没有转化为能力。",
+    "context": "第一步，先对比收藏、理解和调用，它们不是同一件事。",
+    "turningPoint": "先对比收藏、理解和调用，它们不是同一件事",
+    "proof": [
+      {
+        "claim": "先对比收藏、理解和调用，它们不是同一件事",
+        "evidenceIds": []
+      },
+      {
+        "claim": "一个概念如果只停留在摘录里，就很难进入真实任务",
+        "evidenceIds": []
+      },
+      {
+        "claim": "我们把知识拆成问题、场景、证据和下一步行动",
+        "evidenceIds": []
+      },
+      {
+        "claim": "写出可验证的判断",
+        "evidenceIds": []
+      }
+    ],
+    "payoff": "好笔记不是仓库，而是下一次行动的启动器"
+  },
+  "visual": {
+    "tone": "editorial",
+    "density": "medium",
+    "pacing": "fast",
+    "motionIntensity": "high",
+    "colorStrategy": "editorial-contrast",
+    "accent": "#f6d365",
+    "secondaryAccent": "#69d2e7"
+  },
+  "scenes": [
+    {
+      "id": "scene-01",
+      "intent": "hook",
+      "block": "HookScene",
+      "message": {
+        "primary": "这节知识讲解用学习方法解释为什么很多笔记没有转化为能力。",
+        "secondary": "这节知识讲解用学习方法解释为什么很多笔记没有转化为能力。",
+        "keywords": [
+          "这节知识讲解用学"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "这节知识讲解用学",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "low",
+        "focus": "center",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "maskReveal",
+          "kineticCaption",
+          "pushIn"
+        ],
+        "intensity": "high",
+        "transition": "matchCut"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-02",
+      "intent": "contrast",
+      "block": "ContrastScene",
+      "message": {
+        "primary": "先对比收藏、理解和调用，它们不是同一件事",
+        "secondary": "第一步，先对比收藏、理解和调用，它们不是同一件事。",
+        "keywords": [
+          "第一步",
+          "先对比收藏",
+          "理解和调用",
+          "它们不是同一件事"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第一步",
+          "level": 3,
+          "reason": "contrast"
+        },
+        {
+          "text": "收藏、理解和调用，它们",
+          "level": 2,
+          "reason": "contrast"
+        },
+        {
+          "text": "先对比收藏",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "理解和调用",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "split",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "directionalWipe",
+          "snap",
+          "highlightSweep"
+        ],
+        "intensity": "punchy",
+        "transition": "matchCut"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-03",
+      "intent": "process",
+      "block": "ProcessScene",
+      "message": {
+        "primary": "一个概念如果只停留在摘录里，就很难进入真实任务",
+        "secondary": "第二步，一个概念如果只停留在摘录里，就很难进入真实任务。",
+        "keywords": [
+          "第二步",
+          "一个概念如果只停",
+          "就很难进入真实任"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第二步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "一个概念如果只停",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "就很难进入真实任",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-04",
+      "intent": "process",
+      "block": "StatementScene",
+      "message": {
+        "primary": "我们把知识拆成问题、场景、证据和下一步行动",
+        "secondary": "第三步，我们把知识拆成问题、场景、证据和下一步行动。",
+        "keywords": [
+          "第三步",
+          "我们把知识拆成问",
+          "场景",
+          "证据和下一步行动"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第三步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "我们把知识拆成问",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "场景",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "证据和下一步行动",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-05",
+      "intent": "contrast",
+      "block": "ContrastScene",
+      "message": {
+        "primary": "写出可验证的判断",
+        "secondary": "。",
+        "keywords": [
+          "第四步",
+          "读完一篇文章",
+          "不是保存链接",
+          "而是写出可验证的"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "读完一篇文章，",
+          "level": 3,
+          "reason": "contrast"
+        },
+        {
+          "text": "保存链接，",
+          "level": 2,
+          "reason": "contrast"
+        },
+        {
+          "text": "第四步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "读完一篇文章",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "split",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "directionalWipe",
+          "snap",
+          "highlightSweep"
+        ],
+        "intensity": "punchy",
+        "transition": "matchCut"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-06",
+      "intent": "process",
+      "block": "ProcessScene",
+      "message": {
+        "primary": "这套流程包含输入材料、关键句、反例、练习和复盘",
+        "secondary": "第五步，这套流程包含输入材料、关键句、反例、练习和复盘。",
+        "keywords": [
+          "第五步",
+          "这套流程包含输入",
+          "关键句",
+          "反例",
+          "练习和复盘"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第五步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "这套流程包含输入",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "关键句",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "反例",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-07",
+      "intent": "contrast",
+      "block": "ContrastScene",
+      "message": {
+        "primary": "7 天之后再回看同一个问题，能不能做出更快决策就是指标",
+        "secondary": "是指标。",
+        "keywords": [
+          "第六步",
+          "天之后再回看同一",
+          "能不能做出更快决"
+        ]
+      },
+      "medium": "data",
+      "emphasis": [
+        {
+          "text": "7 天",
+          "level": 3,
+          "reason": "number"
+        },
+        {
+          "text": "7 天之后再回看同一个问题，能不能做出更快决策就是指标",
+          "level": 2,
+          "reason": "contrast"
+        },
+        {
+          "text": "第六步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "天之后再回看同一",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "split",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "directionalWipe",
+          "snap",
+          "highlightSweep"
+        ],
+        "intensity": "punchy",
+        "transition": "matchCut"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-08",
+      "intent": "process",
+      "block": "ProcessScene",
+      "message": {
+        "primary": "时间线从第一次接触、主动复述、任务调用到经验沉淀",
+        "secondary": "。",
+        "keywords": [
+          "第七步",
+          "时间线从第一次接",
+          "主动复述",
+          "任务调用到经验沉"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第七步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "时间线从第一次接",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "主动复述",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "任务调用到经验沉",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-09",
+      "intent": "process",
+      "block": "ProcessScene",
+      "message": {
+        "primary": "径向拆解围绕目标，把概念、案例、约束和输出连起来",
+        "secondary": "。",
+        "keywords": [
+          "第八步",
+          "径向拆解围绕目标",
+          "把概念",
+          "案例",
+          "约束和输出连起来"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第八步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "径向拆解围绕目标",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "把概念",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "案例",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-10",
+      "intent": "quote",
+      "block": "QuoteScene",
+      "message": {
+        "primary": "清单列出问题、证据、判断、行动和复盘",
+        "secondary": "第九步，清单列出问题、证据、判断、行动和复盘。",
+        "keywords": [
+          "第九步",
+          "清单列出问题",
+          "证据",
+          "判断",
+          "行动和复盘"
+        ]
+      },
+      "medium": "quote",
+      "emphasis": [
+        {
+          "text": "第九步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "清单列出问题",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "证据",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "判断",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "edge",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "typeReveal",
+          "quoteBuild",
+          "pullBack"
+        ],
+        "intensity": "medium",
+        "transition": "panelShift"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-11",
+      "intent": "process",
+      "block": "ProcessScene",
+      "message": {
+        "primary": "证据回放把一次练习的输入、操作和结果逐步定格",
+        "secondary": "第十步，证据回放把一次练习的输入、操作和结果逐步定格。",
+        "keywords": [
+          "第十步",
+          "证据回放把一次练",
+          "操作和结果逐步定"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第十步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "证据回放把一次练",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "操作和结果逐步定",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-12",
+      "intent": "payoff",
+      "block": "SummaryScene",
+      "message": {
+        "primary": "好笔记不是仓库，而是下一次行动的启动器",
+        "secondary": "最后一句话：好笔记不是仓库，而是下一次行动的启动器。",
+        "keywords": [
+          "最后一句话",
+          "好笔记不是仓库",
+          "而是下一次行动的"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "最后一句话",
+          "level": 3,
+          "reason": "claim"
+        },
+        {
+          "text": "好笔记不是仓库",
+          "level": 3,
+          "reason": "claim"
+        },
+        {
+          "text": "而是下一次行动的",
+          "level": 3,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "low",
+        "focus": "center",
+        "safeArea": "caption-heavy"
+      },
+      "motion": {
+        "presetIds": [
+          "pullBack",
+          "quoteBuild",
+          "highlightSweep"
+        ],
+        "intensity": "medium",
+        "transition": "cameraMove"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    }
+  ],
+  "assets": {},
+  "variants": [
+    {
+      "id": "editorial",
+      "label": "Editorial Explainer",
+      "template": "editorial-explainer",
+      "visual": {
+        "tone": "editorial",
+        "density": "medium",
+        "pacing": "medium",
+        "motionIntensity": "medium",
+        "colorStrategy": "editorial-contrast",
+        "accent": "#f6d365",
+        "secondaryAccent": "#69d2e7"
+      }
+    },
+    {
+      "id": "product-proof",
+      "label": "Product Proof Film",
+      "template": "product-proof",
+      "visual": {
+        "tone": "commercial",
+        "density": "high",
+        "pacing": "fast",
+        "motionIntensity": "high",
+        "colorStrategy": "dual-accent",
+        "accent": "#4be3c1",
+        "secondaryAccent": "#ff7aa8"
+      }
+    },
+    {
+      "id": "founder-story",
+      "label": "Founder Story",
+      "template": "founder-story",
+      "visual": {
+        "tone": "documentary",
+        "density": "high",
+        "pacing": "punchy",
+        "motionIntensity": "punchy",
+        "colorStrategy": "dual-accent",
+        "accent": "#d8c7a1",
+        "secondaryAccent": "#7dbba3"
+      }
+    }
+  ]
+}

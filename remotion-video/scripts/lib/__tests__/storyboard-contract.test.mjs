@@ -26,10 +26,10 @@ afterEach(() => {
 });
 
 describe("Remotion storyboard contract", () => {
-  it("locks the reusable chain to 11 Cinematic + 9 Hero Track with isolated zones", () => {
+  it("locks the reusable chain to 11 Cinematic + 8 Hero Track with isolated zones", () => {
     const result = assertStoryboardContract({ projectRoot: PROJECT_ROOT });
     expect(result.cinematicCount).toBe(11);
-    expect(result.heroCount).toBe(9);
+    expect(result.heroCount).toBe(8);
     expect(result.contract.policies.imageGeneration).toBe("remotion-code-only");
     expect(result.contract.zones.hero.bottom).toBeLessThan(
       result.contract.zones.semantic.top,
@@ -39,7 +39,7 @@ describe("Remotion storyboard contract", () => {
     );
   });
 
-  it("accepts 20 unique portrait Remotion stills", () => {
+  it("accepts 19 unique portrait Remotion stills", () => {
     const result = assertStoryboardContract({ projectRoot: PROJECT_ROOT });
     const outputDir = mkdtempSync(path.join(tmpdir(), "storyboard-contract-"));
     tempRoots.push(outputDir);
@@ -56,7 +56,7 @@ describe("Remotion storyboard contract", () => {
         ids: result.ids,
         outputDir,
       }).uniqueStillCount,
-    ).toBe(20);
+    ).toBe(19);
   });
 
   it("rejects a repeated still even when every file name exists", () => {
@@ -75,6 +75,6 @@ describe("Remotion storyboard contract", () => {
         ids: result.ids,
         outputDir,
       }),
-    ).toThrow("expected 20 unique stills");
+    ).toThrow("expected 19 unique stills");
   });
 });

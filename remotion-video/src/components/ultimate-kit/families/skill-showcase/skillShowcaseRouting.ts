@@ -10,7 +10,7 @@ import type {
 } from "./types";
 
 const VARIANT_HERO_KIND: Record<SkillShowcaseVariant, HeroTrackKind> = {
-  intro: "generic-explainer",
+  intro: "overview-matrix",
   overview: "overview-matrix",
   coding: "rule-compare",
   remotion: "code-render",
@@ -23,7 +23,7 @@ const VARIANT_HERO_KIND: Record<SkillShowcaseVariant, HeroTrackKind> = {
   "frontend-design": "design-compare",
   "ux-pro": "design-compare",
   "cloud-design": "system-summary",
-  generic: "generic-explainer",
+  generic: "overview-matrix",
 };
 
 const ENTITY_TARGETS: Record<HeroTrackKind, readonly string[]> = {
@@ -77,7 +77,6 @@ const ENTITY_TARGETS: Record<HeroTrackKind, readonly string[]> = {
     "skill-hyperframes",
     "skill-ui",
   ],
-  "generic-explainer": ["input-node", "rule-node", "result-node"],
 };
 
 const ACTION_PRESET: Record<SkillBeatAction, SkillBeatShotPreset> = {
@@ -120,6 +119,23 @@ const SHOT_META: Record<HeroShotKind, {
   "before-after": {environment: "Split Compare", target: "before / after split", actionLabel: "前后对照", evidenceType: "截图差异"},
   "metric-highlight": {environment: "Metric Stage", target: "value / unit / context", actionLabel: "指标强调", evidenceType: "明确数值"},
   "concept-explainer": {environment: "Editorial Stage", target: "claim / explanation / evidence", actionLabel: "概念解释", evidenceType: "语义证据"},
+  "product-showcase": {environment: "Product Media", target: "product / work", actionLabel: "产品展示", evidenceType: "作品媒体"},
+  "editor-canvas": {environment: "Editor Canvas", target: "editable object", actionLabel: "编辑画布", evidenceType: "画布对象"},
+  "article-illustration": {environment: "Article Illustration", target: "article / illustration", actionLabel: "文章插画", evidenceType: "文章判断"},
+  "timeline-story": {environment: "Timeline", target: "current stage", actionLabel: "时间线叙事", evidenceType: "阶段节点"},
+  "quote-callout": {environment: "Editorial Quote", target: "core claim", actionLabel: "观点引述", evidenceType: "核心判断"},
+  "checklist-progress": {environment: "Checklist", target: "current item", actionLabel: "清单进度", evidenceType: "清单项"},
+  "radial-explainer": {environment: "Concept Map", target: "central concept", actionLabel: "径向拆解", evidenceType: "概念要素"},
+  "media-compare": {environment: "Media Compare", target: "media difference", actionLabel: "媒体对比", evidenceType: "前后媒体"},
+  "overview-matrix": {environment: "Overview Matrix", target: "capability grid", actionLabel: "能力总览", evidenceType: "能力矩阵"},
+  "rule-compare": {environment: "Rule Compare", target: "rule pair", actionLabel: "规则对比", evidenceType: "正反对照"},
+  "code-render": {environment: "Code Render", target: "code-to-frame", actionLabel: "代码渲染", evidenceType: "管线转译"},
+  "slide-editor": {environment: "Slide Editor", target: "slide objects", actionLabel: "幻灯片编辑", evidenceType: "原生对象"},
+  "article-map": {environment: "Article Map", target: "source-body-action", actionLabel: "文章映射", evidenceType: "判断路径"},
+  "video-agent": {environment: "Video Agent", target: "HTML-to-video", actionLabel: "视频代理", evidenceType: "转换流程"},
+  "design-compare": {environment: "Design Compare", target: "token surfaces", actionLabel: "设计对比", evidenceType: "设计token"},
+  "system-summary": {environment: "System Summary", target: "center node", actionLabel: "系统汇总", evidenceType: "子系统汇聚"},
+  "evidence-replay": {environment: "Evidence Replay", target: "step sequence", actionLabel: "证据回放", evidenceType: "步骤证据"},
 };
 
 const shotKindForBeat = (beat: SkillShowcaseBeat): HeroShotKind => {

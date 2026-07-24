@@ -83,13 +83,14 @@ const componentLibrary = await request('/api/component-library');
 if (componentLibrary.status !== 200 || !Array.isArray(componentLibrary.payload.components)) {
   throw new Error(`component library contract failed: ${JSON.stringify(componentLibrary)}`);
 }
-const productionComponents = componentLibrary.payload.components.filter((component) => component.source === 'project');
-const hyperframesComponents = componentLibrary.payload.components.filter((component) => component.source === 'hyperframes');
-if (productionComponents.length < 12 || !productionComponents.every((component) => component.productionReady === true && component.renderer?.componentId)) {
-  throw new Error('production component descriptors were not exposed as usable renderers');
+if (typeof componentLibrary.payload.sourceRoot !== 'string' || !('version' in componentLibrary.payload)) {
+  throw new Error('component library metadata was not exposed');
 }
-if (!hyperframesComponents.every((component) => component.productionReady === false && component.renderer === null)) {
-  throw new Error('preview-only HyperFrames components were exposed as production renderers');
+if (
+  componentLibrary.payload.components.length !== 29
+  || !componentLibrary.payload.components.every((component) => component.compositionId && component.productionReady === true && component.previewUrl === null)
+) {
+  throw new Error('production component descriptors were not exposed as composition template items');
 }
 
 const prematureRender = await post('/api/jobs', {commandId: 'render-verify', label: 'premature render', project});
@@ -167,7 +168,7 @@ if (afterStill.payload.state.stages.preview.status !== 'current') {
 }
 
 const delivered = await pollJob((await startJob('render-verify')).id, 300000);
-if (delivered.status !== 'done' || delivered.steps.map((step) => step.status).join(',') !== 'done,done') {
+if (delivered.status !== 'done' || delivered.steps.map((step) => step.status).join(',') !== 'done,done,done,done') {
   throw new Error(`render-verify workflow failed: ${JSON.stringify(delivered)}`);
 }
 const afterDelivery = await request(`/api/projects/${id}/state`);
@@ -178,6 +179,16 @@ if (
   || afterDelivery.payload.state.deliveryReady !== true
 ) {
   throw new Error(`delivery readiness is incorrect after render-verify: ${JSON.stringify(afterDelivery)}`);
+}
+for (const evidencePath of [
+  `out/${id}-verify.json`,
+  `out/${id}-component-report.json`,
+  `out/${id}-qa/manifest.json`,
+  `out/${id}-qa/contact-sheet.jpg`,
+]) {
+  const evidence = await fetch(`${base}/api/artifact?path=${encodeURIComponent(evidencePath)}`);
+  if (evidence.status !== 200) throw new Error(`delivery evidence missing: ${evidencePath}`);
+  await evidence.arrayBuffer();
 }
 
 const listed = await request(`/api/jobs?projectId=${id}&limit=20`);

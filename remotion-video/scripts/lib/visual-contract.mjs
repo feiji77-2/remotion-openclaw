@@ -58,6 +58,42 @@ const CINEMATIC_PRESETS = new Set([
   "surface-morph",
   "system-convergence",
 ]);
+const VISUAL_SYSTEM_VARIANTS = new Set([
+  "cinematic-tech",
+  "editorial-lightcut",
+  "product-console",
+]);
+const VISUAL_SYSTEM_PACING = new Set(["fast", "balanced", "explainer"]);
+const VISUAL_SYSTEM_PLATFORMS = new Set(["portrait", "landscape", "square"]);
+const SCENE_PRIMITIVES = new Set([
+  "hook-title",
+  "capability-matrix",
+  "problem-solution-compare",
+  "editor-canvas-demo",
+  "code-or-terminal-evidence",
+  "process-map",
+  "metric-spike",
+  "quote-close",
+  "system-summary",
+]);
+const DIRECTOR_MOTION_PRESETS = new Set([
+  "stage-breathe",
+  "focus-lock",
+  "split-reveal",
+  "matrix-step",
+  "object-select",
+  "number-roll",
+  "path-draw",
+  "quote-snap",
+  "handoff-wipe",
+]);
+const DIRECTOR_TRANSITION_PRESETS = new Set([
+  "ambient-fade",
+  "stage-slide",
+  "focus-handoff",
+  "contrast-flash",
+  "none",
+]);
 const HERO_TRACK_KINDS = new Set([
   "overview-matrix",
   "rule-compare",
@@ -67,22 +103,14 @@ const HERO_TRACK_KINDS = new Set([
   "video-agent",
   "design-compare",
   "system-summary",
-  "generic-explainer",
 ]);
-const HERO_SHOT_KINDS = new Set([
-  "browser-demo",
-  "terminal-execution",
-  "code-diff",
-  "config-check",
-  "interface-audit",
-  "flow-trace",
-  "test-report",
-  "asset-library",
-  "system-map",
-  "before-after",
-  "metric-highlight",
-  "concept-explainer",
-]);
+// Legal shot kinds derive from the same production catalog that drives the
+// registry and Studio, so this contract can never drift from the 29 templates.
+const HERO_SHOT_KINDS = new Set(
+  productionComponentCatalog.components.flatMap(
+    (descriptor) => descriptor.compatibleShotKinds,
+  ),
+);
 const PRODUCTION_COMPONENTS = new Map(
   productionComponentCatalog.components.map((descriptor) => [descriptor.componentId, descriptor]),
 );
@@ -110,6 +138,7 @@ const VISUAL_METADATA_KEYS = new Set([
   "captionStartIndex",
   "componentId",
   "diagnostics",
+  "director",
   "heroStyle",
   "kind",
   "labelIcons",
@@ -125,6 +154,7 @@ const VISUAL_METADATA_KEYS = new Set([
   "sourceComponentId",
   "variant",
   "visualMode",
+  "visualSystem",
 ]);
 
 const collectVisibleStrings = (value, output = []) => {
@@ -234,6 +264,49 @@ const layoutSignatureForScene = (scene) => {
     return `visual:${payload.visualMode}`;
   }
   return `family:${scene?.family ?? "unknown"}`;
+};
+
+const checkVisualSystem = (visualSystem, pathLabel, errors) => {
+  if (!visualSystem || typeof visualSystem !== "object") {
+    errors.push(`${pathLabel}: visualSystem must be an object`);
+    return;
+  }
+  if (!VISUAL_SYSTEM_VARIANTS.has(visualSystem.variant)) {
+    errors.push(`${pathLabel}.variant must be a supported productized visual variant`);
+  }
+  if (!VISUAL_SYSTEM_PACING.has(visualSystem.pacing)) {
+    errors.push(`${pathLabel}.pacing must be fast, balanced, or explainer`);
+  }
+  if (!VISUAL_SYSTEM_PLATFORMS.has(visualSystem.platform)) {
+    errors.push(`${pathLabel}.platform must be portrait, landscape, or square`);
+  }
+};
+
+const checkDirector = (director, pathLabel, sceneLayoutSignature, errors, {required = false} = {}) => {
+  if (!director || typeof director !== "object") {
+    if (required) errors.push(`${pathLabel}: director grammar is required`);
+    return;
+  }
+  if (!SCENE_PRIMITIVES.has(director.scenePrimitive)) {
+    errors.push(`${pathLabel}.scenePrimitive must be a supported scene primitive`);
+  }
+  if (!String(director.layoutSignature ?? "").trim()) {
+    errors.push(`${pathLabel}.layoutSignature is required`);
+  } else if (sceneLayoutSignature && director.layoutSignature !== sceneLayoutSignature) {
+    errors.push(`${pathLabel}.layoutSignature must match scene.payload.layoutSignature`);
+  }
+  if (!DIRECTOR_MOTION_PRESETS.has(director.motionPreset)) {
+    errors.push(`${pathLabel}.motionPreset must be a supported director motion preset`);
+  }
+  if (!DIRECTOR_TRANSITION_PRESETS.has(director.transitionPreset)) {
+    errors.push(`${pathLabel}.transitionPreset must be a supported transition grammar preset`);
+  }
+  if (!["low", "medium", "high"].includes(director.density)) {
+    errors.push(`${pathLabel}.density must be low, medium, or high`);
+  }
+  if (director.focusTarget !== undefined && !String(director.focusTarget).trim()) {
+    errors.push(`${pathLabel}.focusTarget must be readable when supplied`);
+  }
 };
 
 const checkSceneCaptionRange = (scene, sceneIndex, captions, errors) => {
@@ -435,7 +508,7 @@ const checkRendererContract = (scene, sceneIndex, errors) => {
   });
 };
 
-const checkHeroTrack = (scene, sceneIndex, captions, errors) => {
+const checkHeroTrack = (scene, sceneIndex, captions, errors, {directorRequired = false} = {}) => {
   if (resolvedRenderMode(scene?.payload) !== "hero-track-v2") return;
   const track = scene.payload.heroTrack;
   const range = scene.captionRange;
@@ -471,6 +544,7 @@ const checkHeroTrack = (scene, sceneIndex, captions, errors) => {
   }
   let previousEnd = null;
   let previousCaptionEnd = null;
+  const sceneLayoutSignature = layoutSignatureForScene(scene);
   track.states.forEach((state, stateIndex) => {
     if (
       state.endFrame <= state.startFrame ||
@@ -557,7 +631,7 @@ const checkHeroTrack = (scene, sceneIndex, captions, errors) => {
         } else {
           if (!HERO_SHOT_KINDS.has(state.shot.kind)) {
             errors.push(
-              `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].shot.kind must be one of the 12 production shot kinds`,
+              `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].shot.kind must be a declared production shot kind`,
             );
           }
           if (asArray(state.shot.evidence).length === 0) {
@@ -580,6 +654,13 @@ const checkHeroTrack = (scene, sceneIndex, captions, errors) => {
           `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}] with a technical shot must also declare a lens`,
         );
       }
+      checkDirector(
+        state.director,
+        `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].director`,
+        sceneLayoutSignature,
+        errors,
+        {required: directorRequired},
+      );
     }
     previousEnd = state.endFrame;
     previousCaptionEnd = state.captionEndIndex;
@@ -608,6 +689,7 @@ const narrationHashForCaptions = (captions) => createHash("sha256")
 
 const checkVisualPlan = (project, scenes, captions, errors, {required}) => {
   const plan = project?.visualPlan;
+  const directorRequired = Boolean(project?.visualSystem);
   if (!plan) {
     if (required) errors.push("visualPlan is required for non-golden production projects");
     return;
@@ -669,14 +751,34 @@ const checkVisualPlan = (project, scenes, captions, errors, {required}) => {
     if (entry.resolution !== "matched" || asArray(entry.diagnostics).some((diagnostic) => diagnostic?.level === "error")) {
       errors.push(`${prefix}: fallback/error Visual Plan entries cannot enter a production render`);
     }
+    checkDirector(
+      entry.director,
+      `${prefix}.director`,
+      layoutSignatureForScene(scene),
+      errors,
+      {required: directorRequired},
+    );
     const state = asArray(scene.payload?.heroTrack?.states).find((candidate) => candidate?.visualPlanEntryId === entry.id)
       ?? asArray(scene.payload?.heroTrack?.states).find((candidate) => candidate?.captionStartIndex === entry.captionStartIndex);
     if (!state || state.componentId !== entry.componentId || state.shot?.kind !== entry.shot?.kind) {
       errors.push(`${prefix}: scene Hero state must be derived from the same component and shot`);
+    } else if (directorRequired && JSON.stringify(state.director ?? null) !== JSON.stringify(entry.director ?? null)) {
+      errors.push(`${prefix}.director must match the derived scene Hero state director`);
     }
   });
 
   if (entries.length === 0) errors.push("visualPlan.entries must contain at least one production entry");
+  let componentRun = 0;
+  let previousComponentId = null;
+  for (const entry of entries) {
+    componentRun = entry.componentId === previousComponentId ? componentRun + 1 : 1;
+    previousComponentId = entry.componentId;
+    if (entries.length >= 12 && componentRun > 2) errors.push(`visualPlan entries cannot use component ${entry.componentId} more than twice consecutively`);
+  }
+  const compositionFor = (componentId) => ({
+    'browser-demo': 'viewport', 'terminal-execution': 'command-log', 'code-diff': 'line-diff', 'config-check': 'key-value', 'interface-audit': 'annotated-target', 'flow-trace': 'directed-path', 'test-report': 'result-summary', 'asset-library': 'asset-grid', 'system-map': 'relation-network', 'before-after': 'split-compare', 'metric-highlight': 'single-metric', 'concept-explainer': 'editorial-claim', 'product-showcase': 'media-hero', 'editor-canvas': 'free-canvas', 'article-illustration': 'article-figure', 'timeline-story': 'single-axis', 'quote-callout': 'quote-layout', 'checklist-progress': 'vertical-checklist', 'radial-explainer': 'radial-map', 'media-compare': 'media-split',
+  }[componentId] ?? componentId);
+  if (required && entries.length >= 12 && new Set(entries.map((entry) => compositionFor(entry.componentId))).size < 4) errors.push("visualPlan must use at least four distinct production compositions");
   captions.forEach((_, captionIndex) => {
     if (coveredCaptions.get(captionIndex) !== 1) {
       errors.push(`visualPlan must cover captions[${captionIndex}] exactly once`);
@@ -732,6 +834,10 @@ export const checkVisualContract = (
     );
   }
 
+  if (project?.visualSystem) {
+    checkVisualSystem(project.visualSystem, "visualSystem", errors);
+  }
+
   checkVisualPlan(project, skillScenes, captions, errors, {required: !isGolden});
 
   let previousRange = null;
@@ -755,7 +861,23 @@ export const checkVisualContract = (
       requireCaptionBinding: !isGolden,
     });
     checkRendererContract(scene, sceneIndex, errors);
-    checkHeroTrack(scene, sceneIndex, captions, errors);
+    checkHeroTrack(scene, sceneIndex, captions, errors, {
+      directorRequired: Boolean(project?.visualSystem),
+    });
+    if (project?.visualSystem) {
+      if (JSON.stringify(payload.visualSystem ?? null) !== JSON.stringify(project.visualSystem)) {
+        errors.push(
+          `scenes[${sceneIndex}].payload.visualSystem must match project.visualSystem`,
+        );
+      }
+      checkDirector(
+        payload.director,
+        `scenes[${sceneIndex}].payload.director`,
+        layoutSignatureForScene(scene),
+        errors,
+        {required: true},
+      );
+    }
     assertProductIconExists(
       projectRoot,
       payload.productIcon,

@@ -35,6 +35,16 @@ const entries = project.visualPlan.entries.map((entry) => {
     diagnostics: entry.diagnostics,
   };
 });
+const componentRuns = [];
+for (const entry of entries) {
+  const current = componentRuns.at(-1);
+  if (current?.componentId === entry.componentId) current.count += 1;
+  else componentRuns.push({componentId: entry.componentId, count: 1});
+}
+const compositionFor = (componentId) => ({
+  'browser-demo': 'viewport', 'terminal-execution': 'command-log', 'code-diff': 'line-diff', 'config-check': 'key-value', 'interface-audit': 'annotated-target', 'flow-trace': 'directed-path', 'test-report': 'result-summary', 'asset-library': 'asset-grid', 'system-map': 'relation-network', 'before-after': 'split-compare', 'metric-highlight': 'single-metric', 'concept-explainer': 'editorial-claim', 'product-showcase': 'media-hero', 'editor-canvas': 'free-canvas', 'article-illustration': 'article-figure', 'timeline-story': 'single-axis', 'quote-callout': 'quote-layout', 'checklist-progress': 'vertical-checklist', 'radial-explainer': 'radial-map', 'media-compare': 'media-split',
+  'overview-matrix': 'capability-grid', 'rule-compare': 'rule-flip', 'code-render': 'code-pipeline', 'slide-editor': 'slide-selection', 'article-map': 'article-path', 'video-agent': 'input-preview-delivery', 'design-compare': 'token-impact', 'system-summary': 'converge-center', 'evidence-replay': 'evidence-trail',
+}[componentId] ?? componentId);
 const report = {
   projectId: project.projectId,
   title: project.title,
@@ -42,6 +52,10 @@ const report = {
   generatedFrom: project.visualPlan.generatedFrom,
   totalEntries: entries.length,
   uniqueComponents: usage.size,
+  uniqueCompositions: new Set(entries.map((entry) => compositionFor(entry.componentId))).size,
+  componentRuns,
+  maxComponentRun: Math.max(0, ...componentRuns.map((run) => run.count)),
+  unresolvedEntries: entries.filter((entry) => entry.resolution !== 'matched' || !entry.productionReady).map((entry) => entry.id),
   usage: [...usage.entries()].map(([componentId, count]) => ({componentId, count})).sort((left, right) => right.count - left.count || left.componentId.localeCompare(right.componentId)),
   entries,
   diagnostics: [...(project.visualPlan.diagnostics ?? []), ...entries.flatMap((entry) => entry.diagnostics)],

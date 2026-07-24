@@ -24,7 +24,7 @@ import {StyleCard} from './StyleCard';
 import {VideoLibrary} from './VideoLibrary';
 import {VoiceWorkspace, type VoiceWorkspaceAudio} from './VoiceWorkspace';
 import type {ActivityEvent, CommandId, ContractKey, DraftScript, ProjectOption, ProjectState, RunnerJob, RunnerStatus, SceneStillsManifest, StudioFile, Tone} from './types';
-import {LOCAL_SCENE_COMPONENTS, type ComponentLibraryItem} from './component-library-model';
+import {LOCAL_SCENE_COMPONENTS, type CompositionTemplateItem} from './component-library-model';
 import {invalidateProductionArtifacts, navigationState, requestCopyTransfer, usesSceneTimeline, usesWideEditor, type PendingCopyTransfer} from './workflow-model';
 import './index.css';
 
@@ -157,10 +157,10 @@ export const StudioApp: React.FC = () => {
   const [sceneStills, setSceneStills] = useState<SceneStillsManifest | null>(null);
   const [jobs, setJobs] = useState<RunnerJob[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
-  const [remoteComponents, setRemoteComponents] = useState<ComponentLibraryItem[]>([]);
+  const [remoteComponents, setRemoteComponents] = useState<CompositionTemplateItem[]>([]);
   const [componentLibraryLoading, setComponentLibraryLoading] = useState(false);
   const [componentLibraryWarning, setComponentLibraryWarning] = useState<string | null>(null);
-  const [selectedComponentId, setSelectedComponentId] = useState(LOCAL_SCENE_COMPONENTS[0]?.id || null);
+  const [selectedComponentId, setSelectedComponentId] = useState(LOCAL_SCENE_COMPONENTS[0]?.compositionId || null);
   const [selectedScene, setSelectedScene] = useState(0);
   const [sceneStillsAnchorScene, setSceneStillsAnchorScene] = useState<number | null>(null);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -177,7 +177,7 @@ export const StudioApp: React.FC = () => {
   const styleDirty = candidateStyleId !== null && candidateStyleId !== savedStyleId;
   const productionInputsDirty = draftDirty || styleDirty;
   const hasSceneOverrides = project.scenes.some((scene) => Boolean(recordOf(scene.payload.sceneEditor).componentId));
-  const activeJob = state?.activeJob || jobs.find((job) => job.status === 'running') || null;
+  const activeJob = state ? state.activeJob : jobs.find((job) => job.status === 'running') || null;
   const activeRenderJob = activeJob?.commandId === 'render-verify' ? activeJob : null;
   const activeFinalVideoJob = activeJob && (activeJob.commandId === 'render-verify' || voiceCommandIds.has(activeJob.commandId)) ? activeJob : null;
   const activeSceneStillsJob = activeJob?.commandId === 'project-scene-stills' ? activeJob : null;
@@ -192,9 +192,15 @@ export const StudioApp: React.FC = () => {
   const videoUrl = state?.stages.render.status === 'current' && state.stages.render.path ? artifactUrl(state.stages.render.path, videoVersion) : null;
   const recentRenderJob = jobs.find((job) => job.commandId === 'render-verify') || null;
   const downloadUrl = state?.deliveryReady && recentRenderJob ? videoLibraryDownloadUrl(recentRenderJob.id) : null;
+  const deliveryEvidenceLinks = state?.deliveryReady ? [
+    {key: 'verify-json', label: 'Verify JSON', detail: '成片验收结果', url: artifactUrl(`out/${selectedProject.id}-verify.json`, state.updatedAt)},
+    {key: 'component-report', label: 'Component Report', detail: '组件使用分布', url: artifactUrl(`out/${selectedProject.id}-component-report.json`, state.updatedAt)},
+    {key: 'qa-manifest', label: 'QA Manifest', detail: '抽帧样张索引', url: artifactUrl(`out/${selectedProject.id}-qa/manifest.json`, state.updatedAt)},
+    {key: 'qa-contact-sheet', label: 'QA Contact Sheet', detail: '交付质检拼图', url: artifactUrl(`out/${selectedProject.id}-qa/contact-sheet.jpg`, state.updatedAt)},
+  ] : [];
   const recentVoiceJob = jobs.find((job) => voiceCommandIds.has(job.commandId)) || null;
-  const componentLibrary = useMemo(() => [...LOCAL_SCENE_COMPONENTS, ...remoteComponents], [remoteComponents]);
-  const selectedComponent = useMemo(() => componentLibrary.find((component) => component.id === selectedComponentId) || componentLibrary[0] || null, [componentLibrary, selectedComponentId]);
+  const componentLibrary = useMemo(() => remoteComponents.length > 0 ? remoteComponents : LOCAL_SCENE_COMPONENTS, [remoteComponents]);
+  const selectedComponent = useMemo(() => componentLibrary.find((component) => component.compositionId === selectedComponentId) || componentLibrary[0] || null, [componentLibrary, selectedComponentId]);
   const currentVoiceAudio = useMemo(() => audioFromAssetPack(files['asset-pack.json']?.data, project.audio?.voiceAssetId) || audioFromProject(project), [files, project]);
   const currentScriptFingerprint = contentFingerprint(draft.script);
   const voiceSourceScriptFingerprint = stringOf(recordOf(files['asset-pack.json']?.data).voiceSourceScriptFingerprint);
@@ -733,8 +739,7 @@ export const StudioApp: React.FC = () => {
       .then((result) => {
         if (cancelled) return;
         setRemoteComponents(result.components);
-        if (!result.available) setComponentLibraryWarning(`未找到 HyperFrames 动效库：${result.sourceRoot}`);
-        else if (result.warning) setComponentLibraryWarning(result.warning);
+        if (!result.available) setComponentLibraryWarning('生产组件目录暂时不可用。');
       })
       .catch((error) => {
         if (!cancelled) setComponentLibraryWarning(error instanceof Error ? error.message : '组件库同步失败');
@@ -846,9 +851,9 @@ export const StudioApp: React.FC = () => {
         {currentStep === 'voice' && <VoiceWorkspace draft={draft} dirty={draftDirty} writable={writable} runnerOnline={runnerStatus === 'online'} saving={working || Boolean(activeJob)} currentAudio={hasVoiceAsset ? currentVoiceAudio : null} activeJob={activeVoiceJob} recentJob={recentVoiceJob} onSynthesize={runVoiceSynthesis} onUploadAudio={runVoiceFromUpload} onDeleteAudio={deleteVoiceAudio} />}
         {currentStep === 'style' && <div className="workspace-panel style-workspace"><div className="workspace-heading"><div><span className="workspace-kicker">03 / 视觉系统</span><h1>风格</h1></div><span className={`state-chip ${styleDirty ? 'is-stale' : 'is-current'}`}>{styleDirty ? '未保存' : '已保存'}</span></div><p className="workspace-copy">这里只保存色彩、字体、节奏和版式规则；分镜页再根据已保存风格生成画面。</p>{!writable && <div className="notice notice--neutral">样例项目为只读输入。</div>}<StyleCard presets={STYLE_PRESETS} candidate={candidateStyleId} applied={savedStyleId} disabled={!writable} onSelect={setCandidateStyleId} /><button className="primary-action" type="button" disabled={!writable || working || !styleDirty} onClick={() => void saveStyleSelection()}>{working ? '正在保存风格' : styleDirty ? '保存风格' : candidateStyleId === savedStyleId ? '当前风格已保存' : '先选择一个风格'}</button></div>}
         {currentStep === 'storyboard' && <StoryboardWorkspace project={project} fps={project.render.fps} selectedScene={lockedScene} state={state} sceneStills={sceneStills} activeJob={activeJob} runnerOnline={runnerStatus === 'online'} busy={Boolean(activeJob)} writable={writable} saving={sceneEditSaving} onSaveScene={saveSceneEdit} onRenderSceneStills={() => void runSceneStills()} />}
-        {currentStep === 'render' && <RenderWorkspace mode="render" state={state} videoUrl={videoUrl} downloadUrl={downloadUrl} runnerOnline={runnerStatus === 'online'} activeJob={activeRenderJob} blockingJob={renderBlockingJob} starting={working && !activeJob} recentJob={recentRenderJob} onRun={(command) => void runJob(command, '生成最终视频')} totalFrames={totalFrames} fps={project.render.fps} sceneCount={project.scenes.length} />}
-        {currentStep === 'deliver' && <RenderWorkspace mode="deliver" state={state} videoUrl={videoUrl} downloadUrl={downloadUrl} runnerOnline={runnerStatus === 'online'} activeJob={activeRenderJob} blockingJob={renderBlockingJob} starting={working && !activeJob} recentJob={recentRenderJob} onRun={(command) => void runJob(command, '生成最终视频')} totalFrames={totalFrames} fps={project.render.fps} sceneCount={project.scenes.length} />}
-        {currentStep === 'components' && <ComponentLibraryWorkspace components={componentLibrary} loading={componentLibraryLoading} warning={componentLibraryWarning} selectedId={selectedComponent?.id || null} onSelect={setSelectedComponentId} />}
+        {currentStep === 'render' && <RenderWorkspace mode="render" state={state} videoUrl={videoUrl} downloadUrl={downloadUrl} evidenceLinks={deliveryEvidenceLinks} runnerOnline={runnerStatus === 'online'} activeJob={activeRenderJob} blockingJob={renderBlockingJob} starting={working && !activeJob} recentJob={recentRenderJob} onRun={(command) => void runJob(command, '生成最终视频')} totalFrames={totalFrames} fps={project.render.fps} sceneCount={project.scenes.length} />}
+        {currentStep === 'deliver' && <RenderWorkspace mode="deliver" state={state} videoUrl={videoUrl} downloadUrl={downloadUrl} evidenceLinks={deliveryEvidenceLinks} runnerOnline={runnerStatus === 'online'} activeJob={activeRenderJob} blockingJob={renderBlockingJob} starting={working && !activeJob} recentJob={recentRenderJob} onRun={(command) => void runJob(command, '生成最终视频')} totalFrames={totalFrames} fps={project.render.fps} sceneCount={project.scenes.length} />}
+        {currentStep === 'components' && <ComponentLibraryWorkspace components={componentLibrary} loading={componentLibraryLoading} warning={componentLibraryWarning} selectedId={selectedComponent?.compositionId || null} onSelect={setSelectedComponentId} />}
       </>}
       timeline={showSceneTimeline ? <SceneTimeline project={project} totalFrames={totalFrames} fps={project.render.fps} selectedScene={lockedScene} sceneStills={sceneStills} stillsRendering={sceneStillsLocked} onSelectScene={(index) => { if (!sceneStillsLocked) setSelectedScene(index); }} /> : undefined}
       wideWorkspace={wideWorkspace}

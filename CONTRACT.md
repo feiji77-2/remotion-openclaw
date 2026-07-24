@@ -281,40 +281,29 @@ interface ComponentLibraryResponse {
   sourceRoot: string;
   version: number | string | null;
   warning?: string;
-  components: ComponentLibraryItem[];
+  components: CompositionTemplateItem[];
 }
 
-interface ComponentLibraryItem {
-  id: string;
-  sourceId: string;
-  source: 'project' | 'hyperframes';
+interface CompositionTemplateItem {
+  compositionId: string;
   label: string;
   description: string;
   category: string;
   orientation: 'portrait' | 'landscape';
   size: string;
-  duration: number | null;
-  tags: string[];
-  formats: string[];
-  previewUrl: string | null;
-  previewKind: 'video' | 'remotion' | 'mock';
-  status: 'ready' | 'draft';
-  productionReady: boolean;
   compatibleIntents: string[];
   compatibleShotKinds: string[];
   requiredData: string[];
   motionCapability: string[];
   styleCapability: string[];
-  renderer: { componentId: string, rendererId: string } | null;
-  schema: ComponentVariable[];
+  productionReady: boolean;
+  previewUrl: string | null;
 }
 ```
 
-`save-inputs` is emitted when an authorized build workflow persists submitted contract files before its process steps. `internal` is reserved for backend bookkeeping steps such as reporting a state-persistence failure. Only `process` steps contain a command array.
+`CompositionTemplateItem` is mirrored in `remotion-video/src/tools/console/component-library-model.ts`. Its server serializer and that type must change together.
 
-`ComponentLibraryItem` is mirrored in `remotion-video/src/tools/console/component-library-model.ts`. Its server serializer and that type must change together.
-
-`status: 'ready'` means the source asset or preview is available. It does not imply production capability. Only `productionReady: true` with a non-null `renderer` may enter a Visual Plan. HyperFrames HTML templates and pre-rendered samples are returned as `productionReady: false` and `renderer: null` until a real in-project Remotion renderer is integrated.
+Only `productionReady: true` entries may enter a Visual Plan. The catalog exposes exactly the 29 production composition templates registered in `HeroTrackV2.tsx`. HyperFrames HTML templates and pre-rendered samples are no longer present in the public contract. `generic-explainer` is excluded as redundant with `concept-explainer`.
 
 ## 5. Workflow contract
 

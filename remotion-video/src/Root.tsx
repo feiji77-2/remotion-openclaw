@@ -12,7 +12,17 @@ import {
   DEFAULT_PROJECT_DURATION,
   DEFAULT_VIDEO_PROJECT,
 } from "./compositions/v2/defaultProject";
+import {
+  DEFAULT_VIDEO_PRODUCT_DURATION,
+  DEFAULT_VIDEO_PRODUCT_METADATA,
+  DEFAULT_VIDEO_PRODUCT_SPEC,
+} from "./compositions/product-system/defaultProductSpec";
+import {
+  calculateVideoProductDemoMetadata,
+  VideoProductSystemDemo,
+} from "./compositions/product-system/VideoProductSystemDemo";
 import { VideoProjectSchema } from "./project/projectSchema";
+import { VideoProductSpecSchema } from "./video-system/productSchema";
 
 export const RemotionRoot: React.FC = () => (
   <>
@@ -35,6 +45,17 @@ export const RemotionRoot: React.FC = () => (
       width={REMOTION_STORYBOARD_WIDTH}
       height={REMOTION_STORYBOARD_HEIGHT}
       defaultProps={{ index: 0 }}
+    />
+    <Composition
+      id="VideoProductSystemDemo"
+      component={VideoProductSystemDemo}
+      durationInFrames={DEFAULT_VIDEO_PRODUCT_DURATION}
+      fps={DEFAULT_VIDEO_PRODUCT_METADATA.fps}
+      width={DEFAULT_VIDEO_PRODUCT_METADATA.width}
+      height={DEFAULT_VIDEO_PRODUCT_METADATA.height}
+      schema={VideoProductSpecSchema}
+      defaultProps={DEFAULT_VIDEO_PRODUCT_SPEC}
+      calculateMetadata={calculateVideoProductDemoMetadata}
     />
   </>
 );

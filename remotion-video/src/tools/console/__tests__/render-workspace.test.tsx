@@ -138,4 +138,52 @@ describe('render workspace runner progress', () => {
     expect(html).toContain('/api/video-library/job-1/download');
     expect(html).not.toContain('href="/video.mp4"');
   });
+
+  it('exposes delivery evidence links only in the deliver workspace', () => {
+    const state = {
+      projectId: 'project-1',
+      fingerprints: {
+        contentHash: 'content-hash',
+        assetHash: 'asset-hash',
+        projectHash: 'project-hash',
+        rendererHash: 'renderer-hash',
+      },
+      stages: {
+        project: {status: 'current' as const},
+        preview: {status: 'missing' as const},
+        sceneStills: {status: 'current' as const},
+        render: {status: 'current' as const},
+        verify: {status: 'current' as const, result: {ok: true}},
+      },
+      deliveryReady: true,
+      updatedAt: null,
+      activeJob: null,
+    };
+    const props = {
+      state,
+      videoUrl: '/video.mp4',
+      downloadUrl: '/api/video-library/job-1/download',
+      evidenceLinks: [
+        {key: 'verify-json', label: 'Verify JSON', detail: '成片验收结果', url: '/api/artifact?path=out%2Fdemo-verify.json'},
+        {key: 'component-report', label: 'Component Report', detail: '组件使用分布', url: '/api/artifact?path=out%2Fdemo-component-report.json'},
+        {key: 'qa-contact-sheet', label: 'QA Contact Sheet', detail: '交付质检拼图', url: '/api/artifact?path=out%2Fdemo-qa%2Fcontact-sheet.jpg'},
+      ],
+      runnerOnline: true,
+      activeJob: null,
+      onRun: () => undefined,
+      totalFrames: 300,
+      fps: 30,
+      sceneCount: 3,
+    };
+
+    const renderHtml = renderToStaticMarkup(React.createElement(RenderWorkspace, {...props, mode: 'render'}));
+    const deliverHtml = renderToStaticMarkup(React.createElement(RenderWorkspace, {...props, mode: 'deliver'}));
+
+    expect(renderHtml).not.toContain('交付证据');
+    expect(renderHtml).not.toContain('/api/artifact?path=out%2Fdemo-component-report.json');
+    expect(deliverHtml).toContain('交付证据');
+    expect(deliverHtml).toContain('Verify JSON');
+    expect(deliverHtml).toContain('/api/artifact?path=out%2Fdemo-component-report.json');
+    expect(deliverHtml).toContain('QA Contact Sheet');
+  });
 });

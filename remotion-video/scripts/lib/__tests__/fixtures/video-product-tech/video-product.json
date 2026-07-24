@@ -1,0 +1,701 @@
+{
+  "schemaVersion": 2,
+  "metadata": {
+    "projectId": "visual-diversity-tech",
+    "title": "技术教程多样性样例",
+    "language": "zh-CN",
+    "aspectRatio": "9:16",
+    "platform": "internal",
+    "targetDurationSec": 61,
+    "theme": "tech:技术教程多样性样例"
+  },
+  "narrative": {
+    "arc": "data-insight",
+    "hook": "今天用一个真实技术流程说明如何把页面问题修到可交付。",
+    "context": "第一步，浏览器打开控制台，",
+    "turningPoint": "打开 git diff，删除旧逻辑，新增缓存版本参数",
+    "proof": [
+      {
+        "claim": "浏览器打开控制台，DevTools 里 DOM 状态从 loading…",
+        "evidenceIds": []
+      },
+      {
+        "claim": "终端执行 npm run build，CI 输出通过并留下日志",
+        "evidenceIds": []
+      },
+      {
+        "claim": "打开 git diff，删除旧逻辑，新增缓存版本参数",
+        "evidenceIds": []
+      },
+      {
+        "claim": "配置 JSON 里把审计开关保持 enabled，schema 校验也…",
+        "evidenceIds": []
+      }
+    ],
+    "payoff": "前后对照旧画面和新画面，新版本立即接管",
+    "cta": "用同一套 schema 继续生成下一条视频。"
+  },
+  "visual": {
+    "tone": "tech",
+    "density": "medium",
+    "pacing": "fast",
+    "motionIntensity": "high",
+    "colorStrategy": "dual-accent",
+    "accent": "#48e7f3",
+    "secondaryAccent": "#a78bfa"
+  },
+  "scenes": [
+    {
+      "id": "scene-01",
+      "intent": "hook",
+      "block": "HookScene",
+      "message": {
+        "primary": "今天用一个真实技术流程说明如何把页面问题修到可交付。",
+        "secondary": "今天用一个真实技术流程说明如何把页面问题修到可交付。",
+        "keywords": [
+          "今天用一个真实技"
+        ]
+      },
+      "medium": "screenshot",
+      "emphasis": [
+        {
+          "text": "今天用一个真实技",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "low",
+        "focus": "center",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "maskReveal",
+          "kineticCaption",
+          "pushIn"
+        ],
+        "intensity": "high",
+        "transition": "matchCut"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-02",
+      "intent": "proof",
+      "block": "EvidenceScene",
+      "message": {
+        "primary": "浏览器打开控制台，DevTools 里 DOM 状态从 loading…",
+        "secondary": "DevTools 里 DOM 状态从 loading 变成 ready。",
+        "keywords": [
+          "第一步",
+          "浏览器打开控制台",
+          "DevTools",
+          "DOM",
+          "状态从"
+        ]
+      },
+      "medium": "screenshot",
+      "emphasis": [
+        {
+          "text": "第一步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "浏览器打开控制台",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "DevTools",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "DOM",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "high",
+        "focus": "edge",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "screenshotInspect",
+          "focusLock",
+          "pushIn"
+        ],
+        "intensity": "high",
+        "transition": "cameraMove"
+      },
+      "assetRefs": [],
+      "durationFrames": 207
+    },
+    {
+      "id": "scene-03",
+      "intent": "proof",
+      "block": "EvidenceScene",
+      "message": {
+        "primary": "终端执行 npm run build，CI 输出通过并留下日志",
+        "secondary": "通过并留下日志。",
+        "keywords": [
+          "第二步",
+          "终端执行",
+          "npm",
+          "run",
+          "build"
+        ]
+      },
+      "medium": "screenshot",
+      "emphasis": [
+        {
+          "text": "第二步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "终端执行",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "npm",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "run",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "high",
+        "focus": "split",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "screenshotInspect",
+          "focusLock",
+          "pushIn"
+        ],
+        "intensity": "high",
+        "transition": "cameraMove"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-04",
+      "intent": "contrast",
+      "block": "ContrastScene",
+      "message": {
+        "primary": "打开 git diff，删除旧逻辑，新增缓存版本参数",
+        "secondary": "参数。",
+        "keywords": [
+          "第三步",
+          "打开",
+          "git",
+          "diff",
+          "删除旧逻辑"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "打开 git diff，删除旧逻辑，新增缓存版本参数",
+          "level": 3,
+          "reason": "contrast"
+        },
+        {
+          "text": "第三步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "打开",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "git",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "split",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "directionalWipe",
+          "snap",
+          "highlightSweep"
+        ],
+        "intensity": "punchy",
+        "transition": "matchCut"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-05",
+      "intent": "process",
+      "block": "ProcessScene",
+      "message": {
+        "primary": "配置 JSON 里把审计开关保持 enabled，schema 校验也…",
+        "secondary": "schema 校验也通过。",
+        "keywords": [
+          "第四步",
+          "配置",
+          "JSON",
+          "里把审计开关保持",
+          "enabled"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第四步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "配置",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "JSON",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "里把审计开关保持",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 201
+    },
+    {
+      "id": "scene-06",
+      "intent": "proof",
+      "block": "EvidenceScene",
+      "message": {
+        "primary": "界面检查器定位到按钮没有响应，问题行被高亮",
+        "secondary": "第五步，界面检查器定位到按钮没有响应，问题行被高亮。",
+        "keywords": [
+          "第五步",
+          "界面检查器定位到",
+          "问题行被高亮"
+        ]
+      },
+      "medium": "screenshot",
+      "emphasis": [
+        {
+          "text": "第五步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "界面检查器定位到",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "问题行被高亮",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "high",
+        "focus": "edge",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "screenshotInspect",
+          "focusLock",
+          "pushIn"
+        ],
+        "intensity": "high",
+        "transition": "cameraMove"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-07",
+      "intent": "process",
+      "block": "StatementScene",
+      "message": {
+        "primary": "流程从口播输入进入分镜生成，再输出 Remotion 项目",
+        "secondary": "on 项目。",
+        "keywords": [
+          "第六步",
+          "流程从口播输入进",
+          "再输出",
+          "Remotion",
+          "项目"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第六步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "流程从口播输入进",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "再输出",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "Remotion",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-08",
+      "intent": "proof",
+      "block": "EvidenceScene",
+      "message": {
+        "primary": "测试报告显示 37 条断言全部通过，失败数量保持 0",
+        "secondary": "0。",
+        "keywords": [
+          "第七步",
+          "测试报告显示",
+          "37",
+          "条断言全部通过",
+          "失败数量保持"
+        ]
+      },
+      "medium": "data",
+      "emphasis": [
+        {
+          "text": "37 条",
+          "level": 3,
+          "reason": "number"
+        },
+        {
+          "text": "0",
+          "level": 3,
+          "reason": "number"
+        },
+        {
+          "text": "第七步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "测试报告显示",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "high",
+        "focus": "edge",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "numberCount",
+          "focusLock",
+          "depthShift"
+        ],
+        "intensity": "high",
+        "transition": "panelShift"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-09",
+      "intent": "process",
+      "block": "ProcessScene",
+      "message": {
+        "primary": "组件库只选匹配动画和素材，不再乱塞模板",
+        "secondary": "第八步，组件库只选匹配动画和素材，不再乱塞模板。",
+        "keywords": [
+          "第八步",
+          "组件库只选匹配动",
+          "不再乱塞模板"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第八步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "组件库只选匹配动",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "不再乱塞模板",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-10",
+      "intent": "product-reveal",
+      "block": "ProductRevealScene",
+      "message": {
+        "primary": "系统图把 Prompt、Skill、registry 和 render…",
+        "secondary": "registry 和 renderer 关系连起来。",
+        "keywords": [
+          "第九步",
+          "系统图把",
+          "Prompt",
+          "Skill",
+          "registry"
+        ]
+      },
+      "medium": "screenshot",
+      "emphasis": [
+        {
+          "text": "第九步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "系统图把",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "Prompt",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "Skill",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "high",
+        "focus": "edge",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "clipReveal",
+          "productOrbit",
+          "depthShift"
+        ],
+        "intensity": "high",
+        "transition": "cameraMove"
+      },
+      "assetRefs": [],
+      "durationFrames": 253
+    },
+    {
+      "id": "scene-11",
+      "intent": "process",
+      "block": "ProcessScene",
+      "message": {
+        "primary": "证据回放逐步定格输入、操作和结果",
+        "secondary": "第十步，证据回放逐步定格输入、操作和结果。",
+        "keywords": [
+          "第十步",
+          "证据回放逐步定格",
+          "操作和结果"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第十步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "证据回放逐步定格",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "操作和结果",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 121
+    },
+    {
+      "id": "scene-12",
+      "intent": "payoff",
+      "block": "SummaryScene",
+      "message": {
+        "primary": "前后对照旧画面和新画面，新版本立即接管",
+        "secondary": "最后前后对照旧画面和新画面，新版本立即接管。",
+        "keywords": [
+          "最后前后对照旧画",
+          "新版本立即接管"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "最后前后对照旧画",
+          "level": 3,
+          "reason": "claim"
+        },
+        {
+          "text": "新版本立即接管",
+          "level": 3,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "low",
+        "focus": "center",
+        "safeArea": "caption-heavy"
+      },
+      "motion": {
+        "presetIds": [
+          "pullBack",
+          "quoteBuild",
+          "highlightSweep"
+        ],
+        "intensity": "medium",
+        "transition": "cameraMove"
+      },
+      "assetRefs": [],
+      "durationFrames": 127
+    }
+  ],
+  "assets": {},
+  "variants": [
+    {
+      "id": "editorial",
+      "label": "Editorial Explainer",
+      "template": "editorial-explainer",
+      "visual": {
+        "tone": "editorial",
+        "density": "medium",
+        "pacing": "medium",
+        "motionIntensity": "medium",
+        "colorStrategy": "editorial-contrast",
+        "accent": "#f6d365",
+        "secondaryAccent": "#69d2e7"
+      }
+    },
+    {
+      "id": "product-proof",
+      "label": "Product Proof Film",
+      "template": "product-proof",
+      "visual": {
+        "tone": "commercial",
+        "density": "high",
+        "pacing": "fast",
+        "motionIntensity": "high",
+        "colorStrategy": "dual-accent",
+        "accent": "#4be3c1",
+        "secondaryAccent": "#ff7aa8"
+      }
+    },
+    {
+      "id": "data-insight",
+      "label": "Data Insight Video",
+      "template": "data-insight",
+      "visual": {
+        "tone": "tech",
+        "density": "high",
+        "pacing": "punchy",
+        "motionIntensity": "punchy",
+        "colorStrategy": "dual-accent",
+        "accent": "#48e7f3",
+        "secondaryAccent": "#a78bfa"
+      }
+    }
+  ]
+}

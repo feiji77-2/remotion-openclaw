@@ -6,6 +6,7 @@ interface RenderWorkspaceProps {
   state: ProjectState | null;
   videoUrl: string | null;
   downloadUrl?: string | null;
+  evidenceLinks?: DeliveryEvidenceLink[];
   runnerOnline: boolean;
   activeJob: RunnerJob | null;
   blockingJob?: RunnerJob | null;
@@ -15,6 +16,13 @@ interface RenderWorkspaceProps {
   totalFrames: number;
   fps: number;
   sceneCount: number;
+}
+
+export interface DeliveryEvidenceLink {
+  key: string;
+  label: string;
+  detail: string;
+  url: string;
 }
 
 const statusCopy = (
@@ -60,6 +68,8 @@ const stepLabels: Record<string, string> = {
   check: '检查分镜数据',
   'scene-stills': '渲染分镜画面',
   render: '渲染并编码 MP4',
+  'component-report': '生成组件报告',
+  'qa-sheet': '生成 QA 样张',
   verify: '验收视频文件',
   'persist-state': '写入项目状态',
 };
@@ -226,6 +236,7 @@ export const RenderWorkspace: React.FC<RenderWorkspaceProps> = ({
   state,
   videoUrl,
   downloadUrl = null,
+  evidenceLinks = [],
   runnerOnline,
   activeJob,
   blockingJob = null,
@@ -244,6 +255,7 @@ export const RenderWorkspace: React.FC<RenderWorkspaceProps> = ({
   const showRenderAction = mode === 'render' || !deliveryReady;
   const stageStatus = stageStatusForMode(state, mode, activeJob, blockingJob);
   const traceJob = activeJob?.commandId === 'render-verify' ? activeJob : recentJob?.commandId === 'render-verify' ? recentJob : null;
+  const showEvidence = mode === 'deliver' && deliveryReady && evidenceLinks.length > 0;
   return <div className="workspace-panel">
     <div className="workspace-heading"><div><span className="workspace-kicker">{mode === 'render' ? '05 / 成片渲染' : '06 / 交付状态'}</span><h1>{mode === 'render' ? '渲染' : '交付'}</h1></div><span className={`state-chip ${stageStatus.className}`}>{stageStatus.label}</span></div>
     <p className="workspace-copy">{statusCopy(state, mode, activeJob, blockingJob)}</p>
@@ -253,6 +265,15 @@ export const RenderWorkspace: React.FC<RenderWorkspaceProps> = ({
       {traceJob && <RunProgressTrace job={traceJob} title="生成最终视频" />}
       {deliveryReady && downloadUrl && <a className="download-action" href={downloadUrl}>下载 MP4</a>}
       {mode === 'deliver' && state?.stages.verify.result && <div className="verify-result">已生成，可下载</div>}
+      {showEvidence && <section className="delivery-evidence" aria-label="交付证据">
+        <div className="delivery-evidence__heading"><strong>交付证据</strong><span>{evidenceLinks.length} 项</span></div>
+        <div className="delivery-evidence__links">
+          {evidenceLinks.map((link) => <a key={link.key} href={link.url} target="_blank" rel="noreferrer">
+            <span>{link.label}</span>
+            <em>{link.detail}</em>
+          </a>)}
+        </div>
+      </section>}
     </>
   </div>;
 };

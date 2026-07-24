@@ -1,6 +1,6 @@
 # 生产守则
 
-> 当前版本：2026-07-24
+> 当前版本：2026-07-25
 
 本文件只负责生成正确性、视觉质量和生产证据。Agent 启动与工作区保护见 [AGENTS.md](../AGENTS.md)；API、工作流、技术栈和模块边界见 [CONTRACT.md](../CONTRACT.md)。
 
@@ -46,6 +46,8 @@ script-pack.spokenScript
 - 有 `shot` 的 `HeroTrackState` 必须有 `lens`。
 - `lens.objective` 和 `actionLabel` 必须来自当前字幕句或当前技术目标。
 - `shot.environment`、`target`、`evidence` 必须可读，`evidence` 不能为空或只含泛化标签。
+- 若镜头语义要求真实图片、截图、产品画面或视频证据，production pack 必须在 `asset-pack.json` 登记可解析的 `image` 或 `video` 资产，并让对应 scene/Visual Plan entry 引用它。
+- 没有真实 media 资产时，只能声明为程序化 evidence surface；禁止把合成面板冒充成外部截图、照片或产品视频。
 - `asset-library` 只用于口播明确讨论素材、组件、资源或模板匹配时。
 - `system-map` 承接 Prompt、Skill、Token、架构和模块关系。
 - `code-diff` 承接文件差异、PR、patch 和增删改。
@@ -55,12 +57,15 @@ script-pack.spokenScript
 
 ## 5. 组件与扩展
 
-- 当前 `11 Cinematic + 9 Hero Track` 是已验收目录，不是永久上限。
-- 12 种生产 `shot.kind` 必须经 production component registry 解析到真实 Remotion renderer。
-- 组件可达不等于视觉质量通过；同一 generic shell、同一卡片骨架或同一种运动语言重复出现，仍然是失败。
-- `browser-demo`、`terminal-execution`、`code-diff`、`config-check`、`flow-trace`、`system-map`、`asset-library`、`metric-highlight`、`concept-explainer`、`before-after` 等语义必须有不同构图和运动语言。
-- 候选组件、素材和控制台预览不等于生产能力。
-- `visualPlan.entries[].componentId` 必须由 `caption -> intent -> beat/lens/shot -> resolver` 生成；`sceneEditor.componentId` 只能作为编辑来源元数据，不能改变生产计划。
+- 唯一组件目录是 `HeroTrackV2.tsx` 中注册的 29 个 production composition templates。
+- `intent`、`lens`、`shot` 是生成与匹配数据，不是第二套可选组件库。
+- `componentId` 是唯一可预览、可报告、可审核、可在 Studio 中展示的组件标识，其值为 29 个 composition template ID 之一；Studio 公开 DTO 仅在本地将其映射为 `compositionId`，不存在独立的 `compositionId` schema 字段。
+- `captionIndex` 是唯一时间驱动单位：同一索引对应的 Hero、beat、字幕必须同步；不得存在旁路状态。
+- 组件可达不等于视觉质量通过；同一 template 连续最多 2 个 caption entry。
+- 所有 template 不可绘制私有整屏背景，只可使用 `portraitColorTheme.ts` 统一 token。
+- 网格是低对比空间基准；HUD 显示 scene/caption/shot 的有意义状态。
+- 扫描只在 audit、trace、verify、config、flow 等 shot/lens 语义下触发一次，不做无语义循环。
+- 禁止开发标签（Hero Track 版本、shell、节点编号）和硬编码客户/旧样片内容。
 - 禁止新增 `NarrationSemanticSurface` 或 `retargetHeroTrackForComponent` 来建立旁路。
 - 允许保留红色诊断 fallback；禁止让低质 fallback、通用 `TrackShell`、通用 `ShotFrame` 或装饰线框成为匹配生产画面的常态。
 - 具体扩展接线要求以 [ARCHITECTURE.md](../ARCHITECTURE.md#extension-points) 为准。

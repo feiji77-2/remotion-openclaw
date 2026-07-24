@@ -1,24 +1,35 @@
-# Remotion Skill Showcase Video Factory
+# Video Factory
 
 [简体中文](README.md) | English
 
-Video Factory produces portrait Remotion videos from one Project JSON. Root [CONTRACT.md](CONTRACT.md) governs the public API, seven-step workflow, locked stack, and module ownership.
+Video Factory produces portrait Remotion videos from one Project JSON. Root [CONTRACT.md](CONTRACT.md) governs the public HTTP API, seven-step Studio workflow, locked stack, and module ownership.
 
-## Production Path
+## Current Production Path
 
 ```text
-narration script
-  -> initial Project JSON build (ignoring stale captions)
+brief.json + script-pack.json + asset-pack.json
+  -> project:from-pack / Studio build-check
   -> TTS synthesis or uploaded audio
-  -> timestamps extracted from the current audio
-  -> Project JSON rebuilt with source text and real timing
-  -> Project / Visual Check
-  -> scene stills / MP4 / Verify
+  -> audio:align-captions
+  -> Project JSON rebuilt from source narration and current audio timing
+  -> project:check + project:visual-check
+  -> project:scene-stills / project:render / project:verify
 ```
 
 Source narration controls visual meaning; current audio controls timing. ASR/Whisper supplies time boundaries and never replaces the source narration text.
 
-Production output is `1080x1920 / 30fps / portrait`, using the `skill-showcase` scene family. Remotion registers `UltimateVideoV2` and `RemotionStoryboardLibrary`.
+The delivery composition is `UltimateVideoV2`, using the `skill-showcase` scene family at `1080x1920 / 30fps / portrait`. The 29 production composition templates are the only production component catalog.
+
+The repository also keeps a non-public v2 product-spec QA path for schema, motion preset, variant, and report validation:
+
+```text
+video-product.json
+  -> product:metrics
+  -> product:report
+  -> VideoProductSystemDemo (inspectable in Remotion Studio)
+```
+
+That path does not change the Studio HTTP API or seven-step delivery workflow.
 
 ## Quick Start
 
@@ -32,21 +43,34 @@ npm run project:check -- examples/skill-showcase.json
 npm run project:visual-check -- examples/skill-showcase.json
 ```
 
-Generate Project JSON from narration:
+Generate Project JSON from a production pack:
 
 ```bash
-npm run project:from-script -- \
-  --id demo \
-  --title "Demo video" \
-  --script-file ./script.txt \
-  --out projects/demo/project.json
+npm --prefix remotion-video run project:from-pack -- examples --out project.json --ignore-captions
 ```
 
-Generate a still or MP4:
+Generate Project JSON from direct narration:
 
 ```bash
+npm run project:from-script -- --id demo --title "Demo video" --script-file ./script.txt --out projects/demo/project.json
+```
+
+Check, still, render, and verify:
+
+```bash
+npm run project:check -- examples/skill-showcase.json
+npm run project:visual-check -- examples/skill-showcase.json
 npm run project:still -- examples/skill-showcase.json --frame 60 --out out/skill-showcase-still.png
 npm run project:render -- examples/skill-showcase.json --out out/skill-showcase.mp4
+npm --prefix remotion-video run project:verify -- --props examples/skill-showcase.json --video out/skill-showcase.mp4
+```
+
+Run v2 product-spec non-render checks:
+
+```bash
+npm run product:from-script -- remotion-video/scripts/lib/__tests__/fixtures/visual-diversity-product --out /tmp/video-product.json --strict
+npm run product:metrics -- scripts/lib/__tests__/fixtures/video-product-product/video-product.json --strict
+npm run product:report -- scripts/lib/__tests__/fixtures/video-product-product/video-product.json --variant editorial --strict
 ```
 
 ## Studio
@@ -63,6 +87,19 @@ copy -> script -> voice -> style -> storyboard -> render -> deliver
 ```
 
 The video library is a separate screen and the component library is an auxiliary workspace.
+
+## Inputs And Outputs
+
+| File | Purpose |
+|---|---|
+| `remotion-video/examples/brief.json` | Project metadata, platform, visual style, and audience |
+| `remotion-video/examples/script-pack.json` | Narration and keywords, the semantic source of truth |
+| `remotion-video/examples/asset-pack.json` | Registered local or remote assets |
+| `remotion-video/examples/skill-showcase.json` | Schema v1 Project JSON example for `UltimateVideoV2` |
+| `remotion-video/examples/video-product-system.json` | v2 product-spec example, not part of the public Studio API |
+| `remotion-video/out/*.png|*.mp4|*.json` | Local still, MP4, QA, or report output |
+
+The current sample `asset-pack.json` does not register image, screenshot, or video assets; the `skill-showcase` example uses text, icons, and procedural UI evidence. The latest non-render media audit found no usable image/video assets for the media-backed evidence scenes in the v2 examples and fixtures. Real deliveries should register usable `image` / `video` assets and reference them from evidence scenes.
 
 ## Documentation
 

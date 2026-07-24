@@ -1,0 +1,645 @@
+{
+  "schemaVersion": 2,
+  "metadata": {
+    "projectId": "visual-diversity-product",
+    "title": "产品营销多样性样例",
+    "language": "zh-CN",
+    "aspectRatio": "9:16",
+    "platform": "internal",
+    "targetDurationSec": 53,
+    "theme": "product:产品营销多样性样例"
+  },
+  "narrative": {
+    "arc": "data-insight",
+    "hook": "这条新品发布视频讲一款面向门店的智能补货系统。",
+    "context": "第一屏，产品展示商品页和后台大屏，用户能看到当前库存风险。",
+    "turningPoint": "把销售、天气和节假日一起对比",
+    "proof": [
+      {
+        "claim": "把销售、天气和节假日一起对比",
+        "evidenceIds": []
+      },
+      {
+        "claim": "上线前 3 天我们先跑试点门店，缺货率下降到 6%",
+        "evidenceIds": []
+      },
+      {
+        "claim": "媒体对比展示门店货架照片和趋势图证据",
+        "evidenceIds": []
+      },
+      {
+        "claim": "时间线按试点、扩城、稳定运营三个阶段推进",
+        "evidenceIds": []
+      }
+    ],
+    "payoff": "补货系统卖的是确定性，不是更多报表",
+    "cta": "用同一套 schema 继续生成下一条视频。"
+  },
+  "visual": {
+    "tone": "commercial",
+    "density": "medium",
+    "pacing": "fast",
+    "motionIntensity": "high",
+    "colorStrategy": "dual-accent",
+    "accent": "#4be3c1",
+    "secondaryAccent": "#ff7aa8"
+  },
+  "scenes": [
+    {
+      "id": "scene-01",
+      "intent": "hook",
+      "block": "HookScene",
+      "message": {
+        "primary": "这条新品发布视频讲一款面向门店的智能补货系统。",
+        "secondary": "第一屏，产品展示商品页和后台大屏，用户能看到当前库存风险。",
+        "keywords": [
+          "这条新品发布视频",
+          "第一屏",
+          "产品展示商品页和",
+          "用户能看到当前库"
+        ]
+      },
+      "medium": "screenshot",
+      "emphasis": [
+        {
+          "text": "这条新品发布视频",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "第一屏",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "产品展示商品页和",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "用户能看到当前库",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "low",
+        "focus": "center",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "maskReveal",
+          "kineticCaption",
+          "pushIn"
+        ],
+        "intensity": "high",
+        "transition": "matchCut"
+      },
+      "assetRefs": [],
+      "durationFrames": 264
+    },
+    {
+      "id": "scene-02",
+      "intent": "contrast",
+      "block": "ContrastScene",
+      "message": {
+        "primary": "把销售、天气和节假日一起对比",
+        "secondary": "起对比。",
+        "keywords": [
+          "第二步",
+          "不是靠店长凭经验",
+          "而是把销售",
+          "天气和节假日一起"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第二步",
+          "level": 3,
+          "reason": "contrast"
+        },
+        {
+          "text": "靠店长凭经验补货，",
+          "level": 2,
+          "reason": "contrast"
+        },
+        {
+          "text": "不是靠店长凭经验",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "而是把销售",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "split",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "directionalWipe",
+          "snap",
+          "highlightSweep"
+        ],
+        "intensity": "punchy",
+        "transition": "matchCut"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-03",
+      "intent": "proof",
+      "block": "EvidenceScene",
+      "message": {
+        "primary": "上线前 3 天我们先跑试点门店，缺货率下降到 6%",
+        "secondary": "%。",
+        "keywords": [
+          "第三步",
+          "上线前",
+          "天我们先跑试点门",
+          "缺货率下降到",
+          "6%"
+        ]
+      },
+      "medium": "product",
+      "emphasis": [
+        {
+          "text": "3 天",
+          "level": 3,
+          "reason": "number"
+        },
+        {
+          "text": "6%",
+          "level": 3,
+          "reason": "number"
+        },
+        {
+          "text": "第三步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "上线前",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "high",
+        "focus": "split",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "numberCount",
+          "focusLock",
+          "depthShift"
+        ],
+        "intensity": "high",
+        "transition": "panelShift"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-04",
+      "intent": "product-reveal",
+      "block": "ProductRevealScene",
+      "message": {
+        "primary": "移动端仪表盘高亮明日建议采购量和供应商状态",
+        "secondary": "第四步，移动端仪表盘高亮明日建议采购量和供应商状态。",
+        "keywords": [
+          "第四步",
+          "移动端仪表盘高亮"
+        ]
+      },
+      "medium": "screenshot",
+      "emphasis": [
+        {
+          "text": "第四步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "移动端仪表盘高亮",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "high",
+        "focus": "edge",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "clipReveal",
+          "productOrbit",
+          "depthShift"
+        ],
+        "intensity": "high",
+        "transition": "cameraMove"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-05",
+      "intent": "contrast",
+      "block": "ContrastScene",
+      "message": {
+        "primary": "媒体对比展示门店货架照片和趋势图证据",
+        "secondary": "第五步，媒体对比展示门店货架照片和趋势图证据。",
+        "keywords": [
+          "第五步",
+          "媒体对比展示门店"
+        ]
+      },
+      "medium": "screenshot",
+      "emphasis": [
+        {
+          "text": "媒体",
+          "level": 3,
+          "reason": "contrast"
+        },
+        {
+          "text": "展示门店货架照片和趋势图证据",
+          "level": 2,
+          "reason": "contrast"
+        },
+        {
+          "text": "第五步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "媒体对比展示门店",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "split",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "directionalWipe",
+          "snap",
+          "highlightSweep"
+        ],
+        "intensity": "punchy",
+        "transition": "matchCut"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-06",
+      "intent": "process",
+      "block": "ProcessScene",
+      "message": {
+        "primary": "时间线按试点、扩城、稳定运营三个阶段推进",
+        "secondary": "第六步，时间线按试点、扩城、稳定运营三个阶段推进。",
+        "keywords": [
+          "第六步",
+          "时间线按试点",
+          "扩城",
+          "稳定运营三个阶段"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第六步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "时间线按试点",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "扩城",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "稳定运营三个阶段",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-07",
+      "intent": "process",
+      "block": "ProductRevealScene",
+      "message": {
+        "primary": "清单包括安全库存、异常预警、供应商确认和复盘报告",
+        "secondary": "。",
+        "keywords": [
+          "第七步",
+          "清单包括安全库存",
+          "异常预警",
+          "供应商确认和复盘"
+        ]
+      },
+      "medium": "product",
+      "emphasis": [
+        {
+          "text": "第七步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "清单包括安全库存",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "异常预警",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "供应商确认和复盘",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-08",
+      "intent": "product-reveal",
+      "block": "ProductRevealScene",
+      "message": {
+        "primary": "素材库会选择货架、订单状态和趋势图三类证据",
+        "secondary": "第八步，素材库会选择货架、订单状态和趋势图三类证据。",
+        "keywords": [
+          "第八步",
+          "素材库会选择货架",
+          "订单状态和趋势图"
+        ]
+      },
+      "medium": "screenshot",
+      "emphasis": [
+        {
+          "text": "第八步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "素材库会选择货架",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "订单状态和趋势图",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "high",
+        "focus": "edge",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "clipReveal",
+          "productOrbit",
+          "depthShift"
+        ],
+        "intensity": "high",
+        "transition": "cameraMove"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-09",
+      "intent": "process",
+      "block": "ProcessScene",
+      "message": {
+        "primary": "配置规则把补货阈值、天气权重和节假日开关写清楚",
+        "secondary": "第九步，配置规则把补货阈值、天气权重和节假日开关写清楚。",
+        "keywords": [
+          "第九步",
+          "配置规则把补货阈",
+          "天气权重和节假日"
+        ]
+      },
+      "medium": "text",
+      "emphasis": [
+        {
+          "text": "第九步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "配置规则把补货阈",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "天气权重和节假日",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "medium",
+        "focus": "timeline",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "lineWipe",
+          "panelShift",
+          "assetStack"
+        ],
+        "intensity": "medium",
+        "transition": "directionalWipe"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    },
+    {
+      "id": "scene-10",
+      "intent": "proof",
+      "block": "EvidenceScene",
+      "message": {
+        "primary": "界面审计标出缺货风险卡片和异常按钮",
+        "secondary": "第十步，界面审计标出缺货风险卡片和异常按钮。",
+        "keywords": [
+          "第十步",
+          "界面审计标出缺货"
+        ]
+      },
+      "medium": "screenshot",
+      "emphasis": [
+        {
+          "text": "第十步",
+          "level": 2,
+          "reason": "claim"
+        },
+        {
+          "text": "界面审计标出缺货",
+          "level": 2,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "high",
+        "focus": "edge",
+        "safeArea": "standard"
+      },
+      "motion": {
+        "presetIds": [
+          "screenshotInspect",
+          "focusLock",
+          "pushIn"
+        ],
+        "intensity": "high",
+        "transition": "cameraMove"
+      },
+      "assetRefs": [],
+      "durationFrames": 127
+    },
+    {
+      "id": "scene-11",
+      "intent": "payoff",
+      "block": "SummaryScene",
+      "message": {
+        "primary": "补货系统卖的是确定性，不是更多报表",
+        "secondary": "最后收束到一个判断：补货系统卖的是确定性，不是更多报表。",
+        "keywords": [
+          "最后收束到一个判",
+          "补货系统卖的是确",
+          "不是更多报表"
+        ]
+      },
+      "medium": "product",
+      "emphasis": [
+        {
+          "text": "最后收束到一个判",
+          "level": 3,
+          "reason": "claim"
+        },
+        {
+          "text": "补货系统卖的是确",
+          "level": 3,
+          "reason": "claim"
+        },
+        {
+          "text": "不是更多报表",
+          "level": 3,
+          "reason": "claim"
+        }
+      ],
+      "layout": {
+        "density": "low",
+        "focus": "center",
+        "safeArea": "caption-heavy"
+      },
+      "motion": {
+        "presetIds": [
+          "pullBack",
+          "quoteBuild",
+          "highlightSweep"
+        ],
+        "intensity": "medium",
+        "transition": "cameraMove"
+      },
+      "assetRefs": [],
+      "durationFrames": 132
+    }
+  ],
+  "assets": {},
+  "variants": [
+    {
+      "id": "editorial",
+      "label": "Editorial Explainer",
+      "template": "editorial-explainer",
+      "visual": {
+        "tone": "editorial",
+        "density": "medium",
+        "pacing": "medium",
+        "motionIntensity": "medium",
+        "colorStrategy": "editorial-contrast",
+        "accent": "#f6d365",
+        "secondaryAccent": "#69d2e7"
+      }
+    },
+    {
+      "id": "product-proof",
+      "label": "Product Proof Film",
+      "template": "product-proof",
+      "visual": {
+        "tone": "commercial",
+        "density": "high",
+        "pacing": "fast",
+        "motionIntensity": "high",
+        "colorStrategy": "dual-accent",
+        "accent": "#4be3c1",
+        "secondaryAccent": "#ff7aa8"
+      }
+    },
+    {
+      "id": "data-insight",
+      "label": "Data Insight Video",
+      "template": "data-insight",
+      "visual": {
+        "tone": "tech",
+        "density": "high",
+        "pacing": "punchy",
+        "motionIntensity": "punchy",
+        "colorStrategy": "dual-accent",
+        "accent": "#48e7f3",
+        "secondaryAccent": "#a78bfa"
+      }
+    }
+  ]
+}

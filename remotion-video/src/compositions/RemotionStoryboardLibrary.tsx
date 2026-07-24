@@ -339,22 +339,6 @@ export const HERO_STORYBOARDS: HeroStoryboard[] = [
     productIcon: "workbuddy",
     evidence: ["六个 Skill", "连接关系", "统一系统"],
   },
-  {
-    id: "generic-explainer",
-    title: "通用技术解释",
-    subtitle: "Generic Explainer / 输入规则结果",
-    caption: "未来的新口播也能落到输入、规则和结果三个技术实体",
-    icon: "panels-top-left",
-    action: "focus",
-    family: "hero",
-    heroKind: "generic-explainer",
-    entityTarget: "rule-node",
-    accent: "#48e7f3",
-    secondaryAccent: "#7e98ff",
-    variant: "generic",
-    productIcon: "workflow-tool",
-    evidence: ["口播输入", "规则处理", "结果证据"],
-  },
 ];
 
 export const REMOTION_STORYBOARD_LIBRARY: RemotionStoryboardItem[] = [

@@ -15,6 +15,23 @@ export const SEMANTIC_INTENT_KEYS = [
   'concept-explanation',
   'opening',
   'conclusion',
+  'product-showcase',
+  'editor-canvas',
+  'article-illustration',
+  'timeline-story',
+  'quote-callout',
+  'checklist-progress',
+  'radial-explainer',
+  'media-compare',
+  'overview',
+  'rule-compare',
+  'code-render',
+  'slide-editor',
+  'article-map',
+  'video-agent',
+  'design-token',
+  'system-summary',
+  'evidence-replay',
 ] as const;
 
 export const HERO_SHOT_KINDS = [
@@ -30,9 +47,91 @@ export const HERO_SHOT_KINDS = [
   'before-after',
   'metric-highlight',
   'concept-explainer',
+  'product-showcase',
+  'editor-canvas',
+  'article-illustration',
+  'timeline-story',
+  'quote-callout',
+  'checklist-progress',
+  'radial-explainer',
+  'media-compare',
+  'overview-matrix',
+  'rule-compare',
+  'code-render',
+  'slide-editor',
+  'article-map',
+  'video-agent',
+  'design-compare',
+  'system-summary',
+  'evidence-replay',
 ] as const;
 
 export const PRODUCTION_COMPONENT_IDS = HERO_SHOT_KINDS;
+
+export const VISUAL_SYSTEM_VARIANTS = [
+  'cinematic-tech',
+  'editorial-lightcut',
+  'product-console',
+] as const;
+
+export const VISUAL_SYSTEM_PACING = [
+  'fast',
+  'balanced',
+  'explainer',
+] as const;
+
+export const VISUAL_SYSTEM_PLATFORMS = [
+  'portrait',
+  'landscape',
+  'square',
+] as const;
+
+export const SCENE_PRIMITIVES = [
+  'hook-title',
+  'capability-matrix',
+  'problem-solution-compare',
+  'editor-canvas-demo',
+  'code-or-terminal-evidence',
+  'process-map',
+  'metric-spike',
+  'quote-close',
+  'system-summary',
+] as const;
+
+export const DIRECTOR_MOTION_PRESETS = [
+  'stage-breathe',
+  'focus-lock',
+  'split-reveal',
+  'matrix-step',
+  'object-select',
+  'number-roll',
+  'path-draw',
+  'quote-snap',
+  'handoff-wipe',
+] as const;
+
+export const DIRECTOR_TRANSITION_PRESETS = [
+  'ambient-fade',
+  'stage-slide',
+  'focus-handoff',
+  'contrast-flash',
+  'none',
+] as const;
+
+export const VisualSystemSchema = z.object({
+  variant: z.enum(VISUAL_SYSTEM_VARIANTS),
+  pacing: z.enum(VISUAL_SYSTEM_PACING),
+  platform: z.enum(VISUAL_SYSTEM_PLATFORMS),
+}).strict();
+
+export const VisualDirectorSchema = z.object({
+  scenePrimitive: z.enum(SCENE_PRIMITIVES),
+  layoutSignature: z.string().min(1),
+  motionPreset: z.enum(DIRECTOR_MOTION_PRESETS),
+  transitionPreset: z.enum(DIRECTOR_TRANSITION_PRESETS),
+  focusTarget: z.string().min(1).optional(),
+  density: z.enum(['low', 'medium', 'high']),
+}).strict();
 
 export const SemanticIntentSchema = z.object({
   key: z.enum(SEMANTIC_INTENT_KEYS),
@@ -130,8 +229,9 @@ export const VisualPlanEntrySchema = z.object({
   beat: VisualBeatSchema,
   lens: HeroLensSchema,
   shot: HeroShotSchema,
-  componentId: z.string().min(1),
+  componentId: z.enum(PRODUCTION_COMPONENT_IDS),
   componentProps: ProductionComponentPropsSchema,
+  director: VisualDirectorSchema.optional(),
   assetIds: z.array(z.string().min(1)),
   orientation: z.literal('portrait'),
   resolution: z.enum(['matched', 'fallback', 'error']),
@@ -146,6 +246,9 @@ export const VisualPlanEntrySchema = z.object({
   if (entry.resolution === 'matched' && entry.diagnostics.some((diagnostic) => diagnostic.level === 'error')) {
     context.addIssue({code: 'custom', path: ['diagnostics'], message: 'matched entries cannot contain error diagnostics'});
   }
+  if (entry.componentId !== entry.shot.kind) {
+    context.addIssue({code: 'custom', path: ['componentId'], message: 'componentId must match shot.kind for production components'});
+  }
 });
 
 export const VisualPlanSchema = z.object({
@@ -159,6 +262,8 @@ export const VisualPlanSchema = z.object({
 export type SemanticIntent = z.infer<typeof SemanticIntentSchema>;
 export type HeroLens = z.infer<typeof HeroLensSchema>;
 export type HeroShot = z.infer<typeof HeroShotSchema>;
+export type VisualSystem = z.infer<typeof VisualSystemSchema>;
+export type VisualDirector = z.infer<typeof VisualDirectorSchema>;
 export type VisualPlanDiagnostic = z.infer<typeof VisualPlanDiagnosticSchema>;
 export type ProductionComponentProps = z.infer<typeof ProductionComponentPropsSchema>;
 export type ProductionComponentCatalogDescriptor = z.infer<typeof ProductionComponentCatalogDescriptorSchema>;

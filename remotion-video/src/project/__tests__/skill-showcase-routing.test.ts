@@ -25,7 +25,7 @@ const CINEMATIC_PRESETS: SkillBeatShotPreset[] = [
 ];
 
 describe("skill-showcase production routing", () => {
-  it("maps the nine variant inputs onto the nine retained Hero Track compositions", () => {
+  it("maps the nine variant inputs onto the eight retained Hero Track compositions", () => {
     const plans = fixture.scenes.map((scene) => {
       const props = scene.payload as unknown as SkillShowcaseProps;
       return resolveSkillShowcaseRenderPlan(
@@ -36,7 +36,7 @@ describe("skill-showcase production routing", () => {
 
     expect(plans.every((plan) => plan.mode === "hero-track-v2")).toBe(true);
     expect(plans.map((plan) => plan.heroTrack?.kind)).toEqual([
-      "generic-explainer",
+      "overview-matrix",
       "overview-matrix",
       "rule-compare",
       "code-render",

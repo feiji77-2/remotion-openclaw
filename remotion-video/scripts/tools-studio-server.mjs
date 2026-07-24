@@ -44,7 +44,6 @@ import {
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = path.resolve(PROJECT_ROOT, '..');
-const HYPERFRAMES_ROOT = path.resolve(process.env.HYPERFRAMES_LIBRARY_DIR || path.join(process.env.HOME || '/Users/macos', 'Downloads', 'hyperframes-motion-动效库'));
 const PRODUCTION_COMPONENT_CATALOG_PATH = path.join(PROJECT_ROOT, 'src', 'components', 'ultimate-kit', 'families', 'skill-showcase', 'productionComponentCatalog.json');
 const STATIC_ROOT_CANDIDATES = [
   path.join(PROJECT_ROOT, 'build', 'tools'),
@@ -285,14 +284,6 @@ const publicJob = (job) => ({
 
 const publicVideoRecord = (record) => ({...record, playbackUrl: record.playbackUrl, downloadUrl: record.downloadAllowed ? `/api/video-library/${encodeURIComponent(record.id)}/download` : null});
 
-const hyperframesVariableTypes = new Set(['string', 'number', 'color', 'enum', 'boolean']);
-
-const orientationFromSize = (size) => {
-  const [width, height] = String(size || '').split(/[×x]/).map((part) => Number(part.trim()));
-  if (Number.isFinite(width) && Number.isFinite(height) && height > width) return 'portrait';
-  return 'landscape';
-};
-
 const boundedText = (value, fallback = '', max = 220) => String(value ?? fallback).trim().slice(0, max);
 
 const safeAudioUploadName = (value) => {
@@ -310,66 +301,6 @@ const safeAudioUploadName = (value) => {
   return {displayName: `${stem}${ext}`, ext};
 };
 
-const normalizeHyperframesPreviewPath = (value) => {
-  if (typeof value !== 'string' || !value.trim()) return null;
-  if (/^(https?:|data:|blob:)/i.test(value)) return null;
-  const rel = value.split('?')[0].replace(/^\/+/, '');
-  if (!rel.startsWith('renders/') || rel.includes('\\') || rel.split('/').includes('..')) return null;
-  return rel;
-};
-
-const normalizeHyperframesVariable = (value) => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const id = boundedText(value.id, '', 64);
-  const type = hyperframesVariableTypes.has(value.type) ? value.type : 'string';
-  if (!id) return null;
-  const variable = {
-    id,
-    type,
-    label: boundedText(value.label, id, 80) || id,
-  };
-  if (typeof value.hidden === 'boolean') variable.hidden = value.hidden;
-  if (['string', 'color', 'enum'].includes(type) && value.default != null) variable.default = String(value.default).slice(0, 220);
-  if (type === 'number' && Number.isFinite(Number(value.default))) variable.default = Number(value.default);
-  if (type === 'boolean' && typeof value.default === 'boolean') variable.default = value.default;
-  if (type === 'enum' && Array.isArray(value.options)) {
-    variable.options = value.options
-      .map((option) => ({
-        value: boundedText(option?.value, '', 80),
-        label: boundedText(option?.label, option?.value, 80),
-      }))
-      .filter((option) => option.value);
-  }
-  return variable;
-};
-
-const readHyperframesSchema = async (templatePath) => {
-  try {
-    const html = await fs.readFile(path.join(templatePath, 'index.html'), 'utf8');
-    const match = html.match(/data-composition-variables='([^']+)'/s) || html.match(/data-composition-variables="([^"]+)"/s);
-    if (!match) return [];
-    const parsed = JSON.parse(match[1]);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map(normalizeHyperframesVariable).filter(Boolean).slice(0, 32);
-  } catch {
-    return [];
-  }
-};
-
-const hyperframesCategory = (template) => {
-  const text = `${template.id} ${template.name} ${template.description} ${template.category} ${(template.tags || []).join(' ')}`.toLowerCase();
-  if (/transition|转场|wipe|morph|reveal/.test(text)) return '转场';
-  if (/effect|visual|particle|glitch|特效|背景|background|orbit|rays/.test(text)) return '特效';
-  if (/caption|subtitle|kicker|lower-third|字幕|文字/.test(text)) return '字幕';
-  if (/code|terminal|代码|命令|日志/.test(text)) return '代码';
-  if (/chart|number|metric|gauge|rank|stat|数据|数字|kpi|柱状图|折线|趋势|增长/.test(text)) return '数据';
-  if (/flow|step|timeline|process|流程|步骤|链路/.test(text)) return '流程';
-  if (/compare|before|after|split|duel|对比/.test(text)) return '对比';
-  if (/ui|product|image|showcase|界面|产品|演示/.test(text)) return '界面';
-  if (/title|headline|opening|hero|标题|开场|结论/.test(text)) return '标题';
-  return '推荐';
-};
-
 const productionComponentCategory = (value) => {
   const category = boundedText(value, '推荐', 12);
   return ['推荐', '标题', '代码', '流程', '对比', '数据', '界面', '字幕', '转场', '特效'].includes(category)
@@ -377,109 +308,33 @@ const productionComponentCategory = (value) => {
     : '推荐';
 };
 
-const loadProductionComponentLibrary = async () => {
-  const catalog = JSON.parse(await fs.readFile(PRODUCTION_COMPONENT_CATALOG_PATH, 'utf8'));
-  const components = Array.isArray(catalog.components) ? catalog.components : [];
-  return components.map((descriptor) => ({
-    id: boundedText(descriptor.componentId, '', 80),
-    sourceId: boundedText(descriptor.componentId, '', 80),
-    source: 'project',
-    label: boundedText(descriptor.label, descriptor.componentId, 80),
-    description: boundedText(descriptor.description, 'Video Factory production renderer', 220),
-    category: productionComponentCategory(descriptor.category),
-    orientation: descriptor.orientation === 'landscape' ? 'landscape' : 'portrait',
-    size: boundedText(descriptor.size, descriptor.orientation === 'landscape' ? '1920x1080' : '1080x1920', 24),
-    duration: null,
-    tags: [...(Array.isArray(descriptor.compatibleIntents) ? descriptor.compatibleIntents : []), ...(Array.isArray(descriptor.styleCapability) ? descriptor.styleCapability : [])]
-      .map((tag) => boundedText(tag, '', 30))
-      .filter(Boolean)
-      .slice(0, 8),
-    formats: ['remotion'],
-    previewUrl: null,
-    previewKind: 'remotion',
-    status: descriptor.productionReady === false ? 'draft' : 'ready',
-    productionReady: descriptor.productionReady === true,
-    compatibleIntents: Array.isArray(descriptor.compatibleIntents) ? descriptor.compatibleIntents.map((item) => boundedText(item, '', 48)).filter(Boolean) : [],
-    compatibleShotKinds: Array.isArray(descriptor.compatibleShotKinds) ? descriptor.compatibleShotKinds.map((item) => boundedText(item, '', 48)).filter(Boolean) : [],
-    requiredData: Array.isArray(descriptor.requiredData) ? descriptor.requiredData.map((item) => boundedText(item, '', 80)).filter(Boolean) : [],
-    motionCapability: Array.isArray(descriptor.motionCapability) ? descriptor.motionCapability.map((item) => boundedText(item, '', 48)).filter(Boolean) : [],
-    styleCapability: Array.isArray(descriptor.styleCapability) ? descriptor.styleCapability.map((item) => boundedText(item, '', 48)).filter(Boolean) : [],
-    renderer: descriptor.productionReady === true
-      ? {componentId: boundedText(descriptor.componentId, '', 80), rendererId: boundedText(descriptor.rendererId, descriptor.componentId, 80)}
-      : null,
-    schema: [],
-  })).filter((component) => component.id);
-};
-
-const loadHyperframesComponentLibrary = async () => {
-  const catalogPath = path.join(HYPERFRAMES_ROOT, 'catalog.json');
-  if (!existsSync(catalogPath)) {
-    return {
-      ok: true,
-      available: false,
-      sourceRoot: HYPERFRAMES_ROOT,
-      version: null,
-      components: [],
-      warning: 'HyperFrames catalog.json not found',
-    };
-  }
-  const catalog = JSON.parse(await fs.readFile(catalogPath, 'utf8'));
-  const templates = Array.isArray(catalog.templates) ? catalog.templates : [];
-  const components = await Promise.all(templates.map(async (template) => {
-    const sourceId = boundedText(template.id, '', 60);
-    if (!sourceId) return null;
-    const candidatePreviewPath = normalizeHyperframesPreviewPath(template.preview);
-    const previewPath = candidatePreviewPath && existsSync(path.join(HYPERFRAMES_ROOT, candidatePreviewPath))
-      ? candidatePreviewPath
-      : null;
-    const category = hyperframesCategory(template);
-    const templatePath = path.join(HYPERFRAMES_ROOT, boundedText(template.path, `templates/${sourceId}`, 180));
-    return {
-      id: `hf:${sourceId}`,
-      sourceId,
-      source: 'hyperframes',
-      label: boundedText(template.name, sourceId, 80) || sourceId,
-      description: boundedText(template.description, '来自 HyperFrames 的参数化动效模板。', 220),
-      category,
-      orientation: orientationFromSize(template.size),
-      size: boundedText(template.size, '1920×1080', 24) || '1920×1080',
-      duration: Number.isFinite(Number(template.duration)) ? Number(template.duration) : null,
-      tags: Array.isArray(template.tags) ? template.tags.map((tag) => boundedText(tag, '', 30)).filter(Boolean).slice(0, 8) : [],
-      formats: Array.isArray(template.formats) ? template.formats.map((format) => boundedText(format, '', 12)).filter(Boolean).slice(0, 5) : ['mp4'],
-      previewUrl: previewPath ? `/api/component-library/asset?path=${encodeURIComponent(previewPath)}` : null,
-      previewKind: previewPath ? 'video' : 'mock',
-      status: template.status === 'ready' ? 'ready' : 'draft',
-      productionReady: false,
-      compatibleIntents: [],
-      compatibleShotKinds: [],
-      requiredData: [],
-      motionCapability: [],
-      styleCapability: [],
-      renderer: null,
-      schema: await readHyperframesSchema(templatePath),
-    };
-  }));
-  return {
-    ok: true,
-    available: true,
-    sourceRoot: HYPERFRAMES_ROOT,
-    version: catalog.version ?? null,
-    components: components.filter(Boolean),
-  };
-};
-
 const loadComponentLibrary = async () => {
-  const [productionComponents, hyperframes] = await Promise.all([
-    loadProductionComponentLibrary(),
-    loadHyperframesComponentLibrary(),
-  ]);
+  const catalog = JSON.parse(await fs.readFile(PRODUCTION_COMPONENT_CATALOG_PATH, 'utf8'));
+  const descriptors = Array.isArray(catalog.components) ? catalog.components : [];
+  const components = descriptors
+    .filter((descriptor) => descriptor.productionReady === true)
+    .map((descriptor) => ({
+      compositionId: boundedText(descriptor.componentId, '', 80),
+      label: boundedText(descriptor.label, descriptor.componentId, 80),
+      description: boundedText(descriptor.description, 'Video Factory production renderer', 220),
+      category: productionComponentCategory(descriptor.category),
+      orientation: descriptor.orientation === 'landscape' ? 'landscape' : 'portrait',
+      size: boundedText(descriptor.size, descriptor.orientation === 'landscape' ? '1920x1080' : '1080x1920', 24),
+      compatibleIntents: Array.isArray(descriptor.compatibleIntents) ? descriptor.compatibleIntents.map((item) => boundedText(item, '', 48)).filter(Boolean) : [],
+      compatibleShotKinds: Array.isArray(descriptor.compatibleShotKinds) ? descriptor.compatibleShotKinds.map((item) => boundedText(item, '', 48)).filter(Boolean) : [],
+      requiredData: Array.isArray(descriptor.requiredData) ? descriptor.requiredData.map((item) => boundedText(item, '', 80)).filter(Boolean) : [],
+      motionCapability: Array.isArray(descriptor.motionCapability) ? descriptor.motionCapability.map((item) => boundedText(item, '', 48)).filter(Boolean) : [],
+      styleCapability: Array.isArray(descriptor.styleCapability) ? descriptor.styleCapability.map((item) => boundedText(item, '', 48)).filter(Boolean) : [],
+      productionReady: descriptor.productionReady === true,
+      previewUrl: null,
+    }))
+    .filter((component) => component.compositionId);
   return {
     ok: true,
-    available: productionComponents.length > 0 || hyperframes.available,
-    sourceRoot: `${PROJECT_ROOT};${HYPERFRAMES_ROOT}`,
-    version: hyperframes.version,
-    ...(hyperframes.warning ? {warning: hyperframes.warning} : {}),
-    components: [...productionComponents, ...hyperframes.components],
+    available: components.length > 0,
+    sourceRoot: path.relative(PROJECT_ROOT, path.dirname(PRODUCTION_COMPONENT_CATALOG_PATH)).split(path.sep).join('/'),
+    version: catalog.version ?? null,
+    components,
   };
 };
 
@@ -613,6 +468,19 @@ const successMarker = async (job) => {
   if (job.commandId === 'project-verify' || job.commandId === 'render-verify') {
     const signature = await artifactSignature(path.join(PROJECT_ROOT, job.project.outputVideoPath));
     const result = extractLastJsonObject(job.logs);
+    if (result) {
+      await atomicWriteJson(path.join(PROJECT_ROOT, `out/${job.project.id}-verify.json`), {
+        ...result,
+        projectId: job.project.id,
+        videoPath: job.project.outputVideoPath,
+        verifiedAt: finishedAt,
+        evidence: {
+          componentReport: `out/${job.project.id}-component-report.json`,
+          qaManifest: `out/${job.project.id}-qa/manifest.json`,
+          qaContactSheet: `out/${job.project.id}-qa/contact-sheet.jpg`,
+        },
+      });
+    }
     next.render = {...marker, artifactSignature: signature};
     next.verify = {...marker, artifactSignature: signature, result};
   }
@@ -890,24 +758,6 @@ const serveArtifact = async (req, res, url) => {
   await serveFile(req, res, file);
 };
 
-const serveComponentLibraryAsset = async (req, res, url) => {
-  const rel = normalizeHyperframesPreviewPath(url.searchParams.get('path'));
-  if (!rel) {
-    sendJson(res, 403, {ok: false, code: 'component_asset_forbidden', error: 'component preview path must target HyperFrames renders/'});
-    return;
-  }
-  const file = path.resolve(HYPERFRAMES_ROOT, rel);
-  if (!isPathInside(HYPERFRAMES_ROOT, file)) {
-    sendJson(res, 403, {ok: false, code: 'component_asset_forbidden', error: 'component preview path escaped HyperFrames root'});
-    return;
-  }
-  if (!existsSync(file)) {
-    sendJson(res, 404, {ok: false, code: 'component_asset_missing', error: 'component preview asset not found'});
-    return;
-  }
-  await serveFile(req, res, file);
-};
-
 const serveStatic = async (req, res, url) => {
   const STATIC_ROOT = staticRoot();
   const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
@@ -1129,7 +979,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (url.pathname === '/api/component-library/asset' && (req.method === 'GET' || req.method === 'HEAD')) {
-      await serveComponentLibraryAsset(req, res, url);
+      await serveArtifact(req, res, url);
       return;
     }
     const videoDownloadMatch = url.pathname.match(/^\/api\/video-library\/([^/]+)\/download$/);

@@ -2,45 +2,31 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {
   COMPONENT_CATEGORIES,
   COMPONENT_ORIENTATIONS,
-  componentPreviewLabel,
-  dedupeComponentLibrary,
   inferRecommendedComponentIds,
-  isComponentPlayable,
   orientationLabel,
   type ComponentCategory,
-  type ComponentLibraryItem,
+  type CompositionTemplateItem,
   type ComponentOrientation,
 } from './component-library-model';
-import {ComponentMockPreview} from './ComponentPreviewCanvas';
+import {ProductionComponentPreview} from '../../components/ultimate-kit/families/skill-showcase/HeroTrackV2';
 
 interface ComponentLibraryWorkspaceProps {
-  components: ComponentLibraryItem[];
+  components: CompositionTemplateItem[];
   loading: boolean;
   warning: string | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }
 
-const sourceLabel = (component: ComponentLibraryItem) => component.source === 'project' ? '内置组件' : 'HyperFrames';
-const hiddenVariableCount = (component: ComponentLibraryItem) => component.schema.filter((field) => field.hidden).length;
-const visibleVariables = (component: ComponentLibraryItem) => component.schema.filter((field) => !field.hidden).slice(0, 8);
-
-const variableDefault = (value: unknown) => {
-  if (value == null || value === '') return '默认';
-  if (typeof value === 'boolean') return value ? 'true' : 'false';
-  return String(value).slice(0, 36);
-};
-
-const matchesQuery = (component: ComponentLibraryItem, query: string) => {
+const matchesQuery = (component: CompositionTemplateItem, query: string) => {
   if (!query.trim()) return true;
   const needle = query.trim().toLowerCase();
-  return [component.label, component.description, component.category, component.sourceId, ...component.tags]
+  return [component.label, component.description, component.category, component.compositionId,
+    ...component.compatibleIntents, ...component.styleCapability]
     .join(' ')
     .toLowerCase()
     .includes(needle);
 };
-
-type ComponentScope = 'playable' | 'all';
 
 export const ComponentLibraryWorkspace: React.FC<ComponentLibraryWorkspaceProps> = ({
   components,
@@ -49,65 +35,54 @@ export const ComponentLibraryWorkspace: React.FC<ComponentLibraryWorkspaceProps>
   selectedId,
   onSelect,
 }) => {
-  const dedupedComponents = useMemo(() => dedupeComponentLibrary(components), [components]);
   const [orientation, setOrientation] = useState<ComponentOrientation>('portrait');
   const [category, setCategory] = useState<ComponentCategory>('推荐');
-  const [scope, setScope] = useState<ComponentScope>('playable');
   const [query, setQuery] = useState('');
-  const selected = dedupedComponents.find((component) => component.id === selectedId) || dedupedComponents[0] || null;
-  const scopedComponents = useMemo(() => scope === 'playable'
-    ? dedupedComponents.filter(isComponentPlayable)
-    : dedupedComponents, [dedupedComponents, scope]);
+  const selected = components.find((component) => component.compositionId === selectedId) || components[0] || null;
   const counts = useMemo(() => ({
-    portrait: scopedComponents.filter((component) => component.orientation === 'portrait').length,
-    landscape: scopedComponents.filter((component) => component.orientation === 'landscape').length,
-  }), [scopedComponents]);
-  const allCount = dedupedComponents.length;
-  const playableCount = dedupedComponents.filter(isComponentPlayable).length;
-  const visible = scopedComponents
+    portrait: components.filter((component) => component.orientation === 'portrait').length,
+    landscape: components.filter((component) => component.orientation === 'landscape').length,
+  }), [components]);
+  const visible = components
     .filter((component) => component.orientation === orientation)
-    .filter((component) => category === '推荐' ? inferRecommendedComponentIds(orientation).includes(component.id) : component.category === category)
+    .filter((component) => category === '推荐' ? inferRecommendedComponentIds(orientation).includes(component.compositionId) : component.category === category)
     .filter((component) => matchesQuery(component, query));
 
   useEffect(() => {
-    if (!selected || visible.some((component) => component.id === selected.id)) return;
+    if (!selected || visible.some((component) => component.compositionId === selected.compositionId)) return;
     if (visible[0]) {
-      onSelect(visible[0].id);
+      onSelect(visible[0].compositionId);
       return;
     }
-    const selectedStillAvailable = scopedComponents.some((component) => component.id === selected.id && component.orientation === orientation);
+    const selectedStillAvailable = components.some((component) => component.compositionId === selected.compositionId && component.orientation === orientation);
     if (selectedStillAvailable) return;
-    const preferred = scopedComponents.find((component) => component.orientation === orientation && inferRecommendedComponentIds(orientation).includes(component.id))
-      || scopedComponents.find((component) => component.orientation === orientation)
-      || scopedComponents[0]
+    const preferred = components.find((component) => component.orientation === orientation && inferRecommendedComponentIds(orientation).includes(component.compositionId))
+      || components.find((component) => component.orientation === orientation)
+      || components[0]
       || null;
-    if (preferred) onSelect(preferred.id);
-  }, [onSelect, orientation, scopedComponents, selected, visible]);
+    if (preferred) onSelect(preferred.compositionId);
+  }, [components, onSelect, orientation, selected, visible]);
 
   return <div className="workspace-panel component-workspace">
     <div className="workspace-heading">
-      <div><span className="workspace-kicker">组件库 / 素材资产</span><h1>组件库</h1></div>
-      <span className="state-chip is-current">{scope === 'playable' ? `${playableCount} 可用` : `${allCount} 全量`}</span>
+      <div><span className="workspace-kicker">组件库 / 生产渲染器</span><h1>组件库</h1></div>
+      <span className="state-chip is-current">{components.length} 个生产组件</span>
     </div>
-    <p className="workspace-copy">默认只显示可用组件。点击后中间区域显示视频样片或结构预览。</p>
+    <p className="workspace-copy">仅展示可由生产渲染器直接预览和使用的组件。</p>
     {warning && <div className="notice notice--neutral">{warning}</div>}
     {loading && <div className="notice notice--neutral">正在同步组件库数据...</div>}
     <section className="component-applybar">
       <div className="component-applybar__copy">
-        <small>{selected ? `${sourceLabel(selected)} · ${orientationLabel(selected.orientation)}` : '未选择组件'}</small>
+        <small>{selected ? `生产组件 · ${orientationLabel(selected.orientation)}` : '未选择组件'}</small>
         <strong>{selected ? selected.label : '从下方列表选择一个组件'}</strong>
-        <span>{selected ? `${selected.size} · ${componentPreviewLabel(selected)}` : '中间预览区会随选择直接更新'}</span>
+        <span>{selected ? `${selected.size} · 生产渲染预览` : '中间预览区会随选择直接更新'}</span>
       </div>
       <button className="primary-action component-applybar__action" type="button" disabled>
-        {selected?.productionReady ? '由字幕语义自动匹配' : '仅供候选预览'}
+        由字幕语义自动匹配
       </button>
     </section>
 
     <section className="component-picker">
-      <div className="component-scope-tabs" role="tablist" aria-label="组件范围">
-        <button className={scope === 'playable' ? 'is-active' : ''} type="button" onClick={() => setScope('playable')}><strong>可用</strong><span>{playableCount}</span></button>
-        <button className={scope === 'all' ? 'is-active' : ''} type="button" onClick={() => setScope('all')}><strong>全量</strong><span>{allCount}</span></button>
-      </div>
       <div className="component-orientation-tabs" role="tablist" aria-label="画幅选择">
         {COMPONENT_ORIENTATIONS.map((item) => <button
           className={orientation === item ? 'is-active' : ''}
@@ -128,32 +103,20 @@ export const ComponentLibraryWorkspace: React.FC<ComponentLibraryWorkspaceProps>
       </div>
       <div className="component-results" aria-label="组件列表">
         {visible.map((component) => <button
-          className={`component-result ${selected?.id === component.id ? 'is-selected' : ''} ${component.previewUrl ? 'is-video' : 'is-structure-only'} ${isComponentPlayable(component) ? '' : 'is-template-only'}`}
-          key={component.id}
-          onClick={() => onSelect(component.id)}
+          className={`component-result ${selected?.compositionId === component.compositionId ? 'is-selected' : ''} is-structure-only`}
+          key={component.compositionId}
+          onClick={() => onSelect(component.compositionId)}
           type="button"
         >
-          <span className="component-result__preview"><ComponentMockPreview component={component} compact /></span>
+          <span className="component-result__preview"><ProductionComponentPreview componentId={component.compositionId} /></span>
           <span className="component-result__body">
-            <small>{sourceLabel(component)} · {component.category}</small>
+            <small>生产组件 · {component.category}</small>
             <strong>{component.label}</strong>
-            <em>{componentPreviewLabel(component)} · {component.size}</em>
+            <em>生产渲染预览 · {component.size}</em>
           </span>
         </button>)}
-        {!visible.length && <div className="preview-empty-state">{scope === 'playable' ? '这个分类暂时没有可用组件。切到全量可以查看候选预览。' : '没有匹配的组件。'}</div>}
+        {!visible.length && <div className="preview-empty-state">没有匹配的生产组件。</div>}
       </div>
     </section>
-
-    {selected && <section className="component-schema">
-      <div className="scene-edit__section-head"><strong>可编辑变量</strong><span>{visibleVariables(selected).length} 项{hiddenVariableCount(selected) ? ` · 隐藏 ${hiddenVariableCount(selected)} 项` : ''}</span></div>
-      <div className="component-schema__list">
-        {visibleVariables(selected).map((field) => <div className="component-schema__row" key={field.id}>
-          <span><strong>{field.label}</strong><small>{field.id}</small></span>
-          <em>{field.type}</em>
-          <b>{variableDefault(field.default)}</b>
-        </div>)}
-        {!visibleVariables(selected).length && <div className="preview-empty-state">这个组件暂时没有暴露可编辑变量。</div>}
-      </div>
-    </section>}
   </div>;
 };

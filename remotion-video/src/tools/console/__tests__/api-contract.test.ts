@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {createProject, StudioApiError} from '../api';
+import {createProject, loadRemoteComponentLibrary, StudioApiError} from '../api';
 import type {CreateProjectDraft} from '../types';
 
 const draft: CreateProjectDraft = {
@@ -45,6 +45,45 @@ describe('Studio API consumer contract', () => {
       code: 'project_exists',
       path: 'projects/video-contract-test',
       diagnostics: [{code: 'project_exists', phase: 'create-project'}],
+    });
+  });
+
+  it('keeps the documented component-library response metadata and item shape', async () => {
+    vi.stubGlobal('window', {
+      location: {port: '8787', origin: 'http://127.0.0.1:8787'},
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      ok: true,
+      available: true,
+      sourceRoot: 'src/components/ultimate-kit/families/skill-showcase',
+      version: 1,
+      components: [{
+        compositionId: 'browser-demo',
+        label: '浏览器实操',
+        description: '生产组件',
+        category: '界面',
+        orientation: 'portrait',
+        size: '1080x1920',
+        compatibleIntents: ['browser-interaction'],
+        compatibleShotKinds: ['browser-demo'],
+        requiredData: ['shot.environment'],
+        motionCapability: ['viewport-reveal'],
+        styleCapability: ['browser-chrome'],
+        productionReady: true,
+        previewUrl: null,
+      }],
+    }), {
+      status: 200,
+      headers: {'content-type': 'application/json'},
+    })));
+
+    const library = await loadRemoteComponentLibrary();
+
+    expect(library).toMatchObject({
+      available: true,
+      sourceRoot: 'src/components/ultimate-kit/families/skill-showcase',
+      version: 1,
+      components: [{compositionId: 'browser-demo', productionReady: true, previewUrl: null}],
     });
   });
 });

@@ -1,62 +1,48 @@
 import {describe, expect, it} from 'vitest';
 import {
-  componentPreviewLabel,
-  dedupeComponentLibrary,
-  isComponentPlayable,
+  COMPONENT_CATEGORIES,
   LOCAL_SCENE_COMPONENTS,
-  type ComponentLibraryItem,
+  resolveLocalSceneComponent,
+  type ComponentCategory,
 } from '../component-library-model';
 
-const component = (overrides: Partial<ComponentLibraryItem>): ComponentLibraryItem => ({
-  id: 'component-1',
-  sourceId: 'component-1',
-  source: 'project',
-  label: '判断看板',
-  description: '展示判断标准和下一步动作。',
-  category: '推荐',
-  orientation: 'portrait',
-  size: '1080x1920',
-  duration: null,
-  tags: ['判断', '标准'],
-  formats: ['remotion'],
-  previewUrl: null,
-  previewKind: 'remotion',
-  status: 'ready',
-  productionReady: true,
-  compatibleIntents: ['concept-explanation'],
-  compatibleShotKinds: ['concept-explainer'],
-  requiredData: ['shot.evidence'],
-  motionCapability: ['type-reveal'],
-  styleCapability: ['editorial-type'],
-  renderer: {componentId: 'concept-explainer', rendererId: 'concept-explainer'},
-  schema: [],
-  ...overrides,
-});
-
 describe('component library model', () => {
-  it('labels actual renderers and preview-only candidates explicitly', () => {
-    expect(componentPreviewLabel(component({}))).toBe('生产渲染器');
-    expect(componentPreviewLabel(component({source: 'hyperframes', productionReady: false, renderer: null, previewUrl: '/preview.mp4', previewKind: 'video'}))).toBe('候选样片');
-    expect(componentPreviewLabel(component({source: 'hyperframes', productionReady: false, renderer: null, previewUrl: null, previewKind: 'mock'}))).toBe('候选素材');
+  it('derives every library item from a production descriptor (29 templates)', () => {
+    expect(LOCAL_SCENE_COMPONENTS).toHaveLength(29);
+    expect(LOCAL_SCENE_COMPONENTS.every((item) => item.compositionId && item.label && item.category)).toBe(true);
+    expect(LOCAL_SCENE_COMPONENTS.every((item) => COMPONENT_CATEGORIES.includes(item.category as ComponentCategory))).toBe(true);
   });
 
-  it('never treats a preview video as a production renderer', () => {
-    expect(isComponentPlayable(component({source: 'hyperframes', productionReady: false, renderer: null, previewUrl: '/preview.mp4'}))).toBe(false);
-    expect(isComponentPlayable(component({}))).toBe(true);
+  it('exposes composition template DTO fields', () => {
+    const component = LOCAL_SCENE_COMPONENTS[0];
+    expect(component).toMatchObject({
+      compositionId: expect.any(String),
+      label: expect.any(String),
+      productionReady: true,
+    });
+    expect(component).not.toHaveProperty('source');
+    expect(component).not.toHaveProperty('previewKind');
+    expect(component).not.toHaveProperty('renderer');
+    expect(component).not.toHaveProperty('id');
+    expect(component).not.toHaveProperty('tags');
   });
 
-  it('keeps the production renderer when duplicate candidate labels arrive', () => {
-    const result = dedupeComponentLibrary([
-      component({id: 'hf:video', source: 'hyperframes', productionReady: false, renderer: null, label: 'Concept Explainer', previewUrl: '/parallax.mp4', previewKind: 'video'}),
-      component({id: 'concept-explainer', label: 'Concept Explainer'}),
-    ]);
-    expect(result).toHaveLength(1);
-    expect(result[0]?.id).toBe('concept-explainer');
+  it('resolves catalog compositionIds to their item', () => {
+    const component = LOCAL_SCENE_COMPONENTS[0];
+    expect(resolveLocalSceneComponent(component.compositionId)).toEqual(component);
+    expect(resolveLocalSceneComponent('missing')).toBeNull();
   });
 
-  it('derives every local library item from a production descriptor', () => {
-    expect(LOCAL_SCENE_COMPONENTS).toHaveLength(12);
-    expect(LOCAL_SCENE_COMPONENTS.every((item) => item.productionReady && item.renderer && item.previewKind === 'remotion')).toBe(true);
-    expect(LOCAL_SCENE_COMPONENTS.every((item) => item.source === 'project' && item.renderer?.componentId === item.id)).toBe(true);
+  it('has exactly 29 production-ready composition templates', () => {
+    expect(LOCAL_SCENE_COMPONENTS.filter((item) => item.productionReady)).toHaveLength(29);
+  });
+
+  it('has no duplicate compositionIds', () => {
+    const ids = LOCAL_SCENE_COMPONENTS.map((item) => item.compositionId);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('does not include generic-explainer', () => {
+    expect(LOCAL_SCENE_COMPONENTS.find((item) => item.compositionId === 'generic-explainer')).toBeUndefined();
   });
 });

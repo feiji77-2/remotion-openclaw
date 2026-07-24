@@ -10,7 +10,7 @@ import {
 } from "remotion";
 import { SemanticIcon } from "./SemanticLayers";
 import { HeroTrackV2 } from "./HeroTrackV2";
-import { PORTRAIT_COLOR_THEME } from "./portraitColorTheme";
+import { PORTRAIT_COLOR_THEME, resolvePortraitVisualTheme } from "./portraitColorTheme";
 import storyboardContract from "./storyboardContract.json";
 import { productIconPath, type ProductIconKey } from "./productIcons";
 import type {
@@ -111,85 +111,37 @@ const CinematicBackdrop: React.FC<{
   frame: number;
   accent: string;
   secondary: string;
-}> = ({ frame, accent, secondary }) => {
-  const scanY = interpolate(frame % 180, [0, 180], [-160, 2080]);
-  const drift = Math.sin(frame / 54) * 55;
+  visualTheme?: ReturnType<typeof resolvePortraitVisualTheme>;
+}> = ({ frame, accent, secondary, visualTheme = resolvePortraitVisualTheme() }) => {
+  const drift = Math.sin(frame / 52);
+  const breath = interpolate(Math.sin(frame / 39), [-1, 1], [0.24, 0.72]) * visualTheme.glowBoost;
+  const gridSize = interpolate(Math.sin(frame / 68), [-1, 1], [74, 96]);
   return (
-    <AbsoluteFill style={{ background: STAGE_BACKGROUND, overflow: "hidden" }}>
-      <AbsoluteFill
-        style={{
-          opacity: 0.62,
-          backgroundImage: [
-            `linear-gradient(118deg, transparent 0 42%, ${accent}12 42% 43%, transparent 43% 100%)`,
-            `linear-gradient(28deg, transparent 0 70%, ${secondary}10 70% 71%, transparent 71% 100%)`,
-            "linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px)",
-            "linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px)",
-          ].join(", "),
-          backgroundSize: "auto, auto, 64px 64px, 64px 64px",
-          backgroundPosition: `${drift}px 0, ${-drift * 0.6}px 0, 0 0, 0 0`,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          left: -220,
-          right: -220,
-          top: scanY,
-          height: 220,
-          transform: "skewY(-8deg)",
-          background: `linear-gradient(180deg, transparent, ${accent}12, transparent)`,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          width: 780,
-          height: 780,
-          right: -360,
-          top: 120,
-          borderRadius: "50%",
-          background: `radial-gradient(circle, ${secondary}20, transparent 68%)`,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          width: 680,
-          height: 680,
-          left: -390,
-          bottom: 120,
-          borderRadius: "50%",
-          background: `radial-gradient(circle, ${accent}18, transparent 70%)`,
-        }}
-      />
-      <AbsoluteFill
-        style={{
-          background: `linear-gradient(180deg, rgba(16,24,39,0.04), rgba(12,19,33,0.18) 56%, ${STAGE_SHADOW})`,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          left: 38,
-          top: 38,
-          width: 44,
-          height: 44,
-          borderLeft: `2px solid ${accent}88`,
-          borderTop: `2px solid ${accent}88`,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          right: 38,
-          bottom: 38,
-          width: 44,
-          height: 44,
-          borderRight: `2px solid ${secondary}88`,
-          borderBottom: `2px solid ${secondary}88`,
-        }}
-      />
-    </AbsoluteFill>
+  <AbsoluteFill data-shared-background="cinematic-depth" style={{background: STAGE_BACKGROUND, overflow: "hidden"}}>
+    <AbsoluteFill
+      data-stage-depth-map="near-black-chroma"
+      style={{
+        background: `linear-gradient(${126 + drift * 8}deg, #04070d 0%, #111927 28%, #091c26 52%, #140d22 74%, #06050c 100%)`,
+        opacity: 0.84,
+      }}
+    />
+    <div style={{position: "absolute", width: 900, height: 900, right: -470 + drift * 34, top: 44, borderRadius: "50%", background: `radial-gradient(circle, ${secondary}28, transparent 66%)`, opacity: breath}} />
+    <div style={{position: "absolute", width: 780, height: 780, left: -430 - drift * 24, bottom: 48, borderRadius: "50%", background: `radial-gradient(circle, ${accent}24, transparent 70%)`, opacity: 0.45 + breath * 0.28}} />
+    <div
+      data-stage-grid="low-contrast"
+      style={{
+        position: "absolute",
+        inset: 0,
+        opacity: visualTheme.gridOpacity,
+        backgroundImage: `linear-gradient(${PORTRAIT_COLOR_THEME.stageGrid} 1px, transparent 1px), linear-gradient(90deg, ${PORTRAIT_COLOR_THEME.stageGrid} 1px, transparent 1px)`,
+        backgroundSize: `${gridSize}px ${gridSize}px`,
+        transform: `translate3d(${drift * 8}px, ${-drift * 6}px, 0)`,
+      }}
+    />
+    <div style={{position: "absolute", inset: 0, background: `radial-gradient(circle at 50% 38%, transparent 0 42%, ${PORTRAIT_COLOR_THEME.stageVignette} 100%)`}} />
+    <AbsoluteFill style={{background: `linear-gradient(180deg, rgba(16,24,39,0.02), rgba(12,19,33,0.20) 54%, ${STAGE_SHADOW})`}} />
+    <div style={{position: "absolute", left: 52, right: 52, bottom: 44, height: 1, background: `linear-gradient(90deg, transparent, ${accent}66, ${secondary}55, transparent)`, opacity: 0.28 + breath * 0.3}} />
+  </AbsoluteFill>
   );
 };
 
@@ -633,7 +585,7 @@ const SplitWipeShot: React.FC<{
     easing: easeOut,
   });
   const dividerY = interpolate(reveal, [0, 1], [920, 610]);
-  const evidence = beat.evidence ?? ["默认 AI", "装上 Skill"];
+  const evidence = beat.evidence ?? [beat.keyword, beat.detail ?? beat.visualState ?? beat.action];
   const pain = (beat.visualState ?? "").includes("pain");
   return (
     <AbsoluteFill style={{ opacity }}>
@@ -2190,7 +2142,7 @@ const SemanticBeatAnimation: React.FC<{
                 fontWeight: 900,
               }}
             >
-              {evidence[1] ?? "装上 Skill"}
+              {evidence[1] ?? beat.detail ?? beat.keyword}
             </div>
           </div>
         </div>
@@ -2366,6 +2318,8 @@ export const PortraitCinematicSkillShowcase: React.FC<SkillShowcaseProps> = ({
   productIcon,
   productIcons,
   brandName,
+  visualSystem,
+  director,
   progressIndex = 0,
   progressTotal = 6,
   heroStyle = "cinematic",
@@ -2375,6 +2329,9 @@ export const PortraitCinematicSkillShowcase: React.FC<SkillShowcaseProps> = ({
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
   const scale = Math.min(width / 1080, height / 1920);
+  const visualTheme = resolvePortraitVisualTheme(visualSystem);
+  const resolvedAccent = accent ?? visualTheme.palette[0];
+  const resolvedSecondary = secondaryAccent ?? visualTheme.palette[1];
   const resolvedProduct = productIcon ?? PRODUCT_FOR_VARIANT[variant];
   return (
     <AbsoluteFill
@@ -2383,6 +2340,7 @@ export const PortraitCinematicSkillShowcase: React.FC<SkillShowcaseProps> = ({
         overflow: "hidden",
         fontFamily: FONT,
       }}
+      data-shared-background="cinematic"
     >
       <div
         style={{
@@ -2396,15 +2354,16 @@ export const PortraitCinematicSkillShowcase: React.FC<SkillShowcaseProps> = ({
       >
         <CinematicBackdrop
           frame={frame}
-          accent={accent}
-          secondary={secondaryAccent}
+          accent={resolvedAccent}
+          secondary={resolvedSecondary}
+          visualTheme={visualTheme}
         />
         <ChapterHeader
           frame={frame}
           title={title}
           subtitle={subtitle}
           index={index}
-          accent={accent}
+          accent={resolvedAccent}
           product={resolvedProduct}
           progressIndex={progressIndex}
           progressTotal={progressTotal}
@@ -2434,9 +2393,11 @@ export const PortraitCinematicSkillShowcase: React.FC<SkillShowcaseProps> = ({
               <HeroTrackV2
                 frame={frame}
                 track={heroTrack}
-                accent={accent}
-                secondary={secondaryAccent}
+                accent={resolvedAccent}
+                secondary={resolvedSecondary}
                 brandName={brandName}
+                visualSystem={visualSystem}
+                director={director}
               />
             ) : (
               beats.map((beat) => (
@@ -2444,8 +2405,8 @@ export const PortraitCinematicSkillShowcase: React.FC<SkillShowcaseProps> = ({
                   key={`${beat.startFrame}-${beat.keyword}`}
                   frame={frame}
                   beat={beat}
-                  accent={accent}
-                  secondary={secondaryAccent}
+                  accent={resolvedAccent}
+                  secondary={resolvedSecondary}
                   productIcons={productIcons}
                 />
               ))
@@ -2461,40 +2422,17 @@ export const PortraitCinematicSkillShowcase: React.FC<SkillShowcaseProps> = ({
             height: SEMANTIC_STAGE_HEIGHT,
             overflow: "hidden",
           }}
+          data-semantic-layer={heroStyle === "hero-track-v2" ? "hero-track-v2" : "cinematic"}
         >
           {beats.map((beat) => (
             <SemanticBeatAnimation
               key={`${beat.startFrame}-${beat.keyword}`}
               frame={frame}
               beat={beat}
-              accent={accent}
-              secondary={secondaryAccent}
+              accent={resolvedAccent}
+              secondary={resolvedSecondary}
             />
           ))}
-        </div>
-        <div
-          style={{
-            position: "absolute",
-            left: 54,
-            right: 54,
-            top: 1552,
-            height: 1,
-            background: `linear-gradient(90deg, transparent, ${accent}88, transparent)`,
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            left: 54,
-            top: 1572,
-            fontFamily: MONO,
-            fontSize: 10,
-            letterSpacing: 1.6,
-            color: "rgba(255,255,255,0.24)",
-          }}
-        >
-          {brandName ?? "DESIGN SKILL"} /{" "}
-          {heroStyle === "hero-track-v2" ? "HERO TRACK V2" : "CINEMATIC SHOT"}
         </div>
       </div>
     </AbsoluteFill>

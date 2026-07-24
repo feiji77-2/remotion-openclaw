@@ -20,9 +20,55 @@ const PALETTE = [
   "#7e98ff",
 ];
 
+const VISUAL_SYSTEM_VARIANTS = [
+  "cinematic-tech",
+  "editorial-lightcut",
+  "product-console",
+];
+const DIRECTOR_TRANSITION_PRESETS = [
+  "ambient-fade",
+  "stage-slide",
+  "focus-handoff",
+  "contrast-flash",
+];
+
 const NUMBERED_CUE =
   /^(第[一二三四五六七八九十0-9]+个|第[一二三四五六七八九十0-9]+步|首先|然后|接着|最后|压轴|总结|注意)/u;
 const STRUCTURE_CUE = /^(但是|然而|不过|因为|所以|因此|此外|另外)/u;
+const SEQUENCE_MARKER =
+  /(第[一二三四五六七八九十0-9]+(?:个|步|阶段|部分)|第一|第二|第三|第四|第五|首先|然后|接着|最后|压轴)/gu;
+const SEQUENCE_CONTEXT = /(步骤|流程|链路|路径|阶段|编号|顺序|依次|逐步)/u;
+const METRIC_CONTEXT =
+  /(指标|数据|转化|增长|下降|提升|降低|通过|失败|耗时|延迟|成本|预算|收入|用户|客户|订单|库存|缺货|产量|样本|断言|占比|比例|效率|速度|频率|准确率|完成率|帧|秒|分钟|小时|天|元|金额|次数|门店|页面|条目)/u;
+const MEASURED_NUMBER =
+  /\d+(?:[.,]\d+)?\s*(?:K|万|亿|\+|%|条|套|种|个|倍|秒|分钟|小时|天|帧|元|人|次|分|GB|MB)?/iu;
+const STRONG_MEASURED_NUMBER =
+  /\d+(?:[.,]\d+)?\s*(?:K|万|亿|\+|%|条|套|种|倍|秒|分钟|小时|天|帧|元|人|次|分|GB|MB)/iu;
+const RUN_DIVERSITY_KINDS = [
+  "quote-callout",
+  "radial-explainer",
+  "timeline-story",
+  "checklist-progress",
+];
+
+const hasGroupedSequenceSignal = (text) => {
+  const value = String(text ?? "");
+  const markers = value.match(SEQUENCE_MARKER) ?? [];
+  const normalized = markers.map((marker) =>
+    marker.replace(/[，。！？、；：,.!?;:\s]/gu, ""),
+  );
+  if (new Set(normalized).size >= 2) return true;
+  return (
+    normalized.some((marker) => /^第|^第一/u.test(marker)) &&
+    SEQUENCE_CONTEXT.test(value)
+  );
+};
+
+const hasMetricSignal = (text) => {
+  const value = String(text ?? "");
+  if (!MEASURED_NUMBER.test(value)) return false;
+  return STRONG_MEASURED_NUMBER.test(value) || METRIC_CONTEXT.test(value);
+};
 
 const NARRATIVE_SIGNAL_RULES = [
   {
@@ -30,6 +76,7 @@ const NARRATIVE_SIGNAL_RULES = [
     family: "hero-track-v2 / vertical-step-flow",
     pattern:
       /(第[一二三四五六七八九十0-9]+个|第一|第二|第三|第四|第五|首先|然后|接着|最后|压轴)/u,
+    match: hasGroupedSequenceSignal,
     visualMode: "process",
     action: "trace",
     motionPreset: "scan-lock",
@@ -40,7 +87,8 @@ const NARRATIVE_SIGNAL_RULES = [
     key: "numeric-summary",
     family: "hero-track-v2 / metric-strip",
     pattern:
-      /(左右|大约|接近|超过|至少|不到|约|\d+(?:[.,]\d+)?\s*(?:K|万|亿|\+|%|条|套|种|个)?)/iu,
+      /\d+(?:[.,]\d+)?\s*(?:K|万|亿|\+|%|条|套|种|个|倍|秒|分钟|小时|天|帧|元|人|次|分|GB|MB)?/iu,
+    match: hasMetricSignal,
     visualMode: "metrics",
     action: "counter",
     motionPreset: "number-roll",
@@ -177,7 +225,9 @@ const CAPTION_SOFT_LIMIT = 28;
 const CAPTION_HARD_LIMIT = 34;
 
 const narrativeSignalForText = (text) =>
-  NARRATIVE_SIGNAL_RULES.find((rule) => rule.pattern.test(text)) ?? null;
+  NARRATIVE_SIGNAL_RULES.find((rule) =>
+    rule.match ? rule.match(text) : rule.pattern.test(text),
+  ) ?? null;
 
 export const compactLength = (value) =>
   String(value ?? "").replace(/\s+/g, "").length;
@@ -539,8 +589,7 @@ const actionForText = (text, sceneIndex, captionIndex, isLastScene) => {
   if (signal?.action) return signal.action;
   if (/不是|而是|对比|左边|右边|之前|之后|默认|误区|VS/i.test(text))
     return "compare";
-  if (/\d+(?:[.,]\d+)?\s*(?:K|万|亿|\+|%|条|套|种|个)?/i.test(text))
-    return "counter";
+  if (hasMetricSignal(text)) return "counter";
   if (
     /步骤|第一步|第二步|第三步|流程|链路|路径|接入|输入|输出|生成/i.test(text)
   )
@@ -559,8 +608,7 @@ const visualModeForText = (text, index, total) => {
   if (signal?.visualMode) return signal.visualMode;
   if (/不是|而是|对比|左边|右边|之前|之后|默认|误区|反模式|雷区/i.test(text))
     return "compare";
-  if (/\d+(?:[.,]\d+)?\s*(?:K|万|亿|\+|%|条|套|种|个)?/i.test(text))
-    return "metrics";
+  if (hasMetricSignal(text)) return "metrics";
   if (
     /步骤|第一步|第二步|第三步|流程|链路|路径|接入|输入|输出|生成|沉淀/i.test(
       text,
@@ -597,9 +645,7 @@ const evidenceForBeat = (text, action) => {
 };
 
 const beatValueForText = (text) => {
-  const match = String(text).match(
-    /\d+(?:[.,]\d+)?\s*(?:K|万|亿|\+|%|条|套|种|个)?/i,
-  );
+  const match = hasMetricSignal(text) ? String(text).match(MEASURED_NUMBER) : null;
   return match ? match[0].trim().slice(0, 18) : undefined;
 };
 
@@ -712,6 +758,23 @@ const SHOT_META = {
     evidenceType: "语义证据",
     objective: "用清晰层级解释当前口播的核心主张",
   },
+  "product-showcase": {environment: "Product Media", target: "product / work", actionLabel: "产品展示", evidenceType: "作品媒体", objective: "聚焦当前口播对应的产品或作品"},
+  "editor-canvas": {environment: "Editor Canvas", target: "editable object", actionLabel: "编辑画布", evidenceType: "画布对象", objective: "展示当前可编辑对象"},
+  "article-illustration": {environment: "Article Illustration", target: "article / illustration", actionLabel: "文章插画", evidenceType: "文章判断", objective: "用插画承接当前文章观点"},
+  "timeline-story": {environment: "Timeline", target: "current stage", actionLabel: "时间线叙事", evidenceType: "阶段节点", objective: "按顺序呈现过程或版本"},
+  "quote-callout": {environment: "Editorial Quote", target: "core claim", actionLabel: "观点引述", evidenceType: "核心判断", objective: "突出一句核心主张"},
+  "checklist-progress": {environment: "Checklist", target: "current item", actionLabel: "清单进度", evidenceType: "清单项", objective: "逐项说明原则或能力"},
+  "radial-explainer": {environment: "Concept Map", target: "central concept", actionLabel: "径向拆解", evidenceType: "概念要素", objective: "从中心概念拆解关键要素"},
+  "media-compare": {environment: "Media Compare", target: "media difference", actionLabel: "媒体对比", evidenceType: "前后媒体", objective: "对比同一对象的不同状态"},
+  "overview-matrix": {environment: "Overview Matrix", target: "capability grid", actionLabel: "能力总览", evidenceType: "能力矩阵", objective: "按顺序点亮完整能力矩阵"},
+  "rule-compare": {environment: "Rule Compare", target: "rule pair", actionLabel: "规则对比", evidenceType: "正反对照", objective: "用正反对照说清规则差异"},
+  "code-render": {environment: "Code Render", target: "code-to-frame", actionLabel: "代码渲染", evidenceType: "管线转译", objective: "展示代码到成片的转译过程"},
+  "slide-editor": {environment: "Slide Editor", target: "slide objects", actionLabel: "幻灯片编辑", evidenceType: "原生对象", objective: "展示幻灯片对象的编辑与选区"},
+  "article-map": {environment: "Article Map", target: "source-body-action", actionLabel: "文章映射", evidenceType: "判断路径", objective: "把文章判断连接到图像产出"},
+  "video-agent": {environment: "Video Agent", target: "HTML-to-video", actionLabel: "视频代理", evidenceType: "转换流程", objective: "展示输入到预览再到交付的接力"},
+  "design-compare": {environment: "Design Compare", target: "token surfaces", actionLabel: "设计对比", evidenceType: "设计token", objective: "展开设计 token 对页面的影响"},
+  "system-summary": {environment: "System Summary", target: "center node", actionLabel: "系统汇总", evidenceType: "子系统汇聚", objective: "把多个子系统收束到中心"},
+  "evidence-replay": {environment: "Evidence Replay", target: "step sequence", actionLabel: "证据回放", evidenceType: "步骤证据", objective: "按顺序定格输入、操作与结果"},
 };
 
 const lensForText = (text, shotKind, action, captionIndex) => {
@@ -744,6 +807,7 @@ const shotEvidenceForText = (text, shotKind, action) => {
     return [halves[0] ?? "Before", halves[1] ?? "After", "Evidence"];
   }
   if (shotKind === "metric-highlight") return [number ?? "0", tokenList[0] ?? "当前指标", tokenList[1] ?? "口播上下文"];
+  if (["product-showcase", "editor-canvas", "article-illustration", "timeline-story", "quote-callout", "checklist-progress", "radial-explainer", "media-compare"].includes(shotKind)) return tokenList.length ? tokenList.slice(0, 4) : [value.slice(0, 28) || "当前主张"];
   if (shotKind === "concept-explainer") return tokenList.length ? tokenList.slice(0, 3) : [value.slice(0, 28) || "当前主张"];
   return tokenList.length ? tokenList : [action || "evidence"];
 };
@@ -774,8 +838,8 @@ const shotForText = (text, shotKind, action, captionIndex, stateIndex) => {
     kind: shotKind,
     environment: meta.environment,
     target: browserTarget,
-    before: shotKind === "before-after" ? (beforeAfter?.[1]?.trim().slice(0, 40) ?? evidence[0]) : undefined,
-    after: shotKind === "before-after" ? (beforeAfter?.[2]?.trim().slice(0, 40) ?? evidence[1]) : undefined,
+    before: ["before-after", "media-compare"].includes(shotKind) ? (beforeAfter?.[1]?.trim().slice(0, 40) ?? evidence[0]) : undefined,
+    after: ["before-after", "media-compare"].includes(shotKind) ? (beforeAfter?.[2]?.trim().slice(0, 40) ?? evidence[1]) : undefined,
     command: shotKind === "terminal-execution" ? commandForText(value) : undefined,
     path:
       shotKind === "code-diff"
@@ -806,11 +870,66 @@ const shotForText = (text, shotKind, action, captionIndex, stateIndex) => {
   };
 };
 
+const componentPropsForShot = (label, text, shot) => ({
+  title: label,
+  detail: String(text ?? "").slice(0, 118),
+  evidence: shot.evidence.map((item) => item.slice(0, 48)),
+  metric: shot.metric,
+  before: shot.before,
+  after: shot.after,
+  command: shot.command,
+  path: shot.path,
+  log: shot.log,
+  status: shot.status,
+});
+
+const resolveRunDiversityComponent = ({
+  text,
+  action,
+  captionIndex,
+  stateIndex,
+  sceneIndex,
+  runIndex,
+}) => {
+  const shotKind =
+    RUN_DIVERSITY_KINDS[
+      (stateIndex + sceneIndex + runIndex) % RUN_DIVERSITY_KINDS.length
+    ];
+  const intent = {
+    key: shotKind,
+    shotKind,
+    confidence: 0.6,
+    signals: ["sequence-diversity"],
+    sourceText: text,
+  };
+  const shot = shotForText(text, shotKind, action, captionIndex, stateIndex);
+  const lens = lensForText(text, shotKind, action, captionIndex);
+  const component = resolveProductionComponent({
+    intent,
+    shot,
+    lens,
+    orientation: "portrait",
+  });
+  return component.resolution === "matched"
+    ? { intent, shotKind, shot, lens, component }
+    : null;
+};
+
+const applyResolvedComponent = (state, resolved, text) => ({
+  ...state,
+  intent: { ...resolved.intent, sourceText: text },
+  shot: resolved.shot,
+  lens: resolved.lens,
+  componentId: resolved.component.componentId,
+  componentProps: componentPropsForShot(state.label, text, resolved.shot),
+  resolution: resolved.component.resolution,
+  diagnostics: resolved.component.diagnostics,
+});
+
 const visualStateForText = (text, action, captionIndex) => {
   if (/左边|右边|默认|之后|之前|不同结果|不是.*是/u.test(text))
     return "compare";
-  if (/\d+(?:[.,]\d+)?\s*(?:K|万|亿|\+|%|条|套|种|个)?/i.test(text))
-    return "metrics";
+  if (hasMetricSignal(text)) return "metrics";
   if (/清单|规则|系统|包含|内置|打包|这些/u.test(text)) return "stack";
   if (/检测|标注|扫描|规避/u.test(text)) return "scan";
   if (/最后|总结|评论|发布|出成品/u.test(text)) return "outro";
@@ -873,7 +992,10 @@ const heroTrackKindForScene = (sceneText, index, totalScenes) => {
   if (/正文配图|配图|素材|写文章/i.test(sceneText)) return "article-map";
   if (/HyperFrames|HTML|视频 Agent|视频/i.test(sceneText)) return "video-agent";
   if (/UI Skill|设计立场|排版|留白/i.test(sceneText)) return "design-compare";
-  return "generic-explainer";
+  // No hard-coded shell default: derive from the resolved caption semantics and
+  // only keep kinds that still exist in the retained legacy track set.
+  const intent = resolveSemanticIntent(sceneText, {sceneIndex: index, sceneCount: totalScenes});
+  return intent.shotKind in HERO_ENTITY_TARGETS ? intent.shotKind : "overview-matrix";
 };
 
 const HERO_ENTITY_TARGETS = {
@@ -927,7 +1049,6 @@ const HERO_ENTITY_TARGETS = {
     "summary-output",
     "summary-result",
   ],
-  "generic-explainer": ["input-node", "rule-node", "result-node"],
 };
 
 // The eleven cinematic components are motion language, not replacement hero
@@ -1018,7 +1139,7 @@ const cinematicPresetForState = (
   if (stateIndex === 0) preferred = "kinetic-type";
   else if (/对比|不是|而是|之前|之后|默认|不同/i.test(value))
     preferred = "split-wipe";
-  else if (/\d+(?:[.,]\d+)?\s*(?:K|万|亿|%|条|套|种|个)?/i.test(value))
+  else if (hasMetricSignal(value))
     preferred = "particle-field";
   else if (/检测|审计|扫描|标记|问题/i.test(value)) preferred = "ui-scan";
   else if (/颜色|字体|间距|Token|设计系统|WCAG/i.test(value))
@@ -1049,7 +1170,7 @@ const cinematicPresetForState = (
 
 const heroEntityTargetForState = (kind, stateIndex) => {
   const targets =
-    HERO_ENTITY_TARGETS[kind] ?? HERO_ENTITY_TARGETS["generic-explainer"];
+    HERO_ENTITY_TARGETS[kind] ?? HERO_ENTITY_TARGETS["overview-matrix"];
   return targets[Math.min(stateIndex, targets.length - 1)];
 };
 
@@ -1063,6 +1184,8 @@ const heroStatesForChunk = (
 ) => {
   let previousCinematicPreset = "";
   let previousEnd = 0;
+  let previousComponentId = "";
+  let componentRun = 0;
   return chunk.map((caption, stateIndex, statesSource) => {
     const text = caption.text;
     const captionIndex = Number.isInteger(caption.__captionIndex)
@@ -1074,11 +1197,46 @@ const heroStatesForChunk = (
       stateIndex,
       sceneIndex === totalScenes - 1,
     );
-    const intent = resolveSemanticIntent(text, {sceneIndex, sceneCount: totalScenes});
-    const shotKind = intent.shotKind;
-    const shot = shotForText(text, shotKind, action, captionIndex, stateIndex);
-    const lens = lensForText(text, shotKind, action, captionIndex);
-    const component = resolveProductionComponent({intent, shot, lens, orientation: "portrait"});
+    let intent = resolveSemanticIntent(text, {sceneIndex, sceneCount: totalScenes});
+    let shotKind = intent.shotKind;
+    let shot = shotForText(text, shotKind, action, captionIndex, stateIndex);
+    let lens = lensForText(text, shotKind, action, captionIndex);
+    let component = resolveProductionComponent({intent, shot, lens, orientation: "portrait"});
+    const previous = stateIndex > 1 ? statesSource[stateIndex - 2] : null;
+    if (component.componentId === "concept-explainer" && intent.key === "concept-explanation" && previous?.text) {
+      const alternateIntent = resolveSemanticIntent(`${text} ${previous.text}`, {sceneIndex, sceneCount: totalScenes});
+      const alternateShot = shotForText(text, alternateIntent.shotKind, action, captionIndex, stateIndex);
+      const alternateLens = lensForText(text, alternateIntent.shotKind, action, captionIndex);
+      const alternate = resolveProductionComponent({intent: alternateIntent, shot: alternateShot, lens: alternateLens, orientation: "portrait"});
+      if (alternate.resolution === "matched" && alternate.componentId !== "concept-explainer") {
+        intent = {...alternateIntent, sourceText: text};
+        shotKind = alternateIntent.shotKind;
+        shot = alternateShot;
+        lens = alternateLens;
+        component = alternate;
+      }
+    }
+    if (component.componentId === previousComponentId) componentRun += 1;
+    else componentRun = 1;
+    if (componentRun > 2) {
+      const diverse = resolveRunDiversityComponent({
+        text,
+        action,
+        captionIndex,
+        stateIndex,
+        sceneIndex,
+        runIndex: componentRun,
+      });
+      if (diverse) {
+        intent = {...diverse.intent, sourceText: text};
+        shotKind = diverse.shotKind;
+        shot = diverse.shot;
+        lens = diverse.lens;
+        component = diverse.component;
+        componentRun = 1;
+      }
+    }
+    previousComponentId = component.componentId;
     const next = statesSource[stateIndex + 1];
     const label = keywordForText(text, stateIndex);
     let startFrame =
@@ -1114,18 +1272,7 @@ const heroStatesForChunk = (
       shot,
       intent,
       componentId: component.componentId,
-      componentProps: {
-        title: label,
-        detail: text.slice(0, 118),
-        evidence: shot.evidence.map((item) => item.slice(0, 48)),
-        metric: shot.metric,
-        before: shot.before,
-        after: shot.after,
-        command: shot.command,
-        path: shot.path,
-        log: shot.log,
-        status: shot.status,
-      },
+      componentProps: componentPropsForShot(label, text, shot),
       resolution: component.resolution,
       diagnostics: component.diagnostics,
     };
@@ -1151,7 +1298,126 @@ const layoutSignatureForScene = (sceneText, visualMode, index) => {
   return index % 2 === 0 ? "icon-grid" : "tag-matrix";
 };
 
+const visualSystemVariantForText = (text, fallbackSeed = "") => {
+  const value = `${text} ${fallbackSeed}`;
+  if (/产品|客户|用户|订单|库存|销售|营销|品牌|发布|门店|收入|预算|商品|供应商|货架|补货/u.test(value)) {
+    return "product-console";
+  }
+  if (/代码|终端|命令|React|Remotion|API|JSON|配置|测试|构建|浏览器|DevTools|DOM|CI|HTML/i.test(value)) {
+    return "cinematic-tech";
+  }
+  if (/课程|知识|讲解|概念|原理|学习|方法论|课堂|读懂|判断|比喻/u.test(value)) {
+    return "editorial-lightcut";
+  }
+  const seed = Array.from(value).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return VISUAL_SYSTEM_VARIANTS[seed % VISUAL_SYSTEM_VARIANTS.length];
+};
+
+const pacingForCaptions = (captions, text) => {
+  const durations = captions.map((caption) => caption.endMs - caption.startMs).filter((duration) => duration > 0);
+  const meanDuration = durations.length
+    ? durations.reduce((sum, duration) => sum + duration, 0) / durations.length
+    : 0;
+  if (meanDuration <= 1700 || captions.length >= 36) return "fast";
+  if (meanDuration >= 2800 || /讲解|教程|课程|原理|方法论|为什么/u.test(text)) return "explainer";
+  return "balanced";
+};
+
+const paletteForVisualSystem = (variant) => {
+  if (variant === "editorial-lightcut") {
+    return ["#ffd166", "#48e7f3", "#ff7aa8", "#63f0aa", "#ad94ff", "#7e98ff"];
+  }
+  if (variant === "product-console") {
+    return ["#63f0aa", "#ffd166", "#48e7f3", "#ff7aa8", "#7e98ff", "#ad94ff"];
+  }
+  return PALETTE;
+};
+
+const scenePrimitiveFor = ({sceneText, visualMode, heroTrackKind, isFirst, isLast}) => {
+  if (isFirst) return "hook-title";
+  if (isLast) return "quote-close";
+  if (heroTrackKind === "overview-matrix" || /总览|矩阵|几个|能力/u.test(sceneText)) return "capability-matrix";
+  if (heroTrackKind === "rule-compare" || visualMode === "compare") return "problem-solution-compare";
+  if (heroTrackKind === "code-render" || /代码|终端|命令|测试|配置|diff|npm|React/i.test(sceneText)) return "code-or-terminal-evidence";
+  if (heroTrackKind === "slide-editor" || /画布|编辑|PPT|PowerPoint|对象/u.test(sceneText)) return "editor-canvas-demo";
+  if (visualMode === "metrics" || hasMetricSignal(sceneText)) return "metric-spike";
+  if (heroTrackKind === "system-summary") return "system-summary";
+  if (visualMode === "quote") return "quote-close";
+  return "process-map";
+};
+
+const scenePrimitiveForState = (state, fallbackPrimitive) => {
+  const componentId = state.componentId ?? state.shot?.kind;
+  if (["overview-matrix", "product-showcase"].includes(componentId)) return "capability-matrix";
+  if (["rule-compare", "before-after", "media-compare", "design-compare"].includes(componentId)) return "problem-solution-compare";
+  if (["terminal-execution", "code-diff", "config-check", "code-render", "test-report"].includes(componentId)) return "code-or-terminal-evidence";
+  if (["slide-editor", "editor-canvas", "browser-demo", "interface-audit", "asset-library"].includes(componentId)) return "editor-canvas-demo";
+  if (componentId === "metric-highlight") return "metric-spike";
+  if (["quote-callout", "concept-explainer"].includes(componentId)) return "quote-close";
+  if (componentId === "system-summary" || componentId === "system-map") return "system-summary";
+  return fallbackPrimitive;
+};
+
+const directorMotionPresetFor = ({beat, state, scenePrimitive, stateIndex}) => {
+  const sourcePreset = state.cinematicPreset ?? beat?.shotPreset ?? beat?.motionPreset ?? "";
+  if (scenePrimitive === "capability-matrix" || sourcePreset === "card-regroup") return "matrix-step";
+  if (scenePrimitive === "problem-solution-compare" || sourcePreset === "split-wipe" || sourcePreset === "split-reveal") return "split-reveal";
+  if (scenePrimitive === "editor-canvas-demo" || /object|canvas|slide|editor/i.test(String(state.componentId ?? ""))) return "object-select";
+  if (scenePrimitive === "metric-spike" || sourcePreset === "number-roll" || beat?.action === "counter") return "number-roll";
+  if (scenePrimitive === "process-map" || sourcePreset === "pipeline-flow" || sourcePreset === "scan-lock" || beat?.action === "trace") return "path-draw";
+  if (scenePrimitive === "quote-close" || beat?.action === "stamp" || beat?.action === "burst") return "quote-snap";
+  if (sourcePreset === "focus-lock" || sourcePreset === "ui-scan") return "focus-lock";
+  return stateIndex === 0 ? "stage-breathe" : "handoff-wipe";
+};
+
+const directorTransitionPresetFor = (index, totalScenes, visualSystemVariant) => {
+  if (index === totalScenes - 1) return "none";
+  if (visualSystemVariant === "product-console" && index % 3 === 1) return "stage-slide";
+  if (visualSystemVariant === "editorial-lightcut" && index % 3 === 2) return "contrast-flash";
+  return DIRECTOR_TRANSITION_PRESETS[index % DIRECTOR_TRANSITION_PRESETS.length];
+};
+
+const directorDensityFor = (scenePrimitive, state) => {
+  if (["capability-matrix", "editor-canvas-demo", "process-map"].includes(scenePrimitive)) return "high";
+  if (["quote-close", "metric-spike"].includes(scenePrimitive)) return "low";
+  const evidenceCount = Array.isArray(state.evidence) ? state.evidence.length : 0;
+  return evidenceCount >= 4 ? "high" : "medium";
+};
+
+const transitionForDirectorPreset = (preset, index) => {
+  if (preset === "none") return false;
+  return {
+    type: preset === "stage-slide" ? "slide" : "fade",
+    durationInFrames: preset === "contrast-flash" ? 8 : index % 2 === 0 ? 10 : 12,
+  };
+};
+
+const directorForState = ({
+  state,
+  beat,
+  scenePrimitive,
+  layoutSignature,
+  transitionPreset,
+  stateIndex,
+}) => {
+  const resolvedPrimitive = scenePrimitiveForState(state, scenePrimitive);
+  return {
+    scenePrimitive: resolvedPrimitive,
+    layoutSignature,
+    motionPreset: directorMotionPresetFor({
+      beat,
+      state,
+      scenePrimitive: resolvedPrimitive,
+      stateIndex,
+    }),
+    transitionPreset,
+    focusTarget: state.entityTarget,
+    density: directorDensityFor(resolvedPrimitive, state),
+  };
+};
+
 const BODY_LAYOUT_FALLBACKS = [
+  "hero-title",
   "vertical-step-flow",
   "metric-strip",
   "tag-matrix",
@@ -1159,6 +1425,7 @@ const BODY_LAYOUT_FALLBACKS = [
   "focus-diagram",
   "icon-grid",
   "quote-close",
+  "system-orbit",
 ];
 
 const nonRepeatingBodyLayoutForScene = (
@@ -1167,7 +1434,14 @@ const nonRepeatingBodyLayoutForScene = (
   index,
   previousLayouts,
 ) => {
-  const preferred = layoutSignatureForScene(sceneText, visualMode, index);
+  const preferred = index === 0
+    ? "hero-title"
+    : layoutSignatureForScene(sceneText, visualMode, index);
+  if (!previousLayouts.includes(preferred)) return preferred;
+  const unused = BODY_LAYOUT_FALLBACKS.find(
+    (layout) => !previousLayouts.includes(layout),
+  );
+  if (unused) return unused;
   if (
     previousLayouts.length < 2 ||
     previousLayouts.at(-1) !== preferred ||
@@ -1200,6 +1474,80 @@ const sceneTitleFor = (text, index, title) => {
   return keyword.length >= 2 ? keyword : `章节 ${index + 1}`;
 };
 
+const capConsecutiveComponentRuns = (scenes) => {
+  let previousComponentId = "";
+  let componentRun = 0;
+  scenes.forEach((scene, sceneIndex) => {
+    const states = scene.payload?.heroTrack?.states;
+    if (!Array.isArray(states)) return;
+    states.forEach((state, stateIndex) => {
+      if (state.componentId === previousComponentId) componentRun += 1;
+      else componentRun = 1;
+      if (componentRun <= 2) {
+        previousComponentId = state.componentId;
+        return;
+      }
+
+      const text = String(state.detail ?? state.intent?.sourceText ?? "").trim();
+      const captionIndex = Number.isInteger(state.captionStartIndex)
+        ? state.captionStartIndex
+        : stateIndex;
+      const action = actionForText(
+        text,
+        sceneIndex,
+        stateIndex,
+        sceneIndex === scenes.length - 1,
+      );
+      const diverse = resolveRunDiversityComponent({
+        text,
+        action,
+        captionIndex,
+        stateIndex,
+        sceneIndex,
+        runIndex: componentRun,
+      });
+      if (!diverse || diverse.component.componentId === previousComponentId) {
+        previousComponentId = state.componentId;
+        return;
+      }
+      states[stateIndex] = applyResolvedComponent(state, diverse, text);
+      previousComponentId = states[stateIndex].componentId;
+      componentRun = 1;
+    });
+  });
+};
+
+const refreshSceneDirectors = (scenes) => {
+  scenes.forEach((scene, sceneIndex) => {
+    const states = scene.payload?.heroTrack?.states;
+    const beats = scene.payload?.beats;
+    if (!Array.isArray(states) || !Array.isArray(beats)) return;
+    const transitionPreset = sceneIndex === scenes.length - 1
+      ? "none"
+      : states[0]?.director?.transitionPreset ?? scene.payload?.director?.transitionPreset ?? "ambient-fade";
+    const scenePrimitive = scene.payload?.director?.scenePrimitive ?? scenePrimitiveFor({
+      sceneText: String(scene.payload?.sourceText ?? ""),
+      visualMode: scene.payload?.visualMode,
+      heroTrackKind: scene.payload?.heroTrack?.kind,
+      isFirst: sceneIndex === 0,
+      isLast: sceneIndex === scenes.length - 1,
+    });
+    const layoutSignature = String(scene.payload?.layoutSignature ?? "");
+    states.forEach((state, stateIndex) => {
+      const beat = beats.find((candidate) => candidate.captionStartIndex === state.captionStartIndex) ?? beats[stateIndex];
+      state.director = directorForState({
+        state,
+        beat,
+        scenePrimitive,
+        layoutSignature,
+        transitionPreset,
+        stateIndex,
+      });
+    });
+    scene.payload.director = states[0]?.director ?? scene.payload.director;
+  });
+};
+
 export const buildSkillShowcaseProjectFromScript = ({
   scriptText,
   captions: captionsInput,
@@ -1229,6 +1577,13 @@ export const buildSkillShowcaseProjectFromScript = ({
     ...caption,
     __captionIndex: index,
   }));
+  const fullNarrationText = resolvedCaptions.map((caption) => caption.text).join("");
+  const visualSystem = {
+    variant: visualSystemVariantForText(`${resolvedTitle}${fullNarrationText}`, resolvedProjectId),
+    pacing: pacingForCaptions(resolvedCaptions, fullNarrationText),
+    platform: "portrait",
+  };
+  const scenePalette = paletteForVisualSystem(visualSystem.variant);
   const chunks = segmentCaptions(indexedCaptions, { maxScenes });
   const allLabels = labelsForChunk(
     resolvedCaptions.map((caption) => caption.text).join(""),
@@ -1255,6 +1610,18 @@ export const buildSkillShowcaseProjectFromScript = ({
       index,
       chunks.length,
     );
+    const scenePrimitive = scenePrimitiveFor({
+      sceneText,
+      visualMode,
+      heroTrackKind,
+      isFirst,
+      isLast,
+    });
+    const transitionPreset = directorTransitionPresetFor(
+      index,
+      chunks.length,
+      visualSystem.variant,
+    );
     const bodyLayoutSignature = nonRepeatingBodyLayoutForScene(
       sceneText,
       visualMode,
@@ -1272,22 +1639,45 @@ export const buildSkillShowcaseProjectFromScript = ({
       index,
       chunks.length,
     );
+    const heroStates = heroStatesForChunk(
+      chunk,
+      sceneStartFrame,
+      durationInFrames,
+      heroTrackKind,
+      index,
+      chunks.length,
+    ).map((state, stateIndex) => {
+      const beat = beats.find((candidate) => candidate.captionStartIndex === state.captionStartIndex) ?? beats[stateIndex];
+      return {
+        ...state,
+        director: directorForState({
+          state,
+          beat,
+          scenePrimitive,
+          layoutSignature,
+          transitionPreset,
+          stateIndex,
+        }),
+      };
+    });
+    const sceneDirector = heroStates[0]?.director ?? {
+      scenePrimitive,
+      layoutSignature,
+      motionPreset: "stage-breathe",
+      transitionPreset,
+      density: "medium",
+    };
     const heroTrack = {
       kind: heroTrackKind,
       captionStartIndex,
       captionEndIndex,
-      states: heroStatesForChunk(
-        chunk,
-        sceneStartFrame,
-        durationInFrames,
-        heroTrackKind,
-        index,
-        chunks.length,
-      ),
+      states: heroStates,
     };
     const payload = {
       variant: isFirst ? "intro" : isLast ? "outro" : "generic",
       visualMode,
+      visualSystem,
+      director: sceneDirector,
       heroStyle: "hero-track-v2",
       narrativeSignal: dominantNarrativeSignal(sceneText),
       layoutSignature,
@@ -1304,8 +1694,8 @@ export const buildSkillShowcaseProjectFromScript = ({
       headline: isFirst ? resolvedTitle : keywordForText(sceneText, index),
       body: sceneText.slice(0, 118),
       footer: isLast ? "按当前口播生成新视觉合同" : undefined,
-      accent: PALETTE[index % PALETTE.length],
-      secondaryAccent: PALETTE[(index + 1) % PALETTE.length],
+      accent: scenePalette[index % scenePalette.length],
+      secondaryAccent: scenePalette[(index + 1) % scenePalette.length],
       bullets: labels.slice(0, 4),
       labels: isFirst || isLast ? allLabels : labels,
       labelIcons: (isFirst || isLast
@@ -1338,11 +1728,11 @@ export const buildSkillShowcaseProjectFromScript = ({
       },
       payload,
       assetIds: [],
-      transition: isLast
-        ? false
-        : { type: index % 2 === 0 ? "fade" : "slide", durationInFrames: 10 },
+      transition: transitionForDirectorPreset(transitionPreset, index),
     };
   });
+  capConsecutiveComponentRuns(scenes);
+  refreshSceneDirectors(scenes);
 
   const visualPlanEntries = scenes.flatMap((scene, sceneIndex) => {
     const beats = scene.payload.beats;
@@ -1373,6 +1763,7 @@ export const buildSkillShowcaseProjectFromScript = ({
         shot: state.shot,
         componentId: state.componentId,
         componentProps: state.componentProps,
+        director: state.director,
         assetIds: [],
         orientation: "portrait",
         resolution: state.resolution,
@@ -1406,6 +1797,7 @@ export const buildSkillShowcaseProjectFromScript = ({
     },
     scenes,
     captions: resolvedCaptions,
+    visualSystem,
     visualPlan: {
       version: 1,
       generatedFrom: "captions",

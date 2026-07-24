@@ -45,12 +45,11 @@ Video Factory 把口播文本和当前音频时间码编译成同一条画面时
 
 ## 视觉目录
 
-当前 Storyboard 验收目录由两类稳定主视觉组成：
+唯一组件目录是 `HeroTrackV2.tsx` 中注册的 29 个 production composition templates，每项有独立的空间结构、主焦点和运动机制：
 
-- 11 个 Cinematic preset：`beats[].shotPreset` 的电影化节拍语言。
-- 9 个 Hero Track kind：`heroTrack.kind` 的章节主视觉布局。
+`browser-demo`、`terminal-execution`、`code-diff`、`config-check`、`interface-audit`、`flow-trace`、`test-report`、`asset-library`、`system-map`、`before-after`、`metric-highlight`、`concept-explainer`、`product-showcase`、`editor-canvas`、`article-illustration`、`timeline-story`、`quote-callout`、`checklist-progress`、`radial-explainer`、`media-compare`、`overview-matrix`、`rule-compare`、`code-render`、`slide-editor`、`article-map`、`video-agent`、`design-compare`、`system-summary`、`evidence-replay`。
 
-`HeroTrackState.shot.kind` 有 12 种生产镜头：`browser-demo`、`terminal-execution`、`code-diff`、`config-check`、`interface-audit`、`flow-trace`、`test-report`、`asset-library`、`system-map`、`before-after`、`metric-highlight`、`concept-explainer`。每种镜头都必须通过 production component registry 绑定真实 Remotion renderer。
+`HeroTrackState.shot.kind` 与这 29 个 template ID 一一对应，由同一 catalog 常量派生。`intent`、`lens`、`shot` 是绑定到 `captionIndex` 的生成与匹配数据，不是第二套组件库；`generic-explainer` 与 `concept-explainer` 重复，已被排除在 production 之外。每种镜头都必须通过 production component registry 绑定真实 Remotion renderer，缺 renderer 的 catalog 项会在测试阶段直接失败。
 
 技术镜头是 `hero-track-v2` 内部导演语法，不是额外的 Storyboard 组件。候选组件和控制台预览组件也不自动成为生产能力。
 

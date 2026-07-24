@@ -5,7 +5,7 @@ import type {ProjectSceneFamily} from './sceneRegistry';
 import {parseProjectScenePayload} from './sceneRegistry';
 import type {ProjectCaptionRange, ProjectTransition, VideoProject} from './projectSchema';
 import {ProjectValidationError} from './projectSchema';
-import type {VisualPlanEntry} from './visualPlan';
+import type {VisualPlanEntry, VisualSystem} from './visualPlan';
 import {visualPlanEntriesForScene} from './visualPlan';
 
 const GOLDEN_PROJECT_ID = 'workbuddy-six-skills-showcase';
@@ -271,7 +271,16 @@ const payloadFromVisualPlan = (
   const existingTrack = payload.heroTrack && typeof payload.heroTrack === 'object'
     ? payload.heroTrack as {kind?: unknown}
     : null;
-  const kind = typeof existingTrack?.kind === 'string' ? existingTrack.kind : 'generic-explainer';
+  // Legacy hero shells only retain the eight data-driven track kinds; a stale
+  // or missing kind is re-derived from the Visual Plan shot, never defaulted
+  // to the removed generic-explainer.
+  const legacyTrackKinds = new Set(['overview-matrix', 'rule-compare', 'code-render', 'slide-editor', 'article-map', 'video-agent', 'design-compare', 'system-summary']);
+  const shotKind = entries[0]?.shot?.kind;
+  const kind = typeof existingTrack?.kind === 'string' && legacyTrackKinds.has(existingTrack.kind)
+    ? existingTrack.kind
+    : typeof shotKind === 'string' && legacyTrackKinds.has(shotKind)
+      ? shotKind
+      : 'overview-matrix';
   const states = entries.map((entry) => ({
     startFrame: entry.startFrame,
     endFrame: entry.endFrame,
@@ -286,6 +295,7 @@ const payloadFromVisualPlan = (
     shot: entry.shot,
     componentId: entry.componentId,
     componentProps: entry.componentProps,
+    director: entry.director,
     intent: entry.intent,
     visualPlanEntryId: entry.id,
     resolution: entry.resolution,
@@ -295,6 +305,7 @@ const payloadFromVisualPlan = (
     ...payload,
     captionStartIndex: timing.captionRange?.startIndex ?? entries[0].captionStartIndex,
     captionEndIndex: timing.captionRange?.endIndex ?? entries[entries.length - 1]?.captionEndIndex,
+    director: entries[0].director ?? payload.director,
     beats,
     heroTrack: {
       kind,
@@ -333,6 +344,7 @@ export type CompiledProject = {
   orientation: 'landscape' | 'portrait';
   captionStyle: 'boxed' | 'editorial';
   showProjectLabel: boolean;
+  visualSystem?: VisualSystem;
   scenes: CompiledProjectScene[];
   captions: Caption[];
   audioTracks: CompiledProjectAudioTrack[];
@@ -442,10 +454,109 @@ export const compileProject = (project: VideoProject): CompiledProject => {
       );
       payload = {
         ...visualPlanPayload,
+        visualSystem: visualPlanPayload.visualSystem ?? project.visualSystem,
         captionStartIndex: timing.captionRange?.startIndex ?? visualPlanPayload.captionStartIndex,
         captionEndIndex: timing.captionRange?.endIndex ?? visualPlanPayload.captionEndIndex,
         beats: normalizedBeats,
       };
+      const heroTrack = visualPlanPayload.heroTrack as {kind?: unknown; captionStartIndex?: unknown; captionEndIndex?: unknown; states?: unknown};
+      if (heroTrack && typeof heroTrack === 'object' && Array.isArray(heroTrack.states)) {
+        const heroStates = heroTrack.states as Array<Record<string, unknown>>;
+        const sceneCaptionStart = timing.captionRange?.startIndex ?? 0;
+        const sceneCaptionEnd = timing.captionRange?.endIndex ?? orderedCaptions.length - 1;
+        const heroTrackCaptionStart = typeof heroTrack.captionStartIndex === 'number' ? heroTrack.captionStartIndex : undefined;
+        const heroTrackCaptionEnd = typeof heroTrack.captionEndIndex === 'number' ? heroTrack.captionEndIndex : undefined;
+        if (heroTrackCaptionStart !== undefined && heroTrackCaptionStart !== sceneCaptionStart) {
+          throw new ProjectValidationError(
+            'CAPTION_INDEX_MISMATCH',
+            `scenes[${index}].payload.heroTrack.captionStartIndex`,
+            `heroTrack captionStartIndex must match scene captionStartIndex: expected ${sceneCaptionStart}, received ${heroTrackCaptionStart}`,
+          );
+        }
+        if (heroTrackCaptionEnd !== undefined && heroTrackCaptionEnd !== sceneCaptionEnd) {
+          throw new ProjectValidationError(
+            'CAPTION_INDEX_MISMATCH',
+            `scenes[${index}].payload.heroTrack.captionEndIndex`,
+            `heroTrack captionEndIndex must match scene captionEndIndex: expected ${sceneCaptionEnd}, received ${heroTrackCaptionEnd}`,
+          );
+        }
+        heroStates.forEach((heroState, hsIndex) => {
+          const hsCaptionStart = heroState.captionStartIndex;
+          const hsCaptionEnd = heroState.captionEndIndex;
+          if (typeof hsCaptionStart !== 'number' || typeof hsCaptionEnd !== 'number') {
+            throw new ProjectValidationError(
+              'CAPTION_INDEX_MISSING',
+              `scenes[${index}].payload.heroTrack.states[${hsIndex}]`,
+              'every heroTrack state must declare captionStartIndex and captionEndIndex',
+            );
+          }
+          if (hsCaptionEnd < hsCaptionStart) {
+            throw new ProjectValidationError(
+              'CAPTION_INDEX_INVALID',
+              `scenes[${index}].payload.heroTrack.states[${hsIndex}].captionEndIndex`,
+              'heroTrack state caption range must be ascending',
+            );
+          }
+          if (hsCaptionStart < sceneCaptionStart || hsCaptionEnd > sceneCaptionEnd) {
+            throw new ProjectValidationError(
+              'CAPTION_INDEX_INVALID',
+              `scenes[${index}].payload.heroTrack.states[${hsIndex}]`,
+              `heroTrack state caption range [${hsCaptionStart},${hsCaptionEnd}] must stay inside scene caption range [${sceneCaptionStart},${sceneCaptionEnd}]`,
+            );
+          }
+          const hsStartFrame = heroState.startFrame;
+          const hsEndFrame = heroState.endFrame;
+          if (typeof hsStartFrame !== 'number' || typeof hsEndFrame !== 'number') {
+            throw new ProjectValidationError(
+              'CAPTION_INDEX_MISSING',
+              `scenes[${index}].payload.heroTrack.states[${hsIndex}]`,
+              'every heroTrack state must declare startFrame and endFrame',
+            );
+          }
+          const computedStartFrame = Math.max(0, frameForMs(orderedCaptions[hsCaptionStart].startMs) - timing.startFrame);
+          const computedEndFrame = Math.min(sceneDurationInFrames, frameForMs(orderedCaptions[hsCaptionEnd].endMs) - timing.startFrame);
+          if (Math.abs(hsStartFrame - computedStartFrame) > 1) {
+            throw new ProjectValidationError(
+              'CAPTION_INDEX_MISMATCH',
+              `scenes[${index}].payload.heroTrack.states[${hsIndex}].startFrame`,
+              `heroTrack state startFrame must be derived from captions[${hsCaptionStart}].startMs; expected ${computedStartFrame}, received ${hsStartFrame}`,
+            );
+          }
+          if (Math.abs(hsEndFrame - computedEndFrame) > 1) {
+            throw new ProjectValidationError(
+              'CAPTION_INDEX_MISMATCH',
+              `scenes[${index}].payload.heroTrack.states[${hsIndex}].endFrame`,
+              `heroTrack state endFrame must be derived from captions[${hsCaptionEnd}].endMs; expected ${computedEndFrame}, received ${hsEndFrame}`,
+            );
+          }
+          const prevHs = heroStates[hsIndex - 1];
+          if (prevHs && typeof prevHs.captionEndIndex === 'number' && hsCaptionStart !== prevHs.captionEndIndex + 1) {
+            throw new ProjectValidationError(
+              'CAPTION_INDEX_INVALID',
+              `scenes[${index}].payload.heroTrack.states[${hsIndex}].captionStartIndex`,
+              'heroTrack state caption ranges must be continuous; each state must start at previous state captionEndIndex + 1',
+            );
+          }
+        });
+        if (heroStates.length > 0) {
+          const firstState = heroStates[0];
+          const lastState = heroStates[heroStates.length - 1];
+          if (firstState.captionStartIndex !== sceneCaptionStart) {
+            throw new ProjectValidationError(
+              'CAPTION_INDEX_INVALID',
+              `scenes[${index}].payload.heroTrack.states[0].captionStartIndex`,
+              `first heroTrack state must start at scene captionStartIndex ${sceneCaptionStart}`,
+            );
+          }
+          if (lastState.captionEndIndex !== sceneCaptionEnd) {
+            throw new ProjectValidationError(
+              'CAPTION_INDEX_INVALID',
+              `scenes[${index}].payload.heroTrack.states`,
+              `last heroTrack state must end at scene captionEndIndex ${sceneCaptionEnd}`,
+            );
+          }
+        }
+      }
       normalizedBeats.forEach((beat, beatIndex) => {
         if (typeof beat !== 'object' || beat === null || !('endFrame' in beat)) return;
         if (typeof beat.endFrame === 'number' && beat.endFrame > sceneDurationInFrames) {
@@ -513,6 +624,7 @@ export const compileProject = (project: VideoProject): CompiledProject => {
     orientation,
     captionStyle: project.render.captionStyle,
     showProjectLabel: project.render.showProjectLabel,
+    visualSystem: project.visualSystem,
     scenes,
     captions: compileCaptions(project, durationInFrames, diagnostics),
     audioTracks: compileAudio(project, diagnostics),

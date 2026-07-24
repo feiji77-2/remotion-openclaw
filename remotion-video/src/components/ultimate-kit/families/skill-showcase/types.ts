@@ -34,7 +34,9 @@ import type {
   HeroShot,
   ProductionComponentProps,
   SemanticIntent,
+  VisualDirector,
   VisualPlanDiagnostic,
+  VisualSystem,
 } from "../../../../project/visualPlan";
 
 export type { SkillIconKey } from "./iconRegistry";
@@ -78,6 +80,7 @@ export type SkillBeatShotPreset =
 export type SkillShowcaseHeroStyle = "cinematic" | "hero-track-v2";
 
 export type {HeroLens, HeroShot} from "../../../../project/visualPlan";
+export type {VisualDirector, VisualSystem} from "../../../../project/visualPlan";
 export type HeroShotKind = HeroShot["kind"];
 
 export type HeroTrackKind =
@@ -88,8 +91,7 @@ export type HeroTrackKind =
   | "article-map"
   | "video-agent"
   | "design-compare"
-  | "system-summary"
-  | "generic-explainer";
+  | "system-summary";
 
 export type HeroTrackState = {
   startFrame: number;
@@ -110,6 +112,7 @@ export type HeroTrackState = {
   /** Canonical production component selected by the caption-driven Visual Plan. */
   componentId?: string;
   componentProps?: ProductionComponentProps;
+  director?: VisualDirector;
   intent?: SemanticIntent;
   visualPlanEntryId?: string;
   resolution?: "matched" | "fallback" | "error";
@@ -161,6 +164,8 @@ export interface SkillShowcaseProps {
   progressIndex?: number;
   progressTotal?: number;
   visualMode?: SkillShowcaseVisualMode;
+  visualSystem?: VisualSystem;
+  director?: VisualDirector;
   heroStyle?: SkillShowcaseHeroStyle;
   narrativeSignal?: SkillShowcaseNarrativeSignal;
   layoutSignature?: string;

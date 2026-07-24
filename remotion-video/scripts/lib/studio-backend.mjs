@@ -415,6 +415,8 @@ export const commandStepsFor = (commandId, project, execPath = process.execPath)
     ],
     'render-verify': [
       ['render', 'Render MP4', ['npm', 'run', 'project:render', '--', project.projectJsonPath, '--out', project.outputVideoPath]],
+      ['component-report', 'Build Component Report', ['npm', 'run', 'project:component-report', '--', '--props', project.projectJsonPath, '--out', `out/${project.id}-component-report.json`]],
+      ['qa-sheet', 'Build QA Contact Sheet', ['npm', 'run', 'project:qa-sheet', '--', project.projectJsonPath, '--out-dir', `out/${project.id}-qa`, '--render', '--scale=0.25', '--max-beats', '1']],
       ['verify', 'Verify MP4', [execPath, 'scripts/verify-project-render.mjs', '--props', project.projectJsonPath, '--video', project.outputVideoPath]],
     ],
   };
