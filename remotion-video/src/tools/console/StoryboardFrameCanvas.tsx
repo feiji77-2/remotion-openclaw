@@ -1,6 +1,7 @@
 import React from 'react';
 import type {VideoProject} from '../../project/projectSchema';
-import {runnerJobProgressPercent} from './RenderWorkspace';
+import {visualPlanEntriesForScene} from '../../project/visualPlan';
+import {sceneStillsProgressPercent} from './RenderWorkspace';
 import {sceneKeywords, scenePurpose, sceneTitle} from './scene-labels';
 import type {ProjectState, RunnerJob, SceneStillsManifest} from './types';
 
@@ -14,15 +15,7 @@ interface StoryboardFrameCanvasProps {
   fps: number;
 }
 
-const recordOf = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
-
 const stringOf = (value: unknown, fallback = '') => typeof value === 'string' ? value : fallback;
-
-const visualLabel = (scene: VideoProject['scenes'][number]) => {
-  const editor = recordOf(scene.payload.sceneEditor);
-  return stringOf(editor.componentLabel, stringOf(scene.payload.visualMode, stringOf(scene.payload.variant, '结构画面')));
-};
 
 const captionForScene = (project: VideoProject, scene: VideoProject['scenes'][number]) => {
   const range = scene.captionRange;
@@ -41,7 +34,7 @@ const stillStatus = (
   if (activeJob?.commandId === 'project-scene-stills') return '正在渲染关键帧';
   if (still) return '关键帧已生成';
   if (state?.stages.sceneStills?.status === 'stale') return '关键帧待更新';
-  return '结构草图';
+  return 'Visual Plan 诊断';
 };
 
 export const StoryboardFrameCanvas: React.FC<StoryboardFrameCanvasProps> = ({
@@ -57,7 +50,7 @@ export const StoryboardFrameCanvas: React.FC<StoryboardFrameCanvasProps> = ({
   const scene = project.scenes[sceneIndex];
   const still = scene ? sceneStills?.scenes.find((item) => item.sceneId === scene.id) || null : null;
   const rendering = activeJob?.commandId === 'project-scene-stills';
-  const progress = rendering ? runnerJobProgressPercent(activeJob) : 0;
+  const progress = rendering ? sceneStillsProgressPercent(activeJob, project.scenes.length) : 0;
 
   if (!scene) {
     return <div className="preview-empty"><div className="preview-empty__message"><strong>等待分镜</strong><span>保存并更新口播后，这里会显示当前选中的分镜图片。</span></div></div>;
@@ -70,6 +63,9 @@ export const StoryboardFrameCanvas: React.FC<StoryboardFrameCanvasProps> = ({
   const accent = stringOf(scene.payload.accent, '#d9642a');
   const duration = (scene.durationInFrames / fps).toFixed(1);
   const status = stillStatus(state, still, activeJob);
+  const planEntries = visualPlanEntriesForScene(project.visualPlan, scene.id);
+  const componentLabel = planEntries.map((entry) => entry.componentId).filter((value, index, values) => values.indexOf(value) === index).join(' / ');
+  const planErrors = planEntries.flatMap((entry) => entry.diagnostics).filter((diagnostic) => diagnostic.level === 'error');
 
   return <div className="storyboard-canvas" aria-label="当前分镜画布">
     <div className="preview-meta preview-meta--top">
@@ -79,23 +75,15 @@ export const StoryboardFrameCanvas: React.FC<StoryboardFrameCanvasProps> = ({
     <figure className={`storyboard-frame ${still ? 'has-still' : 'is-structure'}`} style={{'--scene-accent': accent} as React.CSSProperties}>
       {still
         ? <img src={still.url} alt={`分镜 ${sceneIndex + 1} 关键帧`} />
-        : <div className="storyboard-static-shot">
+        : <div className="storyboard-plan-empty">
           <div className="storyboard-static-shot__top">
             <span>{String(sceneIndex + 1).padStart(2, '0')} / {duration}s</span>
-            <em>{visualLabel(scene)}</em>
+            <em>{componentLabel || 'Visual Plan missing'}</em>
           </div>
-          <div className="storyboard-static-shot__hero">
+          <div className="storyboard-plan-empty__message">
             <small>{projectTitle}</small>
-            <strong>{title}</strong>
-            <p>{purpose}</p>
-          </div>
-          <div className="storyboard-static-shot__body">
-            <i />
-            <i />
-            <i />
-          </div>
-          <div className="storyboard-static-shot__keywords">
-            {(keywords.length > 0 ? keywords : ['标题', '主体', '字幕']).map((keyword) => <b key={keyword}>{keyword}</b>)}
+            <strong>{planErrors.length ? '生产计划存在错误' : '关键帧尚未生成'}</strong>
+            <p>{planErrors.map((diagnostic) => diagnostic.message).join(' / ') || '这里先展示同一份 Visual Plan 的元数据与诊断，生成关键帧后会切换成与最终 MP4 相同的真实画面。'}</p>
           </div>
           {caption && <div className="storyboard-static-shot__caption">{caption}</div>}
         </div>}

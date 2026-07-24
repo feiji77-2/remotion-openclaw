@@ -5,8 +5,11 @@ interface RenderWorkspaceProps {
   mode: 'render' | 'deliver';
   state: ProjectState | null;
   videoUrl: string | null;
+  downloadUrl?: string | null;
   runnerOnline: boolean;
   activeJob: RunnerJob | null;
+  blockingJob?: RunnerJob | null;
+  starting?: boolean;
   recentJob?: RunnerJob | null;
   onRun: (commandId: 'render-verify') => void;
   totalFrames: number;
@@ -14,9 +17,15 @@ interface RenderWorkspaceProps {
   sceneCount: number;
 }
 
-const statusCopy = (state: ProjectState | null, mode: RenderWorkspaceProps['mode']) => {
+const statusCopy = (
+  state: ProjectState | null,
+  mode: RenderWorkspaceProps['mode'],
+  activeJob: RunnerJob | null,
+  blockingJob: RunnerJob | null,
+) => {
   if (!state) return '正在读取产物状态';
-  if (state.activeJob) return `正在执行 ${state.activeJob.label}`;
+  if (activeJob) return `正在执行 ${activeJob.label}`;
+  if (blockingJob) return `当前正在执行 ${blockingJob.label}，成片渲染会在这个任务结束后可用。`;
   if (mode === 'deliver') return state.deliveryReady ? '成片已通过检查，可以下载。' : '只有最终视频生成并通过检查后，才会开放下载。';
   if (state.stages.project.status !== 'current') return '生成最终视频会先更新分镜结构，再编码 MP4。';
   if (state.stages.render.status === 'current' && state.stages.verify.status === 'current') return '成片已生成并通过检查。';
@@ -32,8 +41,11 @@ const progressLabel = (job: RunnerJob | null, fallback: string) => {
     if (job.currentStep === 'render') return '正在生成最终视频';
     if (job.currentStep === 'verify') return '正在确认成片状态';
   }
-  if (job.commandId === 'build-check') {
+  if (job.commandId === 'build-check' || job.commandId === 'build-check-audio') {
     if (job.currentStep === 'build') return '正在更新分镜';
+    if (job.currentStep === 'tts') return '正在合成口播配音';
+    if (job.currentStep === 'align-captions') return '正在按语音对齐字幕';
+    if (job.currentStep === 'rebuild') return '正在重建语音时间线';
     if (job.currentStep === 'check') return '正在检查分镜';
   }
   return fallback;
@@ -42,7 +54,10 @@ const progressLabel = (job: RunnerJob | null, fallback: string) => {
 const stepLabels: Record<string, string> = {
   'save-inputs': '保存输入合同',
   build: '生成 Remotion 项目',
-  check: '检查项目合同',
+  tts: '合成配音',
+  'align-captions': '对齐字幕时间',
+  rebuild: '重建语音时间线',
+  check: '检查分镜数据',
   'scene-stills': '渲染分镜画面',
   render: '渲染并编码 MP4',
   verify: '验收视频文件',
@@ -74,6 +89,30 @@ const latestRatio = (logs: string[], label: 'Rendered' | 'Encoded') => {
   return null;
 };
 
+const latestSceneStillsRatio = (logs: string[]) => {
+  for (const rawLine of [...logs].reverse()) {
+    const match = cleanLogLine(rawLine).match(/\[scene-stills\]\s+progress\s+(\d+)\/(\d+)/i);
+    if (!match) continue;
+    const current = Number(match[1]);
+    const total = Number(match[2]);
+    if (Number.isFinite(current) && Number.isFinite(total) && total > 0) return Math.max(0, Math.min(1, current / total));
+  }
+  return null;
+};
+
+export const sceneStillsProgressPercent = (job: RunnerJob | null, sceneCount = 0) => {
+  if (!job) return 2;
+  if (job.status === 'done') return 100;
+  const explicit = latestSceneStillsRatio(job.logs);
+  if (explicit !== null) return clampPercent(Math.min(.99, explicit) * 100);
+  if (sceneCount > 0) {
+    const completed = job.logs.map(cleanLogLine).filter((line) => /^Rendered\s+1\/1(?:\s|$)/i.test(line)).length;
+    return clampPercent(Math.max(.04, Math.min(.99, completed / sceneCount)) * 100);
+  }
+  const rendered = latestRatio(job.logs, 'Rendered');
+  return rendered === null ? 4 : clampPercent(8 + rendered * 86);
+};
+
 export const runnerJobProgressPercent = (job: RunnerJob | null) => {
   if (!job) return 0;
   if (job.status === 'done') return 100;
@@ -86,18 +125,9 @@ export const runnerJobProgressPercent = (job: RunnerJob | null) => {
     if (rendered !== null) return clampPercent(8 + rendered * 54);
   }
   if (job.commandId === 'project-scene-stills') {
-    const rendered = latestRatio(job.logs, 'Rendered');
-    if (rendered !== null) return clampPercent(8 + rendered * 86);
+    return sceneStillsProgressPercent(job);
   }
   return clampPercent(((completedSteps + (job.status === 'running' ? 0.22 : 0)) / Math.max(job.steps.length, 1)) * 100);
-};
-
-export const latestRunnerLogLines = (job: RunnerJob | null, limit = 10) => {
-  if (!job) return [];
-  return job.logs
-    .map(cleanLogLine)
-    .filter(Boolean)
-    .slice(-limit);
 };
 
 const clockTime = (value: string | null | undefined) => {
@@ -124,12 +154,32 @@ const latestSyncTime = (job: RunnerJob) => {
 
 const stepLabel = (id: string, fallback: string) => stepLabels[id] || fallback;
 
-const RunProgressTrace: React.FC<{job: RunnerJob; title: string}> = ({job, title}) => {
+const failedStepFor = (job: RunnerJob) => job.steps.find((step) => step.status === 'failed') || null;
+
+export const runnerStepErrorCopy = (step: RunnerJob['steps'][number]) => {
+  if (!step.error) return '';
+  const label = stepLabel(step.id, step.label);
+  if (/^Step\s+[\w-]+\s+failed$/i.test(step.error)) return `${label}失败`;
+  return step.error;
+};
+
+export const runnerJobHeadline = (job: RunnerJob, fallback: string) => {
+  if (job.status !== 'failed') {
+    const currentStep = job.steps.find((step) => step.id === job.currentStep) || job.steps.find((step) => step.status === 'running') || null;
+    return progressLabel(job, currentStep ? stepLabel(currentStep.id, currentStep.label) : fallback);
+  }
+  const failedStep = failedStepFor(job);
+  if ((job.commandId === 'build-check' || job.commandId === 'build-check-audio') && failedStep?.id === 'check') {
+    const audioReady = job.commandId === 'build-check-audio' || job.steps.some((step) => step.id === 'tts' && step.status === 'done');
+    return audioReady ? '配音已生成，分镜合同检查失败' : '分镜合同检查失败';
+  }
+  return failedStep ? `${stepLabel(failedStep.id, failedStep.label)}失败` : `${fallback}失败`;
+};
+
+export const RunProgressTrace: React.FC<{job: RunnerJob; title: string}> = ({job, title}) => {
   const progress = runnerJobProgressPercent(job);
   const currentStep = job.steps.find((step) => step.id === job.currentStep) || job.steps.find((step) => step.status === 'running') || null;
-  const logs = latestRunnerLogLines(job, 9);
-  const commandLines = job.command.split(' && ').filter(Boolean);
-  const currentLabel = progressLabel(job, currentStep ? stepLabel(currentStep.id, currentStep.label) : title);
+  const currentLabel = runnerJobHeadline(job, currentStep ? stepLabel(currentStep.id, currentStep.label) : title);
 
   return <section className={`runner-trace is-${job.status}`} aria-live="polite" aria-label={`${title}执行进度`}>
     <div className="runner-trace__top">
@@ -143,24 +193,23 @@ const RunProgressTrace: React.FC<{job: RunnerJob; title: string}> = ({job, title
         const isCurrent = step.id === job.currentStep || step.status === 'running';
         return <div className={`runner-trace__step is-${step.status}${isCurrent ? ' is-current' : ''}`} key={step.id}>
           <i />
-          <span><strong>{stepLabel(step.id, step.label)}</strong>{step.error && <small>{step.error}</small>}</span>
+          <span><strong>{stepLabel(step.id, step.label)}</strong>{step.error && <small>{runnerStepErrorCopy(step)}</small>}</span>
           <em>{statusLabels[step.status]}{step.status !== 'pending' ? ` · ${durationCopy(step.startedAt, step.finishedAt, step.status === 'running')}` : ''}</em>
         </div>;
       })}
     </div>
-    <div className="runner-trace__terminal">
-      <header><strong>代码同步</strong><span>{job.id}</span></header>
-      <code className="runner-trace__code">
-        {commandLines.map((line, index) => <span className="runner-trace__line is-command" key={`command-${index}`}>{index > 0 ? '&& ' : '$ '}{line}</span>)}
-        {logs.length ? logs.map((line, index) => <span className="runner-trace__line" key={`${line}-${index}`}>{line}</span>) : <span className="runner-trace__line">等待 Runner 返回第一条输出...</span>}
-      </code>
-    </div>
   </section>;
 };
 
-const stageStatusForMode = (state: ProjectState | null, mode: RenderWorkspaceProps['mode']) => {
+const stageStatusForMode = (
+  state: ProjectState | null,
+  mode: RenderWorkspaceProps['mode'],
+  activeJob: RunnerJob | null,
+  blockingJob: RunnerJob | null,
+) => {
   if (!state) return {className: 'is-stale', label: '读取中'};
-  if (state.activeJob) return {className: 'is-running', label: '进行中'};
+  if (activeJob) return {className: 'is-running', label: '生成中'};
+  if (blockingJob) return {className: 'is-stale', label: '等待任务'};
   if (mode === 'render') {
     if (state.stages.project.status !== 'current') return {className: 'is-stale', label: '会先更新'};
     if (state.stages.render.status === 'current') return {className: 'is-current', label: '已生成'};
@@ -176,28 +225,33 @@ export const RenderWorkspace: React.FC<RenderWorkspaceProps> = ({
   mode,
   state,
   videoUrl,
+  downloadUrl = null,
   runnerOnline,
   activeJob,
+  blockingJob = null,
+  starting = false,
   recentJob = null,
   onRun,
   totalFrames,
   fps,
   sceneCount,
 }) => {
-  const busy = Boolean(activeJob);
-  const canStartRender = runnerOnline && !busy && sceneCount > 0;
+  const rendering = Boolean(activeJob) || starting;
+  const blocked = Boolean(blockingJob);
+  const canStartRender = runnerOnline && !rendering && !blocked && sceneCount > 0;
   const duration = Math.round(totalFrames / fps);
   const deliveryReady = Boolean(state?.deliveryReady);
-  const stageStatus = stageStatusForMode(state, mode);
+  const showRenderAction = mode === 'render' || !deliveryReady;
+  const stageStatus = stageStatusForMode(state, mode, activeJob, blockingJob);
   const traceJob = activeJob?.commandId === 'render-verify' ? activeJob : recentJob?.commandId === 'render-verify' ? recentJob : null;
   return <div className="workspace-panel">
-    <div className="workspace-heading"><div><span className="workspace-kicker">{mode === 'render' ? '04 / 成片渲染' : '05 / 交付状态'}</span><h1>{mode === 'render' ? '渲染' : '交付'}</h1></div><span className={`state-chip ${stageStatus.className}`}>{stageStatus.label}</span></div>
-    <p className="workspace-copy">{statusCopy(state, mode)}</p>
+    <div className="workspace-heading"><div><span className="workspace-kicker">{mode === 'render' ? '05 / 成片渲染' : '06 / 交付状态'}</span><h1>{mode === 'render' ? '渲染' : '交付'}</h1></div><span className={`state-chip ${stageStatus.className}`}>{stageStatus.label}</span></div>
+    <p className="workspace-copy">{statusCopy(state, mode, activeJob, blockingJob)}</p>
     <dl className="production-spec"><div><dt>画幅</dt><dd>1080 x 1920</dd></div><div><dt>帧率</dt><dd>{fps} FPS</dd></div><div><dt>时长</dt><dd>{duration} 秒</dd></div><div><dt>场景</dt><dd>{sceneCount}</dd></div></dl>
     <>
-      {!deliveryReady && <button className="primary-action" type="button" disabled={!canStartRender} onClick={() => onRun('render-verify')}>{busy ? <><i className="action-spinner" aria-hidden="true" />正在生成成片</> : '生成最终视频'}</button>}
+      {showRenderAction && <button className="primary-action" type="button" disabled={!canStartRender} onClick={() => onRun('render-verify')}>{rendering ? <><i className="action-spinner" aria-hidden="true" />正在生成成片</> : blocked ? '等待当前任务完成' : deliveryReady ? '重新生成最终视频' : '生成最终视频'}</button>}
       {traceJob && <RunProgressTrace job={traceJob} title="生成最终视频" />}
-      {deliveryReady && videoUrl && <a className="download-action" href={videoUrl} download>下载 MP4</a>}
+      {deliveryReady && downloadUrl && <a className="download-action" href={downloadUrl}>下载 MP4</a>}
       {mode === 'deliver' && state?.stages.verify.result && <div className="verify-result">已生成，可下载</div>}
     </>
   </div>;

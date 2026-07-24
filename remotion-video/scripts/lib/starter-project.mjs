@@ -16,6 +16,7 @@ import { buildSkillShowcaseProjectFromScript } from "./script-project-generator.
  * @param {'portrait'|'landscape'} orientation - accepted for API compatibility; production is portrait-only
  * @param {string} style - renderer-neutral palette preset
  * @param {string} keywords - 逗号/空格分隔的标签
+ * @param {{voiceSrc?: string, projectRoot?: string, captions?: unknown[] | {captions?: unknown[]}}} options
  * @returns {Record<string, unknown>}
  */
 export const buildStarterProject = (
@@ -25,13 +26,17 @@ export const buildStarterProject = (
   orientation = "portrait",
   style = "cyan-tech",
   keywords = "",
+  options = {},
 ) => {
   const params = renderParams(style);
   const accents = accentForStyle(style);
   const project = buildSkillShowcaseProjectFromScript({
     scriptText: spokenScript,
+    captions: options.captions,
     projectId,
     title,
+    voiceSrc: options.voiceSrc,
+    projectRoot: options.projectRoot,
     maxScenes: 8,
   });
   return {

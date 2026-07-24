@@ -5,6 +5,8 @@ import type {ProjectSceneFamily} from './sceneRegistry';
 import {parseProjectScenePayload} from './sceneRegistry';
 import type {ProjectCaptionRange, ProjectTransition, VideoProject} from './projectSchema';
 import {ProjectValidationError} from './projectSchema';
+import type {VisualPlanEntry} from './visualPlan';
+import {visualPlanEntriesForScene} from './visualPlan';
 
 const GOLDEN_PROJECT_ID = 'workbuddy-six-skills-showcase';
 const REQUIRED_GOLDEN_NARRATION_TERMS = [
@@ -203,6 +205,107 @@ const normalizeSkillShowcaseBeats = (
   };
 });
 
+const payloadFromVisualPlan = (
+  payload: Record<string, unknown>,
+  entries: VisualPlanEntry[],
+  sceneIndex: number,
+  sceneDurationInFrames: number,
+  timing: SceneTimingPlan,
+): Record<string, unknown> => {
+  if (entries.length === 0) {
+    throw new ProjectValidationError(
+      'VISUAL_PLAN_INVALID',
+      `scenes[${sceneIndex}]`,
+      'every scene must have at least one Visual Plan entry',
+    );
+  }
+  entries.forEach((entry, entryIndex) => {
+    const previous = entries[entryIndex - 1];
+    if (entry.sceneIndex !== sceneIndex) {
+      throw new ProjectValidationError(
+        'VISUAL_PLAN_INVALID',
+        `visualPlan.entries[${entry.id}].sceneIndex`,
+        `expected sceneIndex ${sceneIndex}, received ${entry.sceneIndex}`,
+      );
+    }
+    if (timing.captionRange && (
+      entry.captionStartIndex < timing.captionRange.startIndex
+      || entry.captionEndIndex > timing.captionRange.endIndex
+    )) {
+      throw new ProjectValidationError(
+        'VISUAL_PLAN_INVALID',
+        `visualPlan.entries[${entry.id}].captionStartIndex`,
+        'Visual Plan caption range must stay inside its scene',
+      );
+    }
+    if (entry.endFrame > sceneDurationInFrames || (previous && entry.startFrame !== previous.endFrame)) {
+      throw new ProjectValidationError(
+        'VISUAL_PLAN_INVALID',
+        `visualPlan.entries[${entry.id}].startFrame`,
+        'Visual Plan entries must continuously cover the scene timeline',
+      );
+    }
+    if (entry.resolution !== 'matched' || entry.diagnostics.some((diagnostic) => diagnostic.level === 'error')) {
+      throw new ProjectValidationError(
+        'VISUAL_PLAN_UNRESOLVED',
+        `visualPlan.entries[${entry.id}]`,
+        entry.diagnostics.map((diagnostic) => diagnostic.message).join('; ') || 'Visual Plan entry is unresolved',
+      );
+    }
+  });
+  if (entries[0]?.startFrame !== 0 || entries[entries.length - 1]?.endFrame !== sceneDurationInFrames) {
+    throw new ProjectValidationError(
+      'VISUAL_PLAN_INVALID',
+      `scenes[${sceneIndex}]`,
+      'Visual Plan entries must cover the complete scene duration',
+    );
+  }
+
+  const beats = entries.map((entry) => ({
+    ...entry.beat,
+    startFrame: entry.startFrame,
+    endFrame: entry.endFrame,
+    captionStartIndex: entry.captionStartIndex,
+    captionEndIndex: entry.captionEndIndex,
+  }));
+  const existingTrack = payload.heroTrack && typeof payload.heroTrack === 'object'
+    ? payload.heroTrack as {kind?: unknown}
+    : null;
+  const kind = typeof existingTrack?.kind === 'string' ? existingTrack.kind : 'generic-explainer';
+  const states = entries.map((entry) => ({
+    startFrame: entry.startFrame,
+    endFrame: entry.endFrame,
+    captionStartIndex: entry.captionStartIndex,
+    captionEndIndex: entry.captionEndIndex,
+    label: entry.componentProps.title.slice(0, 32),
+    detail: entry.componentProps.detail.slice(0, 120),
+    evidence: entry.componentProps.evidence.slice(0, 5),
+    entityTarget: entry.componentId,
+    cinematicPreset: entry.beat.shotPreset,
+    lens: entry.lens,
+    shot: entry.shot,
+    componentId: entry.componentId,
+    componentProps: entry.componentProps,
+    intent: entry.intent,
+    visualPlanEntryId: entry.id,
+    resolution: entry.resolution,
+    diagnostics: entry.diagnostics,
+  }));
+  return {
+    ...payload,
+    captionStartIndex: timing.captionRange?.startIndex ?? entries[0].captionStartIndex,
+    captionEndIndex: timing.captionRange?.endIndex ?? entries[entries.length - 1]?.captionEndIndex,
+    beats,
+    heroTrack: {
+      kind,
+      captionStartIndex: entries[0].captionStartIndex,
+      captionEndIndex: entries[entries.length - 1]?.captionEndIndex ?? entries[0].captionEndIndex,
+      states,
+    },
+    visualPlanEntries: entries,
+  };
+};
+
 export type CompiledProjectScene = {
   id: string;
   family: ProjectSceneFamily;
@@ -301,7 +404,11 @@ export const compileProject = (project: VideoProject): CompiledProject => {
     const sceneDurationInFrames = timing.durationInFrames;
     let payload = parsed.payload;
     if (parsed.family === 'skill-showcase') {
-      const beats = Array.isArray(parsed.payload.beats) ? parsed.payload.beats : [];
+      const planEntries = visualPlanEntriesForScene(project.visualPlan, scene.id);
+      const visualPlanPayload = project.visualPlan
+        ? payloadFromVisualPlan(parsed.payload, planEntries, index, sceneDurationInFrames, timing)
+        : parsed.payload;
+      const beats = Array.isArray(visualPlanPayload.beats) ? visualPlanPayload.beats : [];
       if (beats.length === 0) {
         throw new ProjectValidationError(
           'VISUAL_CONTRACT_INVALID',
@@ -310,7 +417,7 @@ export const compileProject = (project: VideoProject): CompiledProject => {
         );
       }
       if (!isGoldenNarration) {
-        const sourceText = typeof parsed.payload.sourceText === 'string' ? parsed.payload.sourceText : '';
+        const sourceText = typeof visualPlanPayload.sourceText === 'string' ? visualPlanPayload.sourceText : '';
         if (compactMeaningText(sourceText).length < 4) {
           throw new ProjectValidationError(
             'VISUAL_CONTRACT_INVALID',
@@ -334,9 +441,9 @@ export const compileProject = (project: VideoProject): CompiledProject => {
         orderedCaptions,
       );
       payload = {
-        ...parsed.payload,
-        captionStartIndex: timing.captionRange?.startIndex ?? parsed.payload.captionStartIndex,
-        captionEndIndex: timing.captionRange?.endIndex ?? parsed.payload.captionEndIndex,
+        ...visualPlanPayload,
+        captionStartIndex: timing.captionRange?.startIndex ?? visualPlanPayload.captionStartIndex,
+        captionEndIndex: timing.captionRange?.endIndex ?? visualPlanPayload.captionEndIndex,
         beats: normalizedBeats,
       };
       normalizedBeats.forEach((beat, beatIndex) => {

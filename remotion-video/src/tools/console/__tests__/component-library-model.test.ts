@@ -1,5 +1,11 @@
 import {describe, expect, it} from 'vitest';
-import {componentPreviewLabel, dedupeComponentLibrary, type ComponentLibraryItem} from '../component-library-model';
+import {
+  componentPreviewLabel,
+  dedupeComponentLibrary,
+  isComponentPlayable,
+  LOCAL_SCENE_COMPONENTS,
+  type ComponentLibraryItem,
+} from '../component-library-model';
 
 const component = (overrides: Partial<ComponentLibraryItem>): ComponentLibraryItem => ({
   id: 'component-1',
@@ -9,32 +15,48 @@ const component = (overrides: Partial<ComponentLibraryItem>): ComponentLibraryIt
   description: '展示判断标准和下一步动作。',
   category: '推荐',
   orientation: 'portrait',
-  size: '1080×1920',
+  size: '1080x1920',
   duration: null,
   tags: ['判断', '标准'],
   formats: ['remotion'],
   previewUrl: null,
-  previewKind: 'mock',
+  previewKind: 'remotion',
   status: 'ready',
-  renderer: {componentId: 'hero-title', variant: 'generic', visualMode: 'hero', heroStyle: 'hero-track-v2'},
+  productionReady: true,
+  compatibleIntents: ['concept-explanation'],
+  compatibleShotKinds: ['concept-explainer'],
+  requiredData: ['shot.evidence'],
+  motionCapability: ['type-reveal'],
+  styleCapability: ['editorial-type'],
+  renderer: {componentId: 'concept-explainer', rendererId: 'concept-explainer'},
   schema: [],
   ...overrides,
 });
 
 describe('component library model', () => {
-  it('uses explicit preview labels instead of implying failed playback', () => {
-    expect(componentPreviewLabel(component({previewUrl: '/preview.mp4', previewKind: 'video'}))).toBe('视频样片');
-    expect(componentPreviewLabel(component({source: 'project', previewUrl: null}))).toBe('结构预览');
-    expect(componentPreviewLabel(component({source: 'hyperframes', previewUrl: null}))).toBe('结构草图');
+  it('labels actual renderers and preview-only candidates explicitly', () => {
+    expect(componentPreviewLabel(component({}))).toBe('生产渲染器');
+    expect(componentPreviewLabel(component({source: 'hyperframes', productionReady: false, renderer: null, previewUrl: '/preview.mp4', previewKind: 'video'}))).toBe('候选样片');
+    expect(componentPreviewLabel(component({source: 'hyperframes', productionReady: false, renderer: null, previewUrl: null, previewKind: 'mock'}))).toBe('候选素材');
   });
 
-  it('keeps the best playable representative when duplicate labels arrive', () => {
-    const result = dedupeComponentLibrary([
-      component({id: 'hf:plain', source: 'hyperframes', orientation: 'landscape', label: 'Remotion Parallax Layer', previewUrl: null, tags: []}),
-      component({id: 'hf:video', source: 'hyperframes', orientation: 'landscape', label: 'Parallax Layer', previewUrl: '/parallax.mp4', previewKind: 'video', tags: ['motion']}),
-    ]);
+  it('never treats a preview video as a production renderer', () => {
+    expect(isComponentPlayable(component({source: 'hyperframes', productionReady: false, renderer: null, previewUrl: '/preview.mp4'}))).toBe(false);
+    expect(isComponentPlayable(component({}))).toBe(true);
+  });
 
+  it('keeps the production renderer when duplicate candidate labels arrive', () => {
+    const result = dedupeComponentLibrary([
+      component({id: 'hf:video', source: 'hyperframes', productionReady: false, renderer: null, label: 'Concept Explainer', previewUrl: '/parallax.mp4', previewKind: 'video'}),
+      component({id: 'concept-explainer', label: 'Concept Explainer'}),
+    ]);
     expect(result).toHaveLength(1);
-    expect(result[0]?.id).toBe('hf:video');
+    expect(result[0]?.id).toBe('concept-explainer');
+  });
+
+  it('derives every local library item from a production descriptor', () => {
+    expect(LOCAL_SCENE_COMPONENTS).toHaveLength(12);
+    expect(LOCAL_SCENE_COMPONENTS.every((item) => item.productionReady && item.renderer && item.previewKind === 'remotion')).toBe(true);
+    expect(LOCAL_SCENE_COMPONENTS.every((item) => item.source === 'project' && item.renderer?.componentId === item.id)).toBe(true);
   });
 });

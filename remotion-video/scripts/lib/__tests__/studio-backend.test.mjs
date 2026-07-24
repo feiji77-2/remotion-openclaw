@@ -11,6 +11,7 @@ import {
   assertProjectPathContract,
   assertJobCanStart,
   commandStepsFor,
+  canPromoteCheckedProject,
   computeFingerprints,
   computeProjectState,
   diagnosticForFailure,
@@ -65,10 +66,35 @@ describe('studio workflow commands', () => {
       projectJsonPath: 'projects/demo/project.json',
       outputVideoPath: 'out/demo.mp4',
     };
-    expect(commandStepsFor('build-check', project).map((step) => step.id)).toEqual(['build', 'check']);
+    const buildCheckSteps = commandStepsFor('build-check', project);
+    expect(buildCheckSteps.map((step) => step.id)).toEqual(['build', 'tts', 'align-captions', 'rebuild', 'check']);
+    expect(buildCheckSteps[1].command).toEqual([
+      'npm',
+      'run',
+      'tts:project',
+      '--',
+      'projects/demo/project.json',
+      '--asset-pack',
+      'projects/demo/asset-pack.json',
+    ]);
+    expect(buildCheckSteps[2].command).toEqual([
+      'npm',
+      'run',
+      'audio:align-captions',
+      '--',
+      '--project',
+      'projects/demo/project.json',
+      '--asset-pack',
+      'projects/demo/asset-pack.json',
+      '--captions-out',
+      'projects/demo/captions.json',
+      '--asr-out',
+      'projects/demo/asr.json',
+    ]);
     expect(commandStepsFor('render-verify', project).map((step) => step.id)).toEqual(['render', 'verify']);
+    expect(commandStepsFor('build-check-audio', project).map((step) => step.id)).toEqual(['build', 'align-captions', 'rebuild', 'check']);
     expect(commandStepsFor('project-scene-stills', project).map((step) => step.id)).toEqual(['scene-stills']);
-    expect(commandStepsFor('build-check', project).every((step) => Array.isArray(step.command))).toBe(true);
+    expect(buildCheckSteps.every((step) => Array.isArray(step.command))).toBe(true);
   });
 
   it('rejects commands outside the backend whitelist', () => {
@@ -253,9 +279,36 @@ describe('video library records', () => {
       failureMessage: null,
     }]);
   });
+
+  it('associates standalone verification with the latest output and replaces overwritten records', async () => {
+    const {root, project} = await createTemporaryProject();
+    const file = path.join(root, 'runtime', 'studio', 'video-library.json');
+    await fs.writeFile(path.join(root, 'out', 'demo.mp4'), 'first-video');
+    await recordRenderedVideo({file, projectRoot: root, project, sourceJobId: 'render-1', createdAt: '2026-07-21T10:00:00.000Z'});
+    await fs.writeFile(path.join(root, 'out', 'demo.mp4'), 'second-video');
+    await recordRenderedVideo({file, projectRoot: root, project, sourceJobId: 'render-2', createdAt: '2026-07-21T11:00:00.000Z'});
+
+    const verified = await markVideoVerification({
+      file,
+      sourceJobId: 'verify-1',
+      projectId: project.id,
+      videoPath: project.outputVideoPath,
+      ok: true,
+    });
+
+    expect(verified).toMatchObject({sourceJobId: 'render-2', status: 'downloadable', downloadAllowed: true});
+    await expect(loadVideoLibraryRecords(file)).resolves.toHaveLength(1);
+  });
 });
 
 describe('project freshness', () => {
+  it('promotes a checked manual project edit only when production inputs and renderer are unchanged', () => {
+    const previous = {contentHash: 'content', assetHash: 'asset', projectHash: 'old-project', rendererHash: 'renderer'};
+    expect(canPromoteCheckedProject(previous, {...previous, projectHash: 'edited-project'})).toBe(true);
+    expect(canPromoteCheckedProject(previous, {...previous, contentHash: 'changed'})).toBe(false);
+    expect(canPromoteCheckedProject(null, previous)).toBe(false);
+  });
+
   it('only reports delivery ready for current checked and verified artifacts', async () => {
     const {root, project} = await createTemporaryProject();
     await fs.writeFile(path.join(root, 'out', 'demo-frame-30.png'), 'png');

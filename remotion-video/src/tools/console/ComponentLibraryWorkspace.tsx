@@ -1,5 +1,4 @@
 import React, {useEffect, useMemo, useState} from 'react';
-import type {VideoProject} from '../../project/projectSchema';
 import {
   COMPONENT_CATEGORIES,
   COMPONENT_ORIENTATIONS,
@@ -13,19 +12,13 @@ import {
   type ComponentOrientation,
 } from './component-library-model';
 import {ComponentMockPreview} from './ComponentPreviewCanvas';
-import {sceneTitle} from './scene-labels';
 
 interface ComponentLibraryWorkspaceProps {
   components: ComponentLibraryItem[];
   loading: boolean;
   warning: string | null;
   selectedId: string | null;
-  selectedScene: number;
-  project: VideoProject;
-  writable: boolean;
-  saving: boolean;
   onSelect: (id: string) => void;
-  onApply: (component: ComponentLibraryItem) => void | Promise<void>;
 }
 
 const sourceLabel = (component: ComponentLibraryItem) => component.source === 'project' ? '内置组件' : 'HyperFrames';
@@ -54,12 +47,7 @@ export const ComponentLibraryWorkspace: React.FC<ComponentLibraryWorkspaceProps>
   loading,
   warning,
   selectedId,
-  selectedScene,
-  project,
-  writable,
-  saving,
   onSelect,
-  onApply,
 }) => {
   const dedupedComponents = useMemo(() => dedupeComponentLibrary(components), [components]);
   const [orientation, setOrientation] = useState<ComponentOrientation>('portrait');
@@ -76,7 +64,6 @@ export const ComponentLibraryWorkspace: React.FC<ComponentLibraryWorkspaceProps>
   }), [scopedComponents]);
   const allCount = dedupedComponents.length;
   const playableCount = dedupedComponents.filter(isComponentPlayable).length;
-  const selectedSceneTitle = project.scenes[selectedScene] ? sceneTitle(project.scenes[selectedScene]) : '当前分镜';
   const visible = scopedComponents
     .filter((component) => component.orientation === orientation)
     .filter((component) => category === '推荐' ? inferRecommendedComponentIds(orientation).includes(component.id) : component.category === category)
@@ -111,8 +98,8 @@ export const ComponentLibraryWorkspace: React.FC<ComponentLibraryWorkspaceProps>
         <strong>{selected ? selected.label : '从下方列表选择一个组件'}</strong>
         <span>{selected ? `${selected.size} · ${componentPreviewLabel(selected)}` : '中间预览区会随选择直接更新'}</span>
       </div>
-      <button className="primary-action component-applybar__action" type="button" disabled={!selected || !writable || saving || project.scenes.length === 0} onClick={() => selected && void onApply(selected)}>
-        {saving ? '正在应用' : `应用到 ${String(selectedScene + 1).padStart(2, '0')} · ${selectedSceneTitle}`}
+      <button className="primary-action component-applybar__action" type="button" disabled>
+        {selected?.productionReady ? '由字幕语义自动匹配' : '仅供候选预览'}
       </button>
     </section>
 
@@ -153,7 +140,7 @@ export const ComponentLibraryWorkspace: React.FC<ComponentLibraryWorkspaceProps>
             <em>{componentPreviewLabel(component)} · {component.size}</em>
           </span>
         </button>)}
-        {!visible.length && <div className="preview-empty-state">{scope === 'playable' ? '这个分类暂时没有可用组件。切到全量可以查看结构草图模板。' : '没有匹配的组件。'}</div>}
+        {!visible.length && <div className="preview-empty-state">{scope === 'playable' ? '这个分类暂时没有可用组件。切到全量可以查看候选预览。' : '没有匹配的组件。'}</div>}
       </div>
     </section>
 

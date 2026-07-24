@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {VisualPlanSchema} from './visualPlan';
 
 export const PROJECT_SCHEMA_VERSION = 1 as const;
 
@@ -67,6 +68,7 @@ export const VideoProjectSchema = z.object({
     transition: z.union([ProjectTransitionSchema, z.literal(false)]).default(false),
   })).min(1),
   captions: z.array(ProjectCaptionSchema).default([]),
+  visualPlan: VisualPlanSchema.optional(),
   audio: z.object({
     voiceAssetId: z.string().min(1).optional(),
     musicAssetId: z.string().min(1).optional(),
@@ -83,6 +85,22 @@ export const VideoProjectSchema = z.object({
       });
     }
     seen.add(scene.id);
+  });
+  project.visualPlan?.entries.forEach((entry, index) => {
+    if (!seen.has(entry.sceneId)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `visual plan references unknown scene id: ${entry.sceneId}`,
+        path: ['visualPlan', 'entries', index, 'sceneId'],
+      });
+    }
+    if (!project.captions[entry.captionStartIndex] || !project.captions[entry.captionEndIndex]) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'visual plan caption range points outside captions',
+        path: ['visualPlan', 'entries', index, 'captionStartIndex'],
+      });
+    }
   });
 });
 

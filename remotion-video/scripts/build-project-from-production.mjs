@@ -2,8 +2,11 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { buildStarterProject } from "./lib/starter-project.mjs";
 import { styleForPalette } from "./lib/production-style-contract.mjs";
+
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const input = process.argv[2];
 if (!input) {
@@ -18,6 +21,7 @@ const valueFor = (flag, fallback = null) => {
   const index = args.indexOf(flag);
   return index >= 0 ? args[index + 1] : fallback;
 };
+const hasFlag = (flag) => args.includes(flag);
 
 const projectDir = path.resolve(process.cwd(), input);
 const readJson = async (file) =>
@@ -28,6 +32,22 @@ const [brief, script, assetPack] = await Promise.all([
   readJson("asset-pack.json"),
 ]);
 
+const readCaptions = async () => {
+  if (hasFlag("--ignore-captions")) return null;
+  const captionsFile = valueFor("--captions");
+  if (!captionsFile) return null;
+  const absolute = path.resolve(projectDir, captionsFile);
+  try {
+    return JSON.parse(await fs.readFile(absolute, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw new Error(`[CAPTIONS_MISSING] ${path.relative(projectDir, absolute)}`);
+    }
+    throw error;
+  }
+};
+const captions = await readCaptions();
+
 const projectId = String(brief.productionId ?? script.productionId ?? "project");
 const title = String(script.title ?? brief.title ?? projectId);
 const spokenScript = String(script.spokenScript ?? "").trim();
@@ -37,14 +57,6 @@ if (spokenScript.length < 20) {
 
 const style = brief.visualStyle?.presetId
   ?? styleForPalette(brief.visualStyle?.palette);
-const project = buildStarterProject(
-  projectId,
-  title,
-  spokenScript,
-  "portrait",
-  style,
-  script.keywords ?? "",
-);
 
 const assets = {};
 for (const asset of Array.isArray(assetPack.assets) ? assetPack.assets : []) {
@@ -55,8 +67,23 @@ for (const asset of Array.isArray(assetPack.assets) ? assetPack.assets : []) {
     required: Boolean(asset.required),
   };
 }
-project.assets = assets;
 const voiceAsset = Object.entries(assets).find(([, asset]) => asset.kind === "audio");
+
+const project = buildStarterProject(
+  projectId,
+  title,
+  spokenScript,
+  "portrait",
+  style,
+  script.keywords ?? "",
+  {
+    captions,
+    voiceSrc: voiceAsset?.[1]?.src,
+    projectRoot: PROJECT_ROOT,
+  },
+);
+
+project.assets = assets;
 project.audio = voiceAsset ? { voiceAssetId: voiceAsset[0] } : {};
 
 const output = path.resolve(projectDir, valueFor("--out", "project.json"));

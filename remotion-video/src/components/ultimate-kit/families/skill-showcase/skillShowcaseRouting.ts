@@ -118,6 +118,8 @@ const SHOT_META: Record<HeroShotKind, {
   "asset-library": {environment: "Asset Library", target: "library grid / selected item", actionLabel: "素材库", evidenceType: "素材条目"},
   "system-map": {environment: "Architecture Workspace", target: "module graph / relation map", actionLabel: "系统图", evidenceType: "关系图"},
   "before-after": {environment: "Split Compare", target: "before / after split", actionLabel: "前后对照", evidenceType: "截图差异"},
+  "metric-highlight": {environment: "Metric Stage", target: "value / unit / context", actionLabel: "指标强调", evidenceType: "明确数值"},
+  "concept-explainer": {environment: "Editorial Stage", target: "claim / explanation / evidence", actionLabel: "概念解释", evidenceType: "语义证据"},
 };
 
 const shotKindForBeat = (beat: SkillShowcaseBeat): HeroShotKind => {

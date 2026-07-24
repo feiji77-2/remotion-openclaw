@@ -1,56 +1,43 @@
 # 文档总入口
 
-这是仓库唯一的详细文档入口。根 [README.md](../README.md) 说明使用方式，根 [ARCHITECTURE.md](../ARCHITECTURE.md) 说明真实架构，本目录只保留当前代码仍然支持的项目逻辑。
+本目录只保存当前代码仍支持的说明。公开 API、工作流、技术栈和模块边界以根 [CONTRACT.md](../CONTRACT.md) 为准；历史清理记录不能覆盖当前契约。
 
-已删除的 `.agentdesk/`、`kb/`、`remotion-video/docs/` 是历史并行文档系统，不再作为当前真源。需要追溯本次清理，见 [archive/CLEANUP-LOG.md](archive/CLEANUP-LOG.md)。
+## 从哪里开始
 
-## 当前权威文档
-
-| 文档 | 内容 |
+| 需求 | 文档 |
 |---|---|
-| [介绍](INTRO.zh-CN.md) | 口播、caption、beat、lens、shot、Hero、字幕、QA 的基本关系 |
-| [生产守则与禁止清单](PRODUCTION-GUARDRAILS.zh-CN.md) | 当前唯一禁止清单、扩展准入、记忆库冲突处理 |
-| [清理记录](archive/CLEANUP-LOG.md) | 本次删除、合并和禁止事项记录 |
+| 新开 Codex/Coding Agent 窗口 | [Agent 启动规则](../AGENTS.md) |
+| 给 Agent 下发具体开发任务 | [开发 Agent 提示词](../VIDEO_FACTORY_AGENT_PROMPT.md) |
+| 修改 API、工作流、栈或所有权边界 | [项目契约](../CONTRACT.md) |
+| 安装、运行 Studio、生成视频 | [项目 README](../README.md) |
+| 定位模块、数据流、扩展点 | [实现架构](../ARCHITECTURE.md) |
+| 理解 caption、beat、lens、shot | [领域概念](INTRO.zh-CN.md) |
+| 修改生成或视觉质量规则 | [生产守则](PRODUCTION-GUARDRAILS.zh-CN.md) |
+| 准备代码提交与选择验证命令 | [贡献指南](../CONTRIBUTING.md) |
+| 处理本地素材、路径和敏感数据 | [安全策略](../SECURITY.md) |
+| 查询历史文档清理 | [清理记录](archive/CLEANUP-LOG.md) |
 
-## 当前事实源
-
-```text
-控制台 / project:from-script
-  -> scripts/lib/script-project-generator.mjs
-  -> skill-showcase Project JSON
-  -> VideoProjectSchema
-  -> compileProject
-  -> UltimateVideoV2
-  -> sceneRegistry.tsx
-  -> SkillShowcase
-  -> cinematic / hero-track-v2
-  -> Still / MP4 / QA / Verify
-```
-
-## 当前口播驱动合同
+## 权威顺序
 
 ```text
-captionIndex
-  -> beat
-  -> lens
-  -> shot
-  -> HeroTrackV2 / TechnicalShotHero
+用户当前任务
+  > CONTRACT.md
+  > 可执行测试和当前实现（仅补充契约未定义的细节）
+  > README / ARCHITECTURE / docs
+  > 外部记忆与历史材料
 ```
 
-- 顶部主视觉区展示实操证据。
-- 中下方语义节拍区强调当前结论。
-- 底部字幕区展示完整口播。
+## 内容归属
 
-`11 Cinematic + 9 Hero Track` 是当前已验收主视觉 catalog，不是未来扩展上限。10 种 `HeroTrackState.shot.kind` 是 `hero-track-v2` 内部导演镜头语法，不是新增组件库。
+| 内容 | 唯一归属 |
+|---|---|
+| Agent 启动、工作区保护 | `AGENTS.md` |
+| HTTP DTO、七步门禁、锁定技术栈 | `CONTRACT.md` |
+| 安装和日常命令 | `README.md` |
+| 模块关系和扩展接线 | `ARCHITECTURE.md` |
+| 视频领域术语 | `docs/INTRO.zh-CN.md` |
+| 视觉与生成禁止项 | `docs/PRODUCTION-GUARDRAILS.zh-CN.md` |
+| 提交前验证流程 | `CONTRIBUTING.md` |
+| 本地数据和路径安全 | `SECURITY.md` |
 
-## 标准验证
-
-```bash
-npm run typecheck
-npm test
-npm run project:check -- examples/skill-showcase.json
-npm run project:visual-check -- examples/skill-showcase.json
-npm run project:still -- examples/skill-showcase.json --frame 60 --out out/skill-showcase-still.png
-```
-
-自动化成功不代表视觉审核通过。最终仍要直接查看真实 Still、Storyboard 接触表或 MP4。
+同一规则不要复制到多个文件。其他文档需要提及时，应链接到上述唯一归属。

@@ -1,7 +1,9 @@
 import React from 'react';
 import {AbsoluteFill, Easing, interpolate} from 'remotion';
 import type {HeroTrack, HeroLens, HeroShot, HeroTrackState} from './types';
+import {ProductionComponentCatalogSchema, type ProductionComponentId} from '../../../../project/visualPlan';
 import {PORTRAIT_COLOR_THEME} from './portraitColorTheme';
+import componentCatalog from './productionComponentCatalog.json';
 
 const FONT = '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Inter, system-ui, sans-serif';
 const MONO = '"SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace';
@@ -199,9 +201,10 @@ const LineRows: React.FC<{items: string[]; accent: string; p: number; danger?: b
   })}
 </div>;
 
-const TechnicalShotHero: React.FC<{state: HeroTrackState; accent: string; secondary: string; p: number}> = ({state, accent, secondary, p}) => {
+const TechnicalShotHero: React.FC<{state: HeroTrackState; accent: string; secondary: string; p: number; expectedKind?: HeroShot['kind']}> = ({state, accent, secondary, p, expectedKind}) => {
   const shot = state.shot;
   if (!shot) return null;
+  if (expectedKind && shot.kind !== expectedKind) return null;
   const sweep = interpolate(p, [0, 1], [0, 1], {...clamp, easing: ease});
   const metric = shot.metric ?? '100%';
   const body = (() => {
@@ -264,11 +267,601 @@ const TechnicalShotHero: React.FC<{state: HeroTrackState; accent: string; second
         {nodes.map((node, index) => <div key={node} style={{position: 'absolute', left: 34 + index * 92, top: 127, width: 78, height: 78, display: 'grid', placeItems: 'center', borderRadius: 10, border: `1px solid ${index <= Math.floor(sweep * nodes.length) ? accent : 'rgba(255,255,255,.16)'}`, background: index <= Math.floor(sweep * nodes.length) ? `${accent}18` : 'rgba(255,255,255,.045)', color: '#fff', fontFamily: MONO, fontSize: 11, fontWeight: 950}}>{node}</div>)}
       </div>;
     }
+    if (shot.kind === 'metric-highlight') {
+      const context = shot.evidence.filter((item) => item !== metric).slice(0, 2);
+      return <div style={{height: '100%', display: 'grid', gridTemplateRows: '1fr auto', padding: '30px 36px', background: `linear-gradient(135deg, ${accent}22, rgba(255,255,255,.025) 56%)`, overflow: 'hidden'}}>
+        <div style={{alignSelf: 'center'}}>
+          <div style={{fontFamily: MONO, color: secondary, fontSize: 13, fontWeight: 900}}>CURRENT CAPTION / METRIC</div>
+          <div style={{marginTop: 22, color: '#fff', fontSize: textFit(metric, 126, 82), lineHeight: .82, fontWeight: 950, transform: `translateY(${interpolate(sweep, [0, 1], [38, 0], clamp)}px) scale(${interpolate(sweep, [0, 1], [.72, 1], clamp)})`, transformOrigin: 'left bottom'}}>{metric}</div>
+          <div style={{width: `${interpolate(sweep, [0, 1], [8, 100], clamp)}%`, height: 8, marginTop: 30, background: `linear-gradient(90deg, ${accent}, ${secondary}, transparent)`}} />
+        </div>
+        <div style={{display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 26, paddingBottom: 18}}>
+          <div style={{maxWidth: 420, color: 'rgba(255,255,255,.86)', fontSize: 26, lineHeight: 1.18, fontWeight: 900}}>{compact(state.detail, 54)}</div>
+          <div style={{display: 'grid', gap: 8, textAlign: 'right', fontFamily: MONO, color: 'rgba(255,255,255,.56)', fontSize: 13}}>{context.map((item) => <span key={item}>{compact(item, 24)}</span>)}</div>
+        </div>
+      </div>;
+    }
+    if (shot.kind === 'concept-explainer') {
+      return <div style={{height: '100%', padding: '46px 48px 38px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: `linear-gradient(145deg, rgba(255,255,255,.035), ${accent}12)`}}>
+        <div>
+          <div style={{fontFamily: MONO, color: accent, fontSize: 13, fontWeight: 950}}>SEMANTIC CLAIM</div>
+          <div style={{marginTop: 28, maxWidth: 570, color: '#fff', fontSize: textFit(state.label, 70, 46), lineHeight: .96, fontWeight: 950, opacity: sweep, transform: `translateY(${interpolate(sweep, [0, 1], [32, 0], clamp)}px)`}}>{state.label}</div>
+          <div style={{marginTop: 32, maxWidth: 590, color: 'rgba(255,255,255,.72)', fontSize: 25, lineHeight: 1.28, fontWeight: 760}}>{compact(state.detail, 82)}</div>
+        </div>
+        <div style={{display: 'flex', alignItems: 'flex-end', gap: 18}}>{shot.evidence.slice(0, 3).map((item, index) => <div key={`${item}-${index}`} style={{flex: index === 0 ? 1.25 : 1, minHeight: 92 + index * 18, padding: '18px 16px', display: 'flex', alignItems: 'flex-end', background: index === 0 ? accent : index === 1 ? secondary : 'rgba(255,255,255,.09)', color: index < 2 ? '#081015' : '#fff', fontSize: 18, lineHeight: 1.1, fontWeight: 950, opacity: interpolate(sweep, [index * .12, .42 + index * .12], [0, 1], clamp), transform: `translateY(${interpolate(sweep, [0, 1], [32 + index * 8, 0], clamp)}px)`}}>{compact(item, 22)}</div>)}</div>
+      </div>;
+    }
+    if (shot.kind !== 'before-after') return null;
     return <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, height: '100%'}}>
       {[['BEFORE', shot.before ?? shot.evidence[0] ?? '旧状态', '#ff6b88'], ['AFTER', shot.after ?? shot.evidence[1] ?? '新状态', accent]].map(([label, text, color], index) => <div key={label} style={{position: 'relative', padding: 22, border: `1px solid ${color}88`, background: `${color}14`, overflow: 'hidden'}}><div style={{fontFamily: MONO, color, fontSize: 12, fontWeight: 950}}>{label}</div><div style={{marginTop: 48, color: '#fff', fontSize: 27, lineHeight: 1.12, fontWeight: 950}}>{compact(text, 36)}</div><div style={{position: 'absolute', left: 0, top: 0, bottom: 0, width: `${index === 0 ? interpolate(sweep, [0, 1], [100, 22], clamp) : interpolate(sweep, [0, 1], [0, 100], clamp)}%`, background: index === 0 ? 'rgba(0,0,0,.26)' : `${accent}10`, pointerEvents: 'none'}} /></div>)}
     </div>;
   })();
   return <TrackShell label={state.label} detail={state.detail} accent={accent} p={p}><ShotFrame shot={shot} lens={state.lens} accent={accent} secondary={secondary} p={p}>{body}</ShotFrame></TrackShell>;
+};
+
+const productionCatalog = ProductionComponentCatalogSchema.parse(componentCatalog);
+type CatalogDescriptor = (typeof productionCatalog.components)[number];
+export type ProductionComponentRendererProps = {state: HeroTrackState; accent: string; secondary: string; p: number};
+export type ProductionComponentDescriptor = CatalogDescriptor & {
+  renderer: React.FC<ProductionComponentRendererProps>;
+};
+
+const ProductionStage: React.FC<{background: string; children: React.ReactNode}> = ({background, children}) => (
+  <AbsoluteFill style={{fontFamily: FONT, overflow: 'hidden', color: '#fff', background}}>
+    {children}
+  </AbsoluteFill>
+);
+
+const shotMatches = (props: ProductionComponentRendererProps, expectedKind: HeroShot['kind']) =>
+  props.state.shot?.kind === expectedKind;
+
+const productionTitle = (state: HeroTrackState, max = 32) =>
+  compact(state.componentProps?.title ?? state.label, max);
+
+const productionDetail = (state: HeroTrackState, max = 92) =>
+  compact(state.componentProps?.detail ?? state.detail, max);
+
+const productionEvidence = (state: HeroTrackState, max = 5) => {
+  const items = state.componentProps?.evidence ?? state.shot?.evidence ?? state.evidence ?? [];
+  const evidence = items.filter(Boolean);
+  return (evidence.length ? evidence : [state.label]).slice(0, max);
+};
+
+const seededVariant = (value: string, count: number) => {
+  const seed = Array.from(value).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return seed % count;
+};
+
+const revealAt = (p: number, index: number, start = 0.08, span = 0.34) =>
+  interpolate(p, [start + index * 0.08, start + span + index * 0.08], [0, 1], {...clamp, easing: ease});
+
+const BrowserDemoRenderer: React.FC<ProductionComponentRendererProps> = (props) => {
+  if (!shotMatches(props, 'browser-demo')) return <TechnicalShotHero {...props} expectedKind="browser-demo" />;
+  const {state, accent, secondary, p} = props;
+  const title = productionTitle(state, 26);
+  const detail = productionDetail(state, 82);
+  const evidence = productionEvidence(state, 4);
+  const focus = interpolate(p, [0.08, 0.78], [0, 1], {...clamp, easing: ease});
+  const cursorX = interpolate(focus, [0, 1], [218, 708], clamp);
+  const cursorY = interpolate(focus, [0, 1], [592, 425], clamp);
+  return <ProductionStage background="linear-gradient(160deg, #e8f4ef 0%, #f9fbff 46%, #d8ecff 100%)">
+    <div style={{position: 'absolute', left: 56, right: 56, top: 44, bottom: 54, borderRadius: 26, overflow: 'hidden', background: '#fbfcff', boxShadow: '0 34px 80px rgba(20,38,66,.23)'}}>
+      <div style={{height: 70, display: 'flex', alignItems: 'center', gap: 14, padding: '0 22px', borderBottom: '1px solid #d8e0ea', background: '#eef3f8'}}>
+        {['#ff6b88', '#ffd166', '#63f0aa'].map((color) => <span key={color} style={{width: 16, height: 16, borderRadius: 99, background: color}} />)}
+        <div style={{marginLeft: 12, flex: 1, height: 34, borderRadius: 17, display: 'flex', alignItems: 'center', padding: '0 18px', background: '#fff', color: '#667084', fontFamily: MONO, fontSize: 15}}>https://work.body/skills/{title.toLowerCase()}</div>
+        <div style={{width: 38, height: 34, borderRadius: 10, background: accent}} />
+      </div>
+      <div style={{position: 'absolute', left: 0, top: 70, bottom: 0, width: 184, background: '#101826', color: '#dbe7f5', padding: '28px 22px'}}>
+        <div style={{fontFamily: MONO, fontSize: 12, color: '#7f8da3'}}>WORKSPACE</div>
+        {['Skills', 'Pages', 'Render', 'Ship'].map((item, index) => <div key={item} style={{marginTop: 24, padding: '10px 0 10px 12px', borderLeft: index === seededVariant(title, 4) ? `5px solid ${accent}` : '5px solid transparent', color: index === seededVariant(title, 4) ? '#fff' : '#8fa0b7', fontSize: 19, fontWeight: 900}}>{item}</div>)}
+      </div>
+      <div style={{position: 'absolute', left: 184, right: 0, top: 70, bottom: 0, padding: '50px 54px', color: '#111827'}}>
+        <div style={{fontSize: textFit(title, 68, 42), lineHeight: .94, fontWeight: 950, maxWidth: 600}}>{title}</div>
+        <div style={{marginTop: 18, maxWidth: 660, color: '#526070', fontSize: 24, lineHeight: 1.24, fontWeight: 750}}>{detail}</div>
+        <div style={{display: 'grid', gridTemplateColumns: '1.25fr .75fr', gap: 24, marginTop: 42}}>
+          <div style={{height: 250, borderRadius: 22, background: `linear-gradient(145deg, ${accent}24, #ffffff 58%)`, border: `4px solid ${accent}`, position: 'relative', overflow: 'hidden', boxShadow: `0 0 ${36 * focus}px ${accent}55`}}>
+            <div style={{position: 'absolute', left: 28, top: 28, fontSize: 28, fontWeight: 950}}>Live page preview</div>
+            <div style={{position: 'absolute', left: 30, right: 30, bottom: 30, height: 86, borderRadius: 18, background: '#101826', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 26px'}}>
+              <span style={{fontSize: 24, fontWeight: 950}}>{compact(evidence[0], 18)}</span>
+              <span style={{height: 42, borderRadius: 21, padding: '0 22px', display: 'grid', placeItems: 'center', background: accent, color: '#071015', fontSize: 16, fontWeight: 950}}>ACTIVE</span>
+            </div>
+          </div>
+          <div style={{height: 250, borderRadius: 22, background: '#edf2f8', padding: 22}}>
+            <div style={{fontFamily: MONO, color: '#8190a4', fontSize: 12, fontWeight: 950}}>DOM FOCUS</div>
+            {evidence.slice(1).map((item, index) => <div key={`${item}-${index}`} style={{marginTop: 18, height: 42, borderRadius: 12, background: index === 1 ? secondary : '#fff', color: index === 1 ? '#071015' : '#374151', display: 'flex', alignItems: 'center', padding: '0 14px', fontSize: 16, fontWeight: 900, opacity: revealAt(p, index)}}>{compact(item, 18)}</div>)}
+          </div>
+        </div>
+      </div>
+      <div style={{position: 'absolute', left: cursorX, top: cursorY, width: 0, height: 0, borderTop: '24px solid #111827', borderRight: '17px solid transparent', transform: 'rotate(-18deg)', filter: 'drop-shadow(0 8px 10px rgba(17,24,39,.25))'}} />
+      <div style={{position: 'absolute', left: cursorX + 18, top: cursorY + 18, width: 92, height: 34, borderRadius: 17, background: '#111827', color: '#fff', display: 'grid', placeItems: 'center', fontFamily: MONO, fontSize: 12, fontWeight: 950}}>CLICK</div>
+    </div>
+  </ProductionStage>;
+};
+
+const TerminalExecutionRenderer: React.FC<ProductionComponentRendererProps> = (props) => {
+  if (!shotMatches(props, 'terminal-execution')) return <TechnicalShotHero {...props} expectedKind="terminal-execution" />;
+  const {state, accent, secondary, p} = props;
+  const shot = state.shot;
+  const command = shot?.command ?? state.componentProps?.command ?? 'npm run verify';
+  const typedCount = Math.max(1, Math.floor(command.length * interpolate(p, [0.04, 0.44], [0, 1], clamp)));
+  const output = [shot?.log ?? 'visual plan loaded', ...productionEvidence(state, 4), 'renderer completed', 'exit code 0'];
+  return <ProductionStage background="linear-gradient(180deg, #050607 0%, #0c1016 100%)">
+    <div style={{position: 'absolute', left: 64, top: 58, right: 64, height: 704, borderRadius: 22, overflow: 'hidden', background: '#05080c', boxShadow: '0 36px 90px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.08)'}}>
+      <div style={{height: 58, display: 'flex', alignItems: 'center', gap: 10, padding: '0 22px', background: '#151b24', borderBottom: '1px solid rgba(255,255,255,.08)'}}>
+        {['#ff6b88', '#ffd166', '#63f0aa'].map((color) => <span key={color} style={{width: 14, height: 14, borderRadius: 99, background: color}} />)}
+        <span style={{marginLeft: 18, fontFamily: MONO, color: '#93a3b8', fontSize: 13}}>production shell</span>
+      </div>
+      <div style={{padding: '34px 38px', fontFamily: MONO}}>
+        <div style={{color: '#6ee7b7', fontSize: 24, lineHeight: 1.2}}><span style={{color: secondary}}>video@factory</span>:<span style={{color: accent}}>~/project</span>$ {command.slice(0, typedCount)}<span style={{opacity: interpolate(p, [0, .5, 1], [1, .2, 1], clamp)}}>_</span></div>
+        <div style={{marginTop: 42}}>
+          {output.map((item, index) => {
+            const shown = revealAt(p, index, 0.28, 0.28);
+            const isExit = index === output.length - 1;
+            return <div key={`${item}-${index}`} style={{display: 'grid', gridTemplateColumns: '58px minmax(0, 1fr)', alignItems: 'center', minHeight: 48, marginTop: 12, color: isExit ? '#b8ffd7' : '#d7e2f0', fontSize: 22, opacity: shown, transform: `translateX(${interpolate(shown, [0, 1], [-20, 0], clamp)}px)`}}>
+              <span style={{color: isExit ? accent : '#526172'}}>{isExit ? 'OK' : String(index + 1).padStart(2, '0')}</span>
+              <span>{compact(item, 62)}</span>
+            </div>;
+          })}
+        </div>
+      </div>
+      <div style={{position: 'absolute', left: 38, right: 38, bottom: 32, height: 12, borderRadius: 6, background: '#1d2633', overflow: 'hidden'}}><div style={{height: '100%', width: `${interpolate(p, [0.2, .88], [4, 100], clamp)}%`, background: `linear-gradient(90deg, ${secondary}, ${accent})`}} /></div>
+    </div>
+    <div style={{position: 'absolute', left: 74, right: 74, bottom: 62, display: 'flex', justifyContent: 'space-between', color: '#6f7f92', fontFamily: MONO, fontSize: 16}}>
+      <span>stdout / stderr separated</span>
+      <span style={{color: accent}}>process exited successfully</span>
+    </div>
+  </ProductionStage>;
+};
+
+const CodeDiffRenderer: React.FC<ProductionComponentRendererProps> = (props) => {
+  if (!shotMatches(props, 'code-diff')) return <TechnicalShotHero {...props} expectedKind="code-diff" />;
+  const {state, accent, secondary, p} = props;
+  const shot = state.shot;
+  const path = compact(shot?.path ?? state.componentProps?.path ?? 'src/project/visualPlan.ts', 38);
+  const evidence = productionEvidence(state, 4);
+  const rows = [
+    ['-', shot?.before ?? 'renderer: TechnicalShotHero'],
+    ['-', 'shared shell: TrackShell / ShotFrame'],
+    ['+', shot?.after ?? 'renderer: SemanticProductionView'],
+    ['+', evidence[0] ?? 'visual language bound to intent'],
+    ['+', evidence[1] ?? 'motion reflects the operation'],
+  ];
+  return <ProductionStage background="linear-gradient(145deg, #10141d 0%, #151b2a 55%, #0b0d12 100%)">
+    <div style={{position: 'absolute', left: 42, top: 42, bottom: 42, width: 218, borderRight: '1px solid rgba(255,255,255,.08)', color: '#9aa7ba', fontFamily: MONO, paddingTop: 32}}>
+      {['src', 'components', 'ultimate-kit', path, 'visualPlan.ts'].map((item, index) => <div key={`${item}-${index}`} style={{height: 46, display: 'flex', alignItems: 'center', paddingLeft: 16 + Math.min(index, 3) * 15, color: index === 3 ? '#fff' : '#738196', background: index === 3 ? `${accent}18` : 'transparent', borderLeft: index === 3 ? `4px solid ${accent}` : '4px solid transparent', fontSize: 14, fontWeight: index === 3 ? 950 : 700}}>{compact(item, 22)}</div>)}
+    </div>
+    <div style={{position: 'absolute', left: 304, top: 52, right: 56, bottom: 56, overflow: 'hidden'}}>
+      <div style={{fontFamily: MONO, color: '#748196', fontSize: 14}}>EDITOR / DIFF</div>
+      <div style={{marginTop: 20, color: '#fff', fontSize: 34, lineHeight: 1.05, fontWeight: 950}}>{productionTitle(state, 34)}</div>
+      <div style={{marginTop: 24, background: '#0a0e15', borderRadius: 18, overflow: 'hidden', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.08)'}}>
+        <div style={{height: 50, display: 'flex', alignItems: 'center', padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,.08)', color: '#a9b5c6', fontFamily: MONO, fontSize: 14}}>{path}</div>
+        <div style={{padding: '22px 0', fontFamily: MONO}}>
+          {rows.map(([flag, text], index) => {
+            const shown = revealAt(p, index, 0.12, 0.26);
+            const add = flag === '+';
+            return <div key={`${flag}-${text}-${index}`} style={{display: 'grid', gridTemplateColumns: '52px 38px minmax(0, 1fr)', minHeight: 54, alignItems: 'center', background: add ? 'rgba(99,240,170,.08)' : 'rgba(255,107,136,.08)', color: add ? '#caffdf' : '#ffc5cf', opacity: shown, transform: `translateX(${interpolate(shown, [0, 1], [28, 0], clamp)}px)`}}>
+              <span style={{color: '#4c5b6e', textAlign: 'right', paddingRight: 14}}>{102 + index}</span>
+              <span style={{fontSize: 24, color: add ? accent : '#ff6b88'}}>{flag}</span>
+              <span style={{fontSize: 22}}>{compact(text, 58)}</span>
+            </div>;
+          })}
+        </div>
+      </div>
+      <div style={{position: 'absolute', right: 0, bottom: 0, padding: '14px 18px', borderRadius: 17, background: secondary, color: '#071015', fontFamily: MONO, fontSize: 15, fontWeight: 950}}>3 additions / 2 removals</div>
+    </div>
+  </ProductionStage>;
+};
+
+const ConfigCheckRenderer: React.FC<ProductionComponentRendererProps> = (props) => {
+  if (!shotMatches(props, 'config-check')) return <TechnicalShotHero {...props} expectedKind="config-check" />;
+  const {state, accent, secondary, p} = props;
+  const shot = state.shot;
+  const rows = [
+    ['source', shot?.path ?? state.componentProps?.path ?? 'visual-plan.config.json'],
+    ['componentId', productionTitle(state, 26)],
+    ['resolution', state.resolution ?? 'matched'],
+    ['contract', 'caption -> lens -> shot -> renderer'],
+  ];
+  return <ProductionStage background="linear-gradient(155deg, #f7f4ec 0%, #e6eef7 100%)">
+    <div style={{position: 'absolute', left: 74, top: 64, right: 74, bottom: 62, color: '#18202b'}}>
+      <div style={{fontFamily: MONO, color: '#6c7480', fontSize: 15, fontWeight: 950}}>CONFIG CHECK</div>
+      <div style={{marginTop: 18, fontSize: 58, lineHeight: .94, fontWeight: 950, maxWidth: 720}}>{productionTitle(state, 38)}</div>
+      <div style={{position: 'absolute', left: 0, top: 160, bottom: 0, width: 620, borderRadius: 28, background: '#111827', color: '#dbe8f7', padding: '34px 36px', fontFamily: MONO, boxShadow: '0 28px 60px rgba(31,41,55,.22)'}}>
+        <div style={{color: '#718096', fontSize: 13}}>schema.production.json</div>
+        {rows.map(([key, value], index) => {
+          const shown = revealAt(p, index, 0.12, 0.3);
+          return <div key={key} style={{marginTop: 26, display: 'grid', gridTemplateColumns: '165px minmax(0, 1fr)', gap: 16, alignItems: 'baseline', opacity: shown}}>
+            <span style={{color: secondary, fontSize: 17}}>"{key}"</span>
+            <span style={{color: '#fff', fontSize: 21}}>: "{compact(value, 38)}"</span>
+          </div>;
+        })}
+      </div>
+      <div style={{position: 'absolute', right: 0, top: 202, width: 280, display: 'grid', gap: 22}}>
+        {['loaded', 'valid', 'in render'].map((item, index) => {
+          const shown = revealAt(p, index, 0.2, 0.32);
+          return <div key={item} style={{height: 118, borderRadius: 26, background: index === 1 ? accent : '#fff', color: index === 1 ? '#071015' : '#18202b', display: 'grid', gridTemplateColumns: '72px 1fr', alignItems: 'center', padding: '0 22px', opacity: shown, transform: `translateY(${interpolate(shown, [0, 1], [26, 0], clamp)}px)`, boxShadow: '0 18px 38px rgba(62,74,89,.12)'}}>
+            <span style={{width: 48, height: 48, borderRadius: 24, background: index === 1 ? '#071015' : `${accent}24`, color: index === 1 ? accent : '#18202b', display: 'grid', placeItems: 'center', fontFamily: MONO, fontSize: 22, fontWeight: 950}}>OK</span>
+            <span style={{fontSize: 25, fontWeight: 950}}>{item}</span>
+          </div>;
+        })}
+      </div>
+    </div>
+  </ProductionStage>;
+};
+
+const InterfaceAuditRenderer: React.FC<ProductionComponentRendererProps> = (props) => {
+  if (!shotMatches(props, 'interface-audit')) return <TechnicalShotHero {...props} expectedKind="interface-audit" />;
+  const {state, accent, secondary, p} = props;
+  const evidence = productionEvidence(state, 4);
+  const scan = interpolate(p, [0.06, 0.82], [0, 1], clamp);
+  return <ProductionStage background="linear-gradient(180deg, #eef3f8 0%, #d9e5ee 100%)">
+    <div style={{position: 'absolute', left: 70, top: 58, width: 610, height: 724, borderRadius: 34, background: '#fbfcff', color: '#111827', overflow: 'hidden', boxShadow: '0 34px 80px rgba(35,49,70,.22)'}}>
+      <div style={{height: 82, background: '#111827', display: 'flex', alignItems: 'center', padding: '0 34px', color: '#fff', fontSize: 26, fontWeight: 950}}>{productionTitle(state, 28)}</div>
+      <div style={{padding: 34}}>
+        <div style={{height: 88, borderRadius: 24, background: '#e9eef5'}} />
+        <div style={{height: 180, marginTop: 28, borderRadius: 28, background: `linear-gradient(135deg, ${accent}22, #ffffff)`, border: `4px solid ${accent}`, position: 'relative'}}>
+          <div style={{position: 'absolute', left: 34, top: 34, width: 230, height: 26, borderRadius: 13, background: '#111827'}} />
+          <div style={{position: 'absolute', left: 34, bottom: 32, width: 330, height: 18, borderRadius: 9, background: '#c8d2df'}} />
+        </div>
+        <div style={{height: 70, marginTop: 26, borderRadius: 22, background: '#e3e9f1'}} />
+        <div style={{height: 70, marginTop: 18, borderRadius: 22, background: '#e3e9f1'}} />
+      </div>
+      <div style={{position: 'absolute', left: 0, right: 0, top: 110 + scan * 460, height: 5, background: `linear-gradient(90deg, transparent, ${accent}, #fff, ${accent}, transparent)`, boxShadow: `0 0 22px ${accent}`}} />
+      <div style={{position: 'absolute', left: 310, top: 208, width: 260, height: 220, border: `4px solid ${secondary}`, borderRadius: 30, boxShadow: `0 0 ${34 * scan}px ${secondary}66`}} />
+    </div>
+    <div style={{position: 'absolute', right: 64, top: 118, width: 296, color: '#111827'}}>
+      <div style={{fontFamily: MONO, color: '#667184', fontSize: 13, fontWeight: 950}}>AUDIT FINDINGS</div>
+      {evidence.map((item, index) => {
+        const shown = revealAt(p, index, 0.18, 0.3);
+        return <div key={`${item}-${index}`} style={{marginTop: 20, minHeight: 92, borderRadius: 24, background: index === 0 ? '#111827' : '#fff', color: index === 0 ? '#fff' : '#111827', padding: 20, opacity: shown, transform: `translateX(${interpolate(shown, [0, 1], [34, 0], clamp)}px)`}}>
+          <div style={{fontFamily: MONO, color: index === 0 ? accent : secondary, fontSize: 12, fontWeight: 950}}>P{index + 1}</div>
+          <div style={{marginTop: 10, fontSize: 20, lineHeight: 1.08, fontWeight: 950}}>{compact(item, 28)}</div>
+        </div>;
+      })}
+    </div>
+  </ProductionStage>;
+};
+
+const FlowTraceRenderer: React.FC<ProductionComponentRendererProps> = (props) => {
+  if (!shotMatches(props, 'flow-trace')) return <TechnicalShotHero {...props} expectedKind="flow-trace" />;
+  const {state, accent, secondary, p} = props;
+  const evidence = productionEvidence(state, 3);
+  const nodes = [evidence[0] ?? '输入', evidence[1] ?? '处理', evidence[2] ?? '输出'];
+  const progress = interpolate(p, [0.08, 0.88], [0, 1], clamp);
+  return <ProductionStage background="linear-gradient(150deg, #fbf7ee 0%, #f1fbf6 100%)">
+    <div style={{position: 'absolute', left: 76, top: 70, right: 76, color: '#16202a'}}>
+      <div style={{fontSize: 54, lineHeight: .96, fontWeight: 950, maxWidth: 760}}>{productionTitle(state, 44)}</div>
+      <div style={{marginTop: 16, color: '#6b7280', fontSize: 24, lineHeight: 1.2, maxWidth: 780}}>{productionDetail(state, 74)}</div>
+    </div>
+    <svg viewBox="0 0 1080 900" style={{position: 'absolute', inset: 0, width: '100%', height: '100%'}}>
+      <path d="M160 540 C310 360 486 360 540 540 C594 720 770 720 920 540" fill="none" stroke="#cbd5df" strokeWidth="18" strokeLinecap="round" />
+      <path d="M160 540 C310 360 486 360 540 540 C594 720 770 720 920 540" fill="none" stroke={accent} strokeWidth="18" strokeLinecap="round" strokeDasharray={`${progress * 1200} 1200`} />
+      <circle cx={160 + progress * 760} cy={540 + Math.sin(progress * Math.PI * 4) * 90} r="18" fill={secondary} />
+    </svg>
+    {nodes.map((node, index) => {
+      const shown = revealAt(p, index, 0.16, 0.32);
+      const x = [118, 420, 724][index];
+      const y = [492, 320, 492][index];
+      return <div key={`${node}-${index}`} style={{position: 'absolute', left: x, top: y, width: 238, minHeight: 116, color: '#111827', opacity: shown, transform: `translateY(${interpolate(shown, [0, 1], [28, 0], clamp)}px)`}}>
+        <div style={{fontFamily: MONO, color: index === 1 ? accent : '#7b8492', fontSize: 13, fontWeight: 950}}>STEP {String(index + 1).padStart(2, '0')}</div>
+        <div style={{marginTop: 12, fontSize: 31, lineHeight: 1, fontWeight: 950}}>{compact(node, 20)}</div>
+      </div>;
+    })}
+  </ProductionStage>;
+};
+
+const TestReportRenderer: React.FC<ProductionComponentRendererProps> = (props) => {
+  if (!shotMatches(props, 'test-report')) return <TechnicalShotHero {...props} expectedKind="test-report" />;
+  const {state, accent, secondary, p} = props;
+  const shot = state.shot;
+  const metric = shot?.metric ?? state.componentProps?.metric ?? '100%';
+  const evidence = productionEvidence(state, 4);
+  return <ProductionStage background="linear-gradient(145deg, #06110d 0%, #122119 58%, #07100d 100%)">
+    <div style={{position: 'absolute', left: 72, top: 70, color: '#e9fff2'}}>
+      <div style={{fontFamily: MONO, color: accent, fontSize: 16, fontWeight: 950}}>TEST REPORT</div>
+      <div style={{marginTop: 24, fontSize: 142, lineHeight: .82, fontWeight: 950, transform: `scale(${interpolate(p, [0, .7], [.72, 1], clamp)})`, transformOrigin: 'left bottom'}}>{metric}</div>
+      <div style={{marginTop: 34, maxWidth: 650, color: '#b8d6c5', fontSize: 28, lineHeight: 1.18, fontWeight: 850}}>{productionDetail(state, 86)}</div>
+    </div>
+    <div style={{position: 'absolute', right: 70, top: 112, width: 260, height: 260, borderRadius: 130, background: `conic-gradient(${accent} ${interpolate(p, [0.1, 0.82], [20, 360], clamp)}deg, rgba(255,255,255,.08) 0deg)`, display: 'grid', placeItems: 'center'}}>
+      <div style={{width: 180, height: 180, borderRadius: 90, background: '#07100d', display: 'grid', placeItems: 'center', color: '#eafff2', fontFamily: MONO, fontSize: 24, fontWeight: 950}}>0 failed</div>
+    </div>
+    <div style={{position: 'absolute', left: 72, right: 72, bottom: 68, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16}}>
+      {evidence.map((item, index) => {
+        const shown = revealAt(p, index, 0.22, 0.28);
+        return <div key={`${item}-${index}`} style={{height: 112, borderTop: `6px solid ${index === 0 ? secondary : accent}`, background: index === 0 ? `${secondary}18` : 'rgba(255,255,255,.06)', color: '#fff', padding: 18, opacity: shown, transform: `translateY(${interpolate(shown, [0, 1], [30, 0], clamp)}px)`}}>
+          <div style={{fontFamily: MONO, color: '#85a08d', fontSize: 12}}>SUITE {index + 1}</div>
+          <div style={{marginTop: 12, fontSize: 19, lineHeight: 1.08, fontWeight: 950}}>{compact(item, 22)}</div>
+        </div>;
+      })}
+    </div>
+  </ProductionStage>;
+};
+
+const AssetLibraryRenderer: React.FC<ProductionComponentRendererProps> = (props) => {
+  if (!shotMatches(props, 'asset-library')) return <TechnicalShotHero {...props} expectedKind="asset-library" />;
+  const {state, accent, secondary, p} = props;
+  const evidence = productionEvidence(state, 5);
+  const selected = Math.min(5, Math.max(0, seededVariant(productionTitle(state), 6)));
+  const thumbnails = Array.from({length: 6}).map((_, index) => evidence[index % evidence.length] ?? `asset-${index + 1}`);
+  return <ProductionStage background="linear-gradient(180deg, #f4efe6 0%, #e9eef7 100%)">
+    <div style={{position: 'absolute', left: 60, top: 54, right: 60, display: 'flex', justifyContent: 'space-between', alignItems: 'end', color: '#151922'}}>
+      <div>
+        <div style={{fontFamily: MONO, color: '#727b88', fontSize: 14, fontWeight: 950}}>ASSET LIBRARY / AVAILABLE</div>
+        <div style={{marginTop: 16, fontSize: 56, lineHeight: .94, fontWeight: 950}}>{productionTitle(state, 34)}</div>
+      </div>
+      <div style={{width: 250, color: '#55606d', fontSize: 21, lineHeight: 1.15, textAlign: 'right', fontWeight: 800}}>{productionDetail(state, 54)}</div>
+    </div>
+    <div style={{position: 'absolute', left: 60, right: 340, top: 194, bottom: 56, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 18}}>
+      {thumbnails.map((item, index) => {
+        const shown = revealAt(p, index, 0.12, 0.32);
+        const current = index === selected;
+        return <div key={`${item}-${index}`} style={{position: 'relative', borderRadius: 26, overflow: 'hidden', background: '#fff', color: '#111827', opacity: shown, transform: `translateY(${interpolate(shown, [0, 1], [34, 0], clamp)}px)`, boxShadow: current ? `0 0 0 5px ${accent}, 0 24px 46px rgba(17,24,39,.2)` : '0 14px 28px rgba(17,24,39,.1)'}}>
+          <div style={{height: 118, background: index % 3 === 0 ? `linear-gradient(135deg, ${accent}, #ffffff)` : index % 3 === 1 ? `linear-gradient(135deg, ${secondary}, #fff7dd)` : 'linear-gradient(135deg, #111827, #607089)', position: 'relative'}}>
+            {Array.from({length: 4}).map((_, marker) => <div key={marker} style={{position: 'absolute', left: 22 + marker * 42, bottom: 18 + (marker % 2) * 24, width: 42, height: 42, borderRadius: marker % 2 ? 21 : 8, background: 'rgba(255,255,255,.45)'}} />)}
+          </div>
+          <div style={{padding: 18}}>
+            <div style={{fontFamily: MONO, color: current ? accent : '#8a94a3', fontSize: 12, fontWeight: 950}}>{current ? 'SELECTED' : 'READY'} / {String(index + 1).padStart(2, '0')}</div>
+            <div style={{marginTop: 10, fontSize: 22, lineHeight: 1.05, fontWeight: 950}}>{compact(item, 20)}</div>
+          </div>
+          {current ? <div style={{position: 'absolute', right: 16, top: 16, width: 44, height: 44, borderRadius: 22, background: accent, color: '#071015', display: 'grid', placeItems: 'center', fontFamily: MONO, fontSize: 18, fontWeight: 950}}>OK</div> : null}
+        </div>;
+      })}
+    </div>
+    <div style={{position: 'absolute', right: 60, top: 194, bottom: 56, width: 244, color: '#111827'}}>
+      <div style={{height: 250, borderRadius: 30, background: '#111827', color: '#fff', padding: 24}}>
+        <div style={{fontFamily: MONO, color: accent, fontSize: 12, fontWeight: 950}}>SELECTED ASSET</div>
+        <div style={{marginTop: 34, fontSize: 34, lineHeight: .98, fontWeight: 950}}>{compact(thumbnails[selected], 24)}</div>
+        <div style={{position: 'absolute', left: 24, right: 24, bottom: 26, height: 8, borderRadius: 4, background: '#263244'}}><div style={{height: '100%', width: `${interpolate(p, [0.2, 0.86], [12, 100], clamp)}%`, background: secondary}} /></div>
+      </div>
+      <div style={{marginTop: 18, display: 'grid', gap: 14}}>
+        {['source evidence', 'thumbnail ready', 'used by shot'].map((item, index) => <div key={item} style={{height: 72, borderRadius: 20, background: '#fff', display: 'flex', alignItems: 'center', padding: '0 18px', fontSize: 18, fontWeight: 950, opacity: revealAt(p, index, 0.32, 0.26)}}>{item}</div>)}
+      </div>
+    </div>
+  </ProductionStage>;
+};
+
+const SystemMapRenderer: React.FC<ProductionComponentRendererProps> = (props) => {
+  if (!shotMatches(props, 'system-map')) return <TechnicalShotHero {...props} expectedKind="system-map" />;
+  const {state, accent, secondary, p} = props;
+  const evidence = productionEvidence(state, 4);
+  const nodes = [
+    evidence[0] ?? 'Caption',
+    evidence[1] ?? 'Intent',
+    evidence[2] ?? 'Shot',
+    'Renderer',
+    'Visual Plan',
+    'MP4',
+  ];
+  const progress = interpolate(p, [0.06, 0.88], [0, 1], clamp);
+  const positions = [[152, 194], [438, 136], [730, 218], [190, 612], [508, 482], [790, 628]];
+  return <ProductionStage background="linear-gradient(150deg, #0b111b 0%, #102126 48%, #141821 100%)">
+    <div style={{position: 'absolute', left: 70, top: 62, right: 70, display: 'flex', justifyContent: 'space-between', alignItems: 'start'}}>
+      <div>
+        <div style={{fontFamily: MONO, color: accent, fontSize: 14, fontWeight: 950}}>SYSTEM MAP</div>
+        <div style={{marginTop: 18, maxWidth: 610, color: '#fff', fontSize: 55, lineHeight: .94, fontWeight: 950}}>{productionTitle(state, 42)}</div>
+      </div>
+      <div style={{width: 250, color: '#a8b5c7', fontSize: 20, lineHeight: 1.18, textAlign: 'right', fontWeight: 800}}>{productionDetail(state, 58)}</div>
+    </div>
+    <svg viewBox="0 0 1080 900" style={{position: 'absolute', inset: 0, width: '100%', height: '100%'}}>
+      {positions.map(([x, y], index) => index === 4 ? null : <path key={index} d={`M ${x + 82} ${y + 55} C ${x < 508 ? 430 : 650} ${y + 60}, ${x < 508 ? 410 : 650} 515, 548 536`} fill="none" stroke={index % 2 ? secondary : accent} strokeWidth="4" opacity=".74" strokeDasharray={`${interpolate(progress, [index * .09, .45 + index * .05], [0, 420], clamp)} 460`} />)}
+      <path d="M548 552 C622 574 710 600 810 660" fill="none" stroke={accent} strokeWidth="6" strokeLinecap="round" strokeDasharray={`${progress * 340} 360`} />
+    </svg>
+    <div style={{position: 'absolute', left: 440, top: 426, width: 220, height: 184, borderRadius: 92, background: `radial-gradient(circle, ${accent} 0%, ${accent} 42%, #071015 43%)`, color: '#071015', display: 'grid', placeItems: 'center', textAlign: 'center', fontSize: 27, lineHeight: 1, fontWeight: 950, transform: `scale(${interpolate(p, [0, .62], [.74, 1], clamp)})`, boxShadow: `0 0 ${42 * progress}px ${accent}66`}}>Visual<br/>Plan</div>
+    {positions.map(([x, y], index) => {
+      if (index === 4) return null;
+      const shown = revealAt(p, index, 0.12, 0.32);
+      return <div key={`${nodes[index]}-${index}`} style={{position: 'absolute', left: x, top: y, width: 164, minHeight: 108, padding: 16, borderRadius: index === 5 ? 54 : 18, background: index === 5 ? secondary : 'rgba(255,255,255,.075)', color: index === 5 ? '#071015' : '#fff', opacity: shown, transform: `scale(${interpolate(shown, [0, 1], [.78, 1], clamp)})`, textAlign: 'center'}}>
+        <div style={{fontFamily: MONO, color: index === 5 ? '#071015' : '#7f90a8', fontSize: 11, fontWeight: 950}}>NODE {index + 1}</div>
+        <div style={{marginTop: 12, fontSize: 22, lineHeight: 1.02, fontWeight: 950}}>{compact(nodes[index], 18)}</div>
+      </div>;
+    })}
+  </ProductionStage>;
+};
+
+const BeforeAfterRenderer: React.FC<ProductionComponentRendererProps> = (props) => {
+  if (!shotMatches(props, 'before-after')) return <TechnicalShotHero {...props} expectedKind="before-after" />;
+  const {state, accent, secondary, p} = props;
+  const shot = state.shot;
+  const before = shot?.before ?? state.componentProps?.before ?? productionEvidence(state, 2)[0] ?? '旧状态';
+  const after = shot?.after ?? state.componentProps?.after ?? productionEvidence(state, 2)[1] ?? '新状态';
+  const wipe = interpolate(p, [0.12, .82], [0, 1], clamp);
+  return <ProductionStage background="linear-gradient(180deg, #151820 0%, #0f1117 100%)">
+    <div style={{position: 'absolute', left: 64, right: 64, top: 58, color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'end'}}>
+      <div style={{fontSize: 50, lineHeight: .96, fontWeight: 950}}>{productionTitle(state, 38)}</div>
+      <div style={{fontFamily: MONO, color: accent, fontSize: 14, fontWeight: 950}}>SAME OBJECT / STATE CHANGE</div>
+    </div>
+    <div style={{position: 'absolute', left: 64, right: 64, top: 184, bottom: 74, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, overflow: 'hidden', borderRadius: 36}}>
+      <div style={{position: 'relative', background: '#2b2f39', padding: 42}}>
+        <div style={{fontFamily: MONO, color: '#ff8aa0', fontSize: 14, fontWeight: 950}}>BEFORE</div>
+        <div style={{marginTop: 72, fontSize: 41, lineHeight: 1, fontWeight: 950, color: '#fff'}}>{compact(before, 38)}</div>
+        <div style={{position: 'absolute', left: 42, right: 42, bottom: 58, height: 180, borderRadius: 24, background: 'repeating-linear-gradient(135deg, rgba(255,255,255,.13) 0 12px, rgba(255,255,255,.04) 12px 24px)'}} />
+        <div style={{position: 'absolute', inset: 0, background: `rgba(0,0,0,${0.34 * wipe})`}} />
+      </div>
+      <div style={{position: 'relative', background: '#f6f7f3', color: '#111827', padding: 42}}>
+        <div style={{fontFamily: MONO, color: accent, fontSize: 14, fontWeight: 950}}>AFTER</div>
+        <div style={{marginTop: 72, fontSize: 41, lineHeight: 1, fontWeight: 950}}>{compact(after, 38)}</div>
+        <div style={{position: 'absolute', left: 42, right: 42, bottom: 58, height: 180, borderRadius: 24, background: `linear-gradient(135deg, ${accent}55, ${secondary}55)`, transform: `translateX(${interpolate(wipe, [0, 1], [-80, 0], clamp)}px)`}} />
+        <div style={{position: 'absolute', inset: 0, width: `${(1 - wipe) * 100}%`, background: '#f6f7f3'}} />
+      </div>
+      <div style={{position: 'absolute', left: `${50 * wipe}%`, top: 0, bottom: 0, width: 5, background: accent, boxShadow: `0 0 28px ${accent}`}} />
+    </div>
+  </ProductionStage>;
+};
+
+const MetricHighlightRenderer: React.FC<ProductionComponentRendererProps> = (props) => {
+  if (!shotMatches(props, 'metric-highlight')) return <TechnicalShotHero {...props} expectedKind="metric-highlight" />;
+  const {state, accent, secondary, p} = props;
+  const shot = state.shot;
+  const metric = shot?.metric ?? state.componentProps?.metric ?? productionTitle(state, 12);
+  const evidence = productionEvidence(state, 4).filter((item) => item !== metric);
+  return <ProductionStage background="linear-gradient(145deg, #fff8e7 0%, #f3f7ff 100%)">
+    <div style={{position: 'absolute', left: 74, top: 62, color: '#111827'}}>
+      <div style={{fontFamily: MONO, color: '#737d8d', fontSize: 15, fontWeight: 950}}>EDITORIAL METRIC</div>
+      <div style={{marginTop: 36, fontSize: textFit(metric, 210, 138), lineHeight: .78, fontWeight: 950, color: '#111827', transform: `translateY(${interpolate(p, [0, .7], [58, 0], clamp)}px) scale(${interpolate(p, [0, .7], [.68, 1], clamp)})`, transformOrigin: 'left bottom'}}>{metric}</div>
+      <div style={{width: 640, height: 14, marginTop: 40, background: '#d3dbe5'}}><div style={{height: '100%', width: `${interpolate(p, [0.18, .8], [6, 100], clamp)}%`, background: `linear-gradient(90deg, ${accent}, ${secondary})`}} /></div>
+      <div style={{marginTop: 34, maxWidth: 760, fontSize: 32, lineHeight: 1.1, fontWeight: 900, color: '#243040'}}>{productionDetail(state, 76)}</div>
+    </div>
+    <div style={{position: 'absolute', right: 72, top: 98, width: 232, height: 650, display: 'grid', alignContent: 'end', gap: 18}}>
+      {[...evidence, state.intent?.key ?? 'metric'].slice(0, 4).map((item, index) => {
+        const shown = revealAt(p, index, 0.18, 0.3);
+        return <div key={`${item}-${index}`} style={{minHeight: 96, borderLeft: `8px solid ${index % 2 ? secondary : accent}`, background: '#fff', color: '#111827', padding: 18, opacity: shown, transform: `translateX(${interpolate(shown, [0, 1], [32, 0], clamp)}px)`, boxShadow: '0 14px 30px rgba(31,41,55,.09)'}}>
+          <div style={{fontFamily: MONO, color: '#7b8493', fontSize: 11, fontWeight: 950}}>CONTEXT</div>
+          <div style={{marginTop: 10, fontSize: 20, lineHeight: 1.05, fontWeight: 950}}>{compact(item, 24)}</div>
+        </div>;
+      })}
+    </div>
+  </ProductionStage>;
+};
+
+const conceptSemantic = (state: HeroTrackState) => {
+  const text = `${state.label} ${state.detail} ${productionEvidence(state, 5).join(' ')}`.toLowerCase();
+  if (/react|代码|code/.test(text)) return 'code';
+  if (/ppt|powerpoint|图表|形状|连接线|原生对象/.test(text)) return 'slide';
+  if (/正文|配图|插画|比喻|文章/.test(text)) return 'article';
+  if (/html|视频|hyper|frame/.test(text)) return 'video';
+  if (/设计|排版|留白|配色|模板/.test(text)) return 'design';
+  if (/聊天|skill|work|ai|\bia\b/.test(text)) return 'system';
+  return 'claim';
+};
+
+const ConceptExplainerRenderer: React.FC<ProductionComponentRendererProps> = (props) => {
+  if (!shotMatches(props, 'concept-explainer')) return <TechnicalShotHero {...props} expectedKind="concept-explainer" />;
+  const {state, accent, secondary, p} = props;
+  const title = productionTitle(state, 34);
+  const detail = productionDetail(state, 94);
+  const evidence = productionEvidence(state, 4);
+  const semantic = conceptSemantic(state);
+  const variant = seededVariant(`${state.visualPlanEntryId ?? ''}${title}${detail}`, 3);
+  const palette = semantic === 'slide' ? ['#f6efe5', '#17202b', '#e06682']
+    : semantic === 'article' ? ['#fffdf7', '#17202b', '#222']
+      : semantic === 'video' ? ['#111827', '#f9fbff', secondary]
+        : semantic === 'design' ? ['#f7f2e8', '#18202a', '#17372c']
+          : semantic === 'code' ? ['#0a0f18', '#f6f9ff', accent]
+            : semantic === 'system' ? ['#101927', '#f9fbff', secondary]
+              : ['#f5f1e8', '#111827', accent];
+  const dark = ['code', 'video', 'system'].includes(semantic);
+  const bg = dark ? `linear-gradient(145deg, ${palette[0]} 0%, #151f30 100%)` : `linear-gradient(145deg, ${palette[0]} 0%, #eef6f8 100%)`;
+  const fg = dark ? '#fff' : '#111827';
+  const muted = dark ? 'rgba(255,255,255,.66)' : '#566170';
+  const mainX = variant === 0 ? 70 : variant === 1 ? 410 : 86;
+  const mainY = variant === 2 ? 86 : 104;
+  return <ProductionStage background={bg}>
+    <div style={{position: 'absolute', left: mainX, top: mainY, width: variant === 1 ? 570 : 700, color: fg}}>
+      <div style={{fontFamily: MONO, color: palette[2], fontSize: 14, fontWeight: 950}}>CONCEPT / {semantic.toUpperCase()}</div>
+      <div style={{marginTop: 24, fontSize: textFit(title, 86, 54), lineHeight: .9, fontWeight: 950, opacity: interpolate(p, [0, .52], [.62, 1], clamp), transform: `translateY(${interpolate(p, [0, .7], [18, 0], clamp)}px)`}}>{title}</div>
+      <div style={{marginTop: 42, maxWidth: 700, color: muted, fontSize: 30, lineHeight: 1.16, fontWeight: 820, opacity: interpolate(p, [0, .48], [.68, 1], clamp), transform: `translateY(${interpolate(p, [0, .7], [18, 0], clamp)}px)`}}>{detail}</div>
+    </div>
+    {semantic === 'code' ? <div style={{position: 'absolute', right: 70, bottom: 70, width: 410, height: 360, borderRadius: 26, background: '#070b12', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.1)', padding: 28, fontFamily: MONO}}>
+      {['const frame = caption;', 'intent.resolve(frame);', '<Hero shot={plan} />'].map((line, index) => <div key={line} style={{marginTop: index ? 28 : 0, color: index === 1 ? accent : index === 2 ? secondary : '#d8e1ee', fontSize: 22, opacity: revealAt(p, index)}}>{line}</div>)}
+    </div> : null}
+    {semantic === 'slide' ? <div style={{position: 'absolute', right: 78, bottom: 72, width: 430, height: 320, background: '#fff', color: '#111827', boxShadow: '0 24px 60px rgba(23,32,43,.18)', padding: 28}}>
+      <div style={{height: 34, borderBottom: '1px solid #d8d2c8', fontFamily: MONO, color: '#80776d', fontSize: 12}}>PPT OBJECTS</div>
+      <div style={{position: 'absolute', left: 46, top: 92, width: 150, height: 92, background: secondary, opacity: .86}} />
+      <div style={{position: 'absolute', right: 54, top: 92, width: 100, height: 100, borderRadius: 50, border: `14px solid ${accent}`}} />
+      <div style={{position: 'absolute', left: 52, right: 52, bottom: 48, height: 78, display: 'flex', alignItems: 'end', gap: 14}}>{[42, 78, 58, 104].map((height, index) => <div key={index} style={{flex: 1, height, background: [accent, secondary, '#ffd166', '#e06682'][index]}} />)}</div>
+      <div style={{position: 'absolute', left: 38 + p * 172, top: 78 + p * 52, width: 150, height: 92, border: `3px solid ${accent}`}} />
+    </div> : null}
+    {semantic === 'article' ? <div style={{position: 'absolute', right: 72, bottom: 66, width: 420, height: 350, background: '#fff', color: '#151922', borderRadius: 28, padding: 34, boxShadow: '0 24px 54px rgba(30,41,59,.13)'}}>
+      <div style={{fontFamily: MONO, color: '#8a8175', fontSize: 12}}>WHITE ILLUSTRATION</div>
+      <svg viewBox="0 0 360 220" style={{position: 'absolute', left: 28, right: 28, bottom: 34, width: 360, height: 220}}>
+        <path d="M44 130 C82 60 143 60 178 130 C214 202 290 180 318 112" fill="none" stroke="#18202b" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${interpolate(p, [0, .82], [0, 620], clamp)} 640`} />
+        <circle cx="74" cy="138" r="26" fill={accent} />
+        <rect x="205" y="82" width="96" height="88" rx="18" fill={secondary} />
+      </svg>
+    </div> : null}
+    {semantic === 'video' ? <div style={{position: 'absolute', left: 74, right: 74, bottom: 66, height: 190, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12}}>
+      {Array.from({length: 5}).map((_, index) => <div key={index} style={{position: 'relative', borderRadius: 18, background: index % 2 ? `${accent}24` : 'rgba(255,255,255,.09)', overflow: 'hidden', opacity: revealAt(p, index)}}><div style={{position: 'absolute', left: 18, right: 18, top: 28, height: 74, background: index === 2 ? secondary : 'rgba(255,255,255,.22)'}} /><div style={{position: 'absolute', left: 18, right: 18, bottom: 26, height: 8, background: index <= p * 5 ? accent : 'rgba(255,255,255,.16)'}} /></div>)}
+    </div> : null}
+    {semantic === 'design' ? <div style={{position: 'absolute', right: 74, top: 164, width: 360, height: 520, color: '#111827'}}>
+      {['TYPE', 'SPACE', 'COLOR', 'SYSTEM'].map((item, index) => <div key={item} style={{height: 100, marginTop: index ? 22 : 0, display: 'grid', gridTemplateColumns: '90px 1fr', alignItems: 'center', borderTop: `5px solid ${index % 2 ? secondary : accent}`, opacity: revealAt(p, index)}}>
+        <span style={{fontFamily: MONO, fontSize: 15, fontWeight: 950}}>{item}</span>
+        <span style={{fontSize: 27, fontWeight: 950}}>{compact(evidence[index % evidence.length], 18)}</span>
+      </div>)}
+    </div> : null}
+    {semantic === 'system' || semantic === 'claim' ? <div style={{position: 'absolute', right: 72, bottom: 70, width: 420, height: 420}}>
+      <svg viewBox="0 0 420 420" style={{position: 'absolute', inset: 0, width: '100%', height: '100%'}}>
+        <circle cx="210" cy="210" r={70 + 70 * p} fill="none" stroke={accent} strokeWidth="3" opacity=".72" />
+        <circle cx="210" cy="210" r={120 - 34 * p} fill="none" stroke={secondary} strokeWidth="3" opacity=".52" />
+        {[0, 1, 2, 3].map((index) => <line key={index} x1="210" y1="210" x2={210 + Math.cos(index * 1.57 + .5) * 168} y2={210 + Math.sin(index * 1.57 + .5) * 168} stroke={index % 2 ? secondary : accent} strokeWidth="4" strokeDasharray={`${revealAt(p, index) * 210} 230`} />)}
+      </svg>
+      {evidence.map((item, index) => <div key={`${item}-${index}`} style={{position: 'absolute', left: [16, 250, 36, 245][index] ?? 80, top: [40, 74, 288, 278][index] ?? 180, width: 150, minHeight: 68, display: 'grid', placeItems: 'center', textAlign: 'center', color: fg, fontSize: 19, lineHeight: 1.05, fontWeight: 950, opacity: revealAt(p, index)}}>{compact(item, 16)}</div>)}
+    </div> : null}
+  </ProductionStage>;
+};
+
+const PRODUCTION_RENDERERS: Record<ProductionComponentId, React.FC<ProductionComponentRendererProps>> = {
+  'browser-demo': BrowserDemoRenderer,
+  'terminal-execution': TerminalExecutionRenderer,
+  'code-diff': CodeDiffRenderer,
+  'config-check': ConfigCheckRenderer,
+  'interface-audit': InterfaceAuditRenderer,
+  'flow-trace': FlowTraceRenderer,
+  'test-report': TestReportRenderer,
+  'asset-library': AssetLibraryRenderer,
+  'system-map': SystemMapRenderer,
+  'before-after': BeforeAfterRenderer,
+  'metric-highlight': MetricHighlightRenderer,
+  'concept-explainer': ConceptExplainerRenderer,
+};
+
+const rendererForComponent = (componentId: string) => {
+  const renderer = PRODUCTION_RENDERERS[componentId as ProductionComponentId];
+  if (!renderer) throw new Error(`Production component has no renderer: ${componentId}`);
+  return renderer;
+};
+
+export const PRODUCTION_COMPONENT_REGISTRY: readonly ProductionComponentDescriptor[] = productionCatalog.components.map((descriptor) => ({
+  ...descriptor,
+  renderer: rendererForComponent(descriptor.componentId),
+}));
+
+export const resolveProductionComponentDescriptor = (componentId: string) =>
+  PRODUCTION_COMPONENT_REGISTRY.find((descriptor) => descriptor.componentId === componentId) ?? null;
+
+const ProductionFallbackDiagnostic: React.FC<{state: HeroTrackState; accent: string}> = ({state, accent}) => (
+  <TrackShell label="生产组件匹配失败" detail={state.detail} accent={accent} p={1}>
+    <div data-production-fallback="true" style={{position: 'absolute', inset: '90px 70px', padding: 42, background: '#240d16', border: '4px solid #ff5f7a', color: '#fff'}}>
+      <div style={{fontFamily: MONO, color: '#ff9aad', fontSize: 15, fontWeight: 950}}>VISUAL PLAN DIAGNOSTIC</div>
+      <div style={{marginTop: 34, fontSize: 42, lineHeight: 1, fontWeight: 950}}>无法匹配生产组件</div>
+      <div style={{marginTop: 24, color: 'rgba(255,255,255,.72)', fontSize: 22, lineHeight: 1.35}}>{state.diagnostics?.map((diagnostic) => diagnostic.message).join(' / ') || `componentId=${state.componentId ?? 'missing'}`}</div>
+    </div>
+  </TrackShell>
+);
+
+export const ProductionComponentPreview: React.FC<{componentId: string}> = ({componentId}) => {
+  const descriptor = resolveProductionComponentDescriptor(componentId);
+  if (!descriptor) return null;
+  const PreviewRenderer = descriptor.renderer;
+  const shotKind = descriptor.compatibleShotKinds[0] as HeroShot['kind'];
+  const evidence = descriptor.requiredData.includes('shot.before') ? ['旧状态', '新状态', '差异证据']
+    : shotKind === 'metric-highlight' ? ['68%', '当前指标', '真实口播']
+      : ['当前字幕', '语义证据', '生产渲染'];
+  const state: HeroTrackState = {
+    startFrame: 0,
+    endFrame: 90,
+    captionStartIndex: 0,
+    captionEndIndex: 0,
+    label: descriptor.label,
+    detail: descriptor.description,
+    componentId,
+    resolution: 'matched',
+    evidence,
+    lens: {key: `preview:${componentId}`, objective: descriptor.description, actionLabel: descriptor.label, signal: descriptor.compatibleIntents[0], evidenceType: '生产预览'},
+    shot: {
+      kind: shotKind,
+      environment: 'Video Factory',
+      target: descriptor.requiredData.join(' / '),
+      before: shotKind === 'before-after' ? '旧状态' : undefined,
+      after: shotKind === 'before-after' ? '新状态' : undefined,
+      command: shotKind === 'terminal-execution' ? 'npm run project:render' : undefined,
+      path: shotKind === 'code-diff' || shotKind === 'config-check' ? 'src/project/visualPlan.ts' : undefined,
+      metric: shotKind === 'test-report' || shotKind === 'metric-highlight' ? '68%' : undefined,
+      log: shotKind === 'test-report' ? '12 passed / 0 failed' : undefined,
+      status: 'active',
+      evidence,
+    },
+  };
+  return <div data-production-component={componentId} style={{position: 'relative', width: 860, height: 900, background: '#05070d'}}><PreviewRenderer state={state} accent="#48e7f3" secondary="#ff7aa8" p={.82} /></div>;
 };
 
 type MotionAnchor = {x: number; y: number; width: number; height: number};
@@ -313,7 +906,16 @@ export const HeroTrackV2: React.FC<{frame: number; track: HeroTrack; accent: str
   // selected entity changes after the opening has established the layout.
   const p = stateIndex === 0 ? stateP : 1;
   const common = {state, accent, secondary, p, stateIndex, target: state.entityTarget ?? ''};
-  const visual = state.shot ? <TechnicalShotHero state={state} accent={accent} secondary={secondary} p={stateP} />
+  const productionDescriptor = state.componentId ? resolveProductionComponentDescriptor(state.componentId) : null;
+  const componentMatchesShot = productionDescriptor && state.shot
+    ? productionDescriptor.compatibleShotKinds.includes(state.shot.kind)
+    : false;
+  const ProductionRenderer = productionDescriptor?.renderer;
+  const visual = state.componentId
+    ? ProductionRenderer && componentMatchesShot && state.resolution === 'matched'
+      ? <div data-production-component={state.componentId}><ProductionRenderer state={state} accent={accent} secondary={secondary} p={stateP} /></div>
+      : <ProductionFallbackDiagnostic state={state} accent={accent} />
+    : state.shot ? <TechnicalShotHero state={state} accent={accent} secondary={secondary} p={stateP} />
     : track.kind === 'overview-matrix' ? <OverviewMatrix {...common} />
     : track.kind === 'rule-compare' ? <RuleCompare {...common} />
       : track.kind === 'code-render' ? <CodeRender {...common} />
@@ -325,6 +927,6 @@ export const HeroTrackV2: React.FC<{frame: number; track: HeroTrack; accent: str
                   : <GenericExplainer {...common} />;
   return <AbsoluteFill>
     {visual}
-    {state.shot ? null : <EntityBoundMotion track={track} state={state} accent={accent} secondary={secondary} p={stateP} />}
+    {state.shot || state.componentId ? null : <EntityBoundMotion track={track} state={state} accent={accent} secondary={secondary} p={stateP} />}
   </AbsoluteFill>;
 };

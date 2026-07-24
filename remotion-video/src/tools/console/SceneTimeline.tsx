@@ -34,6 +34,7 @@ export const SceneTimeline: React.FC<SceneTimelineProps> = ({project, totalFrame
             const accent = String(scene.payload.accent || '#42d3b6');
             return <button
               className={`timeline-scene ${sceneIndex === index ? 'is-selected' : ''}`}
+              disabled={stillsRendering}
               key={scene.id}
               onClick={() => onSelectScene(index)}
               style={{'--scene-accent': accent, flexBasis: width} as React.CSSProperties}

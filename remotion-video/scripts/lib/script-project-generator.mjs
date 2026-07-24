@@ -1,6 +1,11 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import {
+  resolveProductionComponent,
+  resolveSemanticIntent,
+} from "./semantic-component-resolver.mjs";
 
 export const FPS = 30;
 
@@ -324,7 +329,7 @@ const parseCaptionInput = (captionsInput) => {
       ? numeric
       : null;
   };
-  return rawCaptions
+  const captions = rawCaptions
     .map((caption, index) => {
       const startMs = Math.max(
         0,
@@ -349,6 +354,40 @@ const parseCaptionInput = (captionsInput) => {
     })
     .filter((caption) => caption.text && caption.endMs > caption.startMs)
     .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
+
+  const merged = [];
+  let leadingPunctuation = null;
+  for (const caption of captions) {
+    if (/[\p{L}\p{N}]/u.test(caption.text)) {
+      if (leadingPunctuation) {
+        merged.push({
+          ...caption,
+          text: `${leadingPunctuation.text}${caption.text}`,
+          startMs: leadingPunctuation.startMs,
+          timestampMs: leadingPunctuation.timestampMs,
+        });
+        leadingPunctuation = null;
+      } else {
+        merged.push(caption);
+      }
+      continue;
+    }
+
+    const previous = merged.at(-1);
+    if (previous) {
+      previous.text += caption.text;
+      previous.endMs = Math.max(previous.endMs, caption.endMs);
+    } else {
+      leadingPunctuation = leadingPunctuation
+        ? {
+            ...leadingPunctuation,
+            text: `${leadingPunctuation.text}${caption.text}`,
+            endMs: Math.max(leadingPunctuation.endMs, caption.endMs),
+          }
+        : {...caption};
+    }
+  }
+  return merged;
 };
 
 const alignCaptionsToAudioDuration = (captions, audioDurationMs) => {
@@ -588,19 +627,6 @@ const placementForAction = (action) => {
 const placementForText = (text, action) =>
   narrativeSignalForText(text)?.placement ?? placementForAction(action);
 
-const TECH_SHOT_KINDS = [
-  "browser-demo",
-  "terminal-execution",
-  "code-diff",
-  "config-check",
-  "interface-audit",
-  "flow-trace",
-  "test-report",
-  "asset-library",
-  "system-map",
-  "before-after",
-];
-
 const SHOT_META = {
   "browser-demo": {
     environment: "Browser + DevTools",
@@ -672,27 +698,20 @@ const SHOT_META = {
     evidenceType: "截图差异",
     objective: "把旧状态和新状态并排对照",
   },
-};
-
-const shotKindForText = (text, action, captionIndex, stateIndex, heroTrackKind) => {
-  const value = String(text ?? "");
-  if (/系统图|架构|Prompt|Skill|Token|设计系统|模块|关系图/i.test(value)) return "system-map";
-  if (/浏览器|DevTools|DOM|页面|viewport|web/i.test(value)) return "browser-demo";
-  if (/终端|命令|npm|pnpm|yarn|shell|CI|执行|构建|安装|运行/i.test(value)) return "terminal-execution";
-  if (/diff|Diff|git|代码行|文件变更|修改|删除|新增|patch|\bPR\b/i.test(value)) return "code-diff";
-  if (/配置|JSON|YAML|AGENTS|env|环境变量|规则|开关|参数/i.test(value)) return "config-check";
-  if (/审计|检查器|Inspector|定位|扫描|标红|问题|按钮|无障碍|A11y/i.test(value)) return "interface-audit";
-  if (/流程|链路|步骤|输入|输出|追踪|trace|流转|路径/i.test(value)) return "flow-trace";
-  if (/测试|断言|通过|失败|回归|复检|coverage|验证/i.test(value)) return "test-report";
-  if (/素材库|组件库|动画|模板|资源|素材|library/i.test(value)) return "asset-library";
-  if (/对比|前后|之前|之后|旧.*新|不是.*而是|左边|右边|VS|变化/i.test(value)) return "before-after";
-  if (action === "compare") return "before-after";
-  if (action === "counter") return /测试|断言|通过|失败/i.test(value) ? "test-report" : "system-map";
-  if (action === "trace") return heroTrackKind === "video-agent" ? "browser-demo" : "flow-trace";
-  if (action === "stack") return "asset-library";
-  if (action === "focus") return /检查|审计|定位|规则|配置/.test(value) ? "interface-audit" : "config-check";
-  if (action === "stamp") return "config-check";
-  return TECH_SHOT_KINDS[(captionIndex + stateIndex) % TECH_SHOT_KINDS.length];
+  "metric-highlight": {
+    environment: "Metric Stage",
+    target: "value / unit / context",
+    actionLabel: "指标强调",
+    evidenceType: "明确数值",
+    objective: "突出当前口播中的明确数字和上下文",
+  },
+  "concept-explainer": {
+    environment: "Editorial Stage",
+    target: "claim / explanation / evidence",
+    actionLabel: "概念解释",
+    evidenceType: "语义证据",
+    objective: "用清晰层级解释当前口播的核心主张",
+  },
 };
 
 const lensForText = (text, shotKind, action, captionIndex) => {
@@ -724,6 +743,8 @@ const shotEvidenceForText = (text, shotKind, action) => {
     const halves = value.split(/[，,。；;、：:\n]+/u).map((item) => item.trim()).filter(Boolean);
     return [halves[0] ?? "Before", halves[1] ?? "After", "Evidence"];
   }
+  if (shotKind === "metric-highlight") return [number ?? "0", tokenList[0] ?? "当前指标", tokenList[1] ?? "口播上下文"];
+  if (shotKind === "concept-explainer") return tokenList.length ? tokenList.slice(0, 3) : [value.slice(0, 28) || "当前主张"];
   return tokenList.length ? tokenList : [action || "evidence"];
 };
 
@@ -775,7 +796,7 @@ const shotForText = (text, shotKind, action, captionIndex, stateIndex) => {
             ? "input -> rule -> output"
             : undefined,
     metric:
-      shotKind === "test-report"
+      shotKind === "test-report" || shotKind === "metric-highlight"
         ? number ?? "100%"
         : shotKind === "browser-demo" || shotKind === "before-after"
           ? "1 screenshot diff"
@@ -803,7 +824,6 @@ const beatsForChunk = (
   sceneIndex,
   totalScenes,
 ) => {
-  let previousEnd = 0;
   return chunk.map((caption, captionIndex) => {
     const action = actionForText(
       caption.text,
@@ -819,11 +839,8 @@ const beatsForChunk = (
       sceneDurationInFrames,
       frameForMs(caption.endMs) - sceneStartFrame,
     );
-    if (captionIndex > 0 && startFrame - previousEnd > 6)
-      startFrame = previousEnd;
     startFrame = clamp(startFrame, 0, Math.max(0, sceneDurationInFrames - 1));
     endFrame = clamp(endFrame, startFrame + 1, sceneDurationInFrames);
-    previousEnd = endFrame;
     const beat = {
       startFrame,
       endFrame,
@@ -1057,14 +1074,11 @@ const heroStatesForChunk = (
       stateIndex,
       sceneIndex === totalScenes - 1,
     );
-    const shotKind = shotKindForText(
-      text,
-      action,
-      captionIndex,
-      stateIndex,
-      heroTrackKind,
-    );
+    const intent = resolveSemanticIntent(text, {sceneIndex, sceneCount: totalScenes});
+    const shotKind = intent.shotKind;
     const shot = shotForText(text, shotKind, action, captionIndex, stateIndex);
+    const lens = lensForText(text, shotKind, action, captionIndex);
+    const component = resolveProductionComponent({intent, shot, lens, orientation: "portrait"});
     const next = statesSource[stateIndex + 1];
     const label = keywordForText(text, stateIndex);
     let startFrame =
@@ -1096,8 +1110,24 @@ const heroStatesForChunk = (
       evidence: shot.evidence.map((item) => item.slice(0, 48)),
       entityTarget: heroEntityTargetForState(heroTrackKind, stateIndex),
       cinematicPreset: preset,
-      lens: lensForText(text, shotKind, action, captionIndex),
+      lens,
       shot,
+      intent,
+      componentId: component.componentId,
+      componentProps: {
+        title: label,
+        detail: text.slice(0, 118),
+        evidence: shot.evidence.map((item) => item.slice(0, 48)),
+        metric: shot.metric,
+        before: shot.before,
+        after: shot.after,
+        command: shot.command,
+        path: shot.path,
+        log: shot.log,
+        status: shot.status,
+      },
+      resolution: component.resolution,
+      diagnostics: component.diagnostics,
     };
   });
 };
@@ -1314,6 +1344,46 @@ export const buildSkillShowcaseProjectFromScript = ({
     };
   });
 
+  const visualPlanEntries = scenes.flatMap((scene, sceneIndex) => {
+    const beats = scene.payload.beats;
+    return scene.payload.heroTrack.states.map((state, stateIndex) => {
+      const beat = beats.find((candidate) => candidate.captionStartIndex === state.captionStartIndex) ?? beats[stateIndex];
+      return {
+        id: `${scene.id}:caption-${state.captionStartIndex}`,
+        sceneId: scene.id,
+        sceneIndex,
+        captionStartIndex: state.captionStartIndex,
+        captionEndIndex: state.captionEndIndex,
+        startFrame: state.startFrame,
+        endFrame: state.endFrame,
+        intent: state.intent,
+        beat: {
+          keyword: beat.keyword,
+          icon: beat.icon,
+          action: beat.action,
+          visualState: beat.visualState,
+          motionPreset: beat.motionPreset,
+          placement: beat.placement,
+          shotPreset: state.cinematicPreset,
+          detail: beat.detail,
+          evidence: beat.evidence,
+          value: beat.value,
+        },
+        lens: state.lens,
+        shot: state.shot,
+        componentId: state.componentId,
+        componentProps: state.componentProps,
+        assetIds: [],
+        orientation: "portrait",
+        resolution: state.resolution,
+        diagnostics: state.diagnostics,
+      };
+    });
+  });
+  const visualPlanDiagnostics = visualPlanEntries.flatMap((entry) =>
+    entry.diagnostics.map((diagnostic) => ({...diagnostic, path: `visualPlan.entries.${entry.id}`})),
+  );
+
   const assets = {};
   const audio = {};
   if (voiceSrc) {
@@ -1336,6 +1406,13 @@ export const buildSkillShowcaseProjectFromScript = ({
     },
     scenes,
     captions: resolvedCaptions,
+    visualPlan: {
+      version: 1,
+      generatedFrom: "captions",
+      narrationHash: createHash("sha256").update(JSON.stringify(resolvedCaptions.map(({text, startMs, endMs}) => ({text, startMs, endMs})))).digest("hex"),
+      entries: visualPlanEntries,
+      diagnostics: visualPlanDiagnostics,
+    },
     audio,
     assets,
   };

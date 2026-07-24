@@ -1,23 +1,22 @@
 import React, {useEffect, useRef} from 'react';
-import {Player} from '@remotion/player';
-import {UltimateVideoV2} from '../../compositions/v2/UltimateVideoV2';
-import type {CompiledProject} from '../../project/compileProject';
 import type {VideoProject} from '../../project/projectSchema';
-import type {ProjectState} from './types';
+import {runnerJobProgressPercent, runnerJobHeadline} from './RenderWorkspace';
+import type {ProjectState, RunnerJob} from './types';
 
 interface PreviewCanvasProps {
-  compiled: {project: CompiledProject | null; error: string | null};
   project: VideoProject;
   state: ProjectState | null;
   selectedScene: number;
   projectTitle: string;
   videoUrl: string | null;
+  activeJob: RunnerJob | null;
+  starting?: boolean;
 }
 
-const statusText = (state: ProjectState | null) => {
+const statusText = (state: ProjectState | null, renderBusy: boolean) => {
   if (!state) return '读取项目状态';
+  if (renderBusy) return '渲染中';
   if (state.deliveryReady) return '成片已生成';
-  if (state.activeJob?.commandId === 'render-verify') return '渲染中';
   if (state.activeJob) return '生产中';
   if (state.stages.project.status !== 'current') return '分镜待更新';
   if (state.stages.render.status === 'current' && state.stages.verify.status === 'current') return '成片已通过检查';
@@ -26,12 +25,21 @@ const statusText = (state: ProjectState | null) => {
   return '等待生成成片';
 };
 
-export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({compiled, project, state, selectedScene, projectTitle, videoUrl}) => {
+export const canShowFinalVideo = (state: ProjectState | null, videoUrl: string | null, renderBusy: boolean) => Boolean(
+  !renderBusy
+  && videoUrl
+  && state?.deliveryReady
+  && state.stages.render.status === 'current'
+  && state.stages.verify.status === 'current',
+);
+
+export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({project, state, selectedScene, projectTitle, videoUrl, activeJob, starting = false}) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const sceneIndex = project.scenes.length > 0 ? Math.min(Math.max(selectedScene, 0), project.scenes.length - 1) : 0;
   const sceneStart = project.scenes.slice(0, sceneIndex).reduce((total, item) => total + item.durationInFrames, 0);
-  const hasRenderedVideo = Boolean(videoUrl && state?.stages.render.status === 'current');
-  const canShowLiveComposition = Boolean(compiled.project && (!state || state.stages.project.status === 'current'));
+  const renderBusy = starting || Boolean(activeJob);
+  const hasRenderedVideo = canShowFinalVideo(state, videoUrl, renderBusy);
+  const progress = activeJob ? runnerJobProgressPercent(activeJob) : starting ? 2 : 0;
   useEffect(() => {
     if (!hasRenderedVideo || !videoRef.current) return;
     const video = videoRef.current;
@@ -44,40 +52,40 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({compiled, project, 
     }
     return undefined;
   }, [hasRenderedVideo, project.render.fps, sceneStart, selectedScene, videoUrl]);
-  if (!hasRenderedVideo && !canShowLiveComposition) {
-    const reason = compiled.error || (state?.stages.project.status === 'stale' ? '分镜已过期，请先保存并更新分镜。' : '分镜更新后，在渲染页生成并审看成片。');
-    return <div className="preview-empty"><div className="preview-empty__message"><strong>等待生成最终视频</strong><span>{reason}</span></div></div>;
+  if (!hasRenderedVideo) {
+    const reason = state?.stages.project.status === 'stale'
+      ? '分镜已过期，请先保存并更新分镜。'
+      : '成片生成并通过检查后，会在这里显示。';
+    const headline = renderBusy
+      ? activeJob ? runnerJobHeadline(activeJob, '正在生成最终视频') : '正在准备渲染'
+      : '等待生成最终视频';
+    return <div className={`preview-empty render-preview-state${renderBusy ? ' is-running' : ''}`} aria-live="polite">
+      <div className="preview-empty__message">
+        {renderBusy && <i className="render-preview-state__spinner" aria-hidden="true" />}
+        <strong>{headline}</strong>
+        <span>{renderBusy ? '当前只显示后端渲染进度，不会提前播放预览或旧成片。' : reason}</span>
+        {renderBusy && <div className="render-preview-state__progress" aria-label={`渲染进度 ${progress}%`}><i style={{width: `${Math.max(4, progress)}%`}} /></div>}
+        {renderBusy && <em>{progress}%</em>}
+      </div>
+    </div>;
   }
-  const cp = compiled.project;
-  const displaySpec = cp ? `${cp.width} x ${cp.height} / ${cp.fps} FPS` : `1080 x 1920 / ${project.render.fps} FPS`;
+  const displaySpec = `1080 x 1920 / ${project.render.fps} FPS`;
 
   return (
     <div className="preview-canvas">
       <div className="preview-meta preview-meta--top">
         <span className={`stage-dot ${state?.deliveryReady ? 'is-ready' : ''}`} />
-        <span>{statusText(state)}</span>
+        <span>{statusText(state, renderBusy)}</span>
       </div>
       <div className="portrait-frame">
-        {hasRenderedVideo && videoUrl ? <video
+        <video
           ref={videoRef}
           key={videoUrl}
           className="preview-video-player"
-          src={videoUrl}
+          src={videoUrl || undefined}
           controls
           playsInline
-        /> : cp && <Player
-            key={`${project.projectId}-${selectedScene}`}
-            component={UltimateVideoV2}
-            durationInFrames={cp.durationInFrames}
-            fps={cp.fps}
-            compositionWidth={cp.width}
-            compositionHeight={cp.height}
-            controls
-            loop
-            initialFrame={sceneStart}
-            inputProps={{...project, compiledProject: cp}}
-            style={{width: '100%', height: '100%', background: '#fffaf2'}}
-          />}
+        />
       </div>
       <div className="preview-meta preview-meta--bottom">
         <span>{projectTitle}</span>

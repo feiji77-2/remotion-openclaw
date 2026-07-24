@@ -1,8 +1,19 @@
 import type {VideoProject} from '../../project/projectSchema';
+import type {ComponentLibraryItem} from './component-library-model';
 
 export type RunnerStatus = 'checking' | 'online' | 'offline';
 export type JobStatus = 'running' | 'done' | 'failed';
 export type StageStatus = 'missing' | 'stale' | 'current';
+export type CommandId =
+  | 'build-project'
+  | 'project-check'
+  | 'project-still'
+  | 'project-scene-stills'
+  | 'project-render'
+  | 'project-verify'
+  | 'build-check'
+  | 'build-check-audio'
+  | 'render-verify';
 export type ContractKey = 'brief.json' | 'script-pack.json' | 'asset-pack.json' | 'project.json';
 export type Tone = 'info' | 'success' | 'warning' | 'danger';
 
@@ -32,34 +43,38 @@ export interface JobDiagnostic {
 export interface JobStep {
   id: string;
   label: string;
+  kind: 'process' | 'save-inputs' | 'internal';
+  command: string[] | null;
   status: 'pending' | JobStatus;
-  startedAt?: string | null;
-  finishedAt?: string | null;
-  exitCode?: number | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  exitCode: number | null;
   error: string | null;
 }
 
 export interface RunnerJob {
   id: string;
-  commandId: string;
-  workflowId?: string | null;
+  commandId: CommandId;
+  workflowId: string | null;
   label: string;
   project: ProjectOption;
+  projectId: string | null;
   command: string;
   status: JobStatus;
-  currentStep?: string | null;
+  currentStep: string | null;
   steps: JobStep[];
   logs: string[];
   diagnostics: JobDiagnostic[];
   exitCode: number | null;
   error: string | null;
-  startedAt?: string;
-  finishedAt?: string | null;
-  updatedAt?: string | null;
-  artifact?: {
+  retryOf: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  updatedAt: string | null;
+  artifact: {
     kind: 'image' | 'video' | 'json';
     path: string;
-    url?: string;
+    url?: string | null;
   } | null;
 }
 
@@ -73,10 +88,16 @@ export interface ProjectStage {
 
 export interface ProjectState {
   projectId: string;
+  fingerprints: {
+    contentHash: string;
+    assetHash: string;
+    projectHash: string | null;
+    rendererHash: string;
+  };
   stages: {
     project: ProjectStage;
     preview: ProjectStage;
-    sceneStills?: ProjectStage;
+    sceneStills: ProjectStage;
     render: ProjectStage;
     verify: ProjectStage;
   };
@@ -95,7 +116,7 @@ export interface VideoLibraryRecord {
   createdAt: string;
   status: VideoLibraryStatus;
   playbackUrl: string;
-  downloadUrl?: string | null;
+  downloadUrl: string | null;
   downloadAllowed: boolean;
   failureMessage: string | null;
   sourceJobId: string;
@@ -167,19 +188,42 @@ export interface CreateProjectDraft {
   keywords: string;
 }
 
+export interface ProjectContractPaths {
+  brief: string;
+  scriptPack: string;
+  assetPack: string;
+  projectJson: string;
+}
+
 export interface CreateProjectResult {
   ok: true;
   project: ProjectOption;
-  files: {
-    brief: string;
-    scriptPack: string;
-    assetPack: string;
-    projectJson: string;
-  };
+  files: ProjectContractPaths;
 }
 
-export interface CreateProjectError {
+export interface UploadedAudioAsset {
+  src: string;
+  path: string;
+  fileName: string;
+  size: number;
+  contentType: string;
+}
+
+export interface ComponentLibraryResponse {
+  ok: true;
+  available: boolean;
+  sourceRoot: string;
+  version: number | string | null;
+  warning?: string;
+  components: ComponentLibraryItem[];
+}
+
+export interface ErrorResponse {
   ok: false;
   error: string;
+  code?: string;
   path?: string;
+  diagnostics?: JobDiagnostic[];
 }
+
+export interface CreateProjectError extends ErrorResponse {}

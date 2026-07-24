@@ -24,7 +24,7 @@ const readableExampleContractFiles = new Set([
   'examples/asset-pack.json',
   'examples/skill-showcase.json',
 ]);
-const publicArtifactExtensions = new Set(['.json', '.m4a', '.mp3', '.mp4', '.png', '.jpg', '.jpeg', '.svg', '.wav', '.webm']);
+const publicArtifactExtensions = new Set(['.json', '.aac', '.m4a', '.mp3', '.mp4', '.ogg', '.png', '.jpg', '.jpeg', '.svg', '.wav', '.webm']);
 
 export class StudioHttpError extends Error {
   constructor(status, code, message, diagnostics = []) {
@@ -289,13 +289,14 @@ export const computeFingerprints = async (projectRoot, project) => {
   const productionRoot = path.join(projectRoot, project.productionPath);
   const briefFile = path.join(productionRoot, 'brief.json');
   const scriptFile = path.join(productionRoot, 'script-pack.json');
+  const captionsFile = path.join(productionRoot, 'captions.json');
   const assetPackFile = path.join(productionRoot, 'asset-pack.json');
   const projectFile = path.join(projectRoot, project.projectJsonPath);
   const publicRoot = path.join(projectRoot, 'public');
   const assetFiles = await declaredAssetFiles(assetPackFile, publicRoot);
 
   return {
-    contentHash: await hashFiles(projectRoot, [briefFile, scriptFile]),
+    contentHash: await hashFiles(projectRoot, [briefFile, scriptFile, captionsFile]),
     assetHash: await hashFiles(projectRoot, [assetPackFile, ...assetFiles]),
     projectHash: existsSync(projectFile) ? await hashFiles(projectRoot, [projectFile]) : null,
     rendererHash: await hashRendererSource(projectRoot),
@@ -313,7 +314,10 @@ const coreMatches = (marker, fingerprints) => Boolean(
 
 const buildCheckMatches = (marker, fingerprints) => Boolean(
   coreMatches(marker, fingerprints)
-  && (marker.commandId === 'build-check' || marker.workflowId === 'build-check'),
+  && (
+    ['build-check', 'build-check-audio'].includes(marker.commandId)
+    || ['build-check', 'build-check-audio'].includes(marker.workflowId)
+  ),
 );
 
 const artifactState = ({marker, fingerprints, signature}) => {
@@ -351,6 +355,13 @@ export const computeProjectState = async (projectRoot, project, record = {}) => 
     updatedAt: record.updatedAt ?? null,
   };
 };
+
+export const canPromoteCheckedProject = (previousBuildCheck, checkedFingerprints) => Boolean(
+  previousBuildCheck
+  && previousBuildCheck.contentHash === checkedFingerprints.contentHash
+  && previousBuildCheck.assetHash === checkedFingerprints.assetHash
+  && previousBuildCheck.rendererHash === checkedFingerprints.rendererHash,
+);
 
 export const projectStateFile = (runtimeRoot, projectId) => path.join(runtimeRoot, 'project-states', `${projectId}.json`);
 
@@ -390,7 +401,16 @@ export const commandStepsFor = (commandId, project, execPath = process.execPath)
       ['verify', 'Verify MP4', [execPath, 'scripts/verify-project-render.mjs', '--props', project.projectJsonPath, '--video', project.outputVideoPath]],
     ],
     'build-check': [
-      ['build', 'Build Project', ['npm', 'run', 'project:from-pack', '--', project.productionPath]],
+      ['build', 'Build Project', ['npm', 'run', 'project:from-pack', '--', project.productionPath, '--ignore-captions']],
+      ['tts', 'Synthesize Voiceover', ['npm', 'run', 'tts:project', '--', project.projectJsonPath, '--asset-pack', `${project.productionPath}/asset-pack.json`]],
+      ['align-captions', 'Align Captions To Voiceover', ['npm', 'run', 'audio:align-captions', '--', '--project', project.projectJsonPath, '--asset-pack', `${project.productionPath}/asset-pack.json`, '--captions-out', `${project.productionPath}/captions.json`, '--asr-out', `${project.productionPath}/asr.json`]],
+      ['rebuild', 'Rebuild Project With Voiceover', ['npm', 'run', 'project:from-pack', '--', project.productionPath, '--captions', 'captions.json']],
+      ['check', 'Check Project', ['npm', 'run', 'project:check', '--', project.projectJsonPath]],
+    ],
+    'build-check-audio': [
+      ['build', 'Build Project', ['npm', 'run', 'project:from-pack', '--', project.productionPath, '--ignore-captions']],
+      ['align-captions', 'Align Captions To Uploaded Audio', ['npm', 'run', 'audio:align-captions', '--', '--project', project.projectJsonPath, '--asset-pack', `${project.productionPath}/asset-pack.json`, '--captions-out', `${project.productionPath}/captions.json`, '--asr-out', `${project.productionPath}/asr.json`]],
+      ['rebuild', 'Rebuild Project With Voiceover', ['npm', 'run', 'project:from-pack', '--', project.productionPath, '--captions', 'captions.json']],
       ['check', 'Check Project', ['npm', 'run', 'project:check', '--', project.projectJsonPath]],
     ],
     'render-verify': [
@@ -419,7 +439,7 @@ export const artifactForCommand = (commandId, project) => {
   if (commandId === 'project-render' || commandId === 'project-verify' || commandId === 'render-verify') {
     return {kind: 'video', path: project.outputVideoPath};
   }
-  if (commandId === 'build-project' || commandId === 'project-check' || commandId === 'build-check') {
+  if (commandId === 'build-project' || commandId === 'project-check' || commandId === 'build-check' || commandId === 'build-check-audio') {
     return {kind: 'json', path: project.projectJsonPath};
   }
   return null;
@@ -573,22 +593,31 @@ export const recordRenderedVideo = async ({
     sourceJobId: String(sourceJobId),
   };
   const records = await loadVideoLibraryRecords(file);
-  await persistVideoLibraryRecords(file, [record, ...records.filter((item) => item.sourceJobId !== record.sourceJobId)]);
+  await persistVideoLibraryRecords(file, [record, ...records.filter((item) => (
+    item.sourceJobId !== record.sourceJobId
+    && !(item.projectId === record.projectId && item.videoPath === record.videoPath)
+  ))]);
   return record;
 };
 
-export const markVideoVerification = async ({file, sourceJobId, ok, failureMessage = null}) => {
+export const markVideoVerification = async ({file, sourceJobId, projectId = null, videoPath = null, ok, failureMessage = null}) => {
   const records = await loadVideoLibraryRecords(file);
   const index = records.findIndex((record) => record.sourceJobId === sourceJobId);
-  if (index < 0) return null;
-  const current = records[index];
+  const fallbackIndex = index >= 0 ? index : records.findIndex((record) => (
+    projectId
+    && videoPath
+    && record.projectId === projectId
+    && record.videoPath === videoPath
+  ));
+  if (fallbackIndex < 0) return null;
+  const current = records[fallbackIndex];
   const next = {
     ...current,
     status: ok ? 'downloadable' : 'verification-failed',
     downloadAllowed: Boolean(ok),
     failureMessage: ok ? null : String(failureMessage || '视频文件检查未通过'),
   };
-  records[index] = next;
+  records[fallbackIndex] = next;
   await persistVideoLibraryRecords(file, records);
   return next;
 };

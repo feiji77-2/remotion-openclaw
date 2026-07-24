@@ -1,42 +1,37 @@
 # Contributing
 
-All production changes must stay inside the current Skill Showcase contract.
+## Before Editing
 
-Before submitting a change, run:
+1. Read [AGENTS.md](AGENTS.md), [CONTRACT.md](CONTRACT.md), and the affected implementation/tests.
+2. Inspect `git status --short` and preserve existing user changes.
+3. Identify the owning boundary in [ARCHITECTURE.md](ARCHITECTURE.md).
+4. Define the behavior to verify before changing code.
 
-```bash
-npm run typecheck
-npm test
-npm run project:check -- examples/skill-showcase.json
-npm run project:visual-check -- examples/skill-showcase.json
-npm --prefix remotion-video run skill:gate
-npm --prefix remotion-video run storyboard:check
-git diff --check
-```
+For substantial new capability, inspect a mature open-source analogue for proven patterns. Do not inherit an incompatible framework or architecture.
 
-Open the rendered Still and relevant contact sheet before describing a visual change as accepted. Exit codes prove executable contracts, not composition quality.
+## Change Routing
 
-## Current Boundaries
+| Change | Update together |
+|---|---|
+| Public HTTP contract | `CONTRACT.md`, backend, `api.ts`, `types.ts`, provider/consumer tests |
+| Workflow gate or invalidation | `CONTRACT.md`, `workflow-model.ts`, workflow tests, affected UI tests |
+| Visual capability | schema/types, generator, renderer, visual contract, tests, architecture/docs |
+| User interaction or layout | owning component/CSS, focused tests, Studio build, UI e2e |
+| Documentation only | the single owning document; link instead of copying rules elsewhere |
 
-- Do not add another scene family, Remotion Composition, or renderer branch.
-- `11 Cinematic + 9 Hero Track` is the current accepted Storyboard catalog, not a permanent expansion ceiling.
-- 10 technical Hero shots are `HeroTrackState.shot.kind` values inside `hero-track-v2`; they are not standalone catalog components.
-- Documentation truth lives in `README.md`, `ARCHITECTURE.md`, and `docs/`.
+Production-specific visual constraints are listed in [docs/PRODUCTION-GUARDRAILS.zh-CN.md](docs/PRODUCTION-GUARDRAILS.zh-CN.md).
 
-## Adding Visual Capability
+## Verification
 
-- A new Cinematic preset must update types, Zod schema, renderer, visual contract, tests, and documentation.
-- A new Hero Track kind must update types, Zod schema, generator, renderer, visual contract, tests, storyboard contract, and documentation.
-- A new technical Hero shot must update `HeroShotKind`, Zod schema, generator/fallback routing, `TechnicalShotHero`, visual contract, tests, and documentation.
-- Candidate components may exist in source, but must be documented as not yet part of the production path until those gates pass.
+Run every always-required command and every applicable surface-specific command from the matrix in [CONTRACT.md](CONTRACT.md#8-required-verification). Visual changes require direct inspection of a current Still, contact sheet, or MP4; an exit code alone is not visual acceptance.
 
-## Forbidden Regressions
+For production renderer changes, also run the same Project JSON through baseline and after generation paths, then inspect:
 
-- Do not add `NarrationSemanticSurface`.
-- Do not add `retargetHeroTrackForComponent`.
-- Do not pass `componentId` into `HeroTrackV2` as the primary visual driver.
-- Do not solve narration mismatch by adding unrelated material-library animation.
-- Do not let bottom captions update while top Hero evidence or middle semantic beats stay stale.
-- Do not use external memory, Codex memory, or deleted document systems as current source of truth.
+- component usage report
+- visual check
+- QA contact sheet
+- rendered MP4
 
-Every new production rule must point to a current code path, schema, generator, renderer, contract, test, or command. Do not submit documentation that only redirects to another document.
+If the current output still shows the same generic shell or unreadable wireframe behavior, iterate before submitting.
+
+Before delivery, run `git diff --check`, inspect the final diff/status, and report exact results plus genuine residual risk.

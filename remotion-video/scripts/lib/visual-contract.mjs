@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
+import {productionComponentCatalog} from "./semantic-component-resolver.mjs";
 
 const GOLDEN_PROJECT_ID = "workbuddy-six-skills-showcase";
 
@@ -78,7 +80,12 @@ const HERO_SHOT_KINDS = new Set([
   "asset-library",
   "system-map",
   "before-after",
+  "metric-highlight",
+  "concept-explainer",
 ]);
+const PRODUCTION_COMPONENTS = new Map(
+  productionComponentCatalog.components.map((descriptor) => [descriptor.componentId, descriptor]),
+);
 
 const collectStrings = (value, output = []) => {
   if (typeof value === "string") {
@@ -92,6 +99,49 @@ const collectStrings = (value, output = []) => {
   }
   if (value && typeof value === "object") {
     Object.values(value).forEach((item) => collectStrings(item, output));
+  }
+  return output;
+};
+
+const VISUAL_METADATA_KEYS = new Set([
+  "accent",
+  "brandIcon",
+  "captionEndIndex",
+  "captionStartIndex",
+  "componentId",
+  "diagnostics",
+  "heroStyle",
+  "kind",
+  "labelIcons",
+  "layoutSignature",
+  "narrativeSignal",
+  "productIcon",
+  "productIcons",
+  "progressIndex",
+  "progressTotal",
+  "rendererComponentId",
+  "resolution",
+  "signal",
+  "sourceComponentId",
+  "variant",
+  "visualMode",
+]);
+
+const collectVisibleStrings = (value, output = []) => {
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (text) output.push(text);
+    return output;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectVisibleStrings(item, output));
+    return output;
+  }
+  if (value && typeof value === "object") {
+    Object.entries(value).forEach(([key, item]) => {
+      if (VISUAL_METADATA_KEYS.has(key)) return;
+      collectVisibleStrings(item, output);
+    });
   }
   return output;
 };
@@ -263,7 +313,11 @@ const checkBeats = (
         `scenes[${sceneIndex}].payload.beats[${beatIndex}]: beat exceeds scene duration`,
       );
     }
-    if (previousEnd !== null && beat.startFrame - previousEnd > 6) {
+    if (
+      previousEnd !== null &&
+      !requireCaptionBinding &&
+      beat.startFrame - previousEnd > 6
+    ) {
       errors.push(
         `scenes[${sceneIndex}].payload.beats[${beatIndex}]: visible beat gap exceeds 6 frames`,
       );
@@ -503,7 +557,7 @@ const checkHeroTrack = (scene, sceneIndex, captions, errors) => {
         } else {
           if (!HERO_SHOT_KINDS.has(state.shot.kind)) {
             errors.push(
-              `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].shot.kind must be one of the 10 technical Hero shot kinds`,
+              `scenes[${sceneIndex}].payload.heroTrack.states[${stateIndex}].shot.kind must be one of the 12 production shot kinds`,
             );
           }
           if (asArray(state.shot.evidence).length === 0) {
@@ -548,6 +602,104 @@ const checkHeroTrack = (scene, sceneIndex, captions, errors) => {
   }
 };
 
+const narrationHashForCaptions = (captions) => createHash("sha256")
+  .update(JSON.stringify(captions.map(({text, startMs, endMs}) => ({text, startMs, endMs}))))
+  .digest("hex");
+
+const checkVisualPlan = (project, scenes, captions, errors, {required}) => {
+  const plan = project?.visualPlan;
+  if (!plan) {
+    if (required) errors.push("visualPlan is required for non-golden production projects");
+    return;
+  }
+  if (plan.version !== 1 || plan.generatedFrom !== "captions") {
+    errors.push("visualPlan must declare version=1 and generatedFrom=captions");
+  }
+  if (plan.narrationHash !== narrationHashForCaptions(captions)) {
+    errors.push("visualPlan.narrationHash does not match the current caption text and timestamps");
+  }
+  const entries = asArray(plan.entries);
+  const coveredCaptions = new Map();
+  const byScene = new Map();
+  entries.forEach((entry, entryIndex) => {
+    const prefix = `visualPlan.entries[${entryIndex}]`;
+    const scene = scenes[entry.sceneIndex];
+    if (!scene || scene.id !== entry.sceneId) {
+      errors.push(`${prefix}: sceneId/sceneIndex must reference the same current scene`);
+      return;
+    }
+    const sceneEntries = byScene.get(entry.sceneId) ?? [];
+    sceneEntries.push(entry);
+    byScene.set(entry.sceneId, sceneEntries);
+    for (let captionIndex = entry.captionStartIndex; captionIndex <= entry.captionEndIndex; captionIndex += 1) {
+      coveredCaptions.set(captionIndex, (coveredCaptions.get(captionIndex) ?? 0) + 1);
+    }
+    const caption = captions[entry.captionStartIndex];
+    const endCaption = captions[entry.captionEndIndex];
+    const sceneStartCaption = captions[scene.captionRange?.startIndex];
+    if (!caption || !endCaption || !sceneStartCaption) {
+      errors.push(`${prefix}: caption range points outside the current scene captions`);
+      return;
+    }
+    const expectedStart = frameForMs(caption.startMs) - frameForMs(sceneStartCaption.startMs);
+    const nextCaption = captions[entry.captionEndIndex + 1];
+    const expectedEnd = nextCaption && entry.captionEndIndex < scene.captionRange.endIndex
+      ? frameForMs(nextCaption.startMs) - frameForMs(sceneStartCaption.startMs)
+      : frameForMs(endCaption.endMs) - frameForMs(sceneStartCaption.startMs);
+    if (entry.startFrame !== expectedStart || entry.endFrame !== expectedEnd) {
+      errors.push(`${prefix}: startFrame/endFrame must be derived from the bound caption timestamps`);
+    }
+    if (!sourceTextIsCoveredByNarration(entry.intent?.sourceText, captionTextForRange(captions, entry.captionStartIndex, entry.captionEndIndex))) {
+      errors.push(`${prefix}.intent.sourceText must come from the bound caption text`);
+    }
+    if (entry.intent?.shotKind !== entry.shot?.kind) {
+      errors.push(`${prefix}: semantic intent shotKind must match shot.kind`);
+    }
+    const descriptor = PRODUCTION_COMPONENTS.get(entry.componentId);
+    if (!descriptor || !descriptor.productionReady) {
+      errors.push(`${prefix}.componentId must resolve to a productionReady component`);
+    } else {
+      if (!descriptor.compatibleIntents.includes(entry.intent?.key)) {
+        errors.push(`${prefix}.componentId is incompatible with intent=${entry.intent?.key}`);
+      }
+      if (!descriptor.compatibleShotKinds.includes(entry.shot?.kind)) {
+        errors.push(`${prefix}.componentId is incompatible with shot=${entry.shot?.kind}`);
+      }
+    }
+    if (entry.resolution !== "matched" || asArray(entry.diagnostics).some((diagnostic) => diagnostic?.level === "error")) {
+      errors.push(`${prefix}: fallback/error Visual Plan entries cannot enter a production render`);
+    }
+    const state = asArray(scene.payload?.heroTrack?.states).find((candidate) => candidate?.visualPlanEntryId === entry.id)
+      ?? asArray(scene.payload?.heroTrack?.states).find((candidate) => candidate?.captionStartIndex === entry.captionStartIndex);
+    if (!state || state.componentId !== entry.componentId || state.shot?.kind !== entry.shot?.kind) {
+      errors.push(`${prefix}: scene Hero state must be derived from the same component and shot`);
+    }
+  });
+
+  if (entries.length === 0) errors.push("visualPlan.entries must contain at least one production entry");
+  captions.forEach((_, captionIndex) => {
+    if (coveredCaptions.get(captionIndex) !== 1) {
+      errors.push(`visualPlan must cover captions[${captionIndex}] exactly once`);
+    }
+  });
+  scenes.forEach((scene, sceneIndex) => {
+    const sceneEntries = byScene.get(scene.id) ?? [];
+    if (required && sceneEntries.length === 0) {
+      errors.push(`scenes[${sceneIndex}] has no Visual Plan entries`);
+      return;
+    }
+    if (sceneEntries.length > 0 && (sceneEntries[0].startFrame !== 0 || sceneEntries.at(-1).endFrame !== scene.durationInFrames)) {
+      errors.push(`scenes[${sceneIndex}] Visual Plan entries must cover the complete scene duration`);
+    }
+    sceneEntries.forEach((entry, entryIndex) => {
+      const previous = sceneEntries[entryIndex - 1];
+      if (previous && entry.startFrame !== previous.endFrame) {
+        errors.push(`scenes[${sceneIndex}] Visual Plan entries must be continuous`);
+      }
+    });
+  });
+};
+
 export const checkVisualContract = (
   project,
   { projectRoot = process.cwd() } = {},
@@ -567,8 +719,11 @@ export const checkVisualContract = (
     project?.captions,
   ]).join("\n");
   const isGolden = isGoldenNarration(project, narrationText);
-  const visualText = collectStrings(
-    skillScenes.map((scene) => scene.payload),
+  const visualText = collectVisibleStrings(
+    skillScenes.map((scene) => {
+      const { sceneEditor: _sceneEditor, ...renderedPayload } = scene.payload ?? {};
+      return renderedPayload;
+    }),
   ).join("\n");
 
   if (project?.projectId === GOLDEN_PROJECT_ID && !isGolden) {
@@ -576,6 +731,8 @@ export const checkVisualContract = (
       `projectId=${GOLDEN_PROJECT_ID} is reserved for the WorkBuddy golden sample; changed narration must use a new projectId and regenerated scenes`,
     );
   }
+
+  checkVisualPlan(project, skillScenes, captions, errors, {required: !isGolden});
 
   let previousRange = null;
   const layoutSignatures = [];

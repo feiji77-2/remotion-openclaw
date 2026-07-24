@@ -64,7 +64,7 @@ const waitForFile = async (file, timeoutMs) => {
 const startServer = async () => {
   server = spawn('node', [path.join(projectRoot, 'scripts', 'tools-studio-server.mjs')], {
     cwd: projectRoot,
-    env: {...process.env, VIDEO_FACTORY_PORT: String(port), VIDEO_FACTORY_RUNTIME_DIR: runtimeRel},
+    env: {...process.env, VIDEO_FACTORY_PORT: String(port), VIDEO_FACTORY_RUNTIME_DIR: runtimeRel, VIDEO_FACTORY_SKIP_TTS: '1'},
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   server.stdout.on('data', (chunk) => console.log(String(chunk).trim()));
@@ -129,6 +129,38 @@ const clickWhenEnabled = async (page, text, timeoutMs = 30000) => {
   return false;
 };
 
+const clickProductionStepWhenEnabled = async (page, label, timeoutMs = 30000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const clicked = await page.evaluate((expected) => {
+      const buttons = [...document.querySelectorAll('.production-nav__list .production-step')];
+      const button = buttons.find((item) => item.querySelector('.production-step__label')?.textContent.trim() === expected);
+      if (!button || button.disabled) return false;
+      button.click();
+      return true;
+    }, label);
+    if (clicked) return true;
+    await delay(250);
+  }
+  return false;
+};
+
+const waitButtonState = async (page, text, {enabled, timeoutMs = 30000}) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const matched = await page.evaluate(({label, shouldBeEnabled}) => {
+      const normalize = (value) => String(value || '').trim().replace(/\s+/g, ' ');
+      const button = [...document.querySelectorAll('button')].find((item) => normalize(item.textContent) === label);
+      if (!button) return false;
+      const rect = button.getBoundingClientRect();
+      return rect.width > 2 && rect.height > 2 && button.disabled === !shouldBeEnabled;
+    }, {label: text, shouldBeEnabled: enabled});
+    if (matched) return true;
+    await delay(250);
+  }
+  return false;
+};
+
 const waitWorkspaceHeading = async (page, expected, timeoutMs = 30000) => {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -158,9 +190,13 @@ const findFieldSelector = async (page, labelText) => page.evaluate((needle) => {
   return '[data-e2e-field="' + key + '"]';
 }, labelText);
 
-const waitForJobFromClick = async (page, buttonText, timeoutMs = 180000) => {
+const waitForJobFromClick = async (page, buttonText, timeoutMs = 180000, expectedCommandId = null) => {
   const responsePromise = page.waitForResponse((response) => (
     response.url().endsWith('/api/jobs') && response.request().method() === 'POST'
+    && (!expectedCommandId || (() => {
+      try { return JSON.parse(response.request().postData() || '{}').commandId === expectedCommandId; }
+      catch { return false; }
+    })())
   ), {timeout: 45000});
   const clicked = await clickWhenEnabled(page, buttonText);
   if (!clicked) {
@@ -172,7 +208,7 @@ const waitForJobFromClick = async (page, buttonText, timeoutMs = 180000) => {
   assert(payload?.job?.id, 'job response missing id');
   const job = await pollJob(payload.job.id, timeoutMs);
   assert(job, 'job timeout: ' + payload.job.id);
-  assert(job.status === 'done', 'job failed: ' + (job.error || job.id));
+  assert(job.status === 'done', 'job failed: ' + JSON.stringify({error: job.error, diagnostics: job.diagnostics, logs: job.logs?.slice(-12)}));
   return job;
 };
 
@@ -192,15 +228,15 @@ const main = async () => {
   page.on('console', (message) => { if (message.type() === 'error') pageErrors.push(message.text()); });
   await page.goto('http://127.0.0.1:' + port + '/', {waitUntil: 'networkidle0'});
 
-  await run('T1 default home', async () => {
-    assert(await waitText(page, '开始生产'), 'home title missing');
-    assert(await waitText(page, '最近生成视频'), 'recent outputs missing');
+  await run('T1 direct studio entry', async () => {
+    assert(await waitText(page, 'Video Factory'), 'product title missing');
+    assert(await waitText(page, '执行器在线', 12000), 'runner badge missing');
   });
 
-  await run('T2 enter studio', async () => {
-    assert(await clickByText(page, '打开工作台'), 'open studio button missing');
-    assert(await waitText(page, '执行器在线', 12000), 'runner badge missing');
+  await run('T2 studio shell contract', async () => {
     assert(await page.$('select[aria-label="当前项目"]'), 'project selector missing');
+    assert(await page.$('.production-nav[aria-label="视频生产流程"]'), 'production navigation missing');
+    assert(await page.$('.studio-workspace'), 'studio workspace missing');
   });
 
   await run('T3 new project modal contract', async () => {
@@ -257,45 +293,54 @@ const main = async () => {
 
   await run('T6 seven stage navigation', async () => {
     const state = await page.evaluate(() => ({
-      labels: [...document.querySelectorAll('.production-step__label')].map((item) => item.textContent.trim()),
-      reasons: [...document.querySelectorAll('.production-step:disabled .production-step__state')].map((item) => item.textContent.trim()),
+      labels: [...document.querySelectorAll('.production-nav__list .production-step__label')].map((item) => item.textContent.trim()),
+      reasons: [...document.querySelectorAll('.production-nav__list .production-step:disabled .production-step__state')].map((item) => item.textContent.trim()),
     }));
     assert(state.labels.length === 7, 'expected seven navigation nodes');
-    assert(state.labels[0] === '文案制作' && state.labels[1] === '口播文案', 'navigation order mismatch');
+    assert(state.labels.join(',') === '文案制作,口播文案,语音,风格,分镜,渲染,交付', 'navigation order mismatch');
     assert(state.reasons.length > 0 && state.reasons.every(Boolean), 'disabled reasons missing');
   });
 
-  await run('T7 save script and build storyboard', async () => {
-    assert(await clickByText(page, '口播文案'), 'script navigation missing');
-    assert(await waitWorkspaceHeading(page, '文案'), 'script workspace missing');
-    assert(await waitText(page, '分镜已是最新', 30000), 'script workspace did not settle');
+  await run('T7 save spoken script', async () => {
+    assert(await clickProductionStepWhenEnabled(page, '口播文案'), 'script navigation missing');
+    assert(await waitWorkspaceHeading(page, '口播文案'), 'script workspace missing');
+    assert(await waitButtonState(page, '口播稿已保存', {enabled: false}), 'script workspace did not settle');
     const titleSelector = await findFieldSelector(page, '视频标题');
     const scriptSelector = await findFieldSelector(page, '口播稿');
     assert(titleSelector && scriptSelector, 'script fields missing');
     const updatedScript = '冷启动分镜刷新验证：这一版口播必须替换旧内容。第一段说明新项目已经选中。第二段强调保存后要重新生成字幕。第三段要求分镜标题和画面信息都来自这段新稿。';
     await setValue(page, titleSelector, 'UI 测试更新后的标题');
     await setValue(page, scriptSelector, updatedScript);
-    assert(await waitText(page, '保存并更新分镜', 5000), 'script change did not become dirty');
-    await waitForJobFromClick(page, '保存并更新分镜');
-    assert(await waitWorkspaceHeading(page, '分镜'), 'storyboard workspace missing');
-    const project = (await apiGet('/api/files?path=' + encodeURIComponent('projects/' + projectId + '/project.json'))).json?.file?.data;
+    assert(await waitButtonState(page, '保存口播稿', {enabled: true}), 'script change did not become saveable');
+    assert(await clickByText(page, '保存口播稿'), 'save script button missing');
+    assert(await waitButtonState(page, '口播稿已保存', {enabled: false, timeoutMs: 15000}), 'script did not settle after save');
     const scriptPack = (await apiGet('/api/files?path=' + encodeURIComponent('projects/' + projectId + '/script-pack.json'))).json?.file?.data;
     assert(scriptPack?.spokenScript === updatedScript, 'updated spoken script was not persisted');
-    assert(project?.title === 'UI 测试更新后的标题', 'project title did not update from script workspace');
-    assert(project?.captions?.some((caption) => caption.text.includes('冷启动分镜刷新验证')), 'project captions still use old script');
-    assert(project?.scenes?.some((scene) => String(scene.payload?.sourceText || scene.payload?.body || '').includes('分镜标题和画面信息')), 'storyboard scenes still use old script');
-    assert(Array.isArray(project?.scenes) && project.scenes.length > 0, 'project scenes missing');
     await page.reload({waitUntil: 'networkidle0'});
-    assert(await clickByText(page, '打开工作台'), 'open studio after reload missing');
     assert(await waitText(page, '执行器在线', 12000), 'runner badge after reload missing');
     const selectedAfterReload = await page.$eval('select[aria-label="当前项目"]', (select) => select.value);
     assert(selectedAfterReload.includes('/' + projectId + '/'), 'last selected project was not restored after reload');
   });
 
-  await run('T8 style sample candidate and explicit apply', async () => {
-    assert(await clickWhenEnabled(page, '风格'), 'style navigation did not unlock');
-    const samples = await page.$$('.style-option video');
-    assert(samples.length === 4, 'expected four real style samples');
+  await run('T8 voice synthesis gate', async () => {
+    assert(await clickProductionStepWhenEnabled(page, '语音'), 'voice navigation did not unlock');
+    assert(await waitWorkspaceHeading(page, '语音'), 'voice workspace missing');
+    await waitForJobFromClick(page, '合成语音', 240000, 'build-check');
+    assert(await waitText(page, '已有音轨', 30000), 'voice asset did not become ready');
+    const assetPack = (await apiGet('/api/files?path=' + encodeURIComponent('projects/' + projectId + '/asset-pack.json'))).json?.file?.data;
+    assert(assetPack?.assets?.some((asset) => asset.id === 'voiceover' && asset.kind === 'audio'), 'voiceover asset was not persisted');
+    const project = (await apiGet('/api/files?path=' + encodeURIComponent('projects/' + projectId + '/project.json'))).json?.file?.data;
+    assert(project?.title === 'UI 测试更新后的标题', 'project title did not update from script workspace');
+    assert(project?.captions?.some((caption) => caption.text.includes('冷启动分镜刷新验证')), 'project captions still use old script');
+    assert(project?.scenes?.some((scene) => String(scene.payload?.sourceText || scene.payload?.body || '').includes('分镜标题和画面信息')), 'storyboard scenes still use old script');
+    assert(Array.isArray(project?.scenes) && project.scenes.length > 0, 'project scenes missing');
+  });
+
+  await run('T9 style candidate and explicit save', async () => {
+    assert(await clickProductionStepWhenEnabled(page, '风格'), 'style navigation did not unlock');
+    assert(await waitWorkspaceHeading(page, '风格'), 'style workspace missing');
+    const samples = await page.$$('.style-option');
+    assert(samples.length === 4, 'expected four style options');
     let settled = false;
     for (let attempt = 0; attempt < 48; attempt += 1) {
       const action = await page.evaluate(() => document.querySelector('.studio-workspace .primary-action')?.textContent.trim() || '');
@@ -307,59 +352,91 @@ const main = async () => {
       const option = [...document.querySelectorAll('[role="radio"]')].find((item) => item.getAttribute('aria-label')?.includes('瑞士极简'));
       option?.click();
     });
-    let playback = {selected: 0, playing: 0};
+    let selectedLabel = '';
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      playback = await page.evaluate(() => ({
-        selected: document.querySelectorAll('[role="radio"][aria-checked="true"]').length,
-        playing: [...document.querySelectorAll('.style-option video')].filter((video) => !video.paused).length,
-      }));
-      if (playback.selected === 1 && playback.playing <= 1) break;
+      selectedLabel = await page.evaluate(() => document.querySelector('[role="radio"][aria-checked="true"]')?.getAttribute('aria-label') || '');
+      if (selectedLabel.includes('瑞士极简')) break;
       await delay(250);
     }
-    assert(playback.selected === 1 && playback.playing <= 1, 'style sample selection is not exclusive: ' + JSON.stringify(playback));
-    await waitForJobFromClick(page, '应用候选风格');
-    assert(await waitWorkspaceHeading(page, '分镜'), 'style refresh did not return to storyboard');
+    assert(selectedLabel.includes('瑞士极简'), 'style selection did not settle: ' + selectedLabel);
+    assert(await waitButtonState(page, '保存风格', {enabled: true}), 'save style button missing');
+    assert(await clickByText(page, '保存风格'), 'save style click failed');
+    assert(await waitButtonState(page, '先选择一个风格', {enabled: false, timeoutMs: 15000}), 'style did not settle after save');
+    assert(await clickProductionStepWhenEnabled(page, '分镜'), 'storyboard navigation did not unlock');
+    assert(await waitWorkspaceHeading(page, '当前分镜'), 'storyboard workspace missing');
   });
 
-  await run('T9 scene timeline labels', async () => {
+  await run('T10 scene timeline labels', async () => {
     const text = await page.$eval('.scene-timeline', (element) => element.innerText);
     assert(!text.includes('Cinematic') && !text.includes('Hero Track'), 'renderer names leaked into timeline');
     assert((await page.$$('.timeline-scene')).length > 0, 'timeline scenes missing');
-    const firstCard = await page.$('.storyboard-card');
-    assert(firstCard, 'storyboard card missing');
-    await firstCard.click();
+    const firstScene = await page.$('.timeline-scene');
+    assert(firstScene, 'timeline scene missing');
+    await firstScene.click();
     await delay(300);
     const selectedState = await page.evaluate(() => ({
       heading: document.querySelector('.studio-workspace .workspace-heading h1')?.textContent.trim() || '',
-      hasBack: document.body.innerText.includes('返回分镜'),
-      selectedFacts: document.querySelector('.storyboard-card.is-selected .storyboard-card__facts')?.textContent || '',
+      summary: document.querySelector('.scene-edit__summary')?.textContent || '',
       timelineDetail: document.querySelector('.timeline-detail')?.textContent || '',
     }));
-    assert(selectedState.heading === '分镜' && !selectedState.hasBack, 'storyboard card opened a detail page');
-    assert(selectedState.selectedFacts.includes('时长'), 'selected storyboard facts missing');
+    assert(selectedState.heading === '当前分镜', 'timeline selection left storyboard workspace');
+    assert(selectedState.summary.includes('01 /'), 'selected storyboard summary missing');
     assert(selectedState.timelineDetail.includes('01 /'), 'selected scene did not sync to timeline detail');
   });
 
-  await run('T10 current preview gate and still', async () => {
-    assert(await clickWhenEnabled(page, '预览'), 'preview navigation did not unlock');
-    assert(await waitWorkspaceHeading(page, '预览'), 'preview workspace missing');
-    await waitForJobFromClick(page, '生成分镜画面', 240000);
+  await run('T10b component library separates production renderers from preview-only assets', async () => {
+    const library = await apiGet('/api/component-library');
+    assert(library.status === 200 && library.json?.available, 'component library unavailable');
+    const productionComponents = library.json.components.filter((component) => component.source === 'project');
+    const hyperframesComponents = library.json.components.filter((component) => component.source === 'hyperframes');
+    assert(productionComponents.length >= 12, 'production component descriptors were not loaded');
+    assert(productionComponents.every((component) => component.productionReady === true && component.renderer?.componentId), 'production components were not exposed as renderers');
+    assert(hyperframesComponents.every((component) => component.productionReady === false && component.renderer === null), 'HyperFrames preview was exposed as productionReady');
+    assert(await clickByText(page, '组件库'), 'component library navigation missing');
+    assert(await waitWorkspaceHeading(page, '组件库'), 'component library workspace missing');
+    if (hyperframesComponents.length > 0) {
+      const previewCandidate = hyperframesComponents[0];
+      assert(await clickByText(page, '全量'), 'full component scope missing');
+      assert(await clickByText(page, previewCandidate.orientation === 'landscape' ? '横屏' : '竖屏'), 'preview component orientation filter missing');
+      assert(await clickByText(page, previewCandidate.category), 'preview component category filter missing');
+      const selectedRemote = await page.evaluate((sourceId) => {
+        const tile = [...document.querySelectorAll('.component-result')].find((item) =>
+          item.textContent.includes('HyperFrames') && item.textContent.includes(sourceId)
+        );
+        if (!tile) return false;
+        tile.click();
+        return true;
+      }, previewCandidate.label);
+      assert(selectedRemote, 'no HyperFrames preview component found');
+      const applyState = await page.$eval('.component-applybar__action', (button) => ({disabled: button.disabled, text: button.textContent.trim()}));
+      assert(applyState.disabled && applyState.text === '仅供候选预览', 'preview-only component could be applied to production');
+    }
+    const saved = (await apiGet('/api/files?path=' + encodeURIComponent('projects/' + projectId + '/project.json'))).json?.file?.data;
+    assert(!saved?.scenes?.some((scene) => scene.assetIds?.some((id) => String(id).startsWith('hyperframes-'))), 'preview asset leaked into production project');
+  });
+
+  await run('T11 disabled legacy preview and current scene still', async () => {
+    const hasPreviewStep = await page.evaluate(() => [...document.querySelectorAll('.production-nav__list .production-step__label')].some((item) => item.textContent.trim() === '预览'));
+    assert(!hasPreviewStep, 'legacy preview step leaked into production navigation');
+    assert(await clickProductionStepWhenEnabled(page, '分镜', 240000), 'storyboard navigation did not unlock');
+    assert(await waitWorkspaceHeading(page, '当前分镜'), 'storyboard workspace missing');
+    await waitForJobFromClick(page, '渲染关键帧', 240000, 'project-scene-stills');
     const manifest = path.join(projectRoot, 'out', projectId + '-scene-stills', 'manifest.json');
     const firstStill = path.join(projectRoot, 'out', projectId + '-scene-stills', 'scene-01.png');
     assert(await waitForFile(manifest, 120000), 'scene still manifest missing');
     assert(await waitForFile(firstStill, 120000), 'scene still image missing');
     assert(statSync(firstStill).size > 10000, 'scene still image too small');
-    await page.waitForSelector('.scene-preview-tile img', {visible: true, timeout: 30000});
-    assert((await page.$$('.scene-preview-tile')).length > 0, 'scene preview tiles missing');
-    await page.waitForSelector('.portrait-frame', {visible: true, timeout: 10000});
+    await page.waitForSelector('.storyboard-frame img', {visible: true, timeout: 30000});
     const previewText = await page.$eval('.studio-preview', (element) => element.innerText);
     assert(!/VOICE HIT|VOICE \/ VISUAL|FOCUS \/|HERO TRACK|CINEMATIC SHOT|FRAME-LOCKED/i.test(previewText), 'internal renderer labels leaked into preview');
+    await page.waitForSelector('.studio-interaction-lock', {hidden: true, timeout: 240000});
   });
 
   if (!skipRender) {
-    await run('T11 render, library record and download gate', async () => {
-      assert(await clickByText(page, '渲染'), 'render navigation missing');
-      const job = await waitForJobFromClick(page, '生成最终视频', 600000);
+    await run('T12 render, library record and download gate', async () => {
+      assert(await clickProductionStepWhenEnabled(page, '渲染', 240000), 'render navigation did not unlock');
+      assert(await waitWorkspaceHeading(page, '渲染'), 'render workspace missing');
+      const job = await waitForJobFromClick(page, '生成最终视频', 600000, 'render-verify');
       const video = path.join(projectRoot, 'out', projectId + '.mp4');
       assert(await waitForFile(video, 120000) && statSync(video).size > 100000, 'video output missing');
       await page.waitForSelector('.runner-trace', {visible: true, timeout: 30000});
@@ -367,7 +444,8 @@ const main = async () => {
         trace: document.querySelector('.runner-trace')?.textContent || '',
         workspaceVideos: document.querySelectorAll('.studio-workspace .artifact-video').length,
       }));
-      assert(renderUi.trace.includes('代码同步') && renderUi.trace.includes('验收视频文件'), 'render runner trace missing execution detail');
+      assert(renderUi.trace.includes('验收视频文件'), 'render runner trace missing execution detail');
+      assert(!renderUi.trace.includes('代码同步'), 'developer command log leaked into production progress');
       assert(renderUi.workspaceVideos === 0, 'render workspace should not duplicate the video player');
       await page.waitForSelector('.studio-preview .preview-video-player', {visible: true, timeout: 30000});
       const library = await apiGet('/api/video-library');
@@ -377,10 +455,10 @@ const main = async () => {
       assert(download.status === 200, 'protected download rejected');
     });
   } else {
-    pass('T11 render skipped by SKIP_RENDER');
+    pass('T12 render skipped by SKIP_RENDER');
   }
 
-  await run('T12 video library screen', async () => {
+  await run('T13 video library screen', async () => {
     assert(await clickByText(page, '视频库'), 'library button missing');
     await page.waitForSelector('.library-screen', {visible: true, timeout: 10000});
     if (skipRender) assert(await waitText(page, '还没有成片'), 'empty library state missing');
@@ -390,14 +468,14 @@ const main = async () => {
     }
   });
 
-  await run('T13 mobile overflow', async () => {
+  await run('T14 mobile overflow', async () => {
     await page.setViewport({width: 390, height: 844});
     await delay(500);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     assert(overflow <= 1, 'horizontal overflow: ' + overflow);
   });
 
-  await run('T14 runtime errors', async () => {
+  await run('T15 runtime errors', async () => {
     assert(pageErrors.length === 0, 'page errors: ' + pageErrors.join(' | '));
   });
 

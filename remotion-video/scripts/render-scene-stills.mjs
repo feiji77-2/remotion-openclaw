@@ -28,6 +28,7 @@ await withPreparedProject(input, async ({project, prepared, tempPath, warnings})
 
   let cursor = 0;
   const scenes = [];
+  console.log(`[scene-stills] total ${prepared.scenes.length}`);
   for (let index = 0; index < prepared.scenes.length; index += 1) {
     const scene = prepared.scenes[index];
     const startFrame = cursor;
@@ -37,6 +38,7 @@ await withPreparedProject(input, async ({project, prepared, tempPath, warnings})
     const fileName = `scene-${String(index + 1).padStart(2, '0')}.png`;
     const output = path.join(outputDir, fileName);
 
+    console.log(`[scene-stills] rendering ${index + 1}/${prepared.scenes.length}`);
     runRemotion([
       'still',
       'src/Root.tsx',
@@ -58,6 +60,7 @@ await withPreparedProject(input, async ({project, prepared, tempPath, warnings})
       path: path.relative(PROJECT_ROOT, output).split(path.sep).join('/'),
     });
     cursor = endFrame;
+    console.log(`[scene-stills] progress ${index + 1}/${prepared.scenes.length}`);
   }
 
   const manifest = {

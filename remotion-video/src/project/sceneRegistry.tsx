@@ -7,6 +7,7 @@ import { PRODUCT_ICON_KEYS } from "../components/ultimate-kit/families/skill-sho
 import type { CompiledAsset } from "./assetResolver";
 import type { CompiledProject, CompiledProjectScene } from "./compileProject";
 import { ProjectValidationError, formatProjectPath } from "./projectSchema";
+import { HeroLensSchema, HeroShotSchema } from "./visualPlan";
 
 const SkillIconSchema = z.enum(SKILL_ICON_KEYS);
 const ProductIconSchema = z.enum(PRODUCT_ICON_KEYS);
@@ -34,42 +35,6 @@ const SkillBeatShotPresetSchema = z.enum([
   "surface-morph",
   "system-convergence",
 ]);
-const HeroShotKindSchema = z.enum([
-  "browser-demo",
-  "terminal-execution",
-  "code-diff",
-  "config-check",
-  "interface-audit",
-  "flow-trace",
-  "test-report",
-  "asset-library",
-  "system-map",
-  "before-after",
-]);
-const HeroLensSchema = z
-  .object({
-    key: z.string().min(1).max(48),
-    objective: z.string().min(1).max(120),
-    actionLabel: z.string().min(1).max(48),
-    signal: z.string().min(1).max(48),
-    evidenceType: z.string().min(1).max(48),
-  })
-  .strict();
-const HeroShotSchema = z
-  .object({
-    kind: HeroShotKindSchema,
-    environment: z.string().min(1).max(48),
-    target: z.string().min(1).max(80),
-    before: z.string().min(1).max(80).optional(),
-    after: z.string().min(1).max(80).optional(),
-    command: z.string().min(1).max(80).optional(),
-    path: z.string().min(1).max(80).optional(),
-    log: z.string().min(1).max(100).optional(),
-    metric: z.string().min(1).max(32).optional(),
-    status: z.string().min(1).max(40).optional(),
-    evidence: z.array(z.string().min(1).max(64)).min(1).max(5),
-  })
-  .strict();
 const SceneEditorSchema = z
   .object({
     componentId: z.string().min(1).max(64),
@@ -79,6 +44,7 @@ const SceneEditorSchema = z
     componentLabel: z.string().min(1).max(80).optional(),
     componentCategory: z.string().min(1).max(32).optional(),
     orientation: z.enum(["portrait", "landscape"]).optional(),
+    componentDurationInFrames: z.number().int().positive().max(36000).optional(),
     backgroundPreset: z.string().min(1).max(64).optional(),
     blocks: z.array(z.enum(["background", "component", "caption"])).max(3).optional(),
     updatedAt: z.string().min(1).max(64).optional(),
@@ -166,6 +132,12 @@ const SkillShowcasePayloadSchema = z
                 cinematicPreset: SkillBeatShotPresetSchema.optional(),
                 lens: HeroLensSchema.optional(),
                 shot: HeroShotSchema.optional(),
+                componentId: z.string().min(1).max(64).optional(),
+                componentProps: z.record(z.string(), z.unknown()).optional(),
+                intent: z.record(z.string(), z.unknown()).optional(),
+                visualPlanEntryId: z.string().min(1).max(96).optional(),
+                resolution: z.enum(["matched", "fallback", "error"]).optional(),
+                diagnostics: z.array(z.record(z.string(), z.unknown())).optional(),
               })
               .strict(),
           )

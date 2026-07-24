@@ -1,7 +1,7 @@
 import type {
-  CreateProjectDraft, CreateProjectError, CreateProjectResult, JobDiagnostic,
+  CommandId, ComponentLibraryResponse, CreateProjectDraft, CreateProjectResult, JobDiagnostic,
   ProjectOption, ProjectState, RunnerJob, RunnerStatus, SceneStillsManifest, StudioFile,
-  VideoLibraryRecord,
+  UploadedAudioAsset, VideoLibraryRecord,
 } from './types';
 import type {ComponentLibraryItem} from './component-library-model';
 import {VideoProjectSchema, formatProjectPath} from '../../project/projectSchema';
@@ -15,12 +15,14 @@ declare global {
 export class StudioApiError extends Error {
   public readonly code: string | null;
   public readonly diagnostics: JobDiagnostic[];
+  public readonly path: string | null;
 
-  public constructor(message: string, code: string | null = null, diagnostics: JobDiagnostic[] = []) {
+  public constructor(message: string, code: string | null = null, diagnostics: JobDiagnostic[] = [], path: string | null = null) {
     super(message);
     this.name = 'StudioApiError';
     this.code = code;
     this.diagnostics = diagnostics;
+    this.path = path;
   }
 }
 
@@ -67,7 +69,7 @@ const runnerBase = () => {
 const responseError = async (response: Response) => {
   try {
     const body = await response.json();
-    throw new StudioApiError(body?.error || `HTTP ${response.status}`, body?.code || null, body?.diagnostics || []);
+    throw new StudioApiError(body?.error || `HTTP ${response.status}`, body?.code || null, body?.diagnostics || [], body?.path || null);
   } catch (error) {
     if (error instanceof StudioApiError) throw error;
     throw new StudioApiError(`HTTP ${response.status}`);
@@ -88,17 +90,18 @@ export async function postJson<T>(path: string, data: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export type {UploadedAudioAsset} from './types';
+
 export async function checkHealth(): Promise<RunnerStatus> {
   try { await fetchJson('/api/health'); return 'online'; } catch { return 'offline'; }
 }
 
 export async function loadProjects(): Promise<ProjectOption[]> {
-  try { return (await fetchJson<{projects: ProjectOption[]}>('/api/projects')).projects; } catch { return []; }
+  return (await fetchJson<{projects: ProjectOption[]}>('/api/projects')).projects;
 }
 
 export async function loadStudioFile(path: string): Promise<StudioFile> {
-  try { return (await fetchJson<{file: StudioFile}>(`/api/files?path=${encodeURIComponent(path)}`)).file; }
-  catch { return {path, exists: false, data: null, error: 'failed to load'}; }
+  return (await fetchJson<{file: StudioFile}>(`/api/files?path=${encodeURIComponent(path)}`)).file;
 }
 
 export async function loadProjectState(projectId: string): Promise<ProjectState> {
@@ -127,7 +130,7 @@ export interface RemoteComponentLibraryResult {
 }
 
 export async function loadRemoteComponentLibrary(): Promise<RemoteComponentLibraryResult> {
-  const payload = await fetchJson<RemoteComponentLibraryResult & {ok: boolean}>('/api/component-library');
+  const payload = await fetchJson<ComponentLibraryResponse>('/api/component-library');
   return {
     available: payload.available,
     sourceRoot: payload.sourceRoot,
@@ -144,10 +147,11 @@ export async function loadSceneStillsManifest(path: string | undefined): Promise
   if (!path) return null;
   try {
     const manifest = await fetchJson<SceneStillsManifest>(`/api/artifact?path=${encodeURIComponent(path)}`);
+    const version = manifest.generatedAt || String(Date.now());
     return {
       ...manifest,
       scenes: Array.isArray(manifest.scenes)
-        ? manifest.scenes.map((scene) => ({...scene, url: artifactUrl(scene.path)}))
+        ? manifest.scenes.map((scene) => ({...scene, url: artifactUrl(scene.path, `${version}:${scene.frame}`)}))
         : [],
     };
   } catch {
@@ -155,12 +159,24 @@ export async function loadSceneStillsManifest(path: string | undefined): Promise
   }
 }
 
+export async function uploadProjectAudio(project: ProjectOption, file: File): Promise<UploadedAudioAsset> {
+  const url = new URL(`/api/projects/${encodeURIComponent(project.id)}/audio`, runnerBase());
+  url.searchParams.set('filename', file.name || 'voice.m4a');
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {'content-type': file.type || 'application/octet-stream'},
+    body: file,
+  });
+  if (!response.ok) await responseError(response);
+  return (await response.json() as {audio: UploadedAudioAsset}).audio;
+}
+
 export async function saveFile(path: string, data: unknown): Promise<StudioFile> {
   return (await postJson<{file: StudioFile}>('/api/files', {path, data})).file;
 }
 
 export async function startJob(
-  commandId: string,
+  commandId: CommandId,
   label: string,
   project: ProjectOption,
   files?: Array<{path: string; data: unknown}>,
@@ -187,12 +203,8 @@ export const artifactUrl = (path: string, version?: string | null) => {
   return url.toString();
 };
 export const runnerBaseUrl = runnerBase;
+export const videoLibraryDownloadUrl = (recordId: string) => new URL(`/api/video-library/${encodeURIComponent(recordId)}/download`, runnerBase()).toString();
 
 export async function createProject(draft: CreateProjectDraft): Promise<CreateProjectResult> {
-  try { return await postJson<CreateProjectResult>('/api/projects', draft); }
-  catch (error) {
-    const apiError = error as StudioApiError;
-    const result: CreateProjectError = {ok: false, error: apiError.message};
-    throw result;
-  }
+  return postJson<CreateProjectResult>('/api/projects', draft);
 }

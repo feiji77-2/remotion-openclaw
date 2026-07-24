@@ -17,7 +17,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-VIDEO_FACTORY_PORT=$PORT VIDEO_FACTORY_RUNTIME_DIR="runtime/e2e-$TEST_ID" node "$PROJECT_ROOT/scripts/tools-studio-server.mjs" &
+VIDEO_FACTORY_SKIP_TTS=1 VIDEO_FACTORY_PORT=$PORT VIDEO_FACTORY_RUNTIME_DIR="runtime/e2e-$TEST_ID" node "$PROJECT_ROOT/scripts/tools-studio-server.mjs" &
 SERVER_PID=$!
 for _ in $(seq 1 30); do
   curl -sf "$HOST/api/health" >/dev/null 2>&1 && break
@@ -41,8 +41,10 @@ node --input-type=module -e '
   if (!project.scenes.length || !project.scenes.every((scene) => scene.family === "skill-showcase" && scene.payload.heroStyle === "hero-track-v2")) throw new Error("renderer contract mismatch");
 ' "$TEST_DIR/project.json"
 
-node --input-type=module - "$HOST" "$TEST_ID" <<'NODE'
-const [base, id] = process.argv.slice(2);
+node --input-type=module - "$HOST" "$TEST_ID" "$TEST_DIR" <<'NODE'
+import fs from 'node:fs';
+
+const [base, id, testDir] = process.argv.slice(2);
 const project = {
   id,
   title: '控制台主链路验证',
@@ -66,6 +68,7 @@ const startJob = async (commandId, target = project) => {
   if (result.status !== 202 || !result.payload?.job?.id) throw new Error(`${commandId} did not start: ${JSON.stringify(result)}`);
   return result.payload.job;
 };
+const readContract = (file) => JSON.parse(fs.readFileSync(`${testDir}/${file}`, 'utf8'));
 const pollJob = async (jobId, timeoutMs = 180000) => {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -75,6 +78,19 @@ const pollJob = async (jobId, timeoutMs = 180000) => {
   }
   throw new Error(`job ${jobId} timed out`);
 };
+
+const componentLibrary = await request('/api/component-library');
+if (componentLibrary.status !== 200 || !Array.isArray(componentLibrary.payload.components)) {
+  throw new Error(`component library contract failed: ${JSON.stringify(componentLibrary)}`);
+}
+const productionComponents = componentLibrary.payload.components.filter((component) => component.source === 'project');
+const hyperframesComponents = componentLibrary.payload.components.filter((component) => component.source === 'hyperframes');
+if (productionComponents.length < 12 || !productionComponents.every((component) => component.productionReady === true && component.renderer?.componentId)) {
+  throw new Error('production component descriptors were not exposed as usable renderers');
+}
+if (!hyperframesComponents.every((component) => component.productionReady === false && component.renderer === null)) {
+  throw new Error('preview-only HyperFrames components were exposed as production renderers');
+}
 
 const prematureRender = await post('/api/jobs', {commandId: 'render-verify', label: 'premature render', project});
 if (prematureRender.status !== 409 || prematureRender.payload.code !== 'project_not_checked') {
@@ -104,8 +120,27 @@ if (!failedBuild.diagnostics?.some((diagnostic) => diagnostic.code === 'command_
 }
 
 const built = await pollJob((await startJob('build-check')).id);
-if (built.status !== 'done' || built.steps.map((step) => step.status).join(',') !== 'done,done') {
+if (built.status !== 'done' || built.steps.map((step) => step.status).join(',') !== 'done,done,done,done,done') {
   throw new Error(`build-check workflow failed: ${JSON.stringify(built)}`);
+}
+const builtAssetPack = readContract('asset-pack.json');
+const alignedCaptions = readContract('captions.json');
+const builtProject = readContract('project.json');
+const expectedVoiceSrc = `projects/${id}/audio/voice.m4a`;
+if (!builtAssetPack.assets?.some((asset) => asset.id === 'voiceover' && asset.kind === 'audio' && asset.src === expectedVoiceSrc)) {
+  throw new Error(`build-check did not register voiceover asset: ${JSON.stringify(builtAssetPack)}`);
+}
+if (builtProject.audio?.voiceAssetId !== 'voiceover' || builtProject.assets?.voiceover?.src !== expectedVoiceSrc) {
+  throw new Error(`build-check did not rebuild project with voiceover: ${JSON.stringify({audio: builtProject.audio, assets: builtProject.assets})}`);
+}
+if (!alignedCaptions.length || builtProject.captions.at(-1)?.endMs !== alignedCaptions.at(-1)?.endMs) {
+  throw new Error(`build-check did not rebuild project from aligned captions: ${JSON.stringify({aligned: alignedCaptions.at(-1), project: builtProject.captions?.at(-1)})}`);
+}
+if (!builtProject.visualPlan?.entries?.length || builtProject.visualPlan.generatedFrom !== 'captions') {
+  throw new Error('build-check did not produce a caption-driven Visual Plan');
+}
+if (!builtProject.visualPlan.entries.every((entry) => entry.resolution === 'matched' && entry.componentId && entry.shot?.kind)) {
+  throw new Error('build-check produced unresolved Visual Plan entries');
 }
 const afterBuild = await request(`/api/projects/${id}/state`);
 if (afterBuild.status !== 200 || afterBuild.payload.state.stages.project.status !== 'current' || afterBuild.payload.state.deliveryReady !== false) {

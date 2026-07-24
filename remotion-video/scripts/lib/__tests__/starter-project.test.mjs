@@ -98,6 +98,30 @@ describe("buildStarterProject", () => {
     );
     expect(project.render.captionStyle).toBe("editorial");
   });
+
+  it("attaches voiceover assets when the production pack provides audio", () => {
+    const project = buildStarterProject(
+      "starter",
+      "生成链路",
+      SCRIPT,
+      "portrait",
+      "cyan-tech",
+      "生成,视频",
+      {
+        voiceSrc: "projects/starter/audio/voice.m4a",
+        projectRoot: path.resolve(
+          path.dirname(fileURLToPath(import.meta.url)),
+          "../../..",
+        ),
+      },
+    );
+    expect(project.audio).toEqual({ voiceAssetId: "voiceover" });
+    expect(project.assets.voiceover).toMatchObject({
+      kind: "audio",
+      src: "projects/starter/audio/voice.m4a",
+      required: true,
+    });
+  });
 });
 
 describe("production packs", () => {
@@ -178,6 +202,153 @@ describe("production packs", () => {
             && scene.payload.heroStyle === "hero-track-v2",
         ),
       ).toBe(true);
+    } finally {
+      rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  it("carries production-pack audio into project.json", () => {
+    const projectRoot = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../../..",
+    );
+    const fixtureDir = mkdtempSync(path.join(tmpdir(), "project-pack-audio-"));
+    try {
+      writeFileSync(
+        path.join(fixtureDir, "brief.json"),
+        JSON.stringify({
+          productionId: "pack-audio",
+          title: "Pack Audio",
+          visualStyle: { presetId: "cyan-tech" },
+        }),
+      );
+      writeFileSync(
+        path.join(fixtureDir, "script-pack.json"),
+        JSON.stringify({
+          productionId: "pack-audio",
+          title: "Pack Audio",
+          spokenScript: SCRIPT,
+          keywords: "生成,视频",
+        }),
+      );
+      writeFileSync(
+        path.join(fixtureDir, "asset-pack.json"),
+        JSON.stringify({
+          assets: [
+            {
+              id: "voiceover",
+              kind: "audio",
+              src: "projects/pack-audio/audio/voice.m4a",
+              required: true,
+            },
+          ],
+        }),
+      );
+
+      const result = spawnSync(
+        process.execPath,
+        [
+          path.join(projectRoot, "scripts/build-project-from-production.mjs"),
+          fixtureDir,
+        ],
+        { cwd: projectRoot, encoding: "utf8" },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      const project = JSON.parse(
+        readFileSync(path.join(fixtureDir, "project.json"), "utf8"),
+      );
+      expect(project.audio).toEqual({ voiceAssetId: "voiceover" });
+      expect(project.assets.voiceover).toMatchObject({
+        kind: "audio",
+        src: "projects/pack-audio/audio/voice.m4a",
+        required: true,
+      });
+    } finally {
+      rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rebuilds from explicitly aligned captions when provided", () => {
+    const projectRoot = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../../..",
+    );
+    const fixtureDir = mkdtempSync(path.join(tmpdir(), "project-pack-captions-"));
+    const alignedCaptions = [
+      {
+        text: "真实音频第一拍。",
+        startMs: 0,
+        endMs: 720,
+        timestampMs: 0,
+        confidence: null,
+      },
+      {
+        text: "真实音频第二拍。",
+        startMs: 720,
+        endMs: 1880,
+        timestampMs: 720,
+        confidence: null,
+      },
+    ];
+    try {
+      writeFileSync(
+        path.join(fixtureDir, "brief.json"),
+        JSON.stringify({
+          productionId: "pack-captions",
+          title: "Pack Captions",
+          visualStyle: { presetId: "cyan-tech" },
+        }),
+      );
+      writeFileSync(
+        path.join(fixtureDir, "script-pack.json"),
+        JSON.stringify({
+          productionId: "pack-captions",
+          title: "Pack Captions",
+          spokenScript: "真实音频第一拍。真实音频第二拍。这条稿子用于检查时间码驱动画面。",
+          keywords: "生成,视频",
+        }),
+      );
+      writeFileSync(
+        path.join(fixtureDir, "asset-pack.json"),
+        JSON.stringify({
+          assets: [
+            {
+              id: "voiceover",
+              kind: "audio",
+              src: "projects/pack-captions/audio/voice.m4a",
+              required: true,
+            },
+          ],
+        }),
+      );
+      writeFileSync(
+        path.join(fixtureDir, "captions.json"),
+        JSON.stringify(alignedCaptions),
+      );
+
+      const result = spawnSync(
+        process.execPath,
+        [
+          path.join(projectRoot, "scripts/build-project-from-production.mjs"),
+          fixtureDir,
+          "--captions",
+          "captions.json",
+        ],
+        { cwd: projectRoot, encoding: "utf8" },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      const project = JSON.parse(
+        readFileSync(path.join(fixtureDir, "project.json"), "utf8"),
+      );
+      expect(project.captions).toEqual(alignedCaptions);
+      expect(project.scenes[0].captionRange).toEqual({ startIndex: 0, endIndex: 1 });
+      expect(project.scenes[0].durationInFrames).toBe(56);
+      expect(project.scenes[0].payload.beats[0]).toMatchObject({
+        captionStartIndex: 0,
+        captionEndIndex: 0,
+        startFrame: 0,
+        endFrame: 22,
+      });
     } finally {
       rmSync(fixtureDir, { recursive: true, force: true });
     }

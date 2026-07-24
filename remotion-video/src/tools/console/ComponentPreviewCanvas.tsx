@@ -1,4 +1,5 @@
 import React from 'react';
+import {ProductionComponentPreview} from '../../components/ultimate-kit/families/skill-showcase/HeroTrackV2';
 import type {ComponentCategory, ComponentLibraryItem} from './component-library-model';
 import {componentPreviewLabel, orientationLabel} from './component-library-model';
 
@@ -50,7 +51,9 @@ export const ComponentPreviewCanvas: React.FC<{component: ComponentLibraryItem |
       <span>{component.previewUrl ? '样片播放中' : componentPreviewLabel(component)}</span>
     </div>
     <div className={`component-preview-frame is-${component.orientation}`}>
-      {component.previewUrl ? <video
+      {component.productionReady && component.renderer ? <div className="component-production-preview">
+        <ProductionComponentPreview componentId={component.renderer.componentId} />
+      </div> : component.previewUrl ? <video
         key={component.id}
         src={component.previewUrl}
         autoPlay

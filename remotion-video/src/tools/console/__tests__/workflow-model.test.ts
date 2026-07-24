@@ -4,6 +4,7 @@ import {
   invalidateProductionArtifacts,
   navigationState,
   requestCopyTransfer,
+  shouldBuildBeforeFirstSceneOverride,
   usesSceneTimeline,
   usesWideEditor,
   type WorkflowSnapshot,
@@ -13,6 +14,7 @@ import {
 const baseSnapshot: WorkflowSnapshot = {
   hasProject: true,
   scriptReady: false,
+  voiceReady: false,
   styleReady: false,
   projectStatus: 'missing',
   previewStatus: 'missing',
@@ -22,12 +24,12 @@ const baseSnapshot: WorkflowSnapshot = {
 
 describe('console workflow navigation', () => {
   it('shows the scene timeline only where a scene can be selected for review or output', () => {
-    expect(['copy', 'script', 'style', 'preview', 'components'].every((step) => !usesSceneTimeline(step as WorkflowStepId))).toBe(true);
+    expect(['copy', 'script', 'voice', 'style', 'preview', 'components'].every((step) => !usesSceneTimeline(step as WorkflowStepId))).toBe(true);
     expect(['storyboard', 'render', 'deliver'].every((step) => usesSceneTimeline(step as WorkflowStepId))).toBe(true);
   });
 
   it('uses a wide editor without the preview pane for non-render editing steps', () => {
-    expect(['copy', 'script', 'style'].every((step) => usesWideEditor(step as WorkflowStepId))).toBe(true);
+    expect(['copy', 'script', 'voice', 'style'].every((step) => usesWideEditor(step as WorkflowStepId))).toBe(true);
     expect(['storyboard', 'preview', 'render', 'deliver', 'components'].every((step) => !usesWideEditor(step as WorkflowStepId))).toBe(true);
   });
 
@@ -35,7 +37,8 @@ describe('console workflow navigation', () => {
     const state = navigationState(baseSnapshot);
     expect(state.copy).toMatchObject({enabled: true, reason: null});
     expect(state.script).toMatchObject({enabled: true, reason: null});
-    expect(state.style).toMatchObject({enabled: false, reason: '等待口播文案'});
+    expect(state.voice).toMatchObject({enabled: false, reason: '等待保存口播文案'});
+    expect(state.style).toMatchObject({enabled: false, reason: '等待语音'});
     expect(state.storyboard).toMatchObject({enabled: false, reason: '等待应用风格'});
     expect(state.preview).toMatchObject({enabled: false, reason: '已移至渲染'});
     expect(state.render).toMatchObject({enabled: false, reason: '等待应用风格'});
@@ -46,6 +49,7 @@ describe('console workflow navigation', () => {
     const state = navigationState({
       ...baseSnapshot,
       scriptReady: true,
+      voiceReady: true,
       styleReady: true,
       projectStatus: 'stale',
     });
@@ -54,10 +58,21 @@ describe('console workflow navigation', () => {
     expect(state.render).toMatchObject({enabled: true, reason: null});
   });
 
+  it('keeps voice locked until the spoken script is explicitly saved', () => {
+    const state = navigationState({
+      ...baseSnapshot,
+      scriptDraftReady: true,
+      scriptReady: false,
+    });
+    expect(state.voice).toMatchObject({enabled: false, reason: '等待保存口播文案'});
+    expect(state.style).toMatchObject({enabled: false, reason: '等待语音'});
+  });
+
   it('opens each production stage only after its evidence exists', () => {
     const state = navigationState({
       ...baseSnapshot,
       scriptReady: true,
+      voiceReady: true,
       styleReady: true,
       projectStatus: 'current',
       previewStatus: 'current',
@@ -86,6 +101,15 @@ describe('current preview', () => {
       verifyStatus: 'stale',
       deliveryReady: false,
     });
+  });
+});
+
+describe('manual scene overrides', () => {
+  it('rebuilds stale production inputs before attaching the first override', () => {
+    expect(shouldBuildBeforeFirstSceneOverride('stale', false)).toBe(true);
+    expect(shouldBuildBeforeFirstSceneOverride('missing', false)).toBe(true);
+    expect(shouldBuildBeforeFirstSceneOverride('current', false)).toBe(false);
+    expect(shouldBuildBeforeFirstSceneOverride('stale', true)).toBe(false);
   });
 });
 

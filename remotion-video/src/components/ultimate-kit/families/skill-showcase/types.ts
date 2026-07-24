@@ -29,6 +29,13 @@ export type SkillShowcaseNarrativeSignal = {
 
 import type { SkillIconKey } from "./iconRegistry";
 import type { ProductIconKey } from "./productIcons";
+import type {
+  HeroLens,
+  HeroShot,
+  ProductionComponentProps,
+  SemanticIntent,
+  VisualPlanDiagnostic,
+} from "../../../../project/visualPlan";
 
 export type { SkillIconKey } from "./iconRegistry";
 export type { ProductIconKey } from "./productIcons";
@@ -70,39 +77,8 @@ export type SkillBeatShotPreset =
 
 export type SkillShowcaseHeroStyle = "cinematic" | "hero-track-v2";
 
-export type HeroShotKind =
-  | "browser-demo"
-  | "terminal-execution"
-  | "code-diff"
-  | "config-check"
-  | "interface-audit"
-  | "flow-trace"
-  | "test-report"
-  | "asset-library"
-  | "system-map"
-  | "before-after";
-
-export type HeroLens = {
-  key: string;
-  objective: string;
-  actionLabel: string;
-  signal: string;
-  evidenceType: string;
-};
-
-export type HeroShot = {
-  kind: HeroShotKind;
-  environment: string;
-  target: string;
-  before?: string;
-  after?: string;
-  command?: string;
-  path?: string;
-  log?: string;
-  metric?: string;
-  status?: string;
-  evidence: string[];
-};
+export type {HeroLens, HeroShot} from "../../../../project/visualPlan";
+export type HeroShotKind = HeroShot["kind"];
 
 export type HeroTrackKind =
   | "overview-matrix"
@@ -131,6 +107,13 @@ export type HeroTrackState = {
   lens?: HeroLens;
   /** Director shot: how the top Hero area shows concrete operation evidence. */
   shot?: HeroShot;
+  /** Canonical production component selected by the caption-driven Visual Plan. */
+  componentId?: string;
+  componentProps?: ProductionComponentProps;
+  intent?: SemanticIntent;
+  visualPlanEntryId?: string;
+  resolution?: "matched" | "fallback" | "error";
+  diagnostics?: VisualPlanDiagnostic[];
 };
 
 export type HeroTrack = {
@@ -192,6 +175,7 @@ export interface SkillShowcaseProps {
     componentLabel?: string;
     componentCategory?: string;
     orientation?: "portrait" | "landscape";
+    componentDurationInFrames?: number;
     backgroundPreset?: string;
     blocks?: Array<"background" | "component" | "caption">;
     updatedAt?: string;

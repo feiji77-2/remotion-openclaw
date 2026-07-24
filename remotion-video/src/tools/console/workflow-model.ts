@@ -1,16 +1,20 @@
 import type {StageStatus} from './types';
 
-export type WorkflowStepId = 'copy' | 'script' | 'style' | 'storyboard' | 'preview' | 'render' | 'deliver' | 'components';
+export type WorkflowStepId = 'copy' | 'script' | 'voice' | 'style' | 'storyboard' | 'preview' | 'render' | 'deliver' | 'components';
 
 const sceneTimelineSteps = new Set<WorkflowStepId>(['storyboard', 'render', 'deliver']);
-const wideEditorSteps = new Set<WorkflowStepId>(['copy', 'script', 'style']);
+const wideEditorSteps = new Set<WorkflowStepId>(['copy', 'script', 'voice', 'style']);
 
 export const usesSceneTimeline = (step: WorkflowStepId) => sceneTimelineSteps.has(step);
 export const usesWideEditor = (step: WorkflowStepId) => wideEditorSteps.has(step);
+export const shouldBuildBeforeFirstSceneOverride = (projectStatus: StageStatus, hasSceneOverrides: boolean) =>
+  projectStatus !== 'current' && !hasSceneOverrides;
 
 export interface WorkflowSnapshot {
   hasProject: boolean;
+  scriptDraftReady?: boolean;
   scriptReady: boolean;
+  voiceReady: boolean;
   styleReady: boolean;
   projectStatus: StageStatus;
   previewStatus: StageStatus;
@@ -32,7 +36,8 @@ const entry = (enabled: boolean, reason: string): NavigationEntry => ({
 
 export const navigationState = (snapshot: WorkflowSnapshot): NavigationState => {
   const hasScript = snapshot.hasProject && snapshot.scriptReady;
-  const hasStyle = hasScript && snapshot.styleReady;
+  const hasVoice = hasScript && snapshot.voiceReady;
+  const hasStyle = hasVoice && snapshot.styleReady;
   const hasStoryboard = hasStyle && snapshot.projectStatus === 'current';
   const canRender = hasStyle;
   const hasRender = canRender && snapshot.renderStatus === 'current';
@@ -40,7 +45,8 @@ export const navigationState = (snapshot: WorkflowSnapshot): NavigationState => 
   return {
     copy: entry(snapshot.hasProject, '请先新建视频'),
     script: entry(snapshot.hasProject, '请先新建视频'),
-    style: entry(hasScript, '等待口播文案'),
+    voice: entry(hasScript, '等待保存口播文案'),
+    style: entry(hasVoice, '等待语音'),
     storyboard: entry(hasStyle, '等待应用风格'),
     preview: entry(false, '已移至渲染'),
     render: entry(canRender, '等待应用风格'),

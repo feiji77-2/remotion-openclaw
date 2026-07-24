@@ -119,6 +119,58 @@ describe('buildSkillShowcaseProjectFromScript', () => {
     expect(states.every((state) => state.lens && state.shot)).toBe(true);
   });
 
+  it('keeps beat frames locked to captions even when aligned audio contains a short pause', () => {
+    const captions = [
+      {text: '第一句先建立画面。', startMs: 0, endMs: 1000},
+      {text: '第二句中间有一点真实停顿。', startMs: 1300, endMs: 2100},
+      {text: '第三句继续说明操作结果。', startMs: 2100, endMs: 3000},
+    ];
+    const project = buildSkillShowcaseProjectFromScript({
+      projectId: 'caption-gap-beat-binding',
+      title: '字幕停顿绑定测试',
+      projectRoot: process.cwd(),
+      captions,
+      maxScenes: 1,
+    });
+
+    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).not.toThrow();
+    const beats = project.scenes[0].payload.beats;
+    expect(beats[1]).toMatchObject({
+      captionStartIndex: 1,
+      captionEndIndex: 1,
+      startFrame: 39,
+      endFrame: 63,
+    });
+  });
+
+  it('merges punctuation-only aligned captions before generating visual beats', () => {
+    const project = buildSkillShowcaseProjectFromScript({
+      projectId: 'punctuation-caption-binding',
+      title: '纯标点字幕测试',
+      projectRoot: process.cwd(),
+      scriptText: '第一句建立主题。第二句解释原因。第三句给出结论。',
+      captions: [
+        {text: '。', startMs: 0, endMs: 120},
+        {text: '第一句建立主题', startMs: 120, endMs: 1000},
+        {text: '。', startMs: 1000, endMs: 1150},
+        {text: '第二句解释原因', startMs: 1150, endMs: 2000},
+        {text: '。', startMs: 2000, endMs: 2140},
+        {text: '第三句给出结论', startMs: 2140, endMs: 3000},
+        {text: '。', startMs: 3000, endMs: 3180},
+      ],
+      maxScenes: 1,
+    });
+
+    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).not.toThrow();
+    expect(project.captions).toEqual([
+      expect.objectContaining({text: '。第一句建立主题。', startMs: 0, endMs: 1150}),
+      expect.objectContaining({text: '第二句解释原因。', startMs: 1150, endMs: 2140}),
+      expect.objectContaining({text: '第三句给出结论。', startMs: 2140, endMs: 3180}),
+    ]);
+    const beats = project.scenes.flatMap((scene) => scene.payload.beats);
+    expect(beats.every((beat) => !/^要点\s+\d+$/.test(beat.keyword))).toBe(true);
+  });
+
   it('rejects Hero tracks that leave generated captions without a visual state', () => {
     const project = buildSkillShowcaseProjectFromScript({
       projectId: 'hero-caption-coverage-contract',
@@ -135,6 +187,49 @@ describe('buildSkillShowcaseProjectFromScript', () => {
 
     expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).toThrow(
       'payload.heroTrack.states must cover the full hero track caption range',
+    );
+  });
+
+  it('excludes editor provenance from stale rendered-copy checks', () => {
+    const project = buildSkillShowcaseProjectFromScript({
+      projectId: 'component-provenance-contract',
+      title: '组件来源元数据测试',
+      projectRoot: process.cwd(),
+      scriptText: '这段口播只讲组件来源元数据不应进入画面文案检查。',
+      maxScenes: 1,
+    });
+    project.scenes[0].payload.sceneEditor = {
+      componentId: 'hf:metric-pulse',
+      source: 'hyperframes',
+      sourceComponentId: 'metric-pulse',
+      rendererComponentId: 'data-proof',
+      componentLabel: 'HyperFrames Metric Pulse',
+    };
+
+    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).not.toThrow();
+    project.scenes[0].payload.title = 'HyperFrames Metric Pulse';
+    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).toThrow(
+      'stale golden-sample term not present in narration: HyperFrames',
+    );
+  });
+
+  it('ignores internal icon identifiers when auditing stale golden sample copy', () => {
+    const project = buildSkillShowcaseProjectFromScript({
+      projectId: 'icon-metadata-contract',
+      title: 'Mo 图标元数据测试',
+      projectRoot: process.cwd(),
+      scriptText: '第二个Mo，它让你用写网页的方式写视频，一段react代码就是一帧画面。',
+      maxScenes: 1,
+    });
+
+    expect(project.scenes[0].payload.productIcon).toBe('remotion');
+    expect(project.scenes[0].payload.brandIcon).toBe('remotion');
+    expect(project.scenes[0].payload.productIcons).toContain('remotion');
+    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).not.toThrow();
+
+    project.scenes[0].payload.headline = 'Remotion';
+    expect(() => assertVisualContract(project, {projectRoot: process.cwd()})).toThrow(
+      'stale golden-sample term not present in narration: Remotion',
     );
   });
 });
